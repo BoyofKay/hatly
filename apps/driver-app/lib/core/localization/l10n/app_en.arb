@@ -1,0 +1,20 @@
+{
+  "@@locale": "en",
+  "appName": "Hatly Driver",
+  "goOnline": "Go online",
+  "goOffline": "Go offline",
+  "incomingRequest": "New delivery request",
+  "accept": "Accept",
+  "reject": "Reject",
+  "pickupDetails": "Pickup details",
+  "customerDetails": "Customer details",
+  "navigate": "Start navigation",
+  "markPickedUp": "Mark picked up",
+  "markOnTheWay": "Mark on the way",
+  "markDelivered": "Mark delivered",
+  "earnings": "Earnings",
+  "completedDeliveries": "Completed deliveries",
+  "wallet": "Wallet",
+  "profile": "Profile",
+  "login": "Log in"
+}

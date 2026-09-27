@@ -1,0 +1,276 @@
+import 'package:flutter/material.dart';
+import '../../../../core/localization/l10n/app_localizations.dart';
+import '../../../../core/theme/hatly_theme.dart';
+import '../../../../core/utils/money_formatter.dart';
+import '../../../../shared_widgets/hatly_badge.dart';
+import '../../../../shared_widgets/hatly_quantity_control.dart';
+import '../../../../shared_widgets/hatly_soft_image.dart';
+import '../../../../shared_widgets/ltr_text.dart';
+import '../../domain/cart.dart';
+
+/// One cart line, built only from the real cart-item fields. Visual priority: product image, name, the
+/// selected options (no space is reserved when there are none), the quantity, then the price.
+///
+/// Quantity keeps the existing rules: pieces use `onQuantityChanged`; weighted items step in 100g through
+/// `onWeightChanged` (never below 100g, and capped by known stock for a TRACKED item); a custom-request /
+/// ad-hoc line shows its quantity as text only. While a mutation for this line is running, [busy] disables
+/// its controls (no duplicate taps) and shows a small spinner — the rest of the cart stays usable.
+///
+/// "تعديل" only navigates (the caller opens Product Details): the backend cannot change options on an
+/// existing line, so nothing here pretends to edit in place.
+class CartItemRow extends StatelessWidget {
+  const CartItemRow({
+    super.key,
+    required this.item,
+    required this.onQuantityChanged,
+    required this.onWeightChanged,
+    required this.onRemove,
+    this.onEdit,
+    this.busy = false,
+    this.isCustomRequest = false,
+  });
+
+  final CartItem item;
+  final ValueChanged<int> onQuantityChanged;
+  final ValueChanged<int> onWeightChanged;
+  final VoidCallback onRemove;
+
+  /// Null when the line has no product to open (custom / ad-hoc requests).
+  final VoidCallback? onEdit;
+  final bool busy;
+  final bool isCustomRequest;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final p = context.palette;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final name = isArabic && item.productNameAr != null
+        ? item.productNameAr!
+        : (item.productName ?? item.freeTextDescription ?? '');
+    final options = item.selectedOptionValues
+        .map((v) => isArabic && v.nameAr != null ? v.nameAr! : v.name)
+        .join('، ');
+    final unit = item.isWeighted ? ' /kg' : '';
+
+    return Opacity(
+      opacity: item.isAvailable ? 1 : 0.6,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: HatlySpacing.ms),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Decorative: the name next to it already says what it is.
+                ExcludeSemantics(
+                  child: HatlySoftImage(
+                    url: item.productImageUrl,
+                    width: 72,
+                    height: 72,
+                    placeholderIcon: Icons.shopping_basket_outlined,
+                  ),
+                ),
+                const SizedBox(width: HatlySpacing.ms),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.type.body.copyWith(
+                              color: p.textPrimary,
+                              fontWeight: FontWeight.w700)),
+                      if (options.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(options, style: context.type.small),
+                        ),
+                      if (isCustomRequest ||
+                          item.hasFlashSale ||
+                          !item.isAvailable)
+                        Padding(
+                          padding: const EdgeInsets.only(top: HatlySpacing.xs),
+                          child: Wrap(
+                            spacing: HatlySpacing.sm,
+                            runSpacing: HatlySpacing.xs,
+                            children: [
+                              if (isCustomRequest)
+                                HatlyBadge(
+                                    kind: HatlyBadgeKind.bundle,
+                                    label: l10n.cartCustomRequestBadge),
+                              if (item.hasFlashSale)
+                                HatlyBadge(
+                                    kind: HatlyBadgeKind.flashSale,
+                                    label: l10n.badgeFlashSale),
+                              if (!item.isAvailable)
+                                HatlyBadge(
+                                    kind: HatlyBadgeKind.unavailable,
+                                    label: l10n.cartItemNoLongerAvailable),
+                            ],
+                          ),
+                        ),
+                      if (isCustomRequest && item.imageUrls.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: HatlySpacing.sm),
+                          child: Wrap(
+                            spacing: HatlySpacing.sm,
+                            children: [
+                              for (final url in item.imageUrls)
+                                ExcludeSemantics(
+                                  child: HatlySoftImage(
+                                      url: url,
+                                      width: 40,
+                                      height: 40,
+                                      radius: HatlyRadius.chip),
+                                ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: HatlySpacing.xs),
+                      _Price(item: item, unit: unit),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: HatlySpacing.sm),
+            // A Wrap (not a Row): with a wide weight control, large text or a narrow screen the actions
+            // drop to the next line instead of overflowing.
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: HatlySpacing.xs,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(child: _quantity(context, l10n, p)),
+                    if (busy) ...[
+                      const SizedBox(width: HatlySpacing.sm),
+                      Semantics(
+                        label: l10n.cartItemUpdating,
+                        liveRegion: true,
+                        child: SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: p.accent),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onEdit != null)
+                      TextButton(
+                        onPressed: busy ? null : onEdit,
+                        style: TextButton.styleFrom(
+                            minimumSize: const Size(
+                                HatlyTouch.minTarget, HatlyTouch.minTarget),
+                            foregroundColor: p.link),
+                        child: Text(l10n.cartEditItem,
+                            style: context.type.small.copyWith(
+                                color: p.link, fontWeight: FontWeight.w700)),
+                      ),
+                    Semantics(
+                      button: true,
+                      enabled: !busy,
+                      label: l10n.cartRemoveItem,
+                      excludeSemantics: true,
+                      onTap: busy ? null : onRemove,
+                      child: IconButton(
+                        onPressed: busy ? null : onRemove,
+                        tooltip: l10n.cartRemoveItem,
+                        constraints: const BoxConstraints(
+                            minWidth: HatlyTouch.minTarget,
+                            minHeight: HatlyTouch.minTarget),
+                        icon: Icon(Icons.delete_outline_rounded,
+                            color: busy ? p.textMuted : p.textPrimary,
+                            size: 22),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _quantity(
+      BuildContext context, AppLocalizations l10n, HatlyPalette p) {
+    if (item.isAdHoc) {
+      return LtrText('×${item.quantity}', style: context.type.small);
+    }
+    if (item.isWeighted) {
+      final grams = item.requestedWeightGrams ?? 0;
+      final maxGrams = item.isTracked ? item.availableQuantity : null;
+      final atMax = maxGrams != null && grams >= maxGrams;
+      return HatlyQuantityControl(
+        valueLabel: '${(grams / 1000).toStringAsFixed(2)} kg',
+        decreaseTooltip: l10n.quantityDecrease,
+        increaseTooltip: l10n.quantityIncrease,
+        onDecrease:
+            busy || grams <= 100 ? null : () => onWeightChanged(grams - 100),
+        onIncrease: busy || atMax ? null : () => onWeightChanged(grams + 100),
+      );
+    }
+    final maxQuantity =
+        item.isTracked ? (item.availableQuantity ?? 0).clamp(0, 50) : 50;
+    return HatlyQuantityControl(
+      valueLabel: '${item.quantity}',
+      decreaseTooltip: l10n.quantityDecrease,
+      increaseTooltip: l10n.quantityIncrease,
+      onDecrease: busy || item.quantity <= 1
+          ? null
+          : () => onQuantityChanged(item.quantity - 1),
+      onIncrease: busy || item.quantity >= maxQuantity
+          ? null
+          : () => onQuantityChanged(item.quantity + 1),
+    );
+  }
+}
+
+class _Price extends StatelessWidget {
+  const _Price({required this.item, required this.unit});
+
+  final CartItem item;
+  final String unit;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final p = context.palette;
+    final line = item.lineTotalMinor;
+
+    if (line == null) {
+      // The backend uses null for "not priced yet" — never shown as 0 or blank.
+      return Text(l10n.cartCustomRequestPricePending,
+          style: context.type.small);
+    }
+    if (item.hasOfferPreview) {
+      return Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: HatlySpacing.sm,
+        children: [
+          LtrText(formatMinorUnits(item.payableLineTotalMinor ?? line, context),
+              style: context.type.body
+                  .copyWith(color: p.success, fontWeight: FontWeight.w800)),
+          LtrText(formatMinorUnits(line, context),
+              style: context.type.caption
+                  .copyWith(decoration: TextDecoration.lineThrough)),
+        ],
+      );
+    }
+    return LtrText(formatMinorUnits(line, context),
+        style: context.type.body
+            .copyWith(color: p.textPrimary, fontWeight: FontWeight.w800));
+  }
+}

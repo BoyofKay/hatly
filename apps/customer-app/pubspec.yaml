@@ -1,0 +1,71 @@
+name: hatly_customer
+description: Hatly customer application — browse vendors, order, and track deliveries.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Routing
+  go_router: ^14.2.0
+
+  # Networking
+  dio: ^5.6.0
+  # Vendor/Pharmacy Custom Request — image capture/selection for the
+  # Custom Request screen (up to 2 images, e.g. a product photo or a
+  # prescription photo). Version not verified against `pub get` in
+  # this environment (no Flutter toolchain available) — pinned to a
+  # known-stable release at the time of writing.
+  image_picker: ^1.0.7
+
+  # Secure storage for auth tokens
+  flutter_secure_storage: ^9.2.2
+
+  # Push notifications
+  firebase_core: ^3.4.0
+  firebase_messaging: ^15.1.0
+
+  # Utilities
+  intl: ^0.20.3
+  cached_network_image: ^3.4.1
+  # UI/UX-0 Design System — Cairo (Arabic+Latin) typeface, chosen for
+  # better small-size Arabic readability and familiarity to Belbeis
+  # users versus IBM Plex Sans Arabic's more editorial/geometric feel.
+  # No local font assets existed in this repo, so google_fonts (a
+  # single, standard, minimal dependency for exactly this purpose) is
+  # the safest addition rather than committing unverified binary TTFs.
+  google_fonts: ^6.2.1
+  # PHASE G addition (Checkout / Address / Payment Verification chunk):
+  # device GPS coordinates for Saved Addresses — no location package
+  # existed in this project before. Reverse geocoding is deliberately
+  # NOT added (no third-party geocoding service) — see
+  # core/location/device_location_service.dart's own comment: GPS
+  # supplies lat/lng only, the customer supplies/edits the
+  # human-readable address text themselves.
+  geolocator: ^13.0.1
+  # PHASE G addition: opens WhatsApp externally with a pre-filled
+  # message — see core/utils/whatsapp_helper.dart. Outbound deep-link
+  # only, no webhook/bot capability.
+  url_launcher: ^6.3.1
+  google_maps_flutter: ^2.9.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true # enables gen-l10n from lib/core/localization/l10n
+  assets:
+    - assets/images/
+    - assets/icons/

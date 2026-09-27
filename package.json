@@ -1,0 +1,20 @@
+{
+  "name": "hatly",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hatly delivery marketplace monorepo (backend, dashboard, shared packages). Flutter apps live under apps/ but are managed via the Flutter/Dart toolchain, not npm.",
+  "workspaces": [
+    "apps/backend",
+    "apps/dashboard",
+    "packages/*"
+  ],
+  "scripts": {
+    "backend:dev": "npm run start:dev --workspace=apps/backend",
+    "backend:build": "npm run build --workspace=apps/backend",
+    "dashboard:dev": "npm run dev --workspace=apps/dashboard",
+    "dashboard:build": "npm run build --workspace=apps/dashboard"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

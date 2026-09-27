@@ -1,0 +1,5 @@
+package com.hatly.customer
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()

@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --hatly-orange: #ff7a1a;
+  --hatly-white: #ffffff;
+}

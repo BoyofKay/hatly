@@ -1,0 +1,508 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/localization/l10n/app_localizations.dart';
+import '../../../core/theme/hatly_theme.dart';
+import '../../../shared_widgets/hatly_state_view.dart';
+import '../../../shared_widgets/hatly_image.dart';
+import '../../../shared_widgets/availability_badge.dart';
+import '../../../shared_widgets/cart_summary_bar.dart';
+import '../../../shared_widgets/ltr_text.dart';
+import '../../../shared_widgets/sort_menu_button.dart';
+import '../../products/data/product_providers.dart';
+import '../../products/domain/product_category.dart';
+import '../../products/presentation/widgets/product_list_tile.dart';
+import '../../products/presentation/widgets/product_list_tile_skeleton.dart';
+import '../data/vendor_providers.dart';
+import '../domain/vendor_branch_summary.dart';
+import '../domain/vendor_details.dart';
+import '../../cart/presentation/widgets/cart_icon_button.dart';
+import '../../favorites/data/favorites_providers.dart';
+import 'widgets/custom_request_action.dart';
+
+/// Real Vendor Details screen (Phase 2C) — was a placeholder in Phase
+/// 2B. Composed of: vendor identity header, branch info section
+/// (kept visually and structurally distinct from the vendor identity
+/// — see vendor_details.dart), a category filter row scoped to this
+/// vendor's own menu, and the filtered product list. No cart/checkout
+/// entry point anywhere on this screen — out of scope for this phase.
+class VendorDetailsScreen extends ConsumerStatefulWidget {
+  const VendorDetailsScreen({super.key, required this.vendorId});
+
+  final String vendorId;
+
+  @override
+  ConsumerState<VendorDetailsScreen> createState() =>
+      _VendorDetailsScreenState();
+}
+
+class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen> {
+  String? _selectedCategoryId;
+  String? _sortOption;
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final detailsAsync = ref.watch(vendorDetailsProvider(widget.vendorId));
+
+    return detailsAsync.when(
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (error, stackTrace) => Scaffold(
+        appBar: AppBar(),
+        body: HatlyStateView(
+          icon: Icons.error_outline,
+          title: l10n.somethingWentWrong,
+          retryLabel: l10n.retry,
+          onRetry: () => ref.invalidate(vendorDetailsProvider(widget.vendorId)),
+        ),
+      ),
+      data: (details) => Scaffold(
+        bottomNavigationBar: const CartSummaryBar(),
+        body: _VendorDetailsContent(
+          details: details,
+          selectedCategoryId: _selectedCategoryId,
+          onCategorySelected: (id) => setState(() => _selectedCategoryId = id),
+          sortOption: _sortOption,
+          onSortChanged: (sort) => setState(() => _sortOption = sort),
+          searchQuery: _searchQuery,
+          onSearchChanged: (query) => setState(() => _searchQuery = query),
+        ),
+      ),
+    );
+  }
+}
+
+class _VendorDetailsContent extends ConsumerWidget {
+  const _VendorDetailsContent({
+    required this.details,
+    required this.selectedCategoryId,
+    required this.onCategorySelected,
+    required this.sortOption,
+    required this.onSortChanged,
+    required this.searchQuery,
+    required this.onSearchChanged,
+  });
+
+  final VendorDetails details;
+  final String? selectedCategoryId;
+  final ValueChanged<String?> onCategorySelected;
+  final String? sortOption;
+  final ValueChanged<String?> onSortChanged;
+  final String searchQuery;
+  final ValueChanged<String> onSearchChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final vendorName = isArabic && details.vendor.nameAr != null
+        ? details.vendor.nameAr!
+        : details.vendor.name;
+
+    final categoriesAsync =
+        ref.watch(productCategoriesProvider(details.branch.id));
+    final productListParams = (
+      vendorBranchId: details.branch.id,
+      categoryId: selectedCategoryId,
+      sort: sortOption,
+      search: searchQuery.isEmpty ? null : searchQuery,
+      page: null,
+      limit: null,
+    );
+    final productsAsync = ref.watch(productListProvider(productListParams));
+
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          title: Text(vendorName),
+          pinned: true,
+          actions: [
+            _FavoriteHeartButton(vendorId: details.vendor.id),
+            const CartIconButton()
+          ],
+        ),
+        SliverToBoxAdapter(
+            child: _VendorHeader(details: details, vendorName: vendorName)),
+        SliverToBoxAdapter(child: _BranchInfoSection(branch: details.branch)),
+        const SliverToBoxAdapter(child: Divider(height: 32)),
+        SliverToBoxAdapter(
+          child: categoriesAsync.when(
+            loading: () => const SizedBox(height: 44),
+            // Non-critical: the product list below still works
+            // unfiltered even if this vendor's own category chips fail
+            // to load — no need to block the whole screen on it.
+            error: (error, stackTrace) => const SizedBox.shrink(),
+            data: (categories) => _CategoryChipsRow(
+              categories: categories,
+              selectedCategoryId: selectedCategoryId,
+              onCategorySelected: onCategorySelected,
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: _ProductSearchAndSortBar(
+            searchQuery: searchQuery,
+            onSearchChanged: onSearchChanged,
+            sortOption: sortOption,
+            onSortChanged: onSortChanged,
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 8)),
+        productsAsync.when(
+          loading: () => const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  ProductListTileSkeleton(),
+                  ProductListTileSkeleton(),
+                  ProductListTileSkeleton(),
+                ],
+              ),
+            ),
+          ),
+          error: (error, stackTrace) => SliverToBoxAdapter(
+            child: SizedBox(
+              height: 200,
+              child: HatlyStateView(
+                icon: Icons.wifi_off_rounded,
+                title: l10n.somethingWentWrong,
+                retryLabel: l10n.retry,
+                onRetry: () =>
+                    ref.invalidate(productListProvider(productListParams)),
+              ),
+            ),
+          ),
+          data: (products) {
+            if (products.isEmpty) {
+              return SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 180,
+                  child: HatlyStateView(
+                      icon: Icons.no_food_outlined,
+                      title: l10n.noProductsFound),
+                ),
+              );
+            }
+            return SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final product = products[index];
+                    return ProductListTile(
+                      product: product,
+                      onTap: () => context.push('/products/${product.id}'),
+                    );
+                  },
+                  childCount: products.length,
+                ),
+              ),
+            );
+          },
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Center(
+                child: CustomRequestAction(vendorBranchId: details.branch.id)),
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+      ],
+    );
+  }
+}
+
+class _VendorHeader extends StatelessWidget {
+  const _VendorHeader({required this.details, required this.vendorName});
+
+  final VendorDetails details;
+  final String vendorName;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          HatlySpacing.md, HatlySpacing.ms, HatlySpacing.md, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          HatlyImage(
+              url: details.vendor.logoUrl,
+              width: 84,
+              height: 84,
+              shape: HatlyImageShape.circular),
+          const SizedBox(width: HatlySpacing.ms),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (details.hasPromotion) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: HatlySpacing.sm, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: HatlyColors.primaryOrange,
+                      borderRadius: BorderRadius.circular(HatlyRadius.chip),
+                    ),
+                    child: Text(
+                      l10n.promotionBadge,
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelLarge
+                          ?.copyWith(color: HatlyColors.surfaceWhite),
+                    ),
+                  ),
+                  const SizedBox(height: HatlySpacing.xs),
+                ],
+                Text(vendorName, style: Theme.of(context).textTheme.titleLarge),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Branch info kept in its own visually distinct section — reinforces
+/// that this is the branch's data, not the vendor's, in the UI itself
+/// and not just in code structure (see vendor_details.dart).
+class _BranchInfoSection extends StatelessWidget {
+  const _BranchInfoSection({required this.branch});
+
+  final VendorBranchSummary branch;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final todayHours = branch.openingHours[_todayKey()];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+          HatlySpacing.md, HatlySpacing.md, HatlySpacing.md, 0),
+      padding: const EdgeInsets.all(HatlySpacing.ms),
+      decoration: BoxDecoration(
+          color: HatlyColors.background,
+          borderRadius: BorderRadius.circular(HatlyRadius.card)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined,
+                  size: 18, color: HatlyColors.textMuted),
+              const SizedBox(width: HatlySpacing.sm),
+              Expanded(
+                  child: Text(branch.address,
+                      style: Theme.of(context).textTheme.bodyMedium)),
+            ],
+          ),
+          const SizedBox(height: HatlySpacing.sm),
+          Row(
+            children: [
+              AvailabilityBadge(
+                isOpen: branch.isOpen,
+                openLabel: l10n.vendorOpenNow,
+                closedLabel: l10n.vendorClosed,
+              ),
+              if (todayHours != null) ...[
+                const SizedBox(width: HatlySpacing.sm),
+                LtrText(
+                  '· ${todayHours.open}-${todayHours.close}',
+                  style: Theme.of(context).textTheme.bodyLarge,
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _todayKey() {
+    const keys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    return keys[DateTime.now().weekday - 1];
+  }
+}
+
+/// CONFIRMED (Discovery & Ranking): a search field + sort control
+/// scoped to THIS vendor's own menu — never a marketplace-wide search
+/// (that's `vendor_list_screen.dart`'s own, separate control). Both
+/// values flow straight into `productListProvider`'s real backend
+/// query; neither is ever used to filter/sort/re-rank the already-
+/// fetched list client-side.
+class _ProductSearchAndSortBar extends StatelessWidget {
+  const _ProductSearchAndSortBar({
+    required this.searchQuery,
+    required this.onSearchChanged,
+    required this.sortOption,
+    required this.onSortChanged,
+  });
+
+  final String searchQuery;
+  final ValueChanged<String> onSearchChanged;
+  final String? sortOption;
+  final ValueChanged<String?> onSortChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              onChanged: onSearchChanged,
+              decoration: InputDecoration(
+                hintText: l10n.searchHint,
+                prefixIcon: const Icon(Icons.search, size: 20),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SortMenuButton(
+            value: sortOption,
+            label: l10n.sortNewest,
+            onChanged: onSortChanged,
+            options: [
+              ('newest', l10n.sortNewest),
+              ('highestRated', l10n.sortHighestRated),
+              ('bestSelling', l10n.sortBestSelling),
+              ('price_asc', l10n.sortPriceLowToHigh),
+              ('price_desc', l10n.sortPriceHighToLow),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryChipsRow extends StatelessWidget {
+  const _CategoryChipsRow({
+    required this.categories,
+    required this.selectedCategoryId,
+    required this.onCategorySelected,
+  });
+
+  final List<ProductCategoryInfo> categories;
+  final String? selectedCategoryId;
+  final ValueChanged<String?> onCategorySelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          _CategoryChip(
+            label: l10n.allProducts,
+            selected: selectedCategoryId == null,
+            onTap: () => onCategorySelected(null),
+          ),
+          const SizedBox(width: 8),
+          for (final category in categories) ...[
+            _CategoryChip(
+              label: isArabic && category.nameAr != null
+                  ? category.nameAr!
+                  : category.name,
+              selected: selectedCategoryId == category.id,
+              onTap: () => onCategorySelected(category.id),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip(
+      {required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      selectedColor: HatlyColors.primaryOrange,
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: selected ? Colors.white : HatlyColors.textDark,
+      ),
+      backgroundColor: Colors.grey.shade100,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20), side: BorderSide.none),
+    );
+  }
+}
+
+/// Favorites Chunk 3. Same source-of-truth/no-per-card-request/
+/// narrow-rebuild reasoning as VendorCard's own `_FavoriteHeartButton`
+/// — kept as a separate private copy in this file, per this chunk's
+/// own file-scope restriction (no new shared-widget file introduced
+/// for this).
+class _FavoriteHeartButton extends ConsumerWidget {
+  const _FavoriteHeartButton({required this.vendorId});
+
+  final String vendorId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final controller = ref.watch(favoritesControllerProvider.notifier);
+    final isLoading = ref.watch(favoritesControllerProvider).isLoading;
+    final isFavorited = controller.isFavorited(vendorId);
+
+    return IconButton(
+      icon: Icon(
+        isFavorited ? Icons.favorite : Icons.favorite_border,
+        color: isFavorited ? HatlyColors.primaryOrange : null,
+      ),
+      tooltip:
+          isFavorited ? l10n.favoritesRemoveAction : l10n.favoritesAddAction,
+      onPressed: isLoading
+          ? null
+          : () async {
+              final error = isFavorited
+                  ? await controller.remove(vendorId)
+                  : await controller.add(vendorId);
+              if (error != null && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l10n.somethingWentWrong)),
+                );
+              }
+            },
+    );
+  }
+}

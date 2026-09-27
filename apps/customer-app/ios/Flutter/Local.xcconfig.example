@@ -1,0 +1,13 @@
+// Google Maps SDK key (production-readiness slice — see docs/PRODUCT_DECISIONS.md "Google Maps key architecture").
+// Copy this file to `Local.xcconfig` (same directory, already gitignored) and fill in a RESTRICTED MOBILE key: an iOS key
+// restricted to this app's bundle identifier ($(PRODUCT_BUNDLE_IDENTIFIER) in Runner.xcodeproj, currently
+// com.hatly.customer / com.hatly.customer.dev per scheme). Never the backend's own GOOGLE_MAPS_API_KEY — that one is
+// server-side only (apps/backend/.env) and is never shipped in this app.
+//
+// Leave this file absent (the default) to build with no key: Info.plist's GMSApiKey is then empty, AppDelegate does not
+// register anything with the Maps SDK, and the app still works — the address picker falls back to GPS + server-side
+// address search (see AddressPinPicker's own comment) as long as HATLY_MAPS_ENABLED is NOT passed at build time.
+//
+// Only turn on --dart-define=HATLY_MAPS_ENABLED=true once a real key is set here.
+
+GOOGLE_MAPS_API_KEY =

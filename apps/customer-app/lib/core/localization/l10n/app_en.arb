@@ -1,0 +1,714 @@
+{
+  "@@locale": "en",
+  "appName": "Hatly",
+  "home": "Home",
+  "search": "Search",
+  "cart": "Cart",
+  "orders": "Orders",
+  "favorites": "Favorites",
+  "favoritesAddAction": "Add to favorites",
+  "favoritesRemoveAction": "Remove from favorites",
+  "favoritesEmptyState": "No favorite vendors yet",
+  "favoritesEmptyStateSubtitle": "Tap the heart on a vendor to save it here",
+  "profile": "Profile",
+  "vendorsNearYou": "Vendors near you",
+  "addToCart": "Add to cart",
+  "checkout": "Checkout",
+  "placeOrder": "Place order",
+  "orderTracking": "Order tracking",
+  "deliveryFee": "Delivery fee",
+  "retry": "Retry",
+  "somethingWentWrong": "Something went wrong",
+  "logout": "Log out",
+  "authWelcomeTitle": "Welcome to Hatly",
+  "authWelcomeSubtitle": "Enter your phone number to continue",
+  "fullNameLabel": "Full name",
+  "fullNameHint": "e.g. Ahmed Mohamed",
+  "phoneNumberLabel": "Phone number",
+  "continueButton": "Continue",
+  "passwordLabel": "Password",
+  "passwordHint": "At least 8 characters",
+  "passwordRequired": "Please enter your password",
+  "passwordCreateAccountInstead": "New here? Create an account instead",
+  "passwordHaveAccountInstead": "Already have a password? Log in instead",
+  "verifyPhonePromptTitle": "Verify your phone number",
+  "verifyPhonePromptSubtitle": "Get extra account security by confirming your number.",
+  "verifyPhonePromptAction": "Verify",
+  "verifyPhonePromptDismiss": "Not now",
+  "verifyPhoneSuccess": "Phone verified.",
+  "passwordSetupSectionTitle": "Password",
+  "passwordSetupSectionSubtitle": "Set a password so you can also sign in without a text message code.",
+  "passwordSetupSaveButton": "Save password",
+  "passwordSetupSuccess": "Password saved.",
+  "phoneInvalid": "That phone number doesn't look right",
+  "fullNameRequired": "Please enter your full name",
+  "otpTitle": "Enter verification code",
+  "otpSubtitleWithPhone": "A 6-digit code was sent to {phone}",
+  "@otpSubtitleWithPhone": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "otpVerifyButton": "Verify",
+  "otpResendIn": "Resend in {seconds}s",
+  "@otpResendIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "otpResendAction": "Resend code",
+  "otpChangeNumber": "Change phone number",
+  "errorNetwork": "No connection. Check your network and try again",
+  "errorInvalidOtp": "That code isn't valid",
+  "errorInvalidOrExpiredOtp": "That code is invalid or has expired",
+  "errorTooManyAttempts": "Too many attempts. Please try again shortly",
+  "errorSmsProviderUnavailable": "We couldn't send the verification code right now. Please try again shortly",
+  "homeComingSoon": "Coming soon: browsing vendors and products",
+  "searchComingSoon": "Coming soon: search",
+  "ordersComingSoon": "Coming soon: your orders",
+  "favoritesComingSoon": "Coming soon: your favorites",
+  "profileComingSoon": "Profile",
+  "greetingGeneric": "Welcome 👋",
+  "greetingWithName": "Hello, {name} 👋",
+  "@greetingWithName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "selectAddressCta": "Select delivery address",
+  "selectAddressTitle": "Choose an address",
+  "addressHome": "Home",
+  "addressWork": "Work",
+  "searchHint": "Search vendors or products",
+  "searchComingSoonSubtitle": "Search is still being built",
+  "categoryRestaurants": "Restaurants",
+  "categoryGroceries": "Groceries",
+  "categoryPharmacy": "Pharmacy",
+  "categoryBakery": "Bakery",
+  "categoryDrinks": "Drinks",
+  "categoryDesserts": "Desserts",
+  "categoryFastFood": "Fast Food",
+  "seeAll": "See all",
+  "cartSummaryItemCount": "{count} items",
+  "@cartSummaryItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cartSummaryViewCart": "View Cart",
+  "vendorClosed": "Closed",
+  "vendorOpenNow": "Open now",
+  "minutesAbbreviation": "min",
+  "noVendorsFound": "No vendors found",
+  "noVendorsFoundSubtitle": "Try another category or check back later",
+  "vendorDetailsComingSoon": "Vendor details — coming soon",
+  "promotionBadge": "Special offer",
+  "allProducts": "All",
+  "noProductsFound": "No products in this section",
+  "searchSectionVendors": "Vendors",
+  "searchSectionProducts": "Products",
+  "searchPromptMinLength": "Type at least 2 characters to search",
+  "searchNoResultsForQuery": "No results for \"{query}\"",
+  "@searchNoResultsForQuery": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "ratingRateAction": "Rate",
+  "ratingYourRatingLabel": "Your rating",
+  "ratingCommentHint": "Add a comment (optional)",
+  "ratingSubmitButton": "Submit rating",
+  "ratingSubmittedSuccess": "Rating submitted",
+  "ratingSelectStarsPrompt": "Select a rating",
+  "flashSaleBadge": "Flash Sale",
+  "cartSubtotalDiscountBanner": "A discount applies to eligible items from this vendor",
+  "subtotalDiscountAvailable": "Discount available",
+  "checkoutErrorFlashSaleLimit": "This Flash Sale quantity is no longer available. Please review your cart and try again.",
+  "checkoutErrorFlashSaleLimitWithRemaining": "Only {remaining} left at the Flash Sale price. Please adjust the quantity and try again.",
+  "@checkoutErrorFlashSaleLimitWithRemaining": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      }
+    }
+  },
+  "checkoutErrorInsufficientInventory": "One or more items in your cart no longer have enough stock.",
+  "checkoutErrorOfferConflict": "This offer is no longer available. Please review your cart and try again.",
+  "orderHistoricalDiscountApplied": "Discount applied: {amount}",
+  "@orderHistoricalDiscountApplied": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "orderHistoricalFlashSalePrice": "Flash Sale price: {price}",
+  "@orderHistoricalFlashSalePrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "customRequestEntryPoint": "Can't find what you're looking for?",
+  "customRequestSheetTitle": "Request a custom item",
+  "customRequestSheetSubtitle": "Describe what you need and/or add a photo — we'll pass it on to the vendor.",
+  "customRequestTextHint": "e.g. Panadol Extra 500mg, any brand",
+  "customRequestImageLimitHint": "Up to {max} images",
+  "@customRequestImageLimitHint": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "customRequestSubmit": "Add to cart",
+  "cartCustomRequestBadge": "Custom Request",
+  "cartCustomRequestPricePending": "Price will be confirmed",
+  "productOptionsTitle": "Options",
+  "productUnavailable": "Currently unavailable",
+  "optionRequiredBadge": "required",
+  "quantityLabel": "Quantity",
+  "addToCartWithPrice": "Add to cart — {price}",
+  "@addToCartWithPrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "addedToCartConfirmation": "Added to cart",
+  "cancel": "Cancel",
+  "cartEmpty": "Your cart is empty",
+  "cartSubtotal": "Subtotal",
+  "cartNotReadyForCheckout": "Checkout is not ready yet. Please complete the pending items before placing your order.",
+  "cartItemNoLongerAvailable": "No longer available",
+  "cartBranchConflictTitle": "You have items from another vendor",
+  "cartBranchConflictMessage": "Your cart has items from a different vendor. Clear your cart to add items from this one.",
+  "cartBranchConflictClearAndAdd": "Clear & add",
+  "cartErrorProductUnavailable": "This product is currently unavailable",
+  "cartErrorBranchUnavailable": "This vendor is currently unavailable",
+  "cartErrorOptionRequired": "Please select all required options",
+  "cartErrorInvalidOption": "One of the selected options isn't valid",
+  "noOrdersYet": "You haven't placed any orders yet",
+  "orderVendorSummaryWithOthers": "{vendorName} + {othersCount} others",
+  "@orderVendorSummaryWithOthers": {
+    "placeholders": {
+      "vendorName": {
+        "type": "String"
+      },
+      "othersCount": {
+        "type": "int"
+      }
+    }
+  },
+  "orderDetailsTitle": "Order details",
+  "orderItemsTitle": "Items",
+  "orderPaymentTitle": "Payment",
+  "orderDriverTitle": "Delivery driver",
+  "orderTotalLabel": "Total",
+  "orderDiscountLabel": "Discount",
+  "orderCancellationReasonLabel": "Cancellation reason",
+  "orderFailureReasonLabel": "Delivery failed",
+  "orderRequestedWeightLabel": "Requested",
+  "orderActualWeightLabel": "Actual weight",
+  "orderStatusPending": "Order placed",
+  "orderStatusConfirmed": "Confirmed",
+  "orderStatusPreparing": "Preparing",
+  "orderStatusReadyForPickup": "Ready for pickup",
+  "orderStatusAssignedToDriver": "Driver assigned",
+  "orderStatusPickedUp": "Picked up",
+  "orderStatusOnTheWay": "On the way",
+  "orderStatusDelivered": "Delivered",
+  "orderStatusCancelled": "Cancelled",
+  "orderStatusFailedDelivery": "Delivery failed",
+  "sortLabel": "Sort",
+  "sortNewest": "Newest",
+  "sortHighestRated": "Highest Rated",
+  "sortBestSelling": "Best Selling",
+  "sortPriceLowToHigh": "Price: Low to High",
+  "sortPriceHighToLow": "Price: High to Low",
+  "checkoutTitle": "Checkout",
+  "checkoutAddressLabel": "Delivery address",
+  "checkoutAddressLine1Hint": "Street, building, floor...",
+  "checkoutAddressLatitudeHint": "Latitude",
+  "checkoutAddressLongitudeHint": "Longitude",
+  "checkoutAddressInstructionsHint": "Delivery instructions (optional)",
+  "checkoutPaymentMethodLabel": "Payment method",
+  "checkoutPaymentCod": "Cash on Delivery",
+  "checkoutPaymentPayAtDelivery": "Pay Electronically at Delivery",
+  "checkoutPaymentInstapay": "InstaPay",
+  "checkoutPaymentWallet": "Wallet Transfer",
+  "checkoutSubtotalLabel": "Subtotal",
+  "checkoutPlaceOrderButton": "Place Order",
+  "checkoutOrderPlacedTitle": "Order placed",
+  "transferInstructionsTitle": "Complete your payment",
+  "transferDestinationLabel": "Send payment to",
+  "transferAmountLabel": "Amount to send",
+  "transferSendProofButton": "Send payment proof via WhatsApp",
+  "transferAwaitingVerification": "Your payment is awaiting verification. We'll update your order once it's confirmed.",
+  "transferNotAvailable": "This payment method isn't available right now — please choose another.",
+  "checkoutSelectAddressCta": "Select delivery address",
+  "checkoutSelectAddressError": "Please select a delivery address",
+  "checkoutCartChangedError": "Your cart has changed — please review it before continuing",
+  "addressSelectTitle": "Select address",
+  "addressAddNew": "Add new address",
+  "addressNoneSavedYet": "No saved addresses yet",
+  "addressDeleteConfirmTitle": "Delete address?",
+  "addressDeleteConfirmMessage": "This address will be removed from your saved addresses.",
+  "addressDeleteAction": "Delete",
+  "addressDeleteError": "Failed to delete address. Please try again.",
+  "addAddressTitle": "Add address",
+  "editAddressTitle": "Edit address",
+  "addressLabelHint": "Label (e.g. Home, Work)",
+  "addressUseCurrentLocation": "Use my current location",
+  "addressLocationCaptured": "Location captured",
+  "addressMissingLocationError": "Please enter the address and use current location",
+  "addressSaveButton": "Save address",
+  "navExplore": "Explore",
+  "homeSearchHint": "What are you looking for?",
+  "homeSectionCategories": "Shop by category",
+  "homeSectionPopularNearYou": "Popular near you",
+  "homeSectionOffers": "Offers",
+  "homeSectionPopularNew": "Popular & new",
+  "homeFavoritesShortcut": "Favorites",
+  "homePromoCarouselLabel": "Featured promotions",
+  "homePromoPageIndicator": "Promotion {current} of {total}",
+  "promoCtaProduct": "Add to cart",
+  "promoCtaVendor": "Shop now",
+  "promoCtaOffer": "Discover the offer",
+  "promoCtaFreeDelivery": "Order now",
+  "promoCtaBundle": "See the bundle",
+  "badgeOffer": "Offer",
+  "badgeFlashSale": "Flash sale",
+  "badgeFreeDelivery": "Free delivery",
+  "badgeBundle": "Bundle",
+  "badgeNew": "New",
+  "badgePopular": "Popular",
+  "badgeUnavailable": "Unavailable",
+  "vendorEtaMinutes": "{range} min",
+  "vendorRatingSemantics": "Rating {rating}",
+  "homeDemoContentNotice": "Demo content",
+  "@homePromoPageIndicator": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@vendorEtaMinutes": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  },
+  "@vendorRatingSemantics": {
+    "placeholders": {
+      "rating": {
+        "type": "String"
+      }
+    }
+  },
+  "exploreSearchHint": "Search products, vendors or categories",
+  "exploreSearchClear": "Clear search",
+  "exploreSearchCategories": "Categories",
+  "exploreSectionFeaturedCategories": "Featured Categories",
+  "exploreSectionFeaturedVendors": "Featured Vendors",
+  "exploreSectionNew": "New on Hatly",
+  "exploreLoadFailed": "Couldn't load Explore",
+  "exploreSeeLess": "Show less",
+  "categoryProductsSearchHint": "Search products",
+  "categoryProductsEmptySubtitle": "Try another search or check back later",
+  "catalogStartsFrom": "From {price}",
+  "@catalogStartsFrom": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "catalogStoreCount": "{count, plural, =1{1 store} other{{count} stores}}",
+  "@catalogStoreCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "catalogAvailableFromStores": "Available from {count, plural, =1{1 store} other{{count} stores}}",
+  "@catalogAvailableFromStores": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "catalogChooseStore": "Choose",
+  "catalogChangeStore": "Change store",
+  "descriptionReadMore": "Show more",
+  "descriptionReadLess": "Show less",
+  "productAddToCart": "Add to cart",
+  "productTotalLabel": "Total",
+  "optionRequiredError": "Choose at least one option",
+  "cartMiniFromVendor": "From {vendor}",
+  "@cartMiniFromVendor": {
+    "placeholders": {
+      "vendor": {
+        "type": "String"
+      }
+    }
+  },
+  "cartMiniContinue": "Continue shopping",
+  "cartMiniSummary": "Cart: {items} · {total}",
+  "@cartMiniSummary": {
+    "placeholders": {
+      "items": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "quantityDecrease": "Decrease quantity",
+  "quantityIncrease": "Increase quantity",
+  "cartErrorMaxVendors": "You have reached the maximum number of stores in one cart",
+  "cartErrorPickupSingleVendor": "Pickup is available for a single store only. Switch to delivery to add another store.",
+  "cartErrorMixedCartTypes": "Store items and Hatly Service cannot share a cart. Clear your cart to switch.",
+  "cartEmptyTitle": "Your cart is waiting for your order",
+  "cartEmptyCta": "Explore products",
+  "cartRemoveItem": "Remove item",
+  "cartEditItem": "Edit",
+  "cartEditHint": "To change a product's options: tap Edit, choose the options and add it again, then remove the old line.",
+  "cartSectionExpand": "Show {vendor} items",
+  "@cartSectionExpand": {
+    "placeholders": {
+      "vendor": {
+        "type": "String"
+      }
+    }
+  },
+  "cartSectionCollapse": "Hide {vendor} items",
+  "@cartSectionCollapse": {
+    "placeholders": {
+      "vendor": {
+        "type": "String"
+      }
+    }
+  },
+  "cartItemUpdating": "Updating",
+  "cartContinueToCheckout": "Continue to complete your order",
+  "supportContactAction": "Contact Hatly",
+  "supportContactActionSubtitle": "We reply on WhatsApp",
+  "supportContactOrderAction": "Contact Hatly about this order",
+  "supportContactUnavailable": "Contacting Hatly is currently unavailable",
+  "supportContactLaunchFailed": "Couldn't open WhatsApp. Please try again.",
+  "supportMessageGeneral": "Hi Hatly, I need some help.",
+  "supportMessageOrder": "Hi Hatly, I need help with order {orderId}.",
+  "@supportMessageOrder": {
+    "placeholders": {
+      "orderId": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentMethodInstapay": "InstaPay",
+  "paymentMethodVodafoneCash": "Vodafone Cash",
+  "paymentMethodOrangeCash": "Orange Cash",
+  "paymentMethodEtisalatCash": "Etisalat Cash",
+  "paymentMethodWePay": "WE Pay",
+  "paymentCodLabel": "Cash on delivery",
+  "paymentPayAtDeliveryLabel": "Pay electronically on delivery",
+  "paymentPayAtDeliveryWith": "Pay on delivery via {method}",
+  "@paymentPayAtDeliveryWith": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentManualTransferLabel": "Manual transfer in advance",
+  "paymentManualTransferWith": "Advance transfer via {method}",
+  "@paymentManualTransferWith": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentWalletLabel": "Hatly wallet",
+  "etaAboutMinutes": "About {minutes} min",
+  "@etaAboutMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "etaRangeMinutes": "{min}–{max} min",
+  "@etaRangeMinutes": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "etaUnavailable": "Estimated time is not available right now",
+  "etaUnavailablePreparation": "The store hasn't set a preparation time yet, so there is no estimate",
+  "etaDeliveryAt": "Expected delivery around {time}",
+  "@etaDeliveryAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "etaDeliveryBetween": "Expected delivery between {from} and {until}",
+  "@etaDeliveryBetween": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "until": {
+        "type": "String"
+      }
+    }
+  },
+  "etaReadyAt": "Ready for pickup around {time}",
+  "@etaReadyAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "etaReadyBetween": "Ready for pickup between {from} and {until}",
+  "@etaReadyBetween": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "until": {
+        "type": "String"
+      }
+    }
+  },
+  "etaDelayed": "Your order is running a little behind the estimate",
+  "checkoutFulfillmentTitle": "How do you want it?",
+  "checkoutFulfillmentDelivery": "Delivery",
+  "checkoutFulfillmentPickup": "Pickup",
+  "checkoutPickupSingleVendorOnly": "Pickup is only available for an order from a single store",
+  "checkoutPickupBranchDisabled": "This store does not offer pickup",
+  "checkoutPickupUnavailable": "Pickup is not available for this order",
+  "checkoutPickupFrom": "Pick up from",
+  "checkoutPickupEstimate": "Ready in",
+  "checkoutPickupNoDeliveryFee": "No delivery fee",
+  "checkoutChangeAddress": "Change",
+  "checkoutDefaultAddress": "Default",
+  "checkoutAddressOutOfServiceArea": "Hatly doesn't deliver to this address yet. Choose another address.",
+  "checkoutAddressVendorDoesNotDeliver": "One of the stores in your cart does not offer delivery. You can choose pickup or change your cart.",
+  "checkoutAddressVendorOutsideArea": "One of the stores in your cart does not deliver to this address. Choose another address or change your cart.",
+  "checkoutDeliveryEstimate": "Delivery",
+  "checkoutDeliveryFeePending": "Set once you choose an address",
+  "checkoutBreakdownBase": "Base delivery fee",
+  "checkoutBreakdownAdditionalVendors": "Additional stores ({count})",
+  "@checkoutBreakdownAdditionalVendors": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkoutBreakdownDistance": "Distance",
+  "checkoutDistanceKm": "{km} km",
+  "@checkoutDistanceKm": {
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "checkoutVendorPreparation": "Preparation time per store",
+  "checkoutPreparationMinutes": "About {minutes} min",
+  "@checkoutPreparationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "checkoutPreparationUnknown": "Not set",
+  "checkoutPaymentManualTransfer": "Manual transfer (pay in advance)",
+  "checkoutPaymentManualTransferHint": "Your order isn't prepared until the transfer is approved",
+  "checkoutPaymentPayAtDeliveryHint": "You pay the driver on arrival by an electronic method",
+  "checkoutChooseElectronicMethod": "Choose the electronic payment method",
+  "checkoutNoElectronicMethods": "No electronic payment methods are available right now",
+  "checkoutTransferUnavailable": "Manual transfer is not available right now",
+  "checkoutTransferUnavailableWeighed": "Not available for orders with weighed items — the final price is known after weighing",
+  "checkoutTransferUnavailableUnpriced": "Not available because the order's price isn't set yet",
+  "checkoutPaidFullyByWallet": "This order will be paid entirely from your Hatly wallet",
+  "checkoutWalletTitle": "Wallet",
+  "checkoutWalletUse": "Use Hatly wallet balance",
+  "checkoutWalletBalance": "Your balance: {amount}",
+  "@checkoutWalletBalance": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "checkoutWalletApplied": "Paid from wallet",
+  "checkoutAmountDue": "Amount due",
+  "checkoutWalletAmountLabel": "Amount from wallet (optional)",
+  "checkoutWalletAmountHelp": "Leave empty to use as much as possible",
+  "checkoutWalletEmpty": "Your wallet balance is zero",
+  "checkoutWalletUnavailableForOrder": "The wallet can't be used for this order because its final price isn't known yet",
+  "checkoutCouponTitle": "Have a coupon code?",
+  "checkoutCouponHint": "Enter coupon code",
+  "checkoutCouponApply": "Apply",
+  "checkoutCouponRemove": "Remove",
+  "checkoutCouponSaves": "You save {amount}",
+  "@checkoutCouponSaves": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "checkoutCouponForVendor": "at {vendor}",
+  "@checkoutCouponForVendor": {
+    "placeholders": {
+      "vendor": {
+        "type": "String"
+      }
+    }
+  },
+  "checkoutCouponNotFound": "This coupon code is not valid",
+  "checkoutCouponExpired": "This coupon has expired",
+  "checkoutCouponNotStarted": "This coupon is not active yet",
+  "checkoutCouponMinimumNotMet": "Your order doesn't reach the minimum for this coupon",
+  "checkoutCouponNotApplicable": "This coupon doesn't apply to the items in your cart",
+  "checkoutCouponConflictsWithOffer": "This coupon cannot be combined with an offer already applied at that store",
+  "checkoutCouponLimitReached": "This coupon has reached its usage limit",
+  "checkoutCouponRejected": "This coupon cannot be used",
+  "checkoutOrderSummary": "Order summary",
+  "checkoutTotalPending": "To be confirmed",
+  "checkoutConfirmAndPay": "Confirm order and continue to payment",
+  "checkoutStaleChanged": "The price or delivery details changed. Review the updated summary, then confirm again.",
+  "checkoutStaleExpired": "The previous quote expired. Review the updated summary, then confirm again.",
+  "checkoutErrorWalletInsufficient": "Your wallet balance doesn't cover this order",
+  "checkoutBlockerGeneric": "This order can't be placed right now. Review your cart and try again.",
+  "checkoutBlockerUnavailable": "An item or store in your cart is unavailable right now",
+  "checkoutBlockerMultiVendorDisabled": "Ordering from several stores at once is not available right now",
+  "checkoutBlockerFeeUnavailable": "Couldn't calculate the delivery fee. Please try again shortly.",
+  "checkoutBlockerInvalidAddress": "The address location is not valid. Choose another location.",
+  "checkoutOrderPlacedButLoadFailed": "Your order was placed, but we couldn't load its details right now",
+  "checkoutSuccessTitle": "Order placed",
+  "checkoutSuccessAwaitingTitle": "Order created — payment awaiting review",
+  "checkoutSuccessSendProof": "Send transfer proof",
+  "checkoutSuccessBackHome": "Back to home",
+  "orderNumberLabel": "Order number",
+  "orderVendorsLabel": "Stores",
+  "orderTrackAction": "Track order",
+  "orderDetailsAction": "Order details",
+  "orderPaymentAwaitingReview": "Your payment is awaiting review. Preparation starts once the transfer is approved.",
+  "orderPaymentAwaitingReviewShort": "Payment awaiting review",
+  "orderTimelineTitle": "Order progress",
+  "orderPricingTitle": "Price summary",
+  "orderDeliveryBreakdownTitle": "Delivery fee details",
+  "orderPaymentMethodLabel": "Payment method",
+  "orderPaymentStatusLabel": "Payment status",
+  "orderPaymentStatusPending": "Waiting for your transfer proof",
+  "orderPaymentStatusUnderReview": "Under review",
+  "orderPaymentStatusPaid": "Paid",
+  "orderPaymentStatusRejected": "Transfer rejected",
+  "orderPaymentStatusDueOnDelivery": "Due on delivery",
+  "orderDeliveryAddressTitle": "Delivery address",
+  "orderCouponLine": "Coupon {code}: you saved {amount}",
+  "@orderCouponLine": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "orderVendorReadyAt": "Ready around {time}",
+  "@orderVendorReadyAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "orderVendorPreparationMinutes": "Preparation about {minutes} min",
+  "@orderVendorPreparationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "orderCancelAction": "Cancel order",
+  "orderCancelConfirmTitle": "Cancel the whole order?",
+  "orderCancelConfirmMessage": "The order will be cancelled at every store. Anything paid from your wallet goes back to it.",
+  "orderCancelReasonHint": "Reason (optional)",
+  "orderCancelKeep": "Keep order",
+  "orderCancelConfirmAction": "Yes, cancel",
+  "orderCancelDone": "Order cancelled",
+  "orderCancelNotAllowed": "You can't cancel this order any more — a store has started preparing it",
+  "orderCancelFailed": "Couldn't cancel the order. Please try again.",
+  "ordersTabActive": "Ongoing",
+  "ordersTabCompleted": "Completed",
+  "ordersTabCancelled": "Cancelled",
+  "ordersEmptyActive": "No ongoing orders",
+  "ordersEmptyCompleted": "No completed orders yet",
+  "ordersEmptyCancelled": "No cancelled orders",
+  "addressLocationSection": "Location on the map",
+  "addressDetailsSection": "Address details",
+  "addressMapUnavailable": "The map is not enabled in this build. Set your location with GPS or search for your address.",
+  "addressConfirmPin": "Confirm this location",
+  "addressSearchLabel": "Search for your address",
+  "addressSearchAction": "Search",
+  "addressSearchNoResult": "We couldn't find that address. Try different words or use your current location.",
+  "addressLocationUnavailable": "Couldn't get your location. Turn on location services, allow access, and try again.",
+  "addressSuggestionLabel": "Suggested address for this location",
+  "addressUseSuggestion": "Use",
+  "addressLine1Label": "Address (street and area)",
+  "addressLine1Required": "Enter the delivery address",
+  "addressGovernorateLabel": "Governorate",
+  "addressCityLabel": "City",
+  "addressBuildingLabel": "Building",
+  "addressFloorLabel": "Floor",
+  "addressApartmentLabel": "Apartment",
+  "addressLandmarkLabel": "Landmark",
+  "addressLabelHome": "Home",
+  "addressLabelWork": "Work",
+  "addressMakeDefault": "Make this my default address",
+  "checkoutSuccessAppBar": "Order confirmation",
+  "checkoutAmountDueByTransfer": "Remainder to pay by transfer",
+  "addressLocationServicesDisabled": "Location services are turned off on this device. Turn them on in your device settings and try again.",
+  "addressLocationPermissionDenied": "Hatly wasn't allowed to access your location. Try again, or enter your address manually.",
+  "addressLocationPermissionPermanentlyDenied": "Location permission is permanently denied. Enable it from this app’s settings on your device.",
+  "addressLocationPositionUnavailable": "Couldn't determine your current location. Try again, or enter your address manually.",
+  "addressOpenSettings": "Open app settings"
+}

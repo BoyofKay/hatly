@@ -1,0 +1,36 @@
+# Node
+node_modules/
+dist/
+build/
+.next/
+*.log
+npm-debug.log*
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Flutter
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.packages
+**/build/
+**/ios/Pods/
+**/android/.gradle/
+
+# Playwright (apps/dashboard) — .auth/ holds real access/refresh tokens for the dev fixture accounts
+apps/dashboard/test-results/
+apps/dashboard/playwright-report/
+apps/dashboard/e2e/.auth/
+apps/dashboard/blob-report/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Archive.zip

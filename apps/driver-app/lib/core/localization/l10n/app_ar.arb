@@ -1,0 +1,20 @@
+{
+  "@@locale": "ar",
+  "appName": "هاتلي للسائقين",
+  "goOnline": "بدء الاستلام",
+  "goOffline": "إنهاء الاستلام",
+  "incomingRequest": "طلب توصيل جديد",
+  "accept": "قبول",
+  "reject": "رفض",
+  "pickupDetails": "تفاصيل الاستلام",
+  "customerDetails": "بيانات العميل",
+  "navigate": "بدء الملاحة",
+  "markPickedUp": "تم الاستلام",
+  "markOnTheWay": "في الطريق",
+  "markDelivered": "تم التوصيل",
+  "earnings": "الأرباح",
+  "completedDeliveries": "التوصيلات المكتملة",
+  "wallet": "المحفظة",
+  "profile": "حسابي",
+  "login": "تسجيل الدخول"
+}

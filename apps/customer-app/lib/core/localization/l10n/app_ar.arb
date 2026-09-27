@@ -1,0 +1,714 @@
+{
+  "@@locale": "ar",
+  "appName": "هاتلي",
+  "home": "الرئيسية",
+  "search": "بحث",
+  "cart": "السلة",
+  "orders": "الطلبات",
+  "favorites": "المفضلة",
+  "favoritesAddAction": "إضافة إلى المفضلة",
+  "favoritesRemoveAction": "إزالة من المفضلة",
+  "favoritesEmptyState": "لا توجد متاجر مفضلة بعد",
+  "favoritesEmptyStateSubtitle": "اضغط على القلب في أي متجر لحفظه هنا",
+  "profile": "حسابي",
+  "vendorsNearYou": "متاجر بالقرب منك",
+  "addToCart": "أضف إلى السلة",
+  "checkout": "إتمام الطلب",
+  "placeOrder": "تأكيد الطلب",
+  "orderTracking": "تتبع الطلب",
+  "deliveryFee": "رسوم التوصيل",
+  "retry": "إعادة المحاولة",
+  "somethingWentWrong": "حدث خطأ ما",
+  "logout": "تسجيل الخروج",
+  "authWelcomeTitle": "مرحبًا بك في هاتلي",
+  "authWelcomeSubtitle": "أدخل رقم هاتفك للمتابعة",
+  "fullNameLabel": "الاسم الكامل",
+  "fullNameHint": "مثال: أحمد محمد",
+  "phoneNumberLabel": "رقم الهاتف",
+  "continueButton": "متابعة",
+  "passwordLabel": "كلمة المرور",
+  "passwordHint": "8 أحرف على الأقل",
+  "passwordRequired": "يرجى إدخال كلمة المرور",
+  "passwordCreateAccountInstead": "جديد هنا؟ أنشئ حسابًا بدلاً من ذلك",
+  "passwordHaveAccountInstead": "هل لديك كلمة مرور بالفعل؟ سجّل الدخول بدلاً من ذلك",
+  "verifyPhonePromptTitle": "تحقق من رقم هاتفك",
+  "verifyPhonePromptSubtitle": "احصل على أمان إضافي لحسابك بتأكيد رقمك.",
+  "verifyPhonePromptAction": "تحقق",
+  "verifyPhonePromptDismiss": "ليس الآن",
+  "verifyPhoneSuccess": "تم التحقق من الهاتف.",
+  "passwordSetupSectionTitle": "كلمة المرور",
+  "passwordSetupSectionSubtitle": "عيّن كلمة مرور لتتمكن من تسجيل الدخول أيضًا بدون رمز عبر رسالة نصية.",
+  "passwordSetupSaveButton": "حفظ كلمة المرور",
+  "passwordSetupSuccess": "تم حفظ كلمة المرور.",
+  "phoneInvalid": "رقم الهاتف غير صحيح",
+  "fullNameRequired": "يرجى إدخال الاسم الكامل",
+  "otpTitle": "أدخل رمز التحقق",
+  "otpSubtitleWithPhone": "تم إرسال رمز مكون من 6 أرقام إلى {phone}",
+  "@otpSubtitleWithPhone": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "otpVerifyButton": "تأكيد",
+  "otpResendIn": "إعادة الإرسال خلال {seconds} ثانية",
+  "@otpResendIn": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "otpResendAction": "إعادة إرسال الرمز",
+  "otpChangeNumber": "تغيير رقم الهاتف",
+  "errorNetwork": "لا يوجد اتصال بالإنترنت. تحقق من الشبكة وحاول مرة أخرى",
+  "errorInvalidOtp": "رمز التحقق غير صحيح",
+  "errorInvalidOrExpiredOtp": "الرمز غير صحيح أو منتهي الصلاحية",
+  "errorTooManyAttempts": "محاولات كثيرة جدًا. حاول مرة أخرى بعد قليل",
+  "errorSmsProviderUnavailable": "تعذر إرسال رمز التحقق حاليًا. برجاء المحاولة لاحقًا",
+  "homeComingSoon": "قريبًا: تصفح المتاجر والمنتجات",
+  "searchComingSoon": "قريبًا: البحث",
+  "ordersComingSoon": "قريبًا: طلباتك",
+  "favoritesComingSoon": "قريبًا: المفضلة لديك",
+  "profileComingSoon": "الملف الشخصي",
+  "greetingGeneric": "أهلًا بك 👋",
+  "greetingWithName": "أهلًا، {name} 👋",
+  "@greetingWithName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "selectAddressCta": "اختر عنوان التوصيل",
+  "selectAddressTitle": "اختر عنوانًا",
+  "addressHome": "المنزل",
+  "addressWork": "العمل",
+  "searchHint": "ابحث عن متاجر أو منتجات",
+  "searchComingSoonSubtitle": "ميزة البحث قيد التطوير",
+  "categoryRestaurants": "مطاعم",
+  "categoryGroceries": "بقالة",
+  "categoryPharmacy": "صيدلية",
+  "categoryBakery": "مخبوزات",
+  "categoryDrinks": "مشروبات",
+  "categoryDesserts": "حلويات",
+  "categoryFastFood": "وجبات سريعة",
+  "seeAll": "عرض الكل",
+  "cartSummaryItemCount": "{count} عنصر",
+  "@cartSummaryItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cartSummaryViewCart": "عرض السلة",
+  "vendorClosed": "مغلق",
+  "vendorOpenNow": "مفتوح الآن",
+  "minutesAbbreviation": "د",
+  "noVendorsFound": "لا توجد متاجر حاليًا",
+  "noVendorsFoundSubtitle": "جرّب فئة أخرى أو عد لاحقًا",
+  "vendorDetailsComingSoon": "تفاصيل المتجر — قريبًا",
+  "promotionBadge": "عرض خاص",
+  "allProducts": "الكل",
+  "noProductsFound": "لا توجد منتجات في هذا القسم",
+  "searchSectionVendors": "المتاجر",
+  "searchSectionProducts": "المنتجات",
+  "searchPromptMinLength": "اكتب حرفين على الأقل للبحث",
+  "searchNoResultsForQuery": "لا توجد نتائج لـ \"{query}\"",
+  "@searchNoResultsForQuery": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "ratingRateAction": "قيّم",
+  "ratingYourRatingLabel": "تقييمك",
+  "ratingCommentHint": "أضف تعليقًا (اختياري)",
+  "ratingSubmitButton": "إرسال التقييم",
+  "ratingSubmittedSuccess": "تم إرسال التقييم",
+  "ratingSelectStarsPrompt": "اختر تقييمًا",
+  "flashSaleBadge": "تخفيض سريع",
+  "cartSubtotalDiscountBanner": "يوجد خصم على المنتجات المؤهلة من هذا المتجر",
+  "subtotalDiscountAvailable": "يوجد خصم",
+  "checkoutErrorFlashSaleLimit": "لم تعد هذه الكمية بسعر التخفيض السريع متاحة. يرجى مراجعة سلتك والمحاولة مرة أخرى.",
+  "checkoutErrorFlashSaleLimitWithRemaining": "لم يتبق سوى {remaining} بسعر التخفيض السريع. يرجى تعديل الكمية والمحاولة مرة أخرى.",
+  "@checkoutErrorFlashSaleLimitWithRemaining": {
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      }
+    }
+  },
+  "checkoutErrorInsufficientInventory": "لا تتوفر كمية كافية لمنتج واحد أو أكثر في سلتك.",
+  "checkoutErrorOfferConflict": "هذا العرض لم يعد متاحًا. يرجى مراجعة سلتك والمحاولة مرة أخرى.",
+  "orderHistoricalDiscountApplied": "تم تطبيق خصم: {amount}",
+  "@orderHistoricalDiscountApplied": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "orderHistoricalFlashSalePrice": "سعر التخفيض السريع: {price}",
+  "@orderHistoricalFlashSalePrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "customRequestEntryPoint": "لم تجد ما تبحث عنه؟",
+  "customRequestSheetTitle": "اطلب صنفًا مخصصًا",
+  "customRequestSheetSubtitle": "صف ما تحتاجه و/أو أضف صورة — سنرسلها إلى المتجر.",
+  "customRequestTextHint": "مثال: بانادول إكسترا 500 مجم، أي نوع متاح",
+  "customRequestImageLimitHint": "حتى {max} صور",
+  "@customRequestImageLimitHint": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "customRequestSubmit": "أضف إلى السلة",
+  "cartCustomRequestBadge": "طلب مخصص",
+  "cartCustomRequestPricePending": "سيتم تأكيد السعر",
+  "productOptionsTitle": "خيارات المنتج",
+  "productUnavailable": "غير متوفر حاليًا",
+  "optionRequiredBadge": "مطلوب",
+  "quantityLabel": "الكمية",
+  "addToCartWithPrice": "أضف إلى السلة — {price}",
+  "@addToCartWithPrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "addedToCartConfirmation": "تمت الإضافة إلى السلة",
+  "cancel": "إلغاء",
+  "cartEmpty": "سلتك فارغة",
+  "cartSubtotal": "الإجمالي الفرعي",
+  "cartNotReadyForCheckout": "الدفع غير جاهز بعد. يرجى إكمال العناصر المعلقة قبل تقديم الطلب.",
+  "cartItemNoLongerAvailable": "لم يعد متوفرًا",
+  "cartBranchConflictTitle": "لديك عناصر من متجر آخر",
+  "cartBranchConflictMessage": "سلتك تحتوي على عناصر من متجر آخر. امسح السلة لإضافة عناصر من هذا المتجر.",
+  "cartBranchConflictClearAndAdd": "امسح وأضف",
+  "cartErrorProductUnavailable": "هذا المنتج غير متوفر حاليًا",
+  "cartErrorBranchUnavailable": "هذا المتجر غير متاح حاليًا",
+  "cartErrorOptionRequired": "يرجى اختيار كل الخيارات المطلوبة",
+  "cartErrorInvalidOption": "أحد الخيارات المحددة غير صالح",
+  "noOrdersYet": "لم تقم بأي طلبات بعد",
+  "orderVendorSummaryWithOthers": "{vendorName} + {othersCount} آخرين",
+  "@orderVendorSummaryWithOthers": {
+    "placeholders": {
+      "vendorName": {
+        "type": "String"
+      },
+      "othersCount": {
+        "type": "int"
+      }
+    }
+  },
+  "orderDetailsTitle": "تفاصيل الطلب",
+  "orderItemsTitle": "العناصر",
+  "orderPaymentTitle": "الدفع",
+  "orderDriverTitle": "سائق التوصيل",
+  "orderTotalLabel": "الإجمالي",
+  "orderDiscountLabel": "الخصم",
+  "orderCancellationReasonLabel": "سبب الإلغاء",
+  "orderFailureReasonLabel": "فشل التوصيل",
+  "orderRequestedWeightLabel": "المطلوب",
+  "orderActualWeightLabel": "الوزن الفعلي",
+  "orderStatusPending": "تم تقديم الطلب",
+  "orderStatusConfirmed": "تم التأكيد",
+  "orderStatusPreparing": "جارٍ التحضير",
+  "orderStatusReadyForPickup": "جاهز للاستلام",
+  "orderStatusAssignedToDriver": "تم تعيين السائق",
+  "orderStatusPickedUp": "تم الاستلام",
+  "orderStatusOnTheWay": "في الطريق",
+  "orderStatusDelivered": "تم التوصيل",
+  "orderStatusCancelled": "ملغى",
+  "orderStatusFailedDelivery": "فشل التوصيل",
+  "sortLabel": "الترتيب",
+  "sortNewest": "الأحدث",
+  "sortHighestRated": "الأعلى تقييمًا",
+  "sortBestSelling": "الأكثر مبيعًا",
+  "sortPriceLowToHigh": "السعر: من الأقل إلى الأعلى",
+  "sortPriceHighToLow": "السعر: من الأعلى إلى الأقل",
+  "checkoutTitle": "إتمام الطلب",
+  "checkoutAddressLabel": "عنوان التوصيل",
+  "checkoutAddressLine1Hint": "الشارع، المبنى، الطابق...",
+  "checkoutAddressLatitudeHint": "خط العرض",
+  "checkoutAddressLongitudeHint": "خط الطول",
+  "checkoutAddressInstructionsHint": "تعليمات التوصيل (اختياري)",
+  "checkoutPaymentMethodLabel": "طريقة الدفع",
+  "checkoutPaymentCod": "الدفع عند الاستلام",
+  "checkoutPaymentPayAtDelivery": "الدفع إلكترونيًا عند التوصيل",
+  "checkoutPaymentInstapay": "إنستاباي",
+  "checkoutPaymentWallet": "تحويل محفظة إلكترونية",
+  "checkoutSubtotalLabel": "الإجمالي الفرعي",
+  "checkoutPlaceOrderButton": "تأكيد الطلب",
+  "checkoutOrderPlacedTitle": "تم تقديم الطلب",
+  "transferInstructionsTitle": "أكمل عملية الدفع",
+  "transferDestinationLabel": "أرسل المبلغ إلى",
+  "transferAmountLabel": "المبلغ المطلوب إرساله",
+  "transferSendProofButton": "إرسال إثبات الدفع عبر واتساب",
+  "transferAwaitingVerification": "طلبك بانتظار التحقق من الدفع. سنقوم بتحديث حالة طلبك فور تأكيده.",
+  "transferNotAvailable": "طريقة الدفع هذه غير متاحة حاليًا — يرجى اختيار طريقة أخرى.",
+  "checkoutSelectAddressCta": "اختر عنوان التوصيل",
+  "checkoutSelectAddressError": "يرجى اختيار عنوان للتوصيل",
+  "checkoutCartChangedError": "لقد تغيرت سلة مشترياتك — يرجى مراجعتها قبل المتابعة",
+  "addressSelectTitle": "اختر العنوان",
+  "addressAddNew": "إضافة عنوان جديد",
+  "addressNoneSavedYet": "لا توجد عناوين محفوظة بعد",
+  "addressDeleteConfirmTitle": "حذف العنوان؟",
+  "addressDeleteConfirmMessage": "سيتم إزالة هذا العنوان من عناوينك المحفوظة.",
+  "addressDeleteAction": "حذف",
+  "addressDeleteError": "فشل حذف العنوان. يرجى المحاولة مرة أخرى.",
+  "addAddressTitle": "إضافة عنوان",
+  "editAddressTitle": "تعديل العنوان",
+  "addressLabelHint": "الاسم (مثال: المنزل، العمل)",
+  "addressUseCurrentLocation": "استخدام موقعي الحالي",
+  "addressLocationCaptured": "تم تحديد الموقع",
+  "addressMissingLocationError": "يرجى إدخال العنوان واستخدام الموقع الحالي",
+  "addressSaveButton": "حفظ العنوان",
+  "navExplore": "استكشف",
+  "homeSearchHint": "بتدور على إيه؟",
+  "homeSectionCategories": "تسوّق حسب الفئة",
+  "homeSectionPopularNearYou": "الأشهر بالقرب منك",
+  "homeSectionOffers": "العروض",
+  "homeSectionPopularNew": "الأكثر طلبًا والجديد",
+  "homeFavoritesShortcut": "المفضلة",
+  "homePromoCarouselLabel": "عروض مميزة",
+  "homePromoPageIndicator": "العرض {current} من {total}",
+  "promoCtaProduct": "أضف للسلة",
+  "promoCtaVendor": "تسوّق الآن",
+  "promoCtaOffer": "اكتشف العرض",
+  "promoCtaFreeDelivery": "اطلب الآن",
+  "promoCtaBundle": "شوف الباكدج",
+  "badgeOffer": "عرض",
+  "badgeFlashSale": "عرض سريع",
+  "badgeFreeDelivery": "توصيل مجاني",
+  "badgeBundle": "باكدج",
+  "badgeNew": "جديد",
+  "badgePopular": "الأكثر طلبًا",
+  "badgeUnavailable": "غير متاح",
+  "vendorEtaMinutes": "{range} د",
+  "vendorRatingSemantics": "التقييم {rating}",
+  "homeDemoContentNotice": "محتوى تجريبي",
+  "@homePromoPageIndicator": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@vendorEtaMinutes": {
+    "placeholders": {
+      "range": {
+        "type": "String"
+      }
+    }
+  },
+  "@vendorRatingSemantics": {
+    "placeholders": {
+      "rating": {
+        "type": "String"
+      }
+    }
+  },
+  "exploreSearchHint": "ابحث عن منتجات أو متاجر أو فئات",
+  "exploreSearchClear": "مسح البحث",
+  "exploreSearchCategories": "الفئات",
+  "exploreSectionFeaturedCategories": "فئات مميزة",
+  "exploreSectionFeaturedVendors": "متاجر مميزة",
+  "exploreSectionNew": "جديد على هاتلي",
+  "exploreLoadFailed": "تعذّر تحميل الاستكشاف",
+  "exploreSeeLess": "عرض أقل",
+  "categoryProductsSearchHint": "ابحث في المنتجات",
+  "categoryProductsEmptySubtitle": "جرّب كلمة بحث أخرى أو عد لاحقًا",
+  "catalogStartsFrom": "يبدأ من {price}",
+  "@catalogStartsFrom": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "catalogStoreCount": "{count, plural, =1{متجر واحد} =2{متجران} few{{count} متاجر} many{{count} متجرًا} other{{count} متجر}}",
+  "@catalogStoreCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "catalogAvailableFromStores": "متوفر من {count, plural, =1{متجر واحد} =2{متجرين} few{{count} متاجر} many{{count} متجرًا} other{{count} متجر}}",
+  "@catalogAvailableFromStores": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "catalogChooseStore": "اختيار",
+  "catalogChangeStore": "تغيير المتجر",
+  "descriptionReadMore": "عرض المزيد",
+  "descriptionReadLess": "عرض أقل",
+  "productAddToCart": "أضف للسلة",
+  "productTotalLabel": "الإجمالي",
+  "optionRequiredError": "اختر خيارًا واحدًا على الأقل",
+  "cartMiniFromVendor": "من {vendor}",
+  "@cartMiniFromVendor": {
+    "placeholders": {
+      "vendor": {
+        "type": "String"
+      }
+    }
+  },
+  "cartMiniContinue": "متابعة التسوق",
+  "cartMiniSummary": "السلة: {items} · {total}",
+  "@cartMiniSummary": {
+    "placeholders": {
+      "items": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "quantityDecrease": "تقليل الكمية",
+  "quantityIncrease": "زيادة الكمية",
+  "cartErrorMaxVendors": "وصلت إلى الحد الأقصى لعدد المتاجر في السلة الواحدة",
+  "cartErrorPickupSingleVendor": "الاستلام من المتجر متاح لمتجر واحد فقط. غيّر إلى التوصيل لإضافة متجر آخر.",
+  "cartErrorMixedCartTypes": "لا يمكن الجمع بين منتجات المتاجر وخدمة هاتلي في سلة واحدة. أفرغ السلة للتبديل.",
+  "cartEmptyTitle": "سلتك مستنيا طلبك",
+  "cartEmptyCta": "استكشف المنتجات",
+  "cartRemoveItem": "حذف المنتج",
+  "cartEditItem": "تعديل",
+  "cartEditHint": "لتغيير خيارات منتج: اضغط «تعديل»، اضبط الخيارات وأضفه من جديد، ثم احذف السطر القديم.",
+  "cartSectionExpand": "عرض منتجات {vendor}",
+  "@cartSectionExpand": {
+    "placeholders": {
+      "vendor": {
+        "type": "String"
+      }
+    }
+  },
+  "cartSectionCollapse": "إخفاء منتجات {vendor}",
+  "@cartSectionCollapse": {
+    "placeholders": {
+      "vendor": {
+        "type": "String"
+      }
+    }
+  },
+  "cartItemUpdating": "جارٍ التحديث",
+  "cartContinueToCheckout": "متابعة لإتمام الطلب",
+  "supportContactAction": "تواصل مع Hatly",
+  "supportContactActionSubtitle": "نرد عليك عبر واتساب",
+  "supportContactOrderAction": "تواصل مع Hatly بخصوص الطلب",
+  "supportContactUnavailable": "التواصل مع Hatly غير متاح حاليًا",
+  "supportContactLaunchFailed": "تعذّر فتح واتساب. حاول مرة أخرى.",
+  "supportMessageGeneral": "مرحبًا Hatly، أحتاج إلى مساعدة.",
+  "supportMessageOrder": "مرحبًا Hatly، أحتاج إلى مساعدة بخصوص الطلب رقم {orderId}.",
+  "@supportMessageOrder": {
+    "placeholders": {
+      "orderId": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentMethodInstapay": "إنستاباي",
+  "paymentMethodVodafoneCash": "فودافون كاش",
+  "paymentMethodOrangeCash": "أورانج كاش",
+  "paymentMethodEtisalatCash": "اتصالات كاش",
+  "paymentMethodWePay": "WE Pay",
+  "paymentCodLabel": "الدفع نقدًا عند الاستلام",
+  "paymentPayAtDeliveryLabel": "الدفع إلكترونيًا عند الاستلام",
+  "paymentPayAtDeliveryWith": "الدفع عند الاستلام عبر {method}",
+  "@paymentPayAtDeliveryWith": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentManualTransferLabel": "تحويل يدوي مسبق",
+  "paymentManualTransferWith": "تحويل مسبق عبر {method}",
+  "@paymentManualTransferWith": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "paymentWalletLabel": "محفظة هاتلي",
+  "etaAboutMinutes": "حوالي {minutes} دقيقة",
+  "@etaAboutMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "etaRangeMinutes": "من {min} إلى {max} دقيقة",
+  "@etaRangeMinutes": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "etaUnavailable": "وقت التوصيل المتوقع غير متاح حاليًا",
+  "etaUnavailablePreparation": "لم يحدد المتجر وقت التحضير بعد، لذلك لا يوجد وقت متوقع",
+  "etaDeliveryAt": "التوصيل المتوقع حوالي {time}",
+  "@etaDeliveryAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "etaDeliveryBetween": "التوصيل المتوقع بين {from} و{until}",
+  "@etaDeliveryBetween": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "until": {
+        "type": "String"
+      }
+    }
+  },
+  "etaReadyAt": "يكون جاهزًا للاستلام حوالي {time}",
+  "@etaReadyAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "etaReadyBetween": "يكون جاهزًا للاستلام بين {from} و{until}",
+  "@etaReadyBetween": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "until": {
+        "type": "String"
+      }
+    }
+  },
+  "etaDelayed": "الطلب متأخر قليلًا عن الوقت المتوقع",
+  "checkoutFulfillmentTitle": "طريقة الاستلام",
+  "checkoutFulfillmentDelivery": "توصيل",
+  "checkoutFulfillmentPickup": "استلام من الفرع",
+  "checkoutPickupSingleVendorOnly": "الاستلام من الفرع متاح لطلب من متجر واحد فقط",
+  "checkoutPickupBranchDisabled": "هذا المتجر لا يوفّر الاستلام من الفرع",
+  "checkoutPickupUnavailable": "الاستلام من الفرع غير متاح لهذا الطلب",
+  "checkoutPickupFrom": "الاستلام من",
+  "checkoutPickupEstimate": "وقت التجهيز",
+  "checkoutPickupNoDeliveryFee": "بدون رسوم توصيل",
+  "checkoutChangeAddress": "تغيير",
+  "checkoutDefaultAddress": "افتراضي",
+  "checkoutAddressOutOfServiceArea": "هاتلي لا يوصّل إلى هذا العنوان حاليًا. اختر عنوانًا آخر.",
+  "checkoutAddressVendorDoesNotDeliver": "أحد المتاجر في سلتك لا يوفّر التوصيل. يمكنك اختيار الاستلام من الفرع أو تعديل السلة.",
+  "checkoutAddressVendorOutsideArea": "أحد المتاجر في سلتك لا يوصّل إلى هذا العنوان. اختر عنوانًا آخر أو عدّل السلة.",
+  "checkoutDeliveryEstimate": "التوصيل",
+  "checkoutDeliveryFeePending": "يُحدَّد بعد اختيار العنوان",
+  "checkoutBreakdownBase": "رسوم التوصيل الأساسية",
+  "checkoutBreakdownAdditionalVendors": "متاجر إضافية ({count})",
+  "@checkoutBreakdownAdditionalVendors": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "checkoutBreakdownDistance": "المسافة",
+  "checkoutDistanceKm": "{km} كم",
+  "@checkoutDistanceKm": {
+    "placeholders": {
+      "km": {
+        "type": "String"
+      }
+    }
+  },
+  "checkoutVendorPreparation": "وقت تجهيز كل متجر",
+  "checkoutPreparationMinutes": "حوالي {minutes} دقيقة",
+  "@checkoutPreparationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "checkoutPreparationUnknown": "غير محدد",
+  "checkoutPaymentManualTransfer": "تحويل يدوي (دفع مسبق)",
+  "checkoutPaymentManualTransferHint": "لا يبدأ تجهيز طلبك إلا بعد اعتماد التحويل",
+  "checkoutPaymentPayAtDeliveryHint": "تدفع للمندوب عند التسليم بوسيلة دفع إلكترونية",
+  "checkoutChooseElectronicMethod": "اختر وسيلة الدفع الإلكتروني",
+  "checkoutNoElectronicMethods": "لا توجد وسائل دفع إلكتروني متاحة حاليًا",
+  "checkoutTransferUnavailable": "التحويل اليدوي غير متاح حاليًا",
+  "checkoutTransferUnavailableWeighed": "غير متاح للطلبات التي تحتوي على منتجات بالوزن لأن السعر النهائي يُحسب بعد الوزن",
+  "checkoutTransferUnavailableUnpriced": "غير متاح لأن سعر الطلب لم يُحدَّد بعد",
+  "checkoutPaidFullyByWallet": "سيتم دفع الطلب بالكامل من محفظة هاتلي",
+  "checkoutWalletTitle": "المحفظة",
+  "checkoutWalletUse": "استخدام رصيد محفظة هاتلي",
+  "checkoutWalletBalance": "رصيدك: {amount}",
+  "@checkoutWalletBalance": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "checkoutWalletApplied": "المدفوع من المحفظة",
+  "checkoutAmountDue": "المتبقي للدفع",
+  "checkoutWalletAmountLabel": "المبلغ المخصوم من المحفظة (اختياري)",
+  "checkoutWalletAmountHelp": "اتركه فارغًا لاستخدام أكبر مبلغ ممكن",
+  "checkoutWalletEmpty": "رصيد المحفظة صفر",
+  "checkoutWalletUnavailableForOrder": "لا يمكن استخدام المحفظة مع هذا الطلب لأن سعره النهائي غير محدد بعد",
+  "checkoutCouponTitle": "لديك كود خصم؟",
+  "checkoutCouponHint": "أدخل كود الخصم",
+  "checkoutCouponApply": "تطبيق",
+  "checkoutCouponRemove": "إزالة",
+  "checkoutCouponSaves": "وفّرت {amount}",
+  "@checkoutCouponSaves": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "checkoutCouponForVendor": "من {vendor}",
+  "@checkoutCouponForVendor": {
+    "placeholders": {
+      "vendor": {
+        "type": "String"
+      }
+    }
+  },
+  "checkoutCouponNotFound": "كود الخصم غير صحيح",
+  "checkoutCouponExpired": "انتهت صلاحية كود الخصم",
+  "checkoutCouponNotStarted": "كود الخصم لم يبدأ بعد",
+  "checkoutCouponMinimumNotMet": "لم يصل طلبك إلى الحد الأدنى لاستخدام هذا الكود",
+  "checkoutCouponNotApplicable": "هذا الكود لا ينطبق على المنتجات في سلتك",
+  "checkoutCouponConflictsWithOffer": "لا يمكن استخدام الكود مع عرض مفعّل على نفس المتجر",
+  "checkoutCouponLimitReached": "تم استهلاك هذا الكود بالكامل",
+  "checkoutCouponRejected": "لا يمكن استخدام هذا الكود",
+  "checkoutOrderSummary": "ملخص الطلب",
+  "checkoutTotalPending": "يُحدَّد لاحقًا",
+  "checkoutConfirmAndPay": "تأكيد الطلب ومتابعة الدفع",
+  "checkoutStaleChanged": "تغيّر السعر أو تفاصيل التوصيل منذ آخر مراجعة. راجع الملخص المحدّث ثم أكّد الطلب مرة أخرى.",
+  "checkoutStaleExpired": "انتهت صلاحية العرض السابق. راجع الملخص المحدّث ثم أكّد الطلب مرة أخرى.",
+  "checkoutErrorWalletInsufficient": "رصيد المحفظة لا يغطي قيمة الطلب",
+  "checkoutBlockerGeneric": "لا يمكن إتمام الطلب حاليًا. راجع سلتك وحاول مرة أخرى.",
+  "checkoutBlockerUnavailable": "أحد المنتجات أو المتاجر في سلتك غير متاح حاليًا",
+  "checkoutBlockerMultiVendorDisabled": "الطلب من أكثر من متجر غير متاح حاليًا",
+  "checkoutBlockerFeeUnavailable": "تعذّر حساب رسوم التوصيل الآن. حاول مرة أخرى بعد قليل.",
+  "checkoutBlockerInvalidAddress": "موقع العنوان غير صالح. اختر موقعًا آخر.",
+  "checkoutOrderPlacedButLoadFailed": "تم إنشاء طلبك، لكن تعذّر تحميل تفاصيله الآن",
+  "checkoutSuccessTitle": "تم استلام طلبك",
+  "checkoutSuccessAwaitingTitle": "تم إنشاء طلبك، والدفع قيد المراجعة",
+  "checkoutSuccessSendProof": "أرسل إثبات التحويل",
+  "checkoutSuccessBackHome": "العودة للرئيسية",
+  "orderNumberLabel": "رقم الطلب",
+  "orderVendorsLabel": "المتاجر",
+  "orderTrackAction": "تتبّع الطلب",
+  "orderDetailsAction": "تفاصيل الطلب",
+  "orderPaymentAwaitingReview": "دفعتك قيد المراجعة. سيبدأ تجهيز الطلب بعد اعتماد التحويل.",
+  "orderPaymentAwaitingReviewShort": "الدفع قيد المراجعة",
+  "orderTimelineTitle": "مراحل الطلب",
+  "orderPricingTitle": "ملخص الحساب",
+  "orderDeliveryBreakdownTitle": "تفاصيل رسوم التوصيل",
+  "orderPaymentMethodLabel": "طريقة الدفع",
+  "orderPaymentStatusLabel": "حالة الدفع",
+  "orderPaymentStatusPending": "بانتظار إرسال إثبات التحويل",
+  "orderPaymentStatusUnderReview": "قيد المراجعة",
+  "orderPaymentStatusPaid": "تم الدفع",
+  "orderPaymentStatusRejected": "تم رفض التحويل",
+  "orderPaymentStatusDueOnDelivery": "يُدفع عند الاستلام",
+  "orderDeliveryAddressTitle": "عنوان التوصيل",
+  "orderCouponLine": "كود الخصم {code}: وفّرت {amount}",
+  "@orderCouponLine": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      },
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "orderVendorReadyAt": "يكون جاهزًا حوالي {time}",
+  "@orderVendorReadyAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "orderVendorPreparationMinutes": "وقت التجهيز حوالي {minutes} دقيقة",
+  "@orderVendorPreparationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "orderCancelAction": "إلغاء الطلب",
+  "orderCancelConfirmTitle": "إلغاء الطلب بالكامل؟",
+  "orderCancelConfirmMessage": "سيتم إلغاء الطلب من جميع المتاجر. إذا دفعت من المحفظة يعود المبلغ إليها.",
+  "orderCancelReasonHint": "سبب الإلغاء (اختياري)",
+  "orderCancelKeep": "الاحتفاظ بالطلب",
+  "orderCancelConfirmAction": "نعم، ألغِ الطلب",
+  "orderCancelDone": "تم إلغاء الطلب",
+  "orderCancelNotAllowed": "لم يعد بإمكانك إلغاء هذا الطلب لأن أحد المتاجر بدأ التجهيز",
+  "orderCancelFailed": "تعذّر إلغاء الطلب. حاول مرة أخرى.",
+  "ordersTabActive": "جارية",
+  "ordersTabCompleted": "مكتملة",
+  "ordersTabCancelled": "ملغاة",
+  "ordersEmptyActive": "لا توجد طلبات جارية",
+  "ordersEmptyCompleted": "لا توجد طلبات مكتملة بعد",
+  "ordersEmptyCancelled": "لا توجد طلبات ملغاة",
+  "addressLocationSection": "الموقع على الخريطة",
+  "addressDetailsSection": "تفاصيل العنوان",
+  "addressMapUnavailable": "الخريطة غير مفعّلة في هذا الإصدار. حدّد موقعك بالـGPS أو ابحث عن عنوانك.",
+  "addressConfirmPin": "تأكيد هذا الموقع",
+  "addressSearchLabel": "ابحث عن عنوانك",
+  "addressSearchAction": "بحث",
+  "addressSearchNoResult": "لم نجد هذا العنوان. جرّب صياغة أخرى أو استخدم موقعك الحالي.",
+  "addressLocationUnavailable": "تعذّر الحصول على موقعك. فعّل خدمة الموقع وامنح التطبيق الإذن ثم حاول مرة أخرى.",
+  "addressSuggestionLabel": "عنوان مقترح للموقع المحدد",
+  "addressUseSuggestion": "استخدام",
+  "addressLine1Label": "العنوان (الشارع والمنطقة)",
+  "addressLine1Required": "اكتب عنوان التوصيل",
+  "addressGovernorateLabel": "المحافظة",
+  "addressCityLabel": "المدينة",
+  "addressBuildingLabel": "رقم العقار",
+  "addressFloorLabel": "الدور",
+  "addressApartmentLabel": "الشقة",
+  "addressLandmarkLabel": "علامة مميزة",
+  "addressLabelHome": "المنزل",
+  "addressLabelWork": "العمل",
+  "addressMakeDefault": "اجعله عنواني الافتراضي",
+  "checkoutSuccessAppBar": "تأكيد الطلب",
+  "checkoutAmountDueByTransfer": "المتبقي للدفع بالتحويل",
+  "addressLocationServicesDisabled": "خدمة الموقع مغلقة على جهازك. فعّلها من إعدادات الجهاز ثم حاول مرة أخرى.",
+  "addressLocationPermissionDenied": "لم يُسمح للتطبيق بالوصول لموقعك. حاول مرة أخرى أو أدخل عنوانك يدويًا.",
+  "addressLocationPermissionPermanentlyDenied": "إذن الموقع مرفوض بشكل دائم. فعّله من إعدادات التطبيق على جهازك.",
+  "addressLocationPositionUnavailable": "تعذّر تحديد موقعك الحالي. حاول مرة أخرى أو أدخل عنوانك يدويًا.",
+  "addressOpenSettings": "فتح إعدادات التطبيق"
+}
