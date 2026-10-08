@@ -2,15 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hatly_customer/core/location/device_location_service.dart';
+import 'package:hatly_customer/core/network/api_exception.dart';
 import 'package:hatly_customer/features/addresses/data/addresses_api.dart';
 import 'package:hatly_customer/features/addresses/data/addresses_providers.dart';
+import 'package:hatly_customer/features/addresses/domain/delivery_zone.dart';
 import 'package:hatly_customer/features/addresses/domain/saved_address.dart';
 import 'package:hatly_customer/features/addresses/presentation/add_address_screen.dart';
 import 'package:hatly_customer/features/addresses/presentation/address_selection_screen.dart';
 
 import '../../support/router_test_app.dart';
 
+const _abuNaseeb = DeliveryZone(
+  id: 'zone-1',
+  name: 'Abu Naseeb',
+  nameAr: 'أبو نصيب',
+  city: 'Belbeis',
+  cityAr: 'بلبيس',
+  governorate: 'Sharqia',
+  governorateAr: 'الشرقية',
+  deliveryFeeMinor: 1500,
+);
+const _secondZone = DeliveryZone(
+  id: 'zone-2',
+  name: 'Second Area',
+  nameAr: 'منطقة تانية',
+  city: 'Belbeis',
+  cityAr: 'بلبيس',
+  governorate: 'Sharqia',
+  governorateAr: 'الشرقية',
+  deliveryFeeMinor: 2000,
+);
+
 class _FakeAddressesApi implements AddressesApi {
+  /// The zones the backend returns — the ONLY source of the dropdown (never hardcoded in the app).
+  List<DeliveryZone> zones = const [_abuNaseeb, _secondZone];
+  Object? zonesFailure;
+  int zoneCalls = 0;
   final created = <AddressInput>[];
   final updated = <({String id, AddressInput input})>[];
   String? suggestion = 'شارع الجمهورية، بلبيس، الشرقية';
@@ -27,6 +54,13 @@ class _FakeAddressesApi implements AddressesApi {
   Future<List<SavedAddress>> getAddresses() async => saved;
 
   @override
+  Future<List<DeliveryZone>> getDeliveryZones() async {
+    zoneCalls++;
+    if (zonesFailure != null) throw zonesFailure!;
+    return zones;
+  }
+
+  @override
   Future<SavedAddress> createAddress(AddressInput input) async {
     if (createFailure != null) throw createFailure!;
     created.add(input);
@@ -35,13 +69,15 @@ class _FakeAddressesApi implements AddressesApi {
         line1: input.line1,
         latitude: input.latitude,
         longitude: input.longitude,
+        deliveryZoneId: input.deliveryZoneId,
         isDefault: input.isDefault ?? false);
   }
 
   @override
   Future<SavedAddress> updateAddress(String addressId, AddressInput input) async {
     updated.add((id: addressId, input: input));
-    return SavedAddress(id: addressId, line1: input.line1, latitude: input.latitude, longitude: input.longitude);
+    return SavedAddress(
+        id: addressId, line1: input.line1, latitude: input.latitude, longitude: input.longitude, deliveryZoneId: input.deliveryZoneId);
   }
 
   @override
@@ -128,18 +164,217 @@ Future<void> _enter(WidgetTester tester, String key, String text) async {
   await tester.enterText(find.byKey(Key(key)), text);
 }
 
+/// The zone dropdown (governorate / city are preselected when the backend offers only one of each).
+Finder get _zoneDropdown => find.byWidgetPredicate(
+    (w) => w is DropdownButtonFormField<String> && w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('address-zone-'));
+
+Future<void> _selectZone(WidgetTester tester, {String nameAr = 'أبو نصيب'}) async {
+  await tester.ensureVisible(_zoneDropdown);
+  await tester.tap(_zoneDropdown);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(nameAr).last);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _save(WidgetTester tester) async {
+  await tester.ensureVisible(find.byKey(const Key('address-save')));
+  await tester.tap(find.byKey(const Key('address-save')));
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  group('the map pin is the authoritative location', () {
-    testWidgets('saving without a pin is refused with a clear message — typed text alone is not a location', (tester) async {
+  group('Delivery Zones (PD-009): the zone locates the address, the map pin is optional', () {
+    testWidgets('zones come from the backend: governorate and city are preselected, the area must be chosen', (tester) async {
+      final r = await _pump(tester);
+      expect(r.api.zoneCalls, 1);
+      expect(find.text('الشرقية'), findsWidgets);
+      expect(find.text('بلبيس'), findsWidgets);
+      expect(find.byKey(const Key('address-zone-help')), findsOneWidget);
+      await tester.tap(_zoneDropdown);
+      await tester.pumpAndSettle();
+      expect(find.text('أبو نصيب'), findsWidgets);
+      expect(find.text('منطقة تانية'), findsWidgets);
+    });
+
+    testWidgets('saving WITHOUT a map pin works when an area is chosen — a non-geocodable address is fine', (tester) async {
+      final r = await _pump(tester);
+      await _selectZone(tester);
+      await _enter(tester, 'address-line1', 'شارع أبو نصيب جنب جامع الكردي، منزل 15');
+      await _save(tester);
+      final json = r.api.created.single.toJson();
+      expect(json, {'line1': 'شارع أبو نصيب جنب جامع الكردي، منزل 15', 'deliveryZoneId': 'zone-1'});
+      expect(r.api.reverseCalls, isEmpty, reason: 'no geocoding was needed');
+      expect((r.popped.single as SavedAddress).id, 'new-1');
+    });
+
+    testWidgets('the area is required — nothing is sent without one', (tester) async {
       final r = await _pump(tester);
       await _enter(tester, 'address-line1', 'شارع الجمهورية');
-      await tester.ensureVisible(find.byKey(const Key('address-save')));
-      await tester.tap(find.byKey(const Key('address-save')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('address-error')), findsOneWidget);
+      await _save(tester);
+      expect(find.text('اختار المنطقة'), findsWidgets);
       expect(r.api.created, isEmpty);
     });
 
+    testWidgets('a city with exactly ONE active zone: it is selected for the customer (data-driven), shown as selected, and saved', (tester) async {
+      final api = _FakeAddressesApi()..zones = const [_abuNaseeb];
+      final r = await _pump(tester, api: api);
+      expect(find.byKey(const Key('address-zone-auto-selected')), findsOneWidget);
+      expect(find.text('أبو نصيب'), findsWidgets, reason: 'the selected zone is visible in the field');
+      await _enter(tester, 'address-line1', 'شارع أبو نصيب جنب جامع الكردي، منزل 15');
+      await _save(tester);
+      expect(r.api.created.single.deliveryZoneId, 'zone-1', reason: 'saved without touching the dropdown');
+    });
+
+    testWidgets('the single-zone shortcut is data-driven: a different single zone from the backend is selected the same way', (tester) async {
+      const other = DeliveryZone(id: 'zone-x', name: 'X', nameAr: 'منطقة إكس', city: 'Zagazig', cityAr: 'الزقازيق', governorate: 'Sharqia', governorateAr: 'الشرقية', deliveryFeeMinor: 999);
+      final api = _FakeAddressesApi()..zones = const [other];
+      final r = await _pump(tester, api: api);
+      await _enter(tester, 'address-line1', 'شارع');
+      await _save(tester);
+      expect(r.api.created.single.deliveryZoneId, 'zone-x');
+    });
+
+    testWidgets('a city with SEVERAL zones: nothing is preselected and every active zone of that city is offered', (tester) async {
+      await _pump(tester);
+      expect(find.byKey(const Key('address-zone-auto-selected')), findsNothing);
+      await tester.tap(_zoneDropdown);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('address-zone-option-zone-1')), findsWidgets);
+      expect(find.byKey(const Key('address-zone-option-zone-2')), findsWidgets);
+    });
+
+    testWidgets('switching city re-applies the rule: a one-zone city gets its zone, a several-zone city asks', (tester) async {
+      const zag = DeliveryZone(id: 'zone-z', name: 'Z', nameAr: 'منطقة الزقازيق', city: 'Zagazig', cityAr: 'الزقازيق', governorate: 'Sharqia', governorateAr: 'الشرقية', deliveryFeeMinor: 1000);
+      final api = _FakeAddressesApi()..zones = const [_abuNaseeb, _secondZone, zag];
+      final r = await _pump(tester, api: api);
+      final city = find.byWidgetPredicate((w) => w is DropdownButtonFormField<String> && w.key is ValueKey<String> && (w.key as ValueKey<String>).value.startsWith('address-city-'));
+      await tester.tap(city);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('الزقازيق').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('address-zone-auto-selected')), findsOneWidget);
+      await _enter(tester, 'address-line1', 'شارع');
+      await _save(tester);
+      expect(r.api.created.single.deliveryZoneId, 'zone-z');
+    });
+
+    testWidgets("an address whose city now has NO active zone says so, and can't be saved without a zone", (tester) async {
+      const gone = SavedAddress(
+        id: 'a7',
+        line1: 'شارع',
+        deliveryZoneId: 'zone-old',
+        deliveryZone: DeliveryZone(id: 'zone-old', name: 'Old', nameAr: 'قديمة', city: 'Minya', cityAr: 'المنيا', governorate: 'Minya', governorateAr: 'المنيا'),
+        zoneStatus: AddressZoneStatus.unavailable,
+      );
+      final r = await _pump(tester, existing: gone);
+      expect(find.byKey(const Key('address-city-no-zones')), findsOneWidget);
+      await _save(tester);
+      expect(r.api.updated, isEmpty);
+    });
+
+    testWidgets('a LEGACY address is never assigned a zone on its behalf — even when its city has a single zone', (tester) async {
+      const legacy = SavedAddress(id: 'old-2', line1: 'شارع قديم', city: 'بلبيس', governorate: 'الشرقية', zoneStatus: AddressZoneStatus.missing);
+      final api = _FakeAddressesApi()..zones = const [_abuNaseeb];
+      final r = await _pump(tester, existing: legacy, api: api);
+      expect(find.byKey(const Key('address-zone-auto-selected')), findsNothing);
+      expect(find.byKey(const Key('address-zone-banner')), findsOneWidget);
+      await _save(tester);
+      expect(r.api.updated, isEmpty, reason: 'the customer must confirm the zone explicitly');
+      await _selectZone(tester);
+      await _save(tester);
+      expect(r.api.updated.single.input.deliveryZoneId, 'zone-1');
+    });
+
+    testWidgets("choosing an area shows that area's fee as information (the quote stays authoritative)", (tester) async {
+      await _pump(tester);
+      expect(find.byKey(const Key('address-zone-fee')), findsNothing);
+      await _selectZone(tester, nameAr: 'منطقة تانية');
+      expect(find.byKey(const Key('address-zone-fee')), findsOneWidget);
+      expect(find.textContaining('20'), findsWidgets);
+    });
+
+    testWidgets('loading → error with retry → loaded', (tester) async {
+      final api = _FakeAddressesApi()..zonesFailure = Exception('offline');
+      await _pump(tester, api: api);
+      expect(find.byKey(const Key('address-zones-error')), findsOneWidget);
+      api.zonesFailure = null;
+      await tester.tap(find.byKey(const Key('address-zones-retry')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('address-zones-error')), findsNothing);
+      expect(_zoneDropdown, findsOneWidget);
+      expect(api.zoneCalls, 2);
+    });
+
+    testWidgets('no zones offered: says so, and the form cannot be saved', (tester) async {
+      final api = _FakeAddressesApi()..zones = const [];
+      final r = await _pump(tester, api: api);
+      expect(find.byKey(const Key('address-zones-empty')), findsOneWidget);
+      await _enter(tester, 'address-line1', 'شارع');
+      await _save(tester);
+      expect(r.api.created, isEmpty);
+    });
+
+    testWidgets('an address saved before zones is NOT guessed into one: a banner asks, and saving sends the chosen zone', (tester) async {
+      const legacy = SavedAddress(
+        id: 'old-1',
+        line1: 'شارع البحر',
+        latitude: 30.41,
+        longitude: 31.57,
+        city: 'بلبيس',
+        governorate: 'الشرقية',
+        zoneStatus: AddressZoneStatus.missing,
+      );
+      final r = await _pump(tester, existing: legacy);
+      expect(find.byKey(const Key('address-zone-banner')), findsOneWidget);
+      await _save(tester);
+      expect(r.api.updated, isEmpty, reason: 'no zone chosen yet');
+      await _selectZone(tester);
+      expect(find.byKey(const Key('address-zone-banner')), findsNothing);
+      await _save(tester);
+      expect(r.api.updated.single.input.deliveryZoneId, 'zone-1');
+      expect(r.api.updated.single.input.latitude, 30.41, reason: 'the existing pin is kept');
+    });
+
+    testWidgets('an address whose zone was deactivated must choose another (the old zone is not offered)', (tester) async {
+      const stale = SavedAddress(
+        id: 'a9',
+        line1: 'شارع',
+        deliveryZoneId: 'zone-gone',
+        deliveryZone: DeliveryZone(id: 'zone-gone', name: 'Gone', nameAr: 'قديمة', city: 'Belbeis', cityAr: 'بلبيس', governorate: 'Sharqia', governorateAr: 'الشرقية'),
+        zoneStatus: AddressZoneStatus.unavailable,
+      );
+      final r = await _pump(tester, existing: stale);
+      expect(find.text('منطقة التوصيل بتاعة العنوان ده مش متاحة دلوقتي. اختار منطقة تانية.'), findsOneWidget);
+      await _save(tester);
+      expect(r.api.updated, isEmpty);
+    });
+
+    testWidgets('a pin can be removed on edit: both coordinates are sent as null (never half a pin)', (tester) async {
+      const pinned = SavedAddress(id: 'a1', line1: 'شارع', latitude: 30.41, longitude: 31.57, deliveryZoneId: 'zone-1', deliveryZone: _abuNaseeb);
+      final r = await _pump(tester, existing: pinned);
+      await tester.ensureVisible(find.byKey(const Key('address-remove-pin')));
+      await tester.tap(find.byKey(const Key('address-remove-pin')));
+      await tester.pumpAndSettle();
+      await _save(tester);
+      final json = r.api.updated.single.input.toJson();
+      expect(json.containsKey('latitude'), isTrue);
+      expect(json['latitude'], isNull);
+      expect(json['longitude'], isNull);
+      expect(json['deliveryZoneId'], 'zone-1');
+    });
+
+    testWidgets('a server zone rejection is shown in plain words', (tester) async {
+      final api = _FakeAddressesApi()
+        ..createFailure = const ApiException(code: 'BAD_REQUEST', message: 'x', details: {'code': 'DELIVERY_ZONE_UNAVAILABLE'}, statusCode: 400);
+      await _pump(tester, api: api);
+      await _selectZone(tester);
+      await _enter(tester, 'address-line1', 'شارع');
+      await _save(tester);
+      expect(find.text('هاتلي مش بيوصّل للمنطقة دي دلوقتي. اختار منطقة أو عنوان تاني.'), findsOneWidget);
+    });
+  });
+
+  group('the optional map pin', () {
     testWidgets('without a native map the picker offers GPS and address search, and says why', (tester) async {
       await _pump(tester);
       expect(find.byKey(const Key('address-no-map')), findsOneWidget);
@@ -234,6 +469,7 @@ void main() {
       await tester.tap(find.byKey(const Key('address-use-suggestion')));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(find.byKey(const Key('address-line1'))).controller!.text, 'شارع الجمهورية، بلبيس، الشرقية');
+      await _selectZone(tester);
 
       await tester.ensureVisible(find.byKey(const Key('address-save')));
       await tester.tap(find.byKey(const Key('address-save')));
@@ -246,6 +482,7 @@ void main() {
       await tester.tap(find.byKey(const Key('address-use-current-location')));
       await tester.pumpAndSettle();
       await _enter(tester, 'address-line1', 'عمارة 5 شارع النصر');
+      await _selectZone(tester);
       await tester.ensureVisible(find.byKey(const Key('address-save')));
       await tester.tap(find.byKey(const Key('address-save')));
       await tester.pumpAndSettle();
@@ -269,8 +506,7 @@ void main() {
       await tester.tap(find.byKey(const Key('address-use-current-location')));
       await tester.pumpAndSettle();
       await _enter(tester, 'address-line1', '  شارع الجمهورية  ');
-      await _enter(tester, 'address-governorate', 'الشرقية');
-      await _enter(tester, 'address-city', 'بلبيس');
+      await _selectZone(tester);
       await _enter(tester, 'address-building', '12');
       await _enter(tester, 'address-floor', '3');
       await _enter(tester, 'address-apartment', '8');
@@ -284,14 +520,14 @@ void main() {
       await tester.pumpAndSettle();
 
       final json = r.api.created.single.toJson();
+      // Governorate / city are NOT sent — the server derives them from the zone, so they can never contradict it.
       expect(json, {
         'line1': 'شارع الجمهورية',
+        'deliveryZoneId': 'zone-1',
         'latitude': 30.4,
         'longitude': 31.5,
         'label': 'المنزل',
         'instructions': 'اتصل بي',
-        'governorate': 'الشرقية',
-        'city': 'بلبيس',
         'buildingNumber': '12',
         'floor': '3',
         'apartment': '8',
@@ -318,6 +554,7 @@ void main() {
       await tester.tap(find.byKey(const Key('address-use-current-location')));
       await tester.pumpAndSettle();
       await _enter(tester, 'address-line1', 'شارع');
+      await _selectZone(tester);
       await tester.ensureVisible(find.byKey(const Key('address-save')));
       await tester.tap(find.byKey(const Key('address-save')));
       await tester.pumpAndSettle();
@@ -334,6 +571,8 @@ void main() {
         longitude: 31.57,
         governorate: 'الشرقية',
         city: 'بلبيس',
+        deliveryZoneId: 'zone-1',
+        deliveryZone: _abuNaseeb,
         buildingNumber: '7',
         floor: '2',
         apartment: '4',
@@ -344,7 +583,7 @@ void main() {
       );
       final r = await _pump(tester, existing: existing);
       expect(find.byKey(const Key('address-location-captured')), findsOneWidget, reason: 'the pin comes with the address');
-      expect(tester.widget<TextField>(find.byKey(const Key('address-city'))).controller!.text, 'بلبيس');
+      expect(find.text('أبو نصيب'), findsWidgets, reason: "the address's own zone is preselected");
       expect(tester.widget<Switch>(find.descendant(of: find.byKey(const Key('address-default')), matching: find.byType(Switch))).value, isTrue);
       await _enter(tester, 'address-floor', '5');
       await tester.ensureVisible(find.byKey(const Key('address-save')));
@@ -354,6 +593,7 @@ void main() {
       expect(u.id, 'a1');
       expect(u.input.latitude, 30.41);
       expect(u.input.floor, '5');
+      expect(u.input.deliveryZoneId, 'zone-1');
       expect(u.input.formattedAddress, 'شارع البحر، بلبيس', reason: 'an accepted suggestion is kept on edit');
     });
   });
@@ -405,6 +645,50 @@ void main() {
       await tester.tap(find.byKey(const Key('address-tile-a2')));
       await tester.pumpAndSettle();
       expect((popped.single as SavedAddress).id, 'a2');
+    });
+
+    testWidgets('PD-009: the zone is shown; an address that NEEDS a zone opens the editor instead of being returned half-usable', (tester) async {
+      final api = _FakeAddressesApi()
+        ..saved = const [
+          SavedAddress(id: 'z1', line1: 'شارع أبو نصيب', deliveryZoneId: 'zone-1', deliveryZone: _abuNaseeb),
+          SavedAddress(id: 'old', line1: 'شارع قديم', latitude: 1, longitude: 2, zoneStatus: AddressZoneStatus.missing),
+        ];
+      final popped = <Object?>[];
+      final openedEditorFor = <String>[];
+      await tester.pumpWidget(hatlyRouterApp(
+        overrides: [addressesApiProvider.overrideWithValue(api)],
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (c, s) => Scaffold(
+              body: ElevatedButton(
+                key: const Key('open'),
+                onPressed: () async => popped.add(await c.push<SavedAddress>('/list')),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+          GoRoute(path: '/list', builder: (c, s) => const AddressSelectionScreen()),
+          GoRoute(
+            path: '/addresses/add',
+            builder: (c, s) {
+              openedEditorFor.add((s.extra as SavedAddress).id);
+              return const Scaffold(body: Text('editor'));
+            },
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('open')));
+      await tester.pumpAndSettle();
+      expect(find.text('بلبيس — أبو نصيب'), findsOneWidget);
+      expect(find.byKey(const Key('address-needs-zone-old')), findsOneWidget);
+      expect(find.byKey(const Key('address-needs-zone-z1')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('address-tile-old')));
+      await tester.pumpAndSettle();
+      expect(openedEditorFor, ['old']);
+      expect(popped, isEmpty, reason: 'never returned to checkout without a zone');
     });
   });
 }

@@ -193,13 +193,16 @@ class _Content extends ConsumerWidget {
             onSelectElectronic: controller.selectElectronicMethod,
           ),
           const SizedBox(height: HatlySpacing.lg),
-          CheckoutWalletSection(
-            quote: quote,
-            selection: selection,
-            onToggle: controller.setUseWallet,
-            onAmount: controller.setWalletAmount,
-          ),
-          const SizedBox(height: HatlySpacing.lg),
+          // U2: a pickup order is paid in cash at the counter — the wallet is never offered for it.
+          if (!(quote.fulfillment?.isPickup ?? false)) ...[
+            CheckoutWalletSection(
+              quote: quote,
+              selection: selection,
+              onToggle: controller.setUseWallet,
+              onAmount: controller.setWalletAmount,
+            ),
+            const SizedBox(height: HatlySpacing.lg),
+          ],
         ],
         CheckoutCouponSection(
           coupon: quote.coupon,
@@ -298,7 +301,11 @@ class _StickyBar extends ConsumerWidget {
           !(quote.fulfillment?.isPickup ?? false)) {
         hint = l10n.checkoutSelectAddressCta;
       } else if (quote.eligibility != null && !quote.eligibility!.serviceable) {
-        hint = l10n.checkoutAddressOutOfServiceArea;
+        hint = switch (quote.eligibility!.code) {
+          'ADDRESS_ZONE_REQUIRED' => l10n.checkoutAddressZoneRequired,
+          'DELIVERY_ZONE_UNAVAILABLE' => l10n.checkoutAddressZoneUnavailable,
+          _ => l10n.checkoutAddressOutOfServiceArea,
+        };
       }
     }
 
@@ -327,18 +334,24 @@ class _StickyBar extends ConsumerWidget {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2)),
                     ),
-                  Semantics(
+                  Flexible(
+                      child: Semantics(
                     liveRegion: true,
                     child: total == null
-                        ? Text(l10n.checkoutTotalPending,
+                        ? Text(
+                            quote.hasPendingPricing
+                                ? l10n.hatlyServicePricePending
+                                : l10n.checkoutTotalPending,
                             key: const Key('checkout-total'),
-                            style: context.type.title)
+                            style: quote.hasPendingPricing
+                                ? context.type.small
+                                : context.type.title)
                         : LtrText(
                             formatMinorUnits(total, context),
                             key: const Key('checkout-total'),
                             style: context.type.h2,
                           ),
-                  ),
+                  )),
                 ],
               ),
               if (showDue)
@@ -364,8 +377,11 @@ class _StickyBar extends ConsumerWidget {
                 ),
               const SizedBox(height: HatlySpacing.sm),
               SizedBox(
+                // Polish pass: was `height: 52`, 4px taller than every other
+                // primary button in this app (the theme's own
+                // `ElevatedButtonThemeData.minimumSize` is 48px, e.g. this
+                // same `hatlyAccentButtonStyle` used on Order Success).
                 width: double.infinity,
-                height: 52,
                 child: ElevatedButton(
                   key: const Key('checkout-confirm'),
                   style: hatlyAccentButtonStyle(context),

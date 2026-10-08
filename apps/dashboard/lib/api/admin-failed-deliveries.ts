@@ -1,8 +1,10 @@
+import { DeliveryAddressView } from '../delivery-address';
 import { apiClient } from './client';
 
 /** Mirrors the real backend `FailedDeliveryQueueItem` exactly (failed-delivery-resolution.service.ts). */
 export interface FailedDeliveryQueueItem {
   orderId: string;
+  orderNumber: string;
   failedAt: string | null;
   failureReason: string | null;
   customerId: string;
@@ -15,9 +17,21 @@ export interface FailedDeliveryQueueItem {
   createdAt: string;
 }
 
+/** BUY_FROM_PLACE: origin = the named place (pickup*), destination = the order's delivery address. DELIVER_TO_PLACE: origin = the delivery address, destination = the named place (destination*). */
+export interface AdminHatlyService {
+  serviceType: string | null;
+  placeName: string | null;
+  pickupLatitude: number | null;
+  pickupLongitude: number | null;
+  destinationLatitude: number | null;
+  destinationLongitude: number | null;
+}
+
 /** Mirrors the real backend `AdminOrderDetailView` exactly (admin-orders.service.ts, Chunk 2a). Only the shape actually used by this chunk's UI is declared here. */
 export interface AdminOrderDetail {
   id: string;
+  /** M3b (G-04) addition to this existing type — the backend's `AdminOrderDetailView` already returned this field; it just wasn't declared here yet since Failed Deliveries never needed to show it. */
+  orderNumber: string;
   status: string;
   customerId: string;
   fulfillmentType: string;
@@ -26,7 +40,12 @@ export interface AdminOrderDetail {
   deliveryFeeMinor: number | null;
   discountMinor: number;
   totalMinor: number | null;
+  walletAmountMinor?: number;
+  amountDueMinor?: number | null;
   hasPendingAdHocPricing: boolean;
+  /** Hatly Service pricing Admin UI: at least one Hatly Service request is still PENDING. */
+  hasPendingHatlyServicePricing?: boolean;
+  deliveryAddress?: DeliveryAddressView | null;
   cancellationReason: string | null;
   cancelledByRole: string | null;
   failureReason: string | null;
@@ -34,13 +53,28 @@ export interface AdminOrderDetail {
   createdAt: string;
   updatedAt: string;
   customer: { id: string; fullName: string; phone: string } | null;
+  /** Null for a released order (back to READY_FOR_PICKUP): only the driver actually on (or who finished) the order. */
   driver: { id: string; fullName: string; phone: string } | null;
+  /** Control Tower milestone: status history, oldest first. */
+  timeline?: Array<{ status: string; at: string; actorRole: string | null }>;
+  /** Control Tower milestone: dispatch facts of the delivery (null before any assignment). */
+  delivery?: {
+    assignedAt: string | null;
+    acceptDeadlineAt: string | null;
+    pickedUpAt: string | null;
+    deliveredAt: string | null;
+    reassignmentCount: number;
+  } | null;
+  /** Control Tower milestone: "no eligible driver" alerts for this order, newest first. */
+  dispatchAlerts?: Array<{ id: string; reason: string; createdAt: string; resolvedAt: string | null }>;
   segments: Array<{
     id: string;
     groupType: string;
     vendorBranchId: string | null;
     status: string;
     subtotalMinor: number | null;
+    /** Hatly Service request details — present only for an AD_HOC_SERVICE segment. */
+    hatlyService?: AdminHatlyService | null;
     items: Array<{
       id: string;
       productId: string | null;
@@ -50,6 +84,8 @@ export interface AdminOrderDetail {
       quantity: number;
       unitPriceMinor: number | null;
       actualAmountMinor: number | null;
+      /** `null` for a normal catalog item. */
+      priceStatus?: 'PENDING' | 'CONFIRMED' | null;
       requestedWeightGrams: number | null;
       actualWeightGrams: number | null;
       offerDiscountAmountMinor: number | null;

@@ -176,41 +176,35 @@ void main() {
     });
   }
 
-  group('OrderStatusBadge theme-awareness', () {
+  // Dark Mode implementation: `OrderStatusBadge` used to take a `themeAware`
+  // flag because only Order Details had been migrated onto palette surfaces
+  // (the Orders list still used a fixed-colour legacy path). Every real call
+  // site (Orders list, Order Details, Tracking) now already passed
+  // `themeAware: true`, so the flag and the legacy branch it gated were dead
+  // code — removed. The badge is now always palette-driven; these tests
+  // cover that single behaviour instead of the old flag.
+  group('OrderStatusBadge is theme-aware', () {
     Future<Color> badgeTextColor(WidgetTester tester,
-        {required bool dark,
-        required bool themeAware,
-        String status = 'DELIVERED'}) async {
-      await tester.pumpWidget(hatlyTestApp(
-          OrderStatusBadge(status: status, themeAware: themeAware),
-          dark: dark));
+        {required bool dark, String status = 'DELIVERED'}) async {
+      await tester.pumpWidget(
+          hatlyTestApp(OrderStatusBadge(status: status), dark: dark));
       await tester.pumpAndSettle();
       final text = tester.widget<Text>(find.descendant(
           of: find.byType(OrderStatusBadge), matching: find.byType(Text)));
       return text.style!.color!;
     }
 
-    testWidgets(
-        'default (Orders list, legacy surfaces) keeps the fixed colours in both themes',
+    testWidgets('Light Mode colours are identical to the old fixed ones',
         (tester) async {
-      expect(await badgeTextColor(tester, dark: true, themeAware: false),
+      expect(await badgeTextColor(tester, dark: false, status: 'DELIVERED'),
           HatlyColors.success);
+      expect(await badgeTextColor(tester, dark: false, status: 'CANCELLED'),
+          HatlyColors.error);
+      expect(await badgeTextColor(tester, dark: false, status: 'PENDING'),
+          HatlyColors.primaryOrange);
     });
 
-    testWidgets(
-        'themeAware: Light Mode colours are identical to the fixed ones',
-        (tester) async {
-      for (final status in ['DELIVERED', 'CANCELLED', 'PENDING']) {
-        final fixed = await badgeTextColor(tester,
-            dark: false, themeAware: false, status: status);
-        final adaptive = await badgeTextColor(tester,
-            dark: false, themeAware: true, status: status);
-        expect(adaptive, fixed, reason: status);
-      }
-    });
-
-    testWidgets(
-        'themeAware: Dark Mode badge text is readable on the dark surface',
+    testWidgets('Dark Mode badge text is readable on the dark surface',
         (tester) async {
       for (final status in [
         'DELIVERED',
@@ -218,8 +212,8 @@ void main() {
         'FAILED_DELIVERY',
         'PENDING'
       ]) {
-        final color = await badgeTextColor(tester,
-            dark: true, themeAware: true, status: status);
+        final color =
+            await badgeTextColor(tester, dark: true, status: status);
         expect(_contrast(color, HatlyPalette.dark.surface),
             greaterThanOrEqualTo(4.5),
             reason: status);

@@ -121,6 +121,7 @@ describe('Real Redis via the production shared client', () => {
     const store = app.get(RefreshTokenStore);
     const userId = `${runId}-user`;
     foreignKeys.add(`refresh:${userId}`);
+    foreignKeys.add(`refresh-used:${userId}`); // M5 Batch 2: rotation remembers consumed jtis (reuse detection) under this key
     for (const key of await redis.keys(`*${userId}*`)) foreignKeys.add(key);
 
     const jti = await store.issue(userId, 60);

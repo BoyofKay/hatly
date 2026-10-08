@@ -16,6 +16,8 @@
     "migration:revert": "npm run typeorm -- migration:revert",
     "bootstrap:admin": "ts-node src/scripts/bootstrap-admin.ts",
     "seed:dev-marketplace": "ts-node src/scripts/seed-dev-marketplace.ts",
+    "seed:dev-delivery-zones": "ts-node src/scripts/seed-dev-delivery-zones.ts",
+    "assets:manifest": "ts-node src/scripts/asset-manifest.ts",
     "test:integration": "jest --config test/integration/jest-integration.json --runInBand",
     "test:integration:setup": "sh test/integration/create-integration-db.sh",
     "test:e2e:setup": "sh test/e2e/create-e2e-db.sh"
@@ -30,7 +32,7 @@
     "@nestjs/swagger": "^7.4.0",
     "@nestjs/throttler": "^6.2.0",
     "@nestjs/typeorm": "^10.0.2",
-    "bcrypt": "^5.1.1",
+    "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "firebase-admin": "^12.5.0",
@@ -43,7 +45,7 @@
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.20",
     "uuid": "^10.0.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.0",

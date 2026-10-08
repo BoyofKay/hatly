@@ -17,8 +17,9 @@ import { OrderStatus } from '../orders/order-status.enum';
 import { Role } from '../../common/enums/role.enum';
 import { Delivery } from './entities/delivery.entity';
 import { DispatchAlert } from './entities/dispatch-alert.entity';
+import { FulfillmentType } from '../cart/fulfillment-type.enum';
 import { DriverRankingService } from './driver-ranking.service';
-import { DeliveryAssignmentService } from './delivery-assignment.service';
+import { DeliveryAssignmentService, OrderNotAssignableException } from './delivery-assignment.service';
 import { OrderStateMachineService } from '../orders/order-state-machine.service';
 import { BusinessConfigService } from '../business-config/business-config.service';
 import { REDIS_CLIENT } from '../../common/redis/redis.constants';
@@ -150,8 +151,11 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
    * AUTOMATIC_DISPATCH_ENABLED is false, does nothing at all — the
    * order stays at READY_FOR_PICKUP, available for the manual Admin
    * flow, per the confirmed rule.
+   *
+   * `excludeDriverIds` (U3): drivers this ONE attempt must not offer the order to — the driver who just handed it back.
+   * Applied to the unchanged ranking's output; if it leaves nobody, the existing "no eligible driver" alert is raised.
    */
-  async attemptAutomaticDispatch(orderId: string): Promise<void> {
+  async attemptAutomaticDispatch(orderId: string, options: { excludeDriverIds?: string[] } = {}): Promise<void> {
     const isEnabled = await this.businessConfigService.isAutomaticDispatchEnabled();
     if (!isEnabled) {
       return;
@@ -159,8 +163,11 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
 
     const order = await this.ordersRepository.findOne({ where: { id: orderId }, relations: { segments: true } });
     if (!order) return;
+    // A PICKUP order is collected by the customer (PD-006.C): never dispatched, and not a "no eligible driver" situation.
+    if (order.fulfillmentType !== FulfillmentType.DELIVERY) return;
 
-    const candidateDriverIds = await this.driverRankingService.rankCandidates(order);
+    const excluded = new Set(options.excludeDriverIds ?? []);
+    const candidateDriverIds = (await this.driverRankingService.rankCandidates(order)).filter((id) => !excluded.has(id));
 
     if (candidateDriverIds.length === 0) {
       // Ranking itself produced nothing — distinct from
@@ -178,6 +185,11 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.deliveryAssignmentService.assignDriver({ orderId, candidateDriverIds });
     } catch (error) {
+      if (error instanceof OrderNotAssignableException) {
+        // The order is no longer waiting for a driver (an admin assigned it, or it was cancelled) — nothing to do, and
+        // certainly not a "no eligible driver" alert.
+        return;
+      }
       if (error instanceof ConflictException) {
         // Every ranked candidate was unavailable by the time the lock
         // was attempted (a real race, not a ranking mistake) — same
@@ -186,6 +198,22 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
         return;
       }
       throw error;
+    }
+  }
+
+  /**
+   * U3 (approved): a DRIVER handed an assigned order back (ASSIGNED_TO_DRIVER → READY_FOR_PICKUP, already committed).
+   * One immediate attempt through the SAME automatic dispatch (ranking, atomic assignment, locks, push, alerts, the
+   * AUTOMATIC_DISPATCH_ENABLED switch), never re-offering it to that driver. No delay, no retry loop: if nobody else is
+   * eligible the existing NO_ELIGIBLE_DRIVER alert is raised and an admin takes over. An admin who assigned it in the
+   * meantime simply wins (the attempt sees ORDER_NOT_ASSIGNABLE and stops). Never fails the driver's own request: the
+   * release already happened; an unexpected error is logged, and the order stays visible as "released" in the Control Tower.
+   */
+  async redispatchAfterDriverRelease(orderId: string, releasingDriverId: string): Promise<void> {
+    try {
+      await this.attemptAutomaticDispatch(orderId, { excludeDriverIds: [releasingDriverId] });
+    } catch (error) {
+      this.logger.error(`Redispatch after driver release failed for order ${orderId}: ${(error as Error).message}`);
     }
   }
 
@@ -286,6 +314,11 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
           await this.deliveryAssignmentService.assignDriver({ orderId: released.orderId, candidateDriverIds });
           result.reassigned++;
         } catch (error) {
+          if (error instanceof OrderNotAssignableException) {
+            // Someone else acted on the released order in the meantime (e.g. an admin assigned it) — a benign race.
+            result.skipped++;
+            continue;
+          }
           if (error instanceof ConflictException) {
             await this.raiseAlert(released.orderId);
             result.alerted++;

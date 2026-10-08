@@ -8,6 +8,7 @@ import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/skeleton_box.dart';
 import '../../auth/presentation/widgets/phone_verification_banner.dart';
 import '../data/home_providers.dart';
+import 'widgets/hatly_service_entry_card.dart';
 import 'widgets/home_category_section.dart';
 import 'widgets/home_location_bar.dart';
 import 'widgets/home_offers_section.dart';
@@ -18,9 +19,15 @@ import 'widgets/promo_carousel.dart';
 
 /// Customer Home — approved structure, top to bottom:
 /// Location → Global Search → Rotating Promo Carousel → Shop by Category (3-column
-/// grid) → Offers → Popular & New. (The floating bottom navigation is owned by
-/// the shell.) Vendor discovery lives in Explore and the category listings;
-/// Home deliberately has no vendor section.
+/// grid) → Hatly Service entry → Offers → Popular & New. (The floating bottom
+/// navigation is owned by the shell.) Vendor discovery lives in Explore and the
+/// category listings; Home deliberately has no vendor section.
+///
+/// The Hatly Service entry (added additively, between Categories and Offers)
+/// is the one exception to "Home has no vendor section" — it is not a vendor
+/// entry point at all, but the standalone, not-vendor-scoped Hatly Service
+/// request (see `hatly_service_entry_card.dart`'s own doc comment for why it
+/// is its own section rather than a tile inside "Shop by Category").
 ///
 /// Everything below Search is data from the EXISTING repositories composed in
 /// `home_providers.dart`; nothing here talks to the network or owns business
@@ -89,6 +96,10 @@ class HomeScreen extends ConsumerWidget {
                   ],
                   // 4. Shop by category
                   const HomeCategorySection(),
+                  const SizedBox(height: _sectionGap),
+                  // Hatly Service entry point — additive, not part of the
+                  // category grid (see hatly_service_entry_card.dart).
+                  const HatlyServiceEntryCard(),
                   const SizedBox(height: _sectionGap),
                   // 5. Offers  (there is no offers list screen yet → Explore/search)
                   HomeOffersSection(

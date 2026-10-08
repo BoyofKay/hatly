@@ -10,6 +10,7 @@ import {
   executeFailedDeliveryRefund,
   getAdminOrderDetail,
 } from '../../../../lib/api/admin-failed-deliveries';
+import { apiErrorMessage } from '../../../../lib/api/errors';
 
 /**
  * Failed Delivery case detail, resolution, and refund execution
@@ -57,7 +58,7 @@ export default function FailedDeliveryDetailPage() {
     try {
       setDetail(await getAdminOrderDetail(orderId));
     } catch (err: any) {
-      setDetailError(err?.response?.data?.message ?? 'Failed to load order.');
+      setDetailError(apiErrorMessage(err, 'Failed to load order.'));
     }
   }
 
@@ -69,6 +70,7 @@ export default function FailedDeliveryDetailPage() {
   const existingRefundEvent = detail?.financialEvents.find((e) => e.type === 'MANUAL_TRANSFER_REFUND_RECORDED');
 
   async function handleSubmitResolution() {
+    if (submitting) return;
     setFormError(null);
     if (outcome === 'REFUND_CUSTOMER') {
       const amount = Number(refundAmount);
@@ -76,6 +78,10 @@ export default function FailedDeliveryDetailPage() {
         setFormError('Refund amount is required and must be a positive integer (minor units).');
         return;
       }
+    }
+    // M3a (Launch-Readiness Gap Audit, G-12) — terminal: no edit/delete endpoint exists once recorded.
+    if (!window.confirm('Record this resolution? It is terminal and cannot be edited or deleted afterward.')) {
+      return;
     }
     setSubmitting(true);
     try {
@@ -90,21 +96,26 @@ export default function FailedDeliveryDetailPage() {
       setResolution(created);
       await refresh();
     } catch (err: any) {
-      setFormError(err?.response?.data?.message ?? 'Failed to record resolution.');
+      setFormError(apiErrorMessage(err, 'Failed to record resolution.'));
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleExecuteRefund() {
+    if (executingRefund) return;
     setRefundError(null);
+    // M3a (Launch-Readiness Gap Audit, G-12) — financial and irreversible.
+    if (!window.confirm('Execute this refund now? This sends money back to the customer and cannot be undone.')) {
+      return;
+    }
     setExecutingRefund(true);
     try {
       const result = await executeFailedDeliveryRefund(orderId);
       setRefundResult(result.status);
       await refresh();
     } catch (err: any) {
-      setRefundError(err?.response?.data?.message ?? 'Failed to execute refund.');
+      setRefundError(apiErrorMessage(err, 'Failed to execute refund.'));
     } finally {
       setExecutingRefund(false);
     }

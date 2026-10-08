@@ -139,7 +139,9 @@ describe('Real PostgreSQL transaction atomicity', () => {
 
     // The wallet unique violation aborts the transaction; the service now answers it as a clear 409 (the key is
     // taken by a row that is not this customer's own conversion) instead of leaking the raw 23505 (Group 8).
-    await expect(loyalty.convertPointsToWallet(customer.id, 200, key)).rejects.toMatchObject({
+    // 500 — the approved V1 conversion minimum — so this actually reaches the wallet write instead of failing
+    // earlier on the below-minimum check.
+    await expect(loyalty.convertPointsToWallet(customer.id, 500, key)).rejects.toMatchObject({
       response: { details: { code: 'IDEMPOTENCY_KEY_IN_USE' } },
     });
 

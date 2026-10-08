@@ -29,7 +29,8 @@ Future<CheckoutController> _ready(ProviderContainer container) async {
   return controller;
 }
 
-Future<void> _settle() => Future<void>.delayed(const Duration(milliseconds: 20));
+Future<void> _settle() =>
+    Future<void>.delayed(const Duration(milliseconds: 20));
 
 CheckoutState _state(ProviderContainer c) => c.read(checkoutControllerProvider);
 
@@ -47,7 +48,9 @@ void main() {
   });
 
   group('loading the quote', () {
-    test('asks the server for the quote on entry, with COD and no address (server default)', () async {
+    test(
+        'asks the server for the quote on entry, with COD and no address (server default)',
+        () async {
       await _ready(container);
       expect(checkout.requests, hasLength(1));
       final json = checkout.requests.single.toJson();
@@ -68,13 +71,15 @@ void main() {
       expect(_state(container).canSubmit, isFalse);
     });
 
-    test('the LATEST response wins when an older request finishes late', () async {
+    test('the LATEST response wins when an older request finishes late',
+        () async {
       final slow = Completer<void>();
       checkout.gate = slow; // the first quote is held back
       final controller = container.read(checkoutControllerProvider.notifier);
       container.listen(checkoutControllerProvider, (_, __) {});
       await _settle();
-      checkout.respond = (r) => quoteJson(fee: r.addressId == 'new' ? 2500 : 1500);
+      checkout.respond =
+          (r) => quoteJson(fee: r.addressId == 'new' ? 2500 : 1500);
       controller.selectAddress('new'); // second request, answered immediately
       await _settle();
       expect(_state(container).quote!.summary!.deliveryFeeMinor, 2500);
@@ -86,9 +91,12 @@ void main() {
   });
 
   group('payment choices', () {
-    test('Pay-at-delivery with an electronic method sends both; COD sends neither electronic', () async {
+    test(
+        'Pay-at-delivery with an electronic method sends both; COD sends neither electronic',
+        () async {
       final controller = await _ready(container);
-      controller.selectPayment('PAY_AT_DELIVERY', electronicMethod: 'VODAFONE_CASH');
+      controller.selectPayment('PAY_AT_DELIVERY',
+          electronicMethod: 'VODAFONE_CASH');
       await _settle();
       var json = checkout.requests.last.toJson();
       expect(json['paymentMethod'], 'PAY_AT_DELIVERY');
@@ -99,10 +107,13 @@ void main() {
       json = checkout.requests.last.toJson();
       expect(json['paymentMethod'], 'COD');
       expect(json.containsKey('electronicPaymentMethod'), isFalse,
-          reason: 'an electronic method only applies to Pay-at-delivery and Manual Transfer');
+          reason:
+              'an electronic method only applies to Pay-at-delivery and Manual Transfer');
     });
 
-    test('a method that needs an electronic method cannot be submitted until one is chosen', () async {
+    test(
+        'a method that needs an electronic method cannot be submitted until one is chosen',
+        () async {
       final controller = await _ready(container);
       controller.selectPayment('MANUAL_TRANSFER');
       await _settle();
@@ -112,7 +123,9 @@ void main() {
       expect(_state(container).canSubmit, isTrue);
     });
 
-    test('PD-001 (amended): the wallet stays ON when Manual Transfer is chosen — both are sent, the server splits the amount', () async {
+    test(
+        'PD-001 (amended): the wallet stays ON when Manual Transfer is chosen — both are sent, the server splits the amount',
+        () async {
       final controller = await _ready(container);
       controller.setUseWallet(true);
       await _settle();
@@ -127,22 +140,45 @@ void main() {
       expect(_state(container).canSubmit, isTrue);
     });
 
-    test('wallet + Manual Transfer is placed with BOTH choices (and never an amount): the order request carries useWallet and the transfer method', () async {
+    test(
+        'wallet + Manual Transfer is placed with BOTH choices (and never an amount): the order request carries useWallet and the transfer method',
+        () async {
       final controller = await _ready(container);
       controller.setUseWallet(true);
       controller.setWalletAmount(3000);
-      controller.selectPayment('MANUAL_TRANSFER', electronicMethod: 'ORANGE_CASH');
+      controller.selectPayment('MANUAL_TRANSFER',
+          electronicMethod: 'ORANGE_CASH');
       await _settle();
       await controller.placeOrder();
       final sent = orders.created.single.toJson(includeToken: true);
       expect(sent, containsPair('paymentMethod', 'MANUAL_TRANSFER'));
       expect(sent, containsPair('electronicPaymentMethod', 'ORANGE_CASH'));
       expect(sent, containsPair('useWallet', true));
-      expect(sent, containsPair('walletAmountMinor', 3000)); // only a CAP; the server decides the amount
-      expect(sent.keys.where((k) => k.toLowerCase().contains('total') || k.toLowerCase().contains('due')), isEmpty);
+      expect(
+          sent,
+          containsPair('walletAmountMinor',
+              3000)); // only a CAP; the server decides the amount
+      expect(
+          sent.keys.where((k) =>
+              k.toLowerCase().contains('total') ||
+              k.toLowerCase().contains('due')),
+          isEmpty);
     });
 
-    test('a method that just became unavailable falls back to COD instead of blocking the order', () async {
+    test(
+        'a quote that preselected the DEFAULT address: the order names that saved address (order creation never resolves defaults), the quote does not',
+        () async {
+      final controller = await _ready(container);
+      expect(_state(container).selection.addressId, isNull);
+      expect(checkout.requests.last.toJson().containsKey('addressId'), isFalse);
+      await controller.placeOrder();
+      expect(orders.created.single.toJson(includeToken: true),
+          containsPair('addressId', 'addr-1'));
+    });
+
+    test(
+        'a method that just became unavailable falls back to COD instead of blocking the order',
+        () async {
       final controller = await _ready(container);
       checkout.respond = (r) {
         final q = quoteJson();
@@ -160,13 +196,17 @@ void main() {
       expect(checkout.requests.last.toJson()['paymentMethod'], 'COD');
     });
 
-    test('an electronic method the server stopped offering is dropped from the selection', () async {
+    test(
+        'an electronic method the server stopped offering is dropped from the selection',
+        () async {
       final controller = await _ready(container);
       controller.selectPayment('PAY_AT_DELIVERY', electronicMethod: 'WE_PAY');
       await _settle();
       checkout.respond = (r) {
         final q = quoteJson();
-        ((q['payment'] as Map)['options'] as Map)['electronicMethods'] = ['INSTAPAY'];
+        ((q['payment'] as Map)['options'] as Map)['electronicMethods'] = [
+          'INSTAPAY'
+        ];
         return q;
       };
       controller.selectElectronicMethod('INSTAPAY');
@@ -177,7 +217,9 @@ void main() {
   });
 
   group('wallet', () {
-    test('the wallet is switched off when the server says it is unavailable for this cart', () async {
+    test(
+        'the wallet is switched off when the server says it is unavailable for this cart',
+        () async {
       final controller = await _ready(container);
       checkout.respond = (r) {
         final q = quoteJson();
@@ -189,7 +231,9 @@ void main() {
       expect(_state(container).selection.useWallet, isFalse);
     });
 
-    test('a partial wallet amount is sent as a cap, and cleared when the wallet is turned off', () async {
+    test(
+        'a partial wallet amount is sent as a cap, and cleared when the wallet is turned off',
+        () async {
       final controller = await _ready(container);
       controller.setUseWallet(true);
       controller.setWalletAmount(2000);
@@ -197,13 +241,15 @@ void main() {
       expect(checkout.requests.last.toJson()['walletAmountMinor'], 2000);
       controller.setUseWallet(false);
       await _settle();
-      expect(checkout.requests.last.toJson().containsKey('walletAmountMinor'), isFalse);
+      expect(checkout.requests.last.toJson().containsKey('walletAmountMinor'),
+          isFalse);
       expect(_state(container).selection.walletAmountMinor, isNull);
     });
   });
 
   group('coupon', () {
-    test('a code is upper-cased and sent; the server verdict is shown', () async {
+    test('a code is upper-cased and sent; the server verdict is shown',
+        () async {
       final controller = await _ready(container);
       checkout.respond = (r) => quoteJson(discount: 1000, overrides: {
             'coupon': {
@@ -220,7 +266,9 @@ void main() {
       expect(_state(container).quote!.summary!.discountMinor, 1000);
     });
 
-    test('a refused code is dropped, the reason kept, and the quote re-asked WITHOUT it', () async {
+    test(
+        'a refused code is dropped, the reason kept, and the quote re-asked WITHOUT it',
+        () async {
       final controller = await _ready(container);
       checkout.respond = (r) => r.couponCode == null
           ? quoteJson()
@@ -247,12 +295,15 @@ void main() {
       await _settle();
       controller.removeCoupon();
       await _settle();
-      expect(checkout.requests.last.toJson().containsKey('couponCode'), isFalse);
+      expect(
+          checkout.requests.last.toJson().containsKey('couponCode'), isFalse);
     });
   });
 
   group('address', () {
-    test('an explicit address id is sent; a deleted one falls back to the default', () async {
+    test(
+        'an explicit address id is sent; a deleted one falls back to the default',
+        () async {
       final controller = await _ready(container);
       checkout.respond = (r) => r.addressId == 'gone'
           ? {
@@ -273,7 +324,8 @@ void main() {
   });
 
   group('fulfilment', () {
-    test('switching to pickup changes the CART on the server, then re-quotes', () async {
+    test('switching to pickup changes the CART on the server, then re-quotes',
+        () async {
       final controller = await _ready(container);
       final before = checkout.requests.length;
       final error = await controller.setFulfillment('PICKUP');
@@ -285,7 +337,9 @@ void main() {
   });
 
   group('placing the order', () {
-    test('sends the confirmed quote token and the chosen payment; invalidates the cart', () async {
+    test(
+        'sends the confirmed quote token and the chosen payment; invalidates the cart',
+        () async {
       final controller = await _ready(container);
       controller.selectPayment('PAY_AT_DELIVERY', electronicMethod: 'INSTAPAY');
       await _settle();
@@ -303,7 +357,9 @@ void main() {
           reason: 'the superseded cart is re-read');
     });
 
-    test('when the wallet covers everything the order says WALLET and carries no electronic method', () async {
+    test(
+        'when the wallet covers everything the order says WALLET and carries no electronic method',
+        () async {
       final controller = await _ready(container);
       controller.selectPayment('PAY_AT_DELIVERY', electronicMethod: 'INSTAPAY');
       await _settle();
@@ -311,7 +367,11 @@ void main() {
             'payment': {
               'selected': {'method': 'WALLET', 'electronicMethod': null},
               'awaitsPaymentApproval': false,
-              'wallet': {'balanceMinor': 20000, 'appliedMinor': 11500, 'available': true},
+              'wallet': {
+                'balanceMinor': 20000,
+                'appliedMinor': 11500,
+                'available': true
+              },
               'options': {
                 'cod': true,
                 'payAtDelivery': true,
@@ -329,7 +389,9 @@ void main() {
       expect(sent.containsKey('electronicPaymentMethod'), isFalse);
     });
 
-    test('a stale quote is refused: the CURRENT quote is shown, nothing is placed, the customer confirms again', () async {
+    test(
+        'a stale quote is refused: the CURRENT quote is shown, nothing is placed, the customer confirms again',
+        () async {
       final controller = await _ready(container);
       orders.failWith = ApiException(
         code: 'CONFLICT',
@@ -354,10 +416,13 @@ void main() {
       orders.failWith = null;
       final again = await controller.placeOrder();
       expect(again.order, isNotNull);
-      expect(orders.created.last.toJson(includeToken: true)['quoteToken'], 'token-2');
+      expect(orders.created.last.toJson(includeToken: true)['quoteToken'],
+          'token-2');
     });
 
-    test('another business failure is returned, the quote is refreshed, submission re-enabled', () async {
+    test(
+        'another business failure is returned, the quote is refreshed, submission re-enabled',
+        () async {
       final controller = await _ready(container);
       orders.failWith = const ApiException(
           code: 'CONFLICT',
@@ -385,7 +450,8 @@ void main() {
     test(
         'Reliability & Adversarial Testing milestone (client-level): a late order-creation response arriving '
         'AFTER the customer already navigated away from Checkout (the controller\'s last listener is gone, '
-        'making it eligible for autoDispose) never throws an unhandled exception', () async {
+        'making it eligible for autoDispose) never throws an unhandled exception',
+        () async {
       final sub = container.listen(checkoutControllerProvider, (_, __) {});
       final controller = container.read(checkoutControllerProvider.notifier);
       await _settle();
@@ -406,7 +472,8 @@ void main() {
       orders.gate!.complete();
       await expectLater(future, completes);
       final outcome = await future;
-      expect(outcome.order, isNotNull); // the order WAS created — never silently lost
+      expect(outcome.order,
+          isNotNull); // the order WAS created — never silently lost
     });
   });
 }

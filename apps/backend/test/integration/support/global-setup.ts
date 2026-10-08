@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { applyIntegrationEnv, INTEGRATION_REDIS_URL, REDIS_TEST_KEY_PREFIX } from './config';
+import { applyIntegrationEnv, INTEGRATION_REDIS_DB, INTEGRATION_REDIS_URL } from './config';
 
 /**
  * Runs once before the whole integration suite: guarantees the
@@ -27,8 +27,10 @@ export default async function globalSetup(): Promise<void> {
   const redis = new Redis(INTEGRATION_REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
   try {
     await redis.connect();
-    const stale = await redis.keys(`${REDIS_TEST_KEY_PREFIX}*`);
-    if (stale.length > 0) await redis.del(...stale);
+    // The dedicated logical database belongs to this suite alone, so start it empty: keys left by a crashed/aborted earlier run
+    // (e.g. a refresh-token or lock key from a different spec) must not make an order-dependent "database is empty" check fail.
+    if (redis.options.db !== INTEGRATION_REDIS_DB) throw new Error('Refusing to flush a non-dedicated Redis database.');
+    await redis.flushdb();
   } finally {
     redis.disconnect();
   }

@@ -1,10 +1,13 @@
-import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Driver } from './entities/driver.entity';
 import { Delivery } from './entities/delivery.entity';
+import { DispatchAlert } from './entities/dispatch-alert.entity';
+import { Order } from '../orders/entities/order.entity';
+import { FulfillmentType } from '../cart/fulfillment-type.enum';
 import { OrderStateMachineService } from '../orders/order-state-machine.service';
 import { OrderStatus } from '../orders/order-status.enum';
 import { Role } from '../../common/enums/role.enum';
@@ -13,6 +16,17 @@ import { REDIS_CLIENT } from '../../common/redis/redis.constants';
 import { RequestContextService } from '../../common/request-context/request-context.service';
 import { logBusinessEvent } from '../../common/logging/log-business-event';
 import { BusinessEvent } from '../../common/logging/business-events';
+
+/**
+ * The order is not in the state an assignment (READY_FOR_PICKUP) or reassignment (ASSIGNED_TO_DRIVER) needs — an expected
+ * race outcome (someone else already acted), refused BEFORE anything is written. A ConflictException so HTTP callers get a
+ * 409, but a distinct type so automatic dispatch can treat it as "nothing to do" instead of "no eligible driver".
+ */
+export class OrderNotAssignableException extends ConflictException {
+  constructor(message: string, code: 'ORDER_NOT_ASSIGNABLE' | 'ORDER_NOT_REASSIGNABLE', currentStatus?: string) {
+    super({ message, details: { code, ...(currentStatus ? { currentStatus } : {}) } });
+  }
+}
 
 /**
  * Driver assignment — the second high-risk area flagged in Phase 0.
@@ -99,7 +113,14 @@ export class DeliveryAssignmentService {
       }
 
       try {
+        // Control Tower milestone fix: the WHOLE assignment — order status check, driver lock-out, delivery row, alert
+        // resolution and the READY_FOR_PICKUP→ASSIGNED_TO_DRIVER transition — is ONE transaction. Previously the
+        // transition ran after the driver/delivery writes had committed, so assigning an order that was not
+        // READY_FOR_PICKUP (already assigned by another admin, cancelled, still preparing) left a driver locked out and
+        // the delivery pointing at someone who was never notified, before failing.
         const result = await this.dataSource.transaction(async (manager) => {
+          await this.lockAssignableOrder(manager, params.orderId, OrderStatus.READY_FOR_PICKUP);
+
           const driver = await manager.findOne(Driver, {
             where: { id: driverId },
             lock: { mode: 'pessimistic_write' },
@@ -109,77 +130,15 @@ export class DeliveryAssignmentService {
             return null; // driver went unavailable between candidate list and lock
           }
 
-          driver.isAvailable = false;
-          await manager.save(driver);
-
-          // `deliveries.order_id` is UNIQUE (one delivery per order for its whole life). An order that
-          // is handed to a new driver — after the previous driver rejected it or an admin reassigned
-          // it — therefore keeps its delivery row and gets the new driver written into it; a plain
-          // INSERT here failed with `duplicate key ... idx_deliveries_order` (HTTP 500), which made
-          // reassign-driver and every re-dispatch after a rejection impossible (Group 8 finding).
-          const existingDelivery = await manager.findOne(Delivery, {
-            where: { orderId: params.orderId },
-            lock: { mode: 'pessimistic_write' },
-          });
-          const delivery = existingDelivery
-            ? Object.assign(existingDelivery, {
-                driverId,
-                assignedAt: new Date(),
-                acceptDeadlineAt: new Date(Date.now() + 30_000),
-                pickedUpAt: null,
-                deliveredAt: null,
-              })
-            : manager.create(Delivery, {
-                orderId: params.orderId,
-                driverId,
-                assignedAt: new Date(),
-                acceptDeadlineAt: new Date(Date.now() + 30_000),
-              });
-          const savedDelivery = await manager.save(delivery);
-          return { delivery: savedDelivery, driverUserId: driver.userId };
+          const assigned = await this.assignInTransaction(manager, params.orderId, driver);
+          return { ...assigned, driverUserId: driver.userId };
         });
 
         if (!result) {
-          await this.releaseLock(driverId, lockToken);
           continue;
         }
 
-        await this.orderStateMachine.transition({
-          orderId: params.orderId,
-          to: OrderStatus.ASSIGNED_TO_DRIVER,
-          actorRole: Role.ADMIN, // system-initiated transition
-        });
-
-        // Business-event log (Group 4). Post-commit — the per-driver
-        // transaction above has already committed (`result` was
-        // returned from it) AND the order transition just above has
-        // also succeeded. Single chokepoint: every dispatch path
-        // (automatic ranking AND Admin manual assign/reassign) shares
-        // this one `assignDriver` method, so this is the one place
-        // `dispatch.driver_assigned` is ever emitted.
-        logBusinessEvent(this.logger, 'log', BusinessEvent.DISPATCH_DRIVER_ASSIGNED, () => this.requestContextService.getCorrelationId(), {
-          orderId: params.orderId,
-          deliveryId: result.delivery.id,
-          driverId,
-        });
-
-        // Driver Push Notifications. Fired only after BOTH the
-        // assignment transaction has committed AND the state-machine
-        // transition has succeeded — never before, never on a failed
-        // assignment. This single call site is shared by every caller
-        // of assignDriver() (automatic dispatch AND Admin manual
-        // assignment/reassignment — confirmed by inspection, both
-        // call this same method), so no duplicate wiring was needed
-        // in either caller. Never awaited-and-failed into this
-        // method's own control flow — PushNotificationService itself
-        // never throws (see its own comment); a push failure can
-        // never roll back or affect this already-committed assignment.
-        await this.pushNotificationService.sendOrderAssignedNotification(
-          result.driverUserId,
-          params.orderId,
-          result.delivery.id,
-        );
-
+        await this.afterAssignmentCommitted(params.orderId, result, driverId);
         return result.delivery;
       } finally {
         // Lock is intentionally released only after the transaction
@@ -193,6 +152,173 @@ export class DeliveryAssignmentService {
       orderId: params.orderId,
       candidateCount: params.candidateDriverIds.length,
     });
-    throw new ConflictException('No available driver could be assigned.');
+    throw new ConflictException({
+      message: 'No available driver could be assigned.',
+      details: { code: 'NO_AVAILABLE_DRIVER' },
+    });
+  }
+
+  /**
+   * Manual reassignment of an ASSIGNED_TO_DRIVER order to a named driver — atomically: either the order ends assigned to
+   * the new driver (previous driver freed, timeline records the release and the new assignment), or NOTHING changes. Every
+   * check runs before any write, so a refused reassignment (wrong state, new driver unavailable, someone else changed
+   * the assignment meanwhile) can never leave the order unassigned or a driver wrongly marked available/busy.
+   *
+   * `expectedCurrentDriverId` (optional): the driver the caller believes is assigned. If the assignment has changed since
+   * (another admin, the timeout sweep, the driver's own release), the request is refused with `ASSIGNMENT_CHANGED` instead
+   * of silently overriding a decision the caller never saw. Uses only existing transitions
+   * (ASSIGNED_TO_DRIVER→READY_FOR_PICKUP→ASSIGNED_TO_DRIVER); no new state, no accept/reject.
+   */
+  async reassignDriver(params: { orderId: string; newDriverId: string; expectedCurrentDriverId?: string }): Promise<Delivery> {
+    const lockToken = await this.acquireLock(params.newDriverId);
+    if (!lockToken) {
+      throw new ConflictException({
+        message: 'This driver is being assigned to another order right now. Please try again.',
+        details: { code: 'DRIVER_UNAVAILABLE' },
+      });
+    }
+    try {
+      const result = await this.dataSource.transaction(async (manager) => {
+        await this.lockAssignableOrder(manager, params.orderId, OrderStatus.ASSIGNED_TO_DRIVER);
+        const delivery = await manager.findOne(Delivery, { where: { orderId: params.orderId }, lock: { mode: 'pessimistic_write' } });
+        if (!delivery) {
+          throw new OrderNotAssignableException('This order has no delivery to reassign.', 'ORDER_NOT_REASSIGNABLE');
+        }
+        if (params.expectedCurrentDriverId !== undefined && delivery.driverId !== params.expectedCurrentDriverId) {
+          throw new ConflictException({
+            message: 'The assignment of this order changed since you loaded it. Review the current driver and try again.',
+            details: { code: 'ASSIGNMENT_CHANGED', currentDriverId: delivery.driverId ?? null },
+          });
+        }
+        if (delivery.driverId === params.newDriverId) {
+          throw new ConflictException({
+            message: 'This driver is already assigned to the order.',
+            details: { code: 'DRIVER_ALREADY_ASSIGNED' },
+          });
+        }
+        // Lock BOTH driver rows (previous + new) in a stable id order before the release touches the previous one: two
+        // concurrent swaps (X: D1→D2 while Z: D2→D1) would otherwise lock them in opposite orders and deadlock.
+        const driverIds = [params.newDriverId, ...(delivery.driverId ? [delivery.driverId] : [])].sort();
+        let newDriver: Driver | null = null;
+        for (const id of driverIds) {
+          const row = await manager.findOne(Driver, { where: { id }, lock: { mode: 'pessimistic_write' } });
+          if (id === params.newDriverId) newDriver = row;
+        }
+        if (!newDriver || !newDriver.isOnline || !newDriver.isAvailable) {
+          throw new ConflictException({
+            message: 'The selected driver is not online and available right now.',
+            details: { code: 'DRIVER_UNAVAILABLE' },
+          });
+        }
+
+        // Release (frees the previous driver — the state machine's own rule) and re-assign, in this same transaction.
+        const release = await this.orderStateMachine.transitionInTransaction(manager, {
+          orderId: params.orderId,
+          to: OrderStatus.READY_FOR_PICKUP,
+          actorRole: Role.ADMIN,
+        });
+        delivery.reassignmentCount = (delivery.reassignmentCount ?? 0) + 1;
+        const assigned = await this.assignInTransaction(manager, params.orderId, newDriver, delivery);
+        return { ...assigned, releaseAfterCommit: release.afterCommit, driverUserId: newDriver.userId };
+      });
+
+      await result.releaseAfterCommit();
+      await this.afterAssignmentCommitted(params.orderId, result, params.newDriverId);
+      return result.delivery;
+    } finally {
+      await this.releaseLock(params.newDriverId, lockToken);
+    }
+  }
+
+  /** Locks the order row FIRST (this codebase's Order-before-Delivery/Driver lock order) and requires the expected status. */
+  private async lockAssignableOrder(manager: EntityManager, orderId: string, expected: OrderStatus): Promise<Order> {
+    const order = await manager.findOne(Order, { where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
+    if (!order) {
+      throw new NotFoundException({ message: 'Order not found.', details: { code: 'ORDER_NOT_FOUND' } });
+    }
+    // A PICKUP order is collected by the customer at the branch (PD-006.C — no delivery address): it is never a driver's job.
+    if (order.fulfillmentType !== FulfillmentType.DELIVERY) {
+      throw new OrderNotAssignableException(
+        'This is a pickup order — the customer collects it at the branch, so no driver is assigned.',
+        expected === OrderStatus.READY_FOR_PICKUP ? 'ORDER_NOT_ASSIGNABLE' : 'ORDER_NOT_REASSIGNABLE',
+        order.status,
+      );
+    }
+    if (order.status !== expected) {
+      throw expected === OrderStatus.READY_FOR_PICKUP
+        ? new OrderNotAssignableException(
+            `This order cannot be assigned: it is ${order.status}, not waiting for a driver.`,
+            'ORDER_NOT_ASSIGNABLE',
+            order.status,
+          )
+        : new OrderNotAssignableException(
+            `This order cannot be reassigned: it is ${order.status}, not assigned to a driver.`,
+            'ORDER_NOT_REASSIGNABLE',
+            order.status,
+          );
+    }
+    return order;
+  }
+
+  /** The single definition of "assign this driver to this READY_FOR_PICKUP order", inside the caller's transaction. */
+  private async assignInTransaction(
+    manager: EntityManager,
+    orderId: string,
+    driver: Driver,
+    lockedDelivery?: Delivery,
+  ): Promise<{ delivery: Delivery; afterCommit: () => Promise<void> }> {
+    driver.isAvailable = false;
+    await manager.save(driver);
+
+    const existingDelivery =
+      lockedDelivery ?? (await manager.findOne(Delivery, { where: { orderId }, lock: { mode: 'pessimistic_write' } }));
+    const delivery = existingDelivery
+      ? Object.assign(existingDelivery, {
+          driverId: driver.id,
+          assignedAt: new Date(),
+          acceptDeadlineAt: new Date(Date.now() + 30_000),
+          pickedUpAt: null,
+          deliveredAt: null,
+        })
+      : manager.create(Delivery, {
+          orderId,
+          driverId: driver.id,
+          assignedAt: new Date(),
+          acceptDeadlineAt: new Date(Date.now() + 30_000),
+        });
+    const savedDelivery = await manager.save(delivery);
+
+    // DispatchAlert's documented contract: an alert is resolved once a driver is successfully assigned for its order.
+    await manager
+      .createQueryBuilder()
+      .update(DispatchAlert)
+      .set({ resolvedAt: () => 'now()' })
+      .where('order_id = :orderId AND resolved_at IS NULL', { orderId })
+      .execute();
+
+    const { afterCommit } = await this.orderStateMachine.transitionInTransaction(manager, {
+      orderId,
+      to: OrderStatus.ASSIGNED_TO_DRIVER,
+      actorRole: Role.ADMIN, // system-initiated transition
+    });
+    return { delivery: savedDelivery, afterCommit };
+  }
+
+  private async afterAssignmentCommitted(
+    orderId: string,
+    result: { delivery: Delivery; afterCommit: () => Promise<void>; driverUserId: string },
+    driverId: string,
+  ): Promise<void> {
+    await result.afterCommit();
+
+    logBusinessEvent(this.logger, 'log', BusinessEvent.DISPATCH_DRIVER_ASSIGNED, () => this.requestContextService.getCorrelationId(), {
+      orderId,
+      deliveryId: result.delivery.id,
+      driverId,
+    });
+
+    // Never awaited-and-failed into the caller's control flow — PushNotificationService itself never throws; a push failure
+    // can never roll back or affect this already-committed assignment.
+    await this.pushNotificationService.sendOrderAssignedNotification(result.driverUserId, orderId, result.delivery.id);
   }
 }

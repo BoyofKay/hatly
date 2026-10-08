@@ -1,4 +1,4 @@
-import { IsBoolean, IsLatitude, IsLongitude, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 
 export class CreateAddressDto {
   @IsOptional()
@@ -6,22 +6,31 @@ export class CreateAddressDto {
   @MaxLength(100)
   label?: string;
 
+  /** The detailed, free-form address the driver reads. Required; it never needs to be geocodable. */
   @IsString()
   @MaxLength(255)
+  @Matches(/\S/)
   line1: string;
 
-  @IsLatitude()
-  latitude: number;
+  /** PD-009: the Delivery Zone the customer selected (GET /delivery-zones). Required; must be active. */
+  @IsUUID()
+  deliveryZoneId: string;
 
+  /** Optional map pin — both or neither. Never required to save an address. */
+  @IsOptional()
+  @IsLatitude()
+  latitude?: number;
+
+  @IsOptional()
   @IsLongitude()
-  longitude: number;
+  longitude?: number;
 
   @IsOptional()
   @IsString()
   @MaxLength(500)
   instructions?: string;
 
-  /** Structured Egyptian address details (all optional at this layer; the checkout form asks for them). */
+  /** Governorate / city are DERIVED from the selected zone on save; a client value is accepted for compatibility but replaced. */
   @IsOptional()
   @IsString()
   @MaxLength(80)

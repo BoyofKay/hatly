@@ -10,6 +10,8 @@ import { FinancialEventDirection, FinancialEventType } from '../finance/financia
 import { VendorStaffAuthorizationService } from '../vendors/vendor-staff-authorization.service';
 import { DriverAuthorizationService } from '../delivery/driver-authorization.service';
 import { applyOrderItemAmountDelta } from './apply-order-item-amount-delta.util';
+import { CartGroupType } from '../cart/cart-group-type.enum';
+import { OrderStatus } from './order-status.enum';
 
 /**
  * Vendor/Driver Deferred Pricing for Custom CATALOG Items. Extends the
@@ -132,20 +134,103 @@ export class AdHocPurchaseRecordService {
   }
 
   /**
-   * Loads the OrderItem under a row lock (concurrency-safe — two
-   * simultaneous pricing attempts for the same item serialize here,
-   * so the "already priced" check below can never both pass) and
-   * verifies eligibility. Never returns a normal catalog product's
-   * item, never one that's already priced.
+   * Hatly Service price confirmation by Hatly operations (admin-side). A Hatly Service order is created with an explicit
+   * PENDING price; this replaces it with the confirmed amount through the SAME core the Driver and Vendor paths use, so the
+   * subtotal, total and amount due are recomputed authoritatively on the backend (never by the client) and the single
+   * `ad_hoc_purchase_records` row per item (unique on `order_item_id`) is the audit trail: who confirmed, when, how much.
+   *
+   *  - Authorization is enforced at the controller (`MANAGE_HATLY_SERVICE_PRICING`).
+   *  - Only an item of an AD_HOC_SERVICE (Hatly Service) segment, on an order that is not yet finished/cancelled.
+   *  - Atomic (one transaction) and concurrency-safe (order + item row locks; unique index as the final guard).
+   *  - Idempotent: repeating the SAME confirmation (same item, same amount) returns the existing record with
+   *    `alreadyApplied: true` and changes nothing. A DIFFERENT amount for an already-priced item is refused (409) — a recorded
+   *    price is historical evidence and is never rewritten.
+   *  - Never fires DRIVER_REIMBURSEMENT_OWED: no driver advanced any money through this path.
    */
-  private async lockEligibleItem(manager: DataSource['manager'], orderItemId: string): Promise<OrderItem> {
-    const item = await manager.findOne(OrderItem, {
-      where: { id: orderItemId },
-      lock: { mode: 'pessimistic_write' },
+  async confirmHatlyServicePrice(
+    orderItemId: string,
+    amountMinor: number,
+    adminUserId: string,
+  ): Promise<{ record: AdHocPurchaseRecord; alreadyApplied: boolean }> {
+    if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
+      throw new BadRequestException({ message: 'amountMinor must be a positive integer.', details: { code: 'INVALID_FINAL_AMOUNT' } });
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const item = await this.lockOrderThenItem(manager, orderItemId);
+      if (item.productId !== null && item.productId !== undefined) {
+        throw new BadRequestException({ message: 'Only a product-less custom item can have a recorded final price.', details: { code: 'NOT_A_CUSTOM_ITEM' } });
+      }
+      const segment = await manager.findOne(OrderVendorSegment, { where: { id: item.orderVendorSegmentId } });
+      if (!segment) {
+        throw new NotFoundException('Order segment not found.');
+      }
+      if (segment.groupType !== CartGroupType.AD_HOC_SERVICE) {
+        throw new BadRequestException({
+          message: 'Operations can only confirm the price of a Hatly Service request.',
+          details: { code: 'NOT_A_HATLY_SERVICE_ITEM' },
+        });
+      }
+      const order = await manager.findOne(Order, { where: { id: segment.orderId } });
+      if (!order) {
+        throw new NotFoundException('Order not found.');
+      }
+      if ([OrderStatus.DELIVERED, OrderStatus.CANCELLED, OrderStatus.FAILED_DELIVERY].includes(order.status)) {
+        throw new ConflictException({
+          message: 'The price can no longer be confirmed for an order that is finished or cancelled.',
+          details: { code: 'ORDER_NOT_PRICEABLE', status: order.status },
+        });
+      }
+
+      if (item.actualAmountMinor != null) {
+        const existing = await manager.findOne(AdHocPurchaseRecord, { where: { orderItemId: item.id } });
+        if (existing && existing.recordedByRole === 'ADMIN' && Number(existing.amountMinor) === amountMinor) {
+          return { record: existing, alreadyApplied: true };
+        }
+        throw new ConflictException({
+          message: 'A final price has already been recorded for this item and cannot be changed.',
+          details: { code: 'PURCHASE_ALREADY_RECORDED' },
+        });
+      }
+
+      const record = await this.recordCore(manager, item, segment, amountMinor, {
+        recordedByRole: 'ADMIN',
+        recordedByUserId: adminUserId,
+        recordedByDriverId: null,
+      });
+      return { record, alreadyApplied: false };
     });
+  }
+
+  /**
+   * Locks the Order row FIRST, then the OrderItem, always in that order — every pricing path (driver, vendor, operations)
+   * and every concurrent price on a sibling item of the same order therefore serialize on the order, so the read-modify-write of
+   * the order's subtotal/total in `applyOrderItemAmountDelta` can never lose an update, and two paths can never deadlock by
+   * taking the two locks in opposite orders. Returns the locked item (not yet checked for eligibility).
+   */
+  private async lockOrderThenItem(manager: DataSource['manager'], orderItemId: string): Promise<OrderItem> {
+    const probe = await manager.findOne(OrderItem, { where: { id: orderItemId } });
+    if (!probe) {
+      throw new NotFoundException('Order item not found.');
+    }
+    const probeSegment = await manager.findOne(OrderVendorSegment, { where: { id: probe.orderVendorSegmentId } });
+    if (!probeSegment) {
+      throw new NotFoundException('Order segment not found.');
+    }
+    await manager.findOne(Order, { where: { id: probeSegment.orderId }, lock: { mode: 'pessimistic_write' } });
+    const item = await manager.findOne(OrderItem, { where: { id: orderItemId }, lock: { mode: 'pessimistic_write' } });
     if (!item) {
       throw new NotFoundException('Order item not found.');
     }
+    return item;
+  }
+
+  /**
+   * Loads the OrderItem under row locks (concurrency-safe — two simultaneous pricing attempts for the same item serialize
+   * here, so the "already priced" check below can never both pass) and verifies eligibility. Never returns a normal catalog
+   * product's item, never one that's already priced.
+   */
+  private async lockEligibleItem(manager: DataSource['manager'], orderItemId: string): Promise<OrderItem> {
+    const item = await this.lockOrderThenItem(manager, orderItemId);
     if (item.productId !== null && item.productId !== undefined) {
       throw new BadRequestException({
         message: 'Only a product-less custom item can have a recorded final price.',
@@ -166,7 +251,7 @@ export class AdHocPurchaseRecordService {
     item: OrderItem,
     segment: OrderVendorSegment,
     amountMinor: number,
-    recorder: { recordedByRole: 'DRIVER' | 'VENDOR'; recordedByDriverId: string | null; recordedByUserId: string | null },
+    recorder: { recordedByRole: 'DRIVER' | 'VENDOR' | 'ADMIN'; recordedByDriverId: string | null; recordedByUserId: string | null },
   ): Promise<AdHocPurchaseRecord> {
     if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
       throw new BadRequestException({
@@ -213,8 +298,29 @@ export class AdHocPurchaseRecordService {
     await applyOrderItemAmountDelta(manager, segment, order, amountMinor);
 
     await this.refreshPendingPricingFlag(manager, item.orderVendorSegmentId);
+    await this.finalizeTotalsIfComplete(manager, segment.orderId);
 
     return newRecord;
+  }
+
+  /**
+   * Hatly Service orders are created with `totalMinor` / `amountDueMinor` NULL ("pending": the price of the request is not known
+   * yet — never a fabricated 0). `applyOrderItemAmountDelta` deliberately keeps a NULL total NULL, so without this step the
+   * total would stay unknown forever even after every item was priced. Once NO item is pending any more and the delivery fee
+   * is known, the authoritative total is `subtotal + deliveryFee - discount` and the amount due is `total - walletApplied`
+   * (a Hatly Service order is COD-only, so the wallet part is 0). Never touches an order whose total is already known, and
+   * never invents one while anything is still pending or the fee is unknown.
+   */
+  private async finalizeTotalsIfComplete(manager: DataSource['manager'], orderId: string): Promise<void> {
+    const order = await manager.findOne(Order, { where: { id: orderId } });
+    if (!order || order.totalMinor != null || order.hasPendingAdHocPricing) return;
+    if (order.deliveryFeeMinor == null) return;
+    const totalMinor = order.subtotalMinor + order.deliveryFeeMinor - (order.discountMinor ?? 0);
+    order.totalMinor = totalMinor;
+    if (order.amountDueMinor == null) {
+      order.amountDueMinor = Math.max(0, totalMinor - (order.walletAmountMinor ?? 0));
+    }
+    await manager.save(Order, order);
   }
 
   /**

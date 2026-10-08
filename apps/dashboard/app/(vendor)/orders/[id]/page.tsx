@@ -10,6 +10,8 @@ import {
   recordItemWeight,
   updateSegmentStatus,
 } from '../../../../lib/api/vendor-orders';
+import { apiErrorMessage } from '../../../../lib/api/errors';
+import { markOrderCollected } from '../../../../lib/api/order-collection';
 
 /**
  * CONFIRMED (closed rule — segment lifecycle is authoritative,
@@ -37,6 +39,13 @@ const SEGMENT_NEXT_ACTIONS: Record<string, { label: string; to: VendorOrderSegme
   READY_FOR_PICKUP: [{ label: 'Cancel', to: 'CANCELLED' }],
 };
 
+/**
+ * Once the ORDER has moved past the vendor (picked up by a driver, collected by the customer — U2 — or finished), the
+ * backend locks every segment (order-vendor-segment-state-machine.service.ts, SEGMENT_LOCKED_ORDER_STATUSES): a segment
+ * still reading READY_FOR_PICKUP offers no action then, instead of a "Cancel" the backend would refuse.
+ */
+const SEGMENT_LOCKED_ORDER_STATUSES = ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED', 'COLLECTED', 'CANCELLED', 'FAILED_DELIVERY'];
+
 export default function VendorOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [order, setOrder] = useState<VendorOrder | null>(null);
@@ -61,13 +70,17 @@ export default function VendorOrderDetailPage() {
   const pendingSegmentRef = useRef<string | null>(null);
   const recordingWeightRef = useRef<string | null>(null);
   const pricingRef = useRef<string | null>(null);
+  // U2 — "the customer collected it" (pickup orders). Same ref + state double-click guard as the actions above.
+  const [collecting, setCollecting] = useState(false);
+  const [collectedMessage, setCollectedMessage] = useState<string | null>(null);
+  const collectingRef = useRef(false);
 
   async function refresh() {
     setError(null);
     try {
       setOrder(await getVendorOrder(id));
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load order.');
+      setError(apiErrorMessage(err, 'Failed to load order.'));
     }
   }
 
@@ -78,6 +91,12 @@ export default function VendorOrderDetailPage() {
 
   async function handleSegmentAction(segmentId: string, to: VendorOrderSegment['status']) {
     if (pendingSegmentRef.current === segmentId) return; // already mid-flight for this segment — ignore the duplicate tap
+    // M3a (Launch-Readiness Gap Audit, G-12) — cancelling is the one destructive transition here
+    // (every other transition in SEGMENT_NEXT_ACTIONS is a normal forward step); confirm before
+    // sending, never after.
+    if (to === 'CANCELLED' && !window.confirm('Cancel your items on this order? This cannot be undone.')) {
+      return;
+    }
     pendingSegmentRef.current = segmentId;
     setActionError(null);
     setPendingSegmentId(segmentId);
@@ -85,7 +104,7 @@ export default function VendorOrderDetailPage() {
       await updateSegmentStatus(segmentId, to);
       await refresh();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to update status.');
+      setActionError(apiErrorMessage(err, 'Failed to update status.'));
     } finally {
       pendingSegmentRef.current = null;
       setPendingSegmentId(null);
@@ -109,7 +128,7 @@ export default function VendorOrderDetailPage() {
     } catch (err: any) {
       // Covers the first-actor-wins rejection (e.g. already recorded
       // by the driver) as a normal, expected outcome — not a crash.
-      setActionError(err?.response?.data?.message ?? 'Failed to record weight — it may already be recorded.');
+      setActionError(apiErrorMessage(err, 'Failed to record weight — it may already be recorded.'));
     } finally {
       recordingWeightRef.current = null;
       setRecordingWeightItemId(null);
@@ -143,11 +162,30 @@ export default function VendorOrderDetailPage() {
       // already priced in a previous session, the refreshed
       // `actualAmountMinor` (not a local flag) is what determines the
       // correct UI state afterward.
-      setActionError(err?.response?.data?.message ?? 'Failed to save price.');
+      setActionError(apiErrorMessage(err, 'Failed to save price.'));
       await refresh();
     } finally {
       pricingRef.current = null;
       setPricingItemId(null);
+    }
+  }
+
+  async function handleCollected() {
+    if (collectingRef.current || !order) return;
+    if (!window.confirm('Confirm the customer has collected this order at the counter? This completes the order and cannot be undone.')) return;
+    collectingRef.current = true;
+    setCollecting(true);
+    setActionError(null);
+    setCollectedMessage(null);
+    try {
+      await markOrderCollected(order.id);
+      setCollectedMessage('Order marked as collected.');
+    } catch (err: any) {
+      setActionError(apiErrorMessage(err, 'Failed to mark the order as collected.'));
+    } finally {
+      await refresh(); // always re-read: the order may have been collected or cancelled by someone else meanwhile
+      collectingRef.current = false;
+      setCollecting(false);
     }
   }
 
@@ -162,17 +200,42 @@ export default function VendorOrderDetailPage() {
     );
   }
   if (!order) return <p className="text-gray-500">Loading...</p>;
+  const segmentActions = (status: string) =>
+    SEGMENT_LOCKED_ORDER_STATUSES.includes(order.status) ? [] : SEGMENT_NEXT_ACTIONS[status] ?? [];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="rounded border bg-white p-4">
         <h1 className="text-xl font-semibold">Order #{order.id.slice(0, 8)}</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Order status: {order.status} (read-only — set by dispatch/delivery, not by this dashboard) &middot;{' '}
-          {order.paymentMethod}
+          Order status: <span data-testid="vendor-order-status">{order.status}</span>
+          {order.fulfillmentType === 'PICKUP'
+            ? ' (pickup — the customer collects it at your branch)'
+            : ' (read-only — set by dispatch/delivery, not by this dashboard)'}{' '}
+          &middot; {order.paymentMethod}
         </p>
         {order.orderNote && <p className="mt-2 text-sm">Note: {order.orderNote}</p>}
       </div>
+
+      {order.fulfillmentType === 'PICKUP' && order.status === 'READY_FOR_PICKUP' && (
+        <div className="rounded border border-green-200 bg-green-50 p-4" data-testid="vendor-pickup-ready">
+          <p className="text-sm font-medium text-green-900">Ready — waiting for the customer to collect it at the counter.</p>
+          {order.paymentMethod === 'COD' && <p className="mt-1 text-sm text-green-900">The customer pays you in cash when collecting.</p>}
+          <button
+            data-testid="vendor-mark-collected"
+            onClick={handleCollected}
+            disabled={collecting}
+            className="mt-3 rounded bg-green-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {collecting ? 'Saving...' : 'Customer collected the order'}
+          </button>
+        </div>
+      )}
+      {order.status === 'COLLECTED' && (
+        <div className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-900" data-testid="vendor-order-collected" role="status">
+          {collectedMessage ?? 'Collected by the customer — this order is complete.'}
+        </div>
+      )}
 
       {actionError && (
         <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{actionError}</div>
@@ -290,7 +353,7 @@ export default function VendorOrderDetailPage() {
           </ul>
 
           <div className="mt-3 flex gap-2">
-            {(SEGMENT_NEXT_ACTIONS[segment.status] ?? []).map((action) => (
+            {segmentActions(segment.status).map((action) => (
               <button
                 key={action.to}
                 onClick={() => handleSegmentAction(segment.id, action.to)}
@@ -302,7 +365,7 @@ export default function VendorOrderDetailPage() {
                 {pendingSegmentId === segment.id ? 'Saving...' : action.label}
               </button>
             ))}
-            {(SEGMENT_NEXT_ACTIONS[segment.status] ?? []).length === 0 && (
+            {segmentActions(segment.status).length === 0 && (
               <span className="text-sm text-gray-500">No further action available.</span>
             )}
           </div>

@@ -61,9 +61,9 @@ export class AdHocPurchaseRecord extends BaseEntity {
    * `'DRIVER'` by the migration.
    */
   @Column({ name: 'recorded_by_role', type: 'varchar', length: 10 })
-  recordedByRole: 'DRIVER' | 'VENDOR';
+  recordedByRole: 'DRIVER' | 'VENDOR' | 'ADMIN';
 
-  /** VENDOR rows only — the authorized Vendor Staff user's id. Null for a DRIVER row. */
+  /** VENDOR / ADMIN rows — the authorized Vendor Staff user's id, or the Hatly operations user's id. Null for a DRIVER row. */
   @Column({ name: 'recorded_by_user_id', type: 'uuid', nullable: true })
   recordedByUserId?: string | null;
 }

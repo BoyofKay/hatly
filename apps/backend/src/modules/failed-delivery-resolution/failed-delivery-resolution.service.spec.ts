@@ -34,6 +34,8 @@ function buildHarness(seed: {
         return qb;
       },
       andWhere: () => qb,
+      orderBy: () => qb,
+      addOrderBy: () => qb,
       getMany: async () => {
         if (filterValues[0]?.toString().startsWith('STATUS_FILTER:')) {
           const status = filterValues[0].toString().replace('STATUS_FILTER:', '');
@@ -239,11 +241,12 @@ describe('FailedDeliveryResolutionService.listQueue', () => {
   });
 
   it('the queue returns only the lightweight projection fields', async () => {
-    const { service } = buildHarness({ order: { id: 'order-1', status: 'FAILED_DELIVERY', paymentMethod: 'COD', failureReason: 'x', failedAt: new Date(), customerId: 'customer-1', totalMinor: 5000 } });
+    const { service } = buildHarness({ order: { id: 'order-1', orderNumber: 'HT-100001', status: 'FAILED_DELIVERY', paymentMethod: 'COD', failureReason: 'x', failedAt: new Date(), customerId: 'customer-1', totalMinor: 5000 } });
     const queue = await service.listQueue();
     expect(Object.keys(queue[0]).sort()).toEqual(
-      ['orderId', 'failedAt', 'failureReason', 'customerId', 'customerName', 'driverId', 'driverName', 'totalMinor', 'paymentMethod', 'paymentStatus', 'createdAt'].sort(),
+      ['orderId', 'orderNumber', 'failedAt', 'failureReason', 'customerId', 'customerName', 'driverId', 'driverName', 'totalMinor', 'paymentMethod', 'paymentStatus', 'createdAt'].sort(),
     );
+    expect(queue[0].orderNumber).toBe('HT-100001');
   });
 });
 

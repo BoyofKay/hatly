@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { OrderStateMachineService } from './order-state-machine.service';
 import { OrderStatus } from './order-status.enum';
 import { Role } from '../../common/enums/role.enum';
@@ -45,12 +45,14 @@ function deliveryUpdateQueryBuilder() {
   return qb;
 }
 
-function buildHarness(order: any, segmentItems: any[] = []) {
+function buildHarness(order: any, segmentItems: any[] = [], delivery?: { driverId: string | null } | null) {
   const store = { ...order };
   const manager = {
-    findOne: async (_EntityClass: any, _opts: any) => ({ ...store }),
+    // `delivery` (when given) answers the Delivery lookup of the acting-driver ownership re-check.
+    findOne: async (EntityClass: any, _opts: any) => (delivery !== undefined && EntityClass?.name === 'Delivery' ? delivery : { ...store }),
     save: async (entity: any) => {
       Object.assign(store, entity);
+      saves.push(entity);
       return entity;
     },
     // Inventory Restoration on Order Cancellation. CONFIRMED
@@ -118,8 +120,11 @@ function buildHarness(order: any, segmentItems: any[] = []) {
     noopStatusHistory as any,
     noopWalletRefund as any,
   );
+  lastMocks = { loyaltyService, bestSellingCacheService, pushNotificationService, orderFinancialEventsService, store };
   return service;
 }
+const saves: any[] = [];
+let lastMocks: any;
 
 // Shared across both "Inventory Restoration on Order Cancellation" and
 // "Atomic Manual Transfer Refund on Order Cancellation (Chunk B2)" — hoisted
@@ -1861,5 +1866,96 @@ describe('OrderStateMachineService — PD-006 payment gating, timeline and walle
     const h = buildInventoryHarness({ orderStatus: OrderStatus.PENDING, segments: [], items: [], products: [] });
     await h.service.transition({ orderId: 'order-1', to: OrderStatus.CONFIRMED, actorRole: Role.ADMIN });
     expect(noopWalletRefund.refundExcess).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrderStateMachineService — acting driver ownership, re-checked under the order lock (Operational Completion milestone)', () => {
+  beforeEach(() => (saves.length = 0));
+  const assigned = { id: 'order-1', status: OrderStatus.ASSIGNED_TO_DRIVER };
+
+  it('the driver still on the delivery may move the order', async () => {
+    const service = buildHarness(assigned, [], { driverId: 'driver-1' });
+    await expect(
+      service.transition({ orderId: 'order-1', to: OrderStatus.PICKED_UP, actorRole: Role.DRIVER, actingDriverId: 'driver-1' }),
+    ).resolves.toMatchObject({ status: OrderStatus.PICKED_UP });
+  });
+
+  it('a driver whose delivery was reassigned meanwhile is refused (404) and NOTHING is written', async () => {
+    const service = buildHarness(assigned, [], { driverId: 'driver-2' });
+    await expect(
+      service.transition({ orderId: 'order-1', to: OrderStatus.PICKED_UP, actorRole: Role.DRIVER, actingDriverId: 'driver-1' }),
+    ).rejects.toThrow(NotFoundException);
+    expect(saves).toHaveLength(0);
+  });
+
+  it('no delivery row at all is refused the same way', async () => {
+    const service = buildHarness(assigned, [], null);
+    await expect(
+      service.transition({ orderId: 'order-1', to: OrderStatus.PICKED_UP, actorRole: Role.DRIVER, actingDriverId: 'driver-1' }),
+    ).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('OrderStateMachineService — pickup completion: COLLECTED (U2)', () => {
+  beforeEach(() => (saves.length = 0));
+  const readyPickup = { id: 'order-1', customerId: 'customer-1', status: OrderStatus.READY_FOR_PICKUP, fulfillmentType: 'PICKUP' };
+
+  it.each([Role.VENDOR, Role.VENDOR_MANAGER, Role.ADMIN, Role.SUPER_ADMIN])('%s may mark a ready PICKUP order COLLECTED', async (role) => {
+    const service = buildHarness(readyPickup);
+    await expect(service.transition({ orderId: 'order-1', to: OrderStatus.COLLECTED, actorRole: role })).resolves.toMatchObject({
+      status: OrderStatus.COLLECTED,
+    });
+  });
+
+  it.each([Role.CUSTOMER, Role.DRIVER])('%s may not mark it collected (nothing written)', async (role) => {
+    const service = buildHarness(readyPickup);
+    await expect(service.transition({ orderId: 'order-1', to: OrderStatus.COLLECTED, actorRole: role })).rejects.toThrow(BadRequestException);
+    expect(saves).toHaveLength(0);
+  });
+
+  it('a DELIVERY order can never be COLLECTED (NOT_A_PICKUP_ORDER) — it is completed by its driver', async () => {
+    const service = buildHarness({ ...readyPickup, fulfillmentType: 'DELIVERY' });
+    await expect(service.transition({ orderId: 'order-1', to: OrderStatus.COLLECTED, actorRole: Role.VENDOR })).rejects.toMatchObject({
+      response: { details: { code: 'NOT_A_PICKUP_ORDER' } },
+    });
+    expect(saves).toHaveLength(0);
+  });
+
+  it('a PICKUP order can never be ASSIGNED_TO_DRIVER, through any endpoint (PICKUP_ORDER_NOT_DISPATCHABLE)', async () => {
+    const service = buildHarness(readyPickup);
+    await expect(service.transition({ orderId: 'order-1', to: OrderStatus.ASSIGNED_TO_DRIVER, actorRole: Role.ADMIN })).rejects.toThrow(ConflictException);
+    expect(saves).toHaveLength(0);
+  });
+
+  it.each([OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.CANCELLED, OrderStatus.COLLECTED])(
+    'only READY_FOR_PICKUP can become COLLECTED — from %s it is refused',
+    async (status) => {
+      const service = buildHarness({ ...readyPickup, status });
+      await expect(service.transition({ orderId: 'order-1', to: OrderStatus.COLLECTED, actorRole: Role.VENDOR })).rejects.toThrow(BadRequestException);
+      expect(saves).toHaveLength(0);
+    },
+  );
+
+  it('COLLECTED is terminal: no transition leads out of it, for any role', () => {
+    const service = buildHarness(readyPickup);
+    for (const role of Object.values(Role)) expect(service.getAllowedNextStatuses(OrderStatus.COLLECTED, role as Role)).toEqual([]);
+  });
+
+  it('a weighed item without its actual weight blocks collection (WEIGHT_NOT_RECORDED), exactly like a driver pickup', async () => {
+    const service = buildHarness(readyPickup, [{ id: 'item-1', pricingUnitSnapshot: 'WEIGHT', actualWeightGrams: null }]);
+    await expect(service.transition({ orderId: 'order-1', to: OrderStatus.COLLECTED, actorRole: Role.VENDOR })).rejects.toMatchObject({
+      response: { details: { code: 'WEIGHT_NOT_RECORDED' } },
+    });
+  });
+
+  it('collection earns loyalty (in the transaction), then records best-selling, financial events and the "collected" push', async () => {
+    const service = buildHarness(readyPickup);
+    const pushes = (lastMocks.pushNotificationService.sendOrderCollectedNotification = jest.fn(async () => undefined));
+    await service.transition({ orderId: 'order-1', to: OrderStatus.COLLECTED, actorRole: Role.VENDOR_MANAGER });
+    expect(lastMocks.loyaltyService.awardOrderEarning).toHaveBeenCalledWith(expect.anything(), 'order-1');
+    expect(lastMocks.bestSellingCacheService.recordDeliveredSales).toHaveBeenCalledWith('order-1');
+    expect(lastMocks.orderFinancialEventsService.handleTransition).toHaveBeenCalledWith(expect.objectContaining({ id: 'order-1' }), OrderStatus.COLLECTED);
+    expect(pushes).toHaveBeenCalledWith('customer-1', 'order-1');
+    expect(lastMocks.pushNotificationService.sendOrderDeliveredNotification).not.toHaveBeenCalled();
   });
 });

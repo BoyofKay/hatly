@@ -18,13 +18,13 @@ export class AddressesController {
   @Post()
   async create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateAddressDto) {
     const address = await this.addressesService.create(user.id, dto);
-    return { data: address };
+    return { data: this.addressesService.toView(address) };
   }
 
   @Get()
   async list(@CurrentUser() user: AuthenticatedUser) {
     const addresses = await this.addressesService.listForCustomer(user.id);
-    return { data: addresses };
+    return { data: addresses.map((a) => this.addressesService.toView(a)) };
   }
 
   @Patch(':id')
@@ -34,7 +34,7 @@ export class AddressesController {
     @Body() dto: UpdateAddressDto,
   ) {
     const address = await this.addressesService.update(user.id, id, dto);
-    return { data: address };
+    return { data: this.addressesService.toView(address) };
   }
 
   /**
@@ -46,6 +46,6 @@ export class AddressesController {
   @Delete(':id')
   async deactivate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     const address = await this.addressesService.deactivate(user.id, id);
-    return { data: address };
+    return { data: { id: address.id, isActive: address.isActive } };
   }
 }

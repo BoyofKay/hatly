@@ -5,8 +5,8 @@ import { OrderItem } from '../orders/entities/order-item.entity';
 import { OrderVendorSegment } from '../orders/entities/order-vendor-segment.entity';
 import { OrderVendorSegmentStatus } from '../orders/order-vendor-segment-status.enum';
 import { Order } from '../orders/entities/order.entity';
-import { OrderStatus } from '../orders/order-status.enum';
 import { Product } from '../products/entities/product.entity';
+import { RATEABLE_ORDER_STATUSES } from './rateable-order-statuses';
 
 /**
  * CONFIRMED business decision (Ratings — smallest customer ownership
@@ -54,7 +54,7 @@ export class ProductRatingService {
       }
 
       const order = await manager.findOne(Order, { where: { id: segment.orderId } });
-      if (!order || order.customerId !== params.customerId || order.status !== OrderStatus.DELIVERED) {
+      if (!order || order.customerId !== params.customerId || !RATEABLE_ORDER_STATUSES.includes(order.status)) {
         throw new NotFoundException('Order item not found.');
       }
 

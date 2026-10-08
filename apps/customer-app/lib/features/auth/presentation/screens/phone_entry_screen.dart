@@ -9,6 +9,7 @@ import '../auth_error_messages.dart';
 import '../otp_flow_controller.dart';
 import '../widgets/auth_error_notice.dart';
 import '../widgets/egypt_phone_field.dart';
+import '../../../../shared_widgets/hatly_logo.dart';
 
 class PhoneEntryScreen extends ConsumerStatefulWidget {
   const PhoneEntryScreen({super.key});
@@ -80,6 +81,8 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: HatlySpacing.xl),
+                    const Center(child: HatlyLogo(size: 88)),
+                    const SizedBox(height: HatlySpacing.lg),
                     Text(l10n.authWelcomeTitle, style: context.type.h1),
                     const SizedBox(height: HatlySpacing.sm),
                     Text(

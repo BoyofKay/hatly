@@ -74,6 +74,7 @@ export class OrderReadinessService {
       OrderStatus.PICKED_UP,
       OrderStatus.ON_THE_WAY,
       OrderStatus.DELIVERED,
+      OrderStatus.COLLECTED,
       OrderStatus.CANCELLED,
     ].includes(status);
   }

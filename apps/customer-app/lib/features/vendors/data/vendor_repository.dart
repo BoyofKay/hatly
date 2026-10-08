@@ -43,6 +43,19 @@ abstract class VendorRepository {
   /// available, never a fake/zero/placeholder pair. Passing them never
   /// changes ranking/sorting logic itself — that decision belongs
   /// entirely to the backend's own ServiceArea filter, unmodified here.
+  /// [subcategoryId] (consolidated customer-commerce milestone, Part E)
+  /// is OPTIONAL, same backward-conscious discipline as
+  /// [latitude]/[longitude] — omitted, every branch in the sector is
+  /// returned (unchanged pre-existing behavior); when set, filters to
+  /// branches assigned to that subcategory. Selecting a subcategory
+  /// never turns this into a product listing — it stays the exact same
+  /// vendor/branch listing shape, just filtered (CONFIRMED navigation
+  /// decision: Sector -> Vendors/Stores -> Vendor/Branch -> Products).
+  ///
+  /// Filters V1: [openNow]/[hasOffers]/[minRating] — all OPTIONAL, all
+  /// real backend data (`VendorBranch.isOpen`, real active `Offer`
+  /// existence, real `ratingSumStars/ratingCount`). Omitting all three
+  /// reproduces the exact pre-Filters-V1 listing.
   Future<VendorListPage> getVendorsPage(
     String sectorId, {
     String? sort,
@@ -51,6 +64,10 @@ abstract class VendorRepository {
     int limit = 20,
     double? latitude,
     double? longitude,
+    String? subcategoryId,
+    bool? openNow,
+    bool? hasOffers,
+    double? minRating,
   });
 
   /// Full vendor + branch details for the Vendor Details screen. Throws

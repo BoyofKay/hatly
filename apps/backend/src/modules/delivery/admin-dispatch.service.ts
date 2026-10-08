@@ -3,12 +3,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../orders/entities/order.entity';
 import { Delivery } from './entities/delivery.entity';
-import { Driver } from './entities/driver.entity';
 import { DriverRankingService } from './driver-ranking.service';
-import { DeliveryAssignmentService } from './delivery-assignment.service';
-import { OrderStateMachineService } from '../orders/order-state-machine.service';
+import { DeliveryAssignmentService, OrderNotAssignableException } from './delivery-assignment.service';
 import { OrderStatus } from '../orders/order-status.enum';
-import { Role } from '../../common/enums/role.enum';
+import { FulfillmentType } from '../cart/fulfillment-type.enum';
 
 /**
  * PHASE I-A, CHUNK 6 addition. Read-only view for the Admin Dispatch
@@ -22,6 +20,8 @@ import { Role } from '../../common/enums/role.enum';
  */
 export interface AdminDispatchOrderView {
   orderId: string;
+  /** The human order reference (`HT-…`) an admin searches and talks about. */
+  orderNumber: string;
   status: string;
   createdAt: Date;
   deliveryAddressSnapshot: unknown;
@@ -56,10 +56,8 @@ export class AdminDispatchService {
   constructor(
     @InjectRepository(Order) private readonly ordersRepository: Repository<Order>,
     @InjectRepository(Delivery) private readonly deliveriesRepository: Repository<Delivery>,
-    @InjectRepository(Driver) private readonly driversRepository: Repository<Driver>,
     private readonly driverRankingService: DriverRankingService,
     private readonly deliveryAssignmentService: DeliveryAssignmentService,
-    private readonly orderStateMachine: OrderStateMachineService,
   ) {}
 
   /**
@@ -73,6 +71,8 @@ export class AdminDispatchService {
    * — there's no named driver to bypass filters for).
    */
   async assign(orderId: string, driverId?: string, hasOverridePermission = false): Promise<Delivery> {
+    // A clear refusal up front (the authoritative status check is repeated under lock inside assignDriver()).
+    await this.requireStatus(orderId, OrderStatus.READY_FOR_PICKUP);
     const candidateDriverIds = driverId
       ? await this.resolveNamedDriverCandidate(orderId, driverId, hasOverridePermission)
       : await this.rankForOrder(orderId);
@@ -80,38 +80,36 @@ export class AdminDispatchService {
   }
 
   /**
-   * Releases the currently-assigned driver, moves the order back to
-   * READY_FOR_PICKUP using the EXISTING, already-permitted
-   * ASSIGNED_TO_DRIVER→READY_FOR_PICKUP transition (its own comment
-   * already anticipates this: "driver rejects / reassignment"), then
-   * assigns the new driver via the same unmodified primitive. Same
-   * OVERRIDE_DISPATCH enforcement as assign() — reassignment is still
-   * "naming a specific driver," so the same rule applies.
+   * Control Tower milestone fix: every check (order state, the named driver's eligibility / OVERRIDE_DISPATCH, the new
+   * driver's availability, the caller's view of who is currently assigned) runs BEFORE anything is written, and the
+   * release + new assignment are one transaction (DeliveryAssignmentService.reassignDriver). Previously the previous
+   * driver was freed, the counter bumped and the order released first — so a refused reassignment (ineligible/offline
+   * driver) silently left the order unassigned, and a reassignment attempted on a PICKED_UP order marked the carrying
+   * driver available before failing.
    */
-  async reassign(orderId: string, newDriverId: string, hasOverridePermission = false): Promise<Delivery> {
-    const existingDelivery = await this.deliveriesRepository.findOne({ where: { orderId } });
-    if (!existingDelivery) {
-      throw new NotFoundException('No existing delivery to reassign for this order.');
+  async reassign(orderId: string, newDriverId: string, hasOverridePermission = false, expectedCurrentDriverId?: string): Promise<Delivery> {
+    await this.requireStatus(orderId, OrderStatus.ASSIGNED_TO_DRIVER);
+    await this.resolveNamedDriverCandidate(orderId, newDriverId, hasOverridePermission);
+    return this.deliveryAssignmentService.reassignDriver({ orderId, newDriverId, expectedCurrentDriverId });
+  }
+
+  private async requireStatus(orderId: string, expected: OrderStatus): Promise<void> {
+    const order = await this.ordersRepository.findOne({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException({ message: 'Order not found.', details: { code: 'ORDER_NOT_FOUND' } });
     }
-
-    const previousDriver = existingDelivery.driverId
-      ? await this.driversRepository.findOne({ where: { id: existingDelivery.driverId } })
-      : null;
-    if (previousDriver) {
-      previousDriver.isAvailable = true;
-      await this.driversRepository.save(previousDriver);
+    if (order.fulfillmentType !== FulfillmentType.DELIVERY) {
+      throw new OrderNotAssignableException(
+        'This is a pickup order — the customer collects it at the branch, so no driver is assigned.',
+        expected === OrderStatus.READY_FOR_PICKUP ? 'ORDER_NOT_ASSIGNABLE' : 'ORDER_NOT_REASSIGNABLE',
+        order.status,
+      );
     }
-    existingDelivery.reassignmentCount = (existingDelivery.reassignmentCount ?? 0) + 1;
-    await this.deliveriesRepository.save(existingDelivery);
-
-    await this.orderStateMachine.transition({
-      orderId,
-      to: OrderStatus.READY_FOR_PICKUP,
-      actorRole: Role.ADMIN,
-    });
-
-    const candidateDriverIds = await this.resolveNamedDriverCandidate(orderId, newDriverId, hasOverridePermission);
-    return this.deliveryAssignmentService.assignDriver({ orderId, candidateDriverIds });
+    if (order.status !== expected) {
+      throw expected === OrderStatus.READY_FOR_PICKUP
+        ? new OrderNotAssignableException(`This order cannot be assigned: it is ${order.status}, not waiting for a driver.`, 'ORDER_NOT_ASSIGNABLE', order.status)
+        : new OrderNotAssignableException(`This order cannot be reassigned: it is ${order.status}, not assigned to a driver.`, 'ORDER_NOT_REASSIGNABLE', order.status);
+    }
   }
 
   private async resolveNamedDriverCandidate(
@@ -157,7 +155,10 @@ export class AdminDispatchService {
    */
   async listDispatchable(): Promise<AdminDispatchOrderView[]> {
     const orders = await this.ordersRepository.find({
-      where: [{ status: OrderStatus.READY_FOR_PICKUP }, { status: OrderStatus.ASSIGNED_TO_DRIVER }],
+      where: [
+        { status: OrderStatus.READY_FOR_PICKUP, fulfillmentType: FulfillmentType.DELIVERY },
+        { status: OrderStatus.ASSIGNED_TO_DRIVER, fulfillmentType: FulfillmentType.DELIVERY },
+      ],
       order: { createdAt: 'DESC' },
     });
     if (orders.length === 0) return [];
@@ -169,13 +170,18 @@ export class AdminDispatchService {
 
     return orders.map((order) => {
       const delivery = deliveryByOrderId.get(order.id);
+      // Control Tower milestone fix: a READY_FOR_PICKUP order's delivery row may still name the driver it was RELEASED from
+      // (timeout / driver release) — that driver is not on the order any more, so it must not be reported as current
+      // (the Dispatch page filed such orders under "Assigned" and offered a reassignment that cannot apply).
+      const driverOnOrder = order.status === OrderStatus.ASSIGNED_TO_DRIVER;
       return {
         orderId: order.id,
+        orderNumber: order.orderNumber,
         status: order.status,
         createdAt: order.createdAt,
         deliveryAddressSnapshot: order.deliveryAddressSnapshot,
         currentDeliveryId: delivery?.id ?? null,
-        currentDriverId: delivery?.driverId ?? null,
+        currentDriverId: driverOnOrder ? delivery?.driverId ?? null : null,
         reassignmentCount: delivery?.reassignmentCount ?? 0,
       };
     });

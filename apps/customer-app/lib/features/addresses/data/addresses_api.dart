@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../domain/delivery_zone.dart';
 import '../domain/saved_address.dart';
 
 /// Calls the real `/addresses` endpoints implemented in this same
@@ -24,6 +25,25 @@ class AddressesApi {
     );
   }
 
+  /// `GET /delivery-zones` — the active zones the customer can choose from (PD-009). Never hardcoded in the app.
+  Future<List<DeliveryZone>> getDeliveryZones() {
+    return _client.request(
+      (dio) => dio.get('/delivery-zones'),
+      (data) => (data['data'] as List)
+          .map((e) => DeliveryZone.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  /// Makes an address the default WITHOUT resending its other fields — so it also works for an address saved before zones
+  /// existed (the server only accepts zone-less edits of the label / default flag).
+  Future<SavedAddress> setDefaultAddress(String addressId) {
+    return _client.request(
+      (dio) => dio.patch('/addresses/$addressId', data: {'isDefault': true}),
+      (data) => SavedAddress.fromJson(data['data'] as Map<String, dynamic>),
+    );
+  }
+
   Future<void> deactivateAddress(String addressId) {
     return _client.request<void>(
       (dio) => dio.delete('/addresses/$addressId'),
@@ -31,8 +51,8 @@ class AddressesApi {
     );
   }
 
-  /// `PATCH /addresses/:id` — partial update; ownership is enforced server-side. The coordinates are always sent back
-  /// (the customer's re-pinned ones, or the existing address's own) — never a fabricated default.
+  /// `PATCH /addresses/:id` — partial update; ownership is enforced server-side. The zone is always sent; the pin only when
+  /// the customer set one (or explicitly removed it) — never a fabricated default.
   Future<SavedAddress> updateAddress(String addressId, AddressInput input) {
     return _client.request(
       (dio) => dio.patch('/addresses/$addressId', data: input.toJson()),

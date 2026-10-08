@@ -108,6 +108,22 @@ export async function deactivateVendorBranch(id: string): Promise<VendorBranch> 
   return res.data.data;
 }
 
+/**
+ * M1 (Launch-Readiness Gap Audit, G-01). `isOpen` previously had no
+ * write path at all — mirrors `activateVendorBranch`/
+ * `deactivateVendorBranch` exactly. Gated backend-side by the
+ * `OPEN_CLOSE_VENDOR_BRANCHES` permission, not `MANAGE_VENDORS`.
+ */
+export async function openVendorBranch(id: string): Promise<VendorBranch> {
+  const res = await apiClient.patch(`/admin/vendor-branches/${id}/open`);
+  return res.data.data;
+}
+
+export async function closeVendorBranch(id: string): Promise<VendorBranch> {
+  const res = await apiClient.patch(`/admin/vendor-branches/${id}/close`);
+  return res.data.data;
+}
+
 /** Reuses the EXISTING, untouched Sectors-module endpoint — not duplicated here. */
 export async function assignVendorBranchSector(branchId: string, marketplaceSectorId: string): Promise<VendorBranch> {
   const res = await apiClient.patch(`/admin/vendor-branches/${branchId}/sector`, { marketplaceSectorId });

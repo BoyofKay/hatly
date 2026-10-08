@@ -153,8 +153,22 @@ export class ProductsService {
       search?: string;
       page?: number;
       limit?: number;
+      /** Filters V1. Real `Product.isAvailable` — missing/false never silently becomes available. */
+      availableOnly?: boolean;
+      /** Filters V1. Real, currently-in-window `Offer` targeting this product/its category/branch-wide — see `hasActiveOfferForProductSql`. */
+      hasOffers?: boolean;
+      /** Filters V1. `Product.priceMinor` bounds — inclusive, integer minor units. */
+      minPriceMinor?: number;
+      maxPriceMinor?: number;
     } = {},
   ): Promise<ProductListResult> {
+    if (params.minPriceMinor != null && params.maxPriceMinor != null && params.minPriceMinor > params.maxPriceMinor) {
+      throw new BadRequestException({
+        message: 'minPriceMinor cannot be greater than maxPriceMinor.',
+        details: { code: 'INVALID_PRICE_RANGE' },
+      });
+    }
+
     if (params.categoryId) {
       const category = await this.categoriesRepository.findOne({
         where: { id: params.categoryId, vendorBranchId },
@@ -183,12 +197,31 @@ export class ProductsService {
       qb = qb.andWhere('(product.name ILIKE :term OR product.name_ar ILIKE :term)', { term: `%${searchTerm}%` });
     }
 
+    // Filters V1 additions — all additive, all optional, all real data.
+    if (params.availableOnly) {
+      qb = qb.andWhere('product.is_available = true');
+    }
+    if (params.hasOffers) {
+      qb = qb.andWhere(hasActiveOfferForProductSql());
+    }
+    if (params.minPriceMinor != null) {
+      qb = qb.andWhere('product.price_minor >= :minPriceMinor', { minPriceMinor: params.minPriceMinor });
+    }
+    if (params.maxPriceMinor != null) {
+      qb = qb.andWhere('product.price_minor <= :maxPriceMinor', { maxPriceMinor: params.maxPriceMinor });
+    }
+
     switch (params.sort) {
       case 'price_asc':
         qb = qb.orderBy('product.price_minor', 'ASC').addOrderBy('product.id', 'ASC');
         break;
       case 'price_desc':
         qb = qb.orderBy('product.price_minor', 'DESC').addOrderBy('product.id', 'ASC');
+        break;
+      case 'offers':
+        // Filters V1. Same "raw ORDER BY expression, no addSelect needed" reasoning as
+        // MarketplaceVendorsService's own `sort=offers` — see that file's comment.
+        qb = qb.orderBy(hasActiveOfferForProductSql(), 'DESC').addOrderBy('product.created_at', 'DESC').addOrderBy('product.id', 'ASC');
         break;
       case 'bestSelling':
         qb = qb
@@ -539,4 +572,32 @@ export class ProductsService {
     product.quantity = 0;
     return this.productsRepository.save(product);
   }
+}
+
+/**
+ * Filters V1. Mirrors `OfferConsumptionService.resolveActiveOffersForProducts`'s own targeting rule
+ * exactly (branch-wide when an offer has no product/category targeting rows at all; otherwise a
+ * specific-product or specific-category match), expressed as SQL instead of an in-memory Set — this
+ * is a boolean presence filter/sort key, never a "which offer / best offer" resolution, so it doesn't
+ * need that method's FLASH_SALE-vs-SUBTOTAL_DISCOUNT "best offer wins" logic at all. Hand-written raw
+ * SQL (not TypeORM's own query builder for these tables), so soft-delete (`deleted_at IS NULL`) is
+ * spelled out explicitly here rather than relying on TypeORM's automatic scoping.
+ */
+function hasActiveOfferForProductSql(): string {
+  return `EXISTS (
+    SELECT 1 FROM offers o
+    WHERE o.vendor_branch_id = product.vendor_branch_id
+      AND o.is_active = true
+      AND o.deleted_at IS NULL
+      AND o.start_at <= now()
+      AND o.end_at > now()
+      AND (
+        (
+          NOT EXISTS (SELECT 1 FROM offer_products op WHERE op.offer_id = o.id)
+          AND NOT EXISTS (SELECT 1 FROM offer_categories oc WHERE oc.offer_id = o.id)
+        )
+        OR EXISTS (SELECT 1 FROM offer_products op2 WHERE op2.offer_id = o.id AND op2.product_id = product.id)
+        OR EXISTS (SELECT 1 FROM offer_categories oc2 WHERE oc2.offer_id = o.id AND oc2.product_category_id = product.category_id)
+      )
+  )`;
 }

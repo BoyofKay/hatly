@@ -2,10 +2,12 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Address } from '../../addresses/entities/address.entity';
+import { isZoneServiceable } from '../../addresses/addresses.service';
 import { VendorBranch } from '../../vendors/entities/vendor-branch.entity';
 import { ServiceAreaResolverService } from '../../service-areas/service-area-resolver.service';
+import { DeliveryZone, toDeliveryZoneSummary } from '../../delivery-zones/entities/delivery-zone.entity';
 import { DeliveryAddressSnapshot } from '../entities/order.entity';
-import { AddressEligibility } from './checkout-plan';
+import { AddressEligibility, ResolvedDeliveryZone } from './checkout-plan';
 
 // A coarse sanity box around Egypt: catches swapped or nonsensical coordinates. Serviceability is the SERVICE AREA's job.
 const EGYPT_LAT = { min: 21.9, max: 31.7 };
@@ -24,20 +26,36 @@ const OPTIONAL_TEXT_FIELDS = [
   'formattedAddress',
 ] as const;
 
+/** True when the snapshot carries a usable map pin (both coordinates, finite). */
+export function hasPin(address: Pick<DeliveryAddressSnapshot, 'latitude' | 'longitude'> | null | undefined): boolean {
+  return !!address && Number.isFinite(address.latitude) && Number.isFinite(address.longitude);
+}
+
 /**
- * Server-side validation of a delivery address and of whether Hatly can deliver to it. The coordinates are the
- * authoritative location; the written details are what the customer typed; `formattedAddress` is only the map provider's
- * suggestion. Nothing here trusts a client-supplied fee, distance or "serviceable" flag.
+ * Server-side validation of a delivery address and of whether Hatly can deliver to it. Nothing here trusts a client-supplied
+ * fee, distance, zone name or "serviceable" flag.
+ *
+ * PD-009: an address is located EITHER by its map pin (the existing service-area radius check, distance-based fee) OR — when it
+ * has no pin — by the Delivery Zone the customer selected (the zone is the serviceability boundary and its fee the base fee).
+ * A selected zone that is no longer available always blocks; nothing ever falls back to another zone or location.
  */
 @Injectable()
 export class AddressValidationService {
   constructor(
     @InjectRepository(Address) private readonly addressesRepository: Repository<Address>,
+    @InjectRepository(DeliveryZone) private readonly zonesRepository: Repository<DeliveryZone>,
     private readonly serviceAreaResolver: ServiceAreaResolverService,
   ) {}
 
   /** Trims, drops empty optional fields, and rejects a malformed address outright (400 INVALID_DELIVERY_ADDRESS). */
-  normalize(input: Partial<DeliveryAddressSnapshot> & { line1?: string; latitude?: number; longitude?: number }): DeliveryAddressSnapshot {
+  normalize(
+    input: Partial<Omit<DeliveryAddressSnapshot, 'latitude' | 'longitude' | 'deliveryZoneId' | 'deliveryZone'>> & {
+      line1?: string;
+      latitude?: number | null;
+      longitude?: number | null;
+      deliveryZoneId?: string | null;
+    },
+  ): DeliveryAddressSnapshot {
     const line1 = typeof input.line1 === 'string' ? input.line1.trim() : '';
     if (line1.length < 1) {
       throw new BadRequestException({
@@ -45,13 +63,20 @@ export class AddressValidationService {
         details: { code: 'INVALID_DELIVERY_ADDRESS', field: 'line1' },
       });
     }
-    if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)) {
+    const hasLat = input.latitude !== undefined && input.latitude !== null;
+    const hasLng = input.longitude !== undefined && input.longitude !== null;
+    if (hasLat !== hasLng || (hasLat && (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)))) {
       throw new BadRequestException({
-        message: 'The delivery address needs a location on the map.',
+        message: 'The map location of the delivery address is not valid.',
         details: { code: 'INVALID_DELIVERY_ADDRESS', field: 'location' },
       });
     }
-    const snapshot: DeliveryAddressSnapshot = { line1, latitude: Number(input.latitude), longitude: Number(input.longitude) };
+    const snapshot: DeliveryAddressSnapshot = { line1 };
+    if (hasLat) {
+      snapshot.latitude = Number(input.latitude);
+      snapshot.longitude = Number(input.longitude);
+    }
+    if (typeof input.deliveryZoneId === 'string' && input.deliveryZoneId.length > 0) snapshot.deliveryZoneId = input.deliveryZoneId;
     for (const field of OPTIONAL_TEXT_FIELDS) {
       const value = input[field];
       if (typeof value === 'string' && value.trim().length > 0) snapshot[field] = value.trim();
@@ -69,6 +94,7 @@ export class AddressValidationService {
       line1: address.line1,
       latitude: address.latitude,
       longitude: address.longitude,
+      deliveryZoneId: address.deliveryZoneId,
       label: address.label ?? undefined,
       instructions: address.instructions ?? undefined,
       governorate: address.governorate ?? undefined,
@@ -83,36 +109,86 @@ export class AddressValidationService {
   }
 
   /**
-   * Can every vendor branch in the cart deliver to this point? The point must fall inside an ACTIVE service area, and each
-   * branch must have delivery enabled and belong to that same service area (a branch with no area configured is not
-   * area-restricted). `address` null = the customer has not chosen one yet.
+   * Can every vendor branch in the cart deliver to this address? (`branches` is empty for a Hatly Service order — the same
+   * address rules still apply.)
+   *  1. The address's zone, when it has one, must be active (else DELIVERY_ZONE_UNAVAILABLE — no fallback).
+   *  2. With a map pin: the point must be in Egypt and inside an ACTIVE service area (existing rule) → pricing DISTANCE.
+   *     Without a pin: the active zone is the boundary (ADDRESS_ZONE_REQUIRED when there is none) → pricing DELIVERY_ZONE.
+   *  3. Each branch must deliver and belong to that same service area (a branch with no area configured is not restricted).
+   *
+   * `zoneAuthoritative` (Hatly Service, PD-009 amended): the ACTIVE zone is the ONLY serviceability/pricing source — it is
+   * required even when the address has a pin, and the pin's service-area radius is not consulted (a pin is still sanity-checked,
+   * since a driver may use it, but it never decides serviceability or price).
    */
-  async checkEligibility(address: DeliveryAddressSnapshot | null, branches: VendorBranch[]): Promise<AddressEligibility> {
+  async checkEligibility(
+    address: DeliveryAddressSnapshot | null,
+    branches: VendorBranch[],
+    options: { zoneAuthoritative?: boolean } = {},
+  ): Promise<AddressEligibility> {
     const vendors = (deliverable: boolean, code?: string) =>
       branches.map((b) => ({ vendorBranchId: b.id, deliverable, ...(code ? { code } : {}) }));
+    const blocked = (code: string, message: string): AddressEligibility => ({
+      serviceable: false,
+      code,
+      message,
+      serviceAreaId: null,
+      pricingSource: null,
+      deliveryZone: null,
+      vendors: vendors(false, code),
+    });
 
-    if (!address) {
-      return { serviceable: false, code: 'ADDRESS_REQUIRED', message: 'Choose a delivery address.', serviceAreaId: null, vendors: vendors(false, 'ADDRESS_REQUIRED') };
-    }
-    const inEgypt =
-      address.latitude >= EGYPT_LAT.min && address.latitude <= EGYPT_LAT.max && address.longitude >= EGYPT_LNG.min && address.longitude <= EGYPT_LNG.max;
-    if (!inEgypt) {
-      return { serviceable: false, code: 'INVALID_DELIVERY_LOCATION', message: 'The selected location is not valid.', serviceAreaId: null, vendors: vendors(false, 'INVALID_DELIVERY_LOCATION') };
+    if (!address) return blocked('ADDRESS_REQUIRED', 'Choose a delivery address.');
+
+    let zone: ResolvedDeliveryZone | null = null;
+    let zoneServiceAreaId: string | null = null;
+    if (address.deliveryZoneId) {
+      const row = await this.zonesRepository.findOne({ where: { id: address.deliveryZoneId }, relations: { serviceArea: true } });
+      if (!row || !isZoneServiceable(row)) {
+        return blocked('DELIVERY_ZONE_UNAVAILABLE', 'Hatly does not deliver to the selected area right now. Please choose another area.');
+      }
+      zone = { ...toDeliveryZoneSummary(row), deliveryFeeMinor: row.deliveryFeeMinor };
+      zoneServiceAreaId = row.serviceAreaId;
     }
 
-    const area = await this.serviceAreaResolver.resolveForPoint(address.latitude, address.longitude);
-    if (!area) {
-      return { serviceable: false, code: 'ADDRESS_OUT_OF_SERVICE_AREA', message: 'Hatly does not deliver to this location yet.', serviceAreaId: null, vendors: vendors(false, 'ADDRESS_OUT_OF_SERVICE_AREA') };
+    let serviceAreaId: string;
+    let pricingSource: 'DISTANCE' | 'DELIVERY_ZONE';
+    if (hasPin(address)) {
+      const inEgypt =
+        address.latitude! >= EGYPT_LAT.min && address.latitude! <= EGYPT_LAT.max && address.longitude! >= EGYPT_LNG.min && address.longitude! <= EGYPT_LNG.max;
+      if (!inEgypt) return blocked('INVALID_DELIVERY_LOCATION', 'The selected location is not valid.');
+    }
+
+    if (options.zoneAuthoritative) {
+      if (!zone) return blocked('ADDRESS_ZONE_REQUIRED', 'Choose the delivery area (zone) of this address.');
+      serviceAreaId = zoneServiceAreaId!;
+      pricingSource = 'DELIVERY_ZONE';
+    } else if (hasPin(address)) {
+      const area = await this.serviceAreaResolver.resolveForPoint(address.latitude!, address.longitude!);
+      if (!area) return blocked('ADDRESS_OUT_OF_SERVICE_AREA', 'Hatly does not deliver to this location yet.');
+      serviceAreaId = area.id;
+      pricingSource = 'DISTANCE';
+    } else {
+      if (!zone) return blocked('ADDRESS_ZONE_REQUIRED', 'Choose the delivery area (zone) of this address.');
+      serviceAreaId = zoneServiceAreaId!;
+      pricingSource = 'DELIVERY_ZONE';
     }
 
     const perVendor = branches.map((b) => {
       if (b.deliveryEnabled === false) return { vendorBranchId: b.id, deliverable: false, code: 'VENDOR_DOES_NOT_DELIVER' };
-      if (b.serviceAreaId && b.serviceAreaId !== area.id) return { vendorBranchId: b.id, deliverable: false, code: 'VENDOR_OUTSIDE_DELIVERY_AREA' };
+      if (b.serviceAreaId && b.serviceAreaId !== serviceAreaId) return { vendorBranchId: b.id, deliverable: false, code: 'VENDOR_OUTSIDE_DELIVERY_AREA' };
       return { vendorBranchId: b.id, deliverable: true };
     });
-    const blocked = perVendor.find((v) => !v.deliverable);
-    return blocked
-      ? { serviceable: false, code: blocked.code, message: 'One of the vendors in your cart cannot deliver to this location.', serviceAreaId: area.id, vendors: perVendor }
-      : { serviceable: true, serviceAreaId: area.id, vendors: perVendor };
+    const blockedVendor = perVendor.find((v) => !v.deliverable);
+    return blockedVendor
+      ? {
+          serviceable: false,
+          code: blockedVendor.code,
+          message: 'One of the vendors in your cart cannot deliver to this location.',
+          serviceAreaId,
+          pricingSource,
+          deliveryZone: zone,
+          vendors: perVendor,
+        }
+      : { serviceable: true, serviceAreaId, pricingSource, deliveryZone: zone, vendors: perVendor };
   }
 }

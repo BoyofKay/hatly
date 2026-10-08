@@ -9,8 +9,11 @@ function buildHarness(opts: { branch?: any; driver?: any }) {
     findOne: jest.fn(async () => opts.branch ?? null),
     save: jest.fn(async (b: any) => b),
   };
+  const driverRow = opts.driver ? { ...opts.driver } : null;
   const driversRepository = {
-    findOne: jest.fn(async () => opts.driver ?? null),
+    findOne: jest.fn(async () => driverRow),
+    findOneOrFail: jest.fn(async () => driverRow),
+    update: jest.fn(async (_criteria: any, partial: any) => Object.assign(driverRow, partial)),
     save: jest.fn(async (d: any) => d),
   };
   const controller = new AdminCommissionConfigController(vendorBranchesRepository as any, driversRepository as any);
@@ -52,16 +55,15 @@ describe('AdminCommissionConfigController', () => {
   });
 
   describe('setDriverCommissionRate', () => {
-    it('updates and saves the driver, returning it in the response envelope', async () => {
+    it('writes only the commission rate column (no whole-row save), returning the driver in the response envelope', async () => {
       const { controller, driversRepository } = buildHarness({
         driver: { id: 'driver-1', commissionRateBasisPoints: null },
       });
 
       const result = await controller.setDriverCommissionRate('driver-1', { commissionRateBasisPoints: 2000 });
 
-      expect(driversRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ commissionRateBasisPoints: 2000 }),
-      );
+      expect(driversRepository.update).toHaveBeenCalledWith({ id: 'driver-1' }, { commissionRateBasisPoints: 2000 });
+      expect(driversRepository.save).not.toHaveBeenCalled();
       expect(result.data.commissionRateBasisPoints).toBe(2000);
     });
 
@@ -71,6 +73,7 @@ describe('AdminCommissionConfigController', () => {
       await expect(
         controller.setDriverCommissionRate('missing-driver', { commissionRateBasisPoints: 2000 }),
       ).rejects.toThrow(NotFoundException);
+      expect(driversRepository.update).not.toHaveBeenCalled();
       expect(driversRepository.save).not.toHaveBeenCalled();
     });
 

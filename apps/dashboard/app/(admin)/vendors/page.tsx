@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Vendor, createVendor, listVendors } from '../../../lib/api/admin-vendors';
+import { apiErrorMessage } from '../../../lib/api/errors';
 
 /**
  * Real Vendor management — consumes `GET/POST admin/vendors` (Chunk
@@ -27,7 +28,7 @@ export default function VendorsPage() {
       const data = await listVendors();
       setVendors(data);
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load vendors.');
+      setError(apiErrorMessage(err, 'Failed to load vendors.'));
     }
   }
 
@@ -52,7 +53,7 @@ export default function VendorsPage() {
       setShowCreateForm(false);
       await refresh();
     } catch (err: any) {
-      setCreateError(err?.response?.data?.message ?? 'Failed to create vendor.');
+      setCreateError(apiErrorMessage(err, 'Failed to create vendor.'));
     } finally {
       setIsSubmitting(false);
     }

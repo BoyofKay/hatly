@@ -2,6 +2,22 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ManualTransferRefundService } from './manual-transfer-refund.service';
 import { PaymentStatus } from './payment-status.enum';
 
+/**
+ * Consolidated customer-commerce milestone: `ManualTransferRefundService` now also depends on
+ * `LoyaltyService` (post-DELIVERED refund reversal — see that method's own doc comment) and
+ * `DataSource` (to open its own transaction for the no-manager call shape). Every harness below
+ * passes a no-op `loyaltyService` mock — the reversal logic itself is unit-tested directly in
+ * `loyalty.service.spec.ts`, not re-tested here — and a `dataSource` mock whose `transaction()` just
+ * invokes the callback with a dummy manager, matching how every OTHER `this.dataSource.transaction`
+ * caller in this codebase is mocked (e.g. WalletService's own spec).
+ */
+function makeLoyaltyServiceMock() {
+  return { reverseEarningForRefund: jest.fn(async () => undefined) };
+}
+function makeDataSourceMock() {
+  return { transaction: jest.fn(async (cb: any) => cb({})) };
+}
+
 function buildHarness(payment: any | null) {
   const paymentsRepository = {
     findOne: jest.fn(async () => (payment ? { ...payment } : null)),
@@ -15,7 +31,12 @@ function buildHarness(payment: any | null) {
       return event;
     }),
   };
-  const service = new ManualTransferRefundService(paymentsRepository as any, financialEventService as any);
+  const service = new ManualTransferRefundService(
+    paymentsRepository as any,
+    financialEventService as any,
+    makeLoyaltyServiceMock() as any,
+    makeDataSourceMock() as any,
+  );
   return { service, paymentsRepository, recordedEvents };
 }
 
@@ -78,7 +99,12 @@ describe('ManualTransferRefundService.recordRefund — manager path (Chunk B2 pr
       }),
     };
     const injectedPaymentsRepository = { findOne: jest.fn(async () => null), save: jest.fn() };
-    const service = new ManualTransferRefundService(injectedPaymentsRepository as any, financialEventService as any);
+    const service = new ManualTransferRefundService(
+      injectedPaymentsRepository as any,
+      financialEventService as any,
+      makeLoyaltyServiceMock() as any,
+      makeDataSourceMock() as any,
+    );
     return { service, manager, managerPaymentRepository, injectedPaymentsRepository, recordedEvents };
   }
 
@@ -148,7 +174,7 @@ describe('ManualTransferRefundService — partial cancellation refunds (PD-002)'
         };
       },
     };
-    const service = new ManualTransferRefundService({} as any, financialEventService as any);
+    const service = new ManualTransferRefundService({} as any, financialEventService as any, makeLoyaltyServiceMock() as any, makeDataSourceMock() as any);
     return { service, manager, events, financialEventService };
   }
   const paid = { id: 'pay-1', orderId: 'order-1', status: PaymentStatus.PAID, amountMinor: 32500 };
@@ -271,7 +297,7 @@ describe('ManualTransferRefundService — pending refund entitlement (PD-004)', 
         };
       },
     };
-    return { service: new ManualTransferRefundService({} as any, financialEventService as any), manager, stored, events };
+    return { service: new ManualTransferRefundService({} as any, financialEventService as any, makeLoyaltyServiceMock() as any, makeDataSourceMock() as any), manager, stored, events };
   }
   const base = { id: 'pay-1', orderId: 'order-1', amountMinor: 32500 };
   const reduce = (owedAfterMinor: number, segmentId = 'seg-B') => ({ orderId: 'order-1', owedAfterMinor, segmentId, actorUserId: 'v1', reason: 'r' });
@@ -472,7 +498,7 @@ describe('ManualTransferRefundService — wallet + Manual Transfer waterfall (PD
         };
       },
     };
-    return { service: new ManualTransferRefundService({} as any, financialEventService as any), manager, stored, events };
+    return { service: new ManualTransferRefundService({} as any, financialEventService as any, makeLoyaltyServiceMock() as any, makeDataSourceMock() as any), manager, stored, events };
   }
   const paid = { id: 'pay-1', orderId: 'order-1', status: PaymentStatus.PAID, amountMinor: E };
   const cancel = (owedAfterMinor: number, segmentId = 'seg-A') => ({ orderId: 'order-1', owedAfterMinor, segmentId, actorUserId: 'v1', reason: 'r' });

@@ -228,7 +228,9 @@ function buildHarness(opts: {
   const hatlyServicePricingService = {
     calculateCharge: jest.fn(async () => ({
       chargeMinor: opts.hatlyServiceChargeMinor ?? 500,
-      distanceMeters: 1000,
+      pricingSource: 'DELIVERY_ZONE',
+      deliveryZoneId: 'zone-1',
+      zoneDeliveryFeeMinorUsed: 500,
       multiplierUsed: 1,
     })),
   };
@@ -258,6 +260,14 @@ function buildHarness(opts: {
   // this harness's fakes, so every behaviour asserted below still runs through the production planner code.
   const addressValidationService = new AddressValidationService(
     { findOne: async () => null } as any,
+    // One active Delivery Zone (PD-009): every test address carries it — registered vendors still price by the pin (distance),
+    // Hatly Service always by the zone.
+    {
+      findOne: async ({ where }: any) =>
+        where.id === 'zone-1'
+          ? { id: 'zone-1', name: 'Abu Naseeb', nameAr: 'أبو نصيب', city: 'Belbeis', cityAr: 'بلبيس', governorate: 'Sharqia', governorateAr: 'الشرقية', deliveryFeeMinor: 500, isActive: true, serviceAreaId: 'area-1', serviceArea: { id: 'area-1', isActive: true } }
+          : null,
+    } as any,
     { resolveForPoint: async () => ({ id: 'area-1' }) } as any, // every test address is inside a service area
   );
   const walletService = {
@@ -396,7 +406,7 @@ function makeBranch(id: string, overrides: Partial<any> = {}) {
   };
 }
 
-const address = { line1: '12 Market St', latitude: 30.1, longitude: 31.2 };
+const address = { line1: '12 Market St', latitude: 30.1, longitude: 31.2, deliveryZoneId: 'zone-1' };
 
 describe('OrderCreationService', () => {
   it('creates a single-vendor order successfully, with correct group->segment and item->item mapping', async () => {
@@ -540,20 +550,14 @@ describe('OrderCreationService', () => {
     ).rejects.toThrow(ConflictException);
   });
 
-  // `makeAdHocGroup`'s default is BUY_FROM_PLACE with no customer-
-  // supplied pickup override — `resolveAdHocLocations` therefore always
-  // needs the configured default pickup location for these AD_HOC
-  // tests (matching the already-passing BUY_FROM_PLACE-default tests
-  // further down in this file), except where the request is rejected
-  // before ever reaching that resolution step (e.g. the ONLINE-payment
-  // rejection test right below, which fails closed on Step 7, earlier).
-  const AD_HOC_DEFAULT_PICKUP_CONFIG = {
-    HATLY_SERVICE_DEFAULT_PICKUP_LOCATION: { latitude: 30.0, longitude: 31.0, label: 'Hatly Office' },
-  };
+  // `makeAdHocGroup`'s default is BUY_FROM_PLACE with NO location. Hatly Service rule: the pickup of a BUY_FROM_PLACE request
+  // is the place the CUSTOMER chose — a missing one is rejected, never replaced by a Hatly default — so every ad-hoc test that
+  // is about something else supplies the customer's own pickup explicitly.
+  const CUSTOMER_PICKUP = { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 };
 
   it('preserves ad-hoc snapshot integrity: place name, free text, and images are frozen onto the order', async () => {
-    const cart = makeCart([makeAdHocGroup('g1', [makeAdHocItem('i1')])]);
-    const { service } = buildHarness({ cart, businessConfigValues: AD_HOC_DEFAULT_PICKUP_CONFIG });
+    const cart = makeCart([makeAdHocGroup('g1', [makeAdHocItem('i1')], CUSTOMER_PICKUP)]);
+    const { service } = buildHarness({ cart });
 
     const order = await service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'COD' });
 
@@ -563,8 +567,8 @@ describe('OrderCreationService', () => {
   });
 
   it('never assigns a fake 0 price to an unpriced ad-hoc segment/item — stays null', async () => {
-    const cart = makeCart([makeAdHocGroup('g1', [makeAdHocItem('i1')])]);
-    const { service } = buildHarness({ cart, businessConfigValues: AD_HOC_DEFAULT_PICKUP_CONFIG });
+    const cart = makeCart([makeAdHocGroup('g1', [makeAdHocItem('i1')], CUSTOMER_PICKUP)]);
+    const { service } = buildHarness({ cart });
 
     const order = await service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'COD' });
 
@@ -585,8 +589,8 @@ describe('OrderCreationService', () => {
   });
 
   it('allows COD for an order containing an unpriced ad-hoc segment', async () => {
-    const cart = makeCart([makeAdHocGroup('g1', [makeAdHocItem('i1')])]);
-    const { service } = buildHarness({ cart, businessConfigValues: AD_HOC_DEFAULT_PICKUP_CONFIG });
+    const cart = makeCart([makeAdHocGroup('g1', [makeAdHocItem('i1')], CUSTOMER_PICKUP)]);
+    const { service } = buildHarness({ cart });
 
     const order = await service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'COD' });
     expect(order.paymentMethod).toBe('COD');
@@ -635,50 +639,104 @@ describe('OrderCreationService', () => {
     expect(order.segments[0].adHocPickupLongitudeSnapshot).toBe(31.5);
   });
 
-  it('falls back to the configured default pickup location for BUY_FROM_PLACE when the customer supplied none', async () => {
-    const group = makeAdHocGroup('g1', [makeAdHocItem('i1')]); // no pickup override
+  it('Hatly Service location rule: REJECTS BUY_FROM_PLACE when the customer chose no pickup place — never falls back to Hatly\'s configured default pickup, even when one IS configured', async () => {
+    const group = makeAdHocGroup('g1', [makeAdHocItem('i1')]); // no pickup chosen
     const cart = makeCart([group]);
-    const { service } = buildHarness({
+    const { service, store } = buildHarness({
       cart,
       businessConfigValues: {
         HATLY_SERVICE_DEFAULT_PICKUP_LOCATION: { latitude: 30.0, longitude: 31.0, label: 'Hatly Office' },
       },
     });
 
-    const order = await service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'COD' });
-
-    expect(order.segments[0].adHocPickupLatitudeSnapshot).toBe(30.0);
-    expect(order.segments[0].adHocPickupLongitudeSnapshot).toBe(31.0);
-    expect(order.segments[0].adHocDestinationLatitudeSnapshot).toBeNull(); // not applicable to BUY_FROM_PLACE
+    await expect(
+      service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'COD' }),
+    ).rejects.toMatchObject({ response: { details: { code: 'BUY_FROM_PLACE_PICKUP_REQUIRED' } } });
+    expect(store.orders.size).toBe(0);
   });
 
-  it('fails closed when a default pickup location is needed but was never configured — never invents a coordinate', async () => {
-    const group = makeAdHocGroup('g1', [makeAdHocItem('i1')]); // no override, no config seeded
-    const cart = makeCart([group]);
+  it('BUY_FROM_PLACE with no pickup and no configured default is the SAME clear rejection (not a config error) — nothing is invented', async () => {
+    const cart = makeCart([makeAdHocGroup('g1', [makeAdHocItem('i1')])]);
     const { service, store } = buildHarness({ cart });
 
     await expect(
       service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'COD' }),
-    ).rejects.toThrow(NotFoundException);
+    ).rejects.toMatchObject({ response: { details: { code: 'BUY_FROM_PLACE_PICKUP_REQUIRED' } } });
     expect(store.orders.size).toBe(0);
   });
 
-  it('falls back to the configured default destination for DELIVER_TO_PLACE when the customer supplied none', async () => {
-    const group = makeAdHocGroup('g1', [makeAdHocItem('i1')], {
-      adHocServiceType: AdHocServiceType.DELIVER_TO_PLACE,
-    });
+  it('BUY_FROM_PLACE with a customer-chosen pickup: pickup = the customer\'s place, destination = the customer\'s delivery address; Hatly\'s defaults are ignored even if configured', async () => {
+    const group = makeAdHocGroup('g1', [makeAdHocItem('i1')], CUSTOMER_PICKUP);
     const cart = makeCart([group]);
     const { service } = buildHarness({
       cart,
       businessConfigValues: {
-        HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION: { latitude: 30.2, longitude: 31.2, label: 'Default drop-off' },
+        HATLY_SERVICE_DEFAULT_PICKUP_LOCATION: { latitude: 1, longitude: 1, label: 'Hatly Office' },
+        HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION: { latitude: 2, longitude: 2, label: 'Hatly HQ' },
       },
     });
 
     const order = await service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'COD' });
 
-    expect(order.segments[0].adHocDestinationLatitudeSnapshot).toBe(30.2);
-    expect(order.segments[0].adHocDestinationLongitudeSnapshot).toBe(31.2);
+    expect(order.segments[0].adHocPickupLatitudeSnapshot).toBe(30.5);
+    expect(order.segments[0].adHocPickupLongitudeSnapshot).toBe(31.5);
+    expect(order.segments[0].adHocDestinationLatitudeSnapshot).toBeNull(); // not a stored location for BUY_FROM_PLACE
+    expect(order.deliveryAddressSnapshot).toMatchObject({ latitude: address.latitude, longitude: address.longitude });
+  });
+
+  it('a missing customer ADDRESS is rejected for BOTH Hatly Service types — Hatly\'s configured locations never stand in for it', async () => {
+    const defaults = {
+      HATLY_SERVICE_DEFAULT_PICKUP_LOCATION: { latitude: 30.0, longitude: 31.0, label: 'Hatly Office' },
+      HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION: { latitude: 30.2, longitude: 31.2, label: 'Hatly HQ' },
+    };
+    const buy = makeAdHocGroup('g1', [makeAdHocItem('i1')], CUSTOMER_PICKUP);
+    const deliver = makeAdHocGroup('g1', [makeAdHocItem('i1')], {
+      adHocServiceType: AdHocServiceType.DELIVER_TO_PLACE,
+      adHocDestinationLatitude: 30.55,
+      adHocDestinationLongitude: 31.66,
+    });
+    for (const group of [buy, deliver]) {
+      const { rawCreateOrder, store } = buildHarness({ cart: makeCart([group]), businessConfigValues: defaults });
+      await expect(rawCreateOrder('customer-1', { paymentMethod: 'COD' } as any)).rejects.toMatchObject({
+        response: { details: { code: 'DELIVERY_ADDRESS_REQUIRED' } },
+      });
+      expect(store.orders.size).toBe(0);
+    }
+  });
+
+  it('Launch-Readiness Gap Audit fix (Hatly Service location semantics): REJECTS DELIVER_TO_PLACE when the customer supplied no destination — never silently falls back to a Hatly-configured default (which would misdeliver the order)', async () => {
+    const group = makeAdHocGroup('g1', [makeAdHocItem('i1')], {
+      adHocServiceType: AdHocServiceType.DELIVER_TO_PLACE,
+    });
+    const cart = makeCart([group]);
+    const { service, store } = buildHarness({
+      cart,
+      // Even if an Admin HAS configured this key, it must never be read as a destination fallback —
+      // the fix removed that read path entirely, not just its default value.
+      businessConfigValues: {
+        HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION: { latitude: 30.2, longitude: 31.2, label: 'Default drop-off' },
+      },
+    });
+
+    await expect(
+      service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'COD' }),
+    ).rejects.toMatchObject({ response: { details: { code: 'DELIVER_TO_PLACE_DESTINATION_REQUIRED' } } });
+    expect(store.orders.size).toBe(0);
+  });
+
+  it('DELIVER_TO_PLACE succeeds when the customer DID supply an explicit destination — the customer\'s own coordinate, never Hatly\'s default', async () => {
+    const group = makeAdHocGroup('g1', [makeAdHocItem('i1')], {
+      adHocServiceType: AdHocServiceType.DELIVER_TO_PLACE,
+      adHocDestinationLatitude: 30.55,
+      adHocDestinationLongitude: 31.66,
+    });
+    const cart = makeCart([group]);
+    const { service } = buildHarness({ cart });
+
+    const order = await service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'COD' });
+
+    expect(order.segments[0].adHocDestinationLatitudeSnapshot).toBe(30.55);
+    expect(order.segments[0].adHocDestinationLongitudeSnapshot).toBe(31.66);
     expect(order.segments[0].adHocPickupLatitudeSnapshot).toBeNull(); // not applicable to DELIVER_TO_PLACE
   });
 
@@ -724,14 +782,16 @@ describe('OrderCreationService', () => {
   });
 
   it('PHASE E: MANUAL_TRANSFER is still rejected for an unpriced Hatly Service order — the existing check already covers this, unchanged', async () => {
-    const group = makeAdHocGroup('g1', [makeAdHocItem('i1')], { adHocServiceType: AdHocServiceType.DELIVER_TO_PLACE });
-    const cart = makeCart([group]);
-    const { service } = buildHarness({
-      cart,
-      businessConfigValues: {
-        HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION: { latitude: 30.2, longitude: 31.2, label: 'Default drop-off' },
-      },
+    // An explicit destination — DELIVER_TO_PLACE no longer has a config-based fallback to rely on
+    // (Launch-Readiness Gap Audit fix) — this test's own concern is the MANUAL_TRANSFER rejection
+    // below, not location resolution, so a valid destination is supplied directly.
+    const group = makeAdHocGroup('g1', [makeAdHocItem('i1')], {
+      adHocServiceType: AdHocServiceType.DELIVER_TO_PLACE,
+      adHocDestinationLatitude: 30.2,
+      adHocDestinationLongitude: 31.2,
     });
+    const cart = makeCart([group]);
+    const { service } = buildHarness({ cart });
 
     await expect(
       service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: ElectronicPaymentMethod.INSTAPAY }),
@@ -1417,16 +1477,8 @@ describe('OrderCreationService — Vendor/Pharmacy Custom Item inside a CATALOG 
 
   it('existing External Hatly Service (AD_HOC_SERVICE) order creation remains unchanged', async () => {
     const customItem = makeAdHocItem('custom-1');
-    const cart = makeCart([makeAdHocGroup('g1', [customItem])]);
-    // BUY_FROM_PLACE with no customer-supplied pickup override (see
-    // makeAdHocGroup's own default) needs the configured default
-    // pickup location — same fixture value used by the equivalent
-    // AD_HOC tests earlier in this file.
-    const { service, store } = buildHarness({
-      cart,
-      branches: [],
-      businessConfigValues: { HATLY_SERVICE_DEFAULT_PICKUP_LOCATION: { latitude: 30.0, longitude: 31.0, label: 'Hatly Office' } },
-    });
+    const cart = makeCart([makeAdHocGroup('g1', [customItem], { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 })]);
+    const { service, store } = buildHarness({ cart, branches: [] });
 
     const order = await service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'COD' });
     const segments = [...store.segments.values()].filter((s: any) => s.orderId === order.id);

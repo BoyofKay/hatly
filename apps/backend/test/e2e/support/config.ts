@@ -39,6 +39,9 @@ export function e2eEnv(): Record<string, string> {
     OTP_RESEND_COOLDOWN_SECONDS: '60',
     OTP_LOG_CODE_FOR_LOCAL_DEV: 'false',
     STORAGE_ENDPOINT: '', STORAGE_REGION: '', STORAGE_BUCKET: '', STORAGE_ACCESS_KEY: '', STORAGE_SECRET_KEY: '',
+    // M5 Batch 1/2 knobs, pinned (empty = unset) so a developer's own .env can never change what the suite exercises.
+    STORAGE_DRIVER: 'local', STORAGE_ACCESS: 'private', STORAGE_PUBLIC_BASE_URL: '', STORAGE_FORCE_PATH_STYLE: '', STORAGE_SIGNED_URL_TTL_SECONDS: '', STORAGE_KEY_PREFIX: '',
+    CORS_ALLOWED_ORIGINS: '', TRUST_PROXY: '', ENABLE_API_DOCS: '', DB_SSL_REJECT_UNAUTHORIZED: '', ALLOW_INSECURE_DB: '', ALLOW_MISSING_SMS_PROVIDER: '', ALLOW_MISSING_PUSH_PROVIDER: '', UPLOADS_PUBLIC_URL_PREFIX: '/uploads/files',
     FCM_PROJECT_ID: '', FCM_CLIENT_EMAIL: '', FCM_PRIVATE_KEY: '',
     // Pinned explicitly, never inherited from whatever the developer's own .env happens to say — E2E always
     // exercises the REAL GoogleMapsProvider (against the fake-fetch boundary below), never the deterministic

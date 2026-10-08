@@ -112,6 +112,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         busy: _busy.contains(item.id),
                         isCustomRequest:
                             item.isAdHoc && !cart.groups[g].isAdHocService,
+                        isHatlyService: cart.groups[g].isAdHocService,
                         // "Edit" = open the product again (the backend cannot change options in place).
                         onEdit: item.productId == null
                             ? null

@@ -1,12 +1,13 @@
 /**
  * Group 8 / phase 19 — rate limiting against the REAL production throttler (no storage override):
  * the per-route limits on the OTP/login endpoints, the global limit, the 429 contract, and that a
- * throttled request never reaches business logic. Every test boots its own app so counters start at zero.
+ * throttled request never reaches business logic. Counters live in the shared Redis (so limits hold across app instances),
+ * so every test starts from an emptied Redis database as well as a freshly booted app.
  */
 import { bootWorld, World } from './support/world';
 import { Scenario, nextPhone, DEFAULT_PASSWORD } from './support/actors';
 import { boundary } from './support/external-boundary';
-import { resetE2eInfrastructure } from './support/db';
+import { flushE2eRedis, resetE2eInfrastructure } from './support/db';
 
 describe('E2E — rate limiting (real throttler)', () => {
   let world: World;
@@ -16,6 +17,7 @@ describe('E2E — rate limiting (real throttler)', () => {
   });
 
   const boot = async () => {
+    await flushE2eRedis(); // counters are shared state in Redis now, not per-app memory
     world = await bootWorld({ throttling: 'real', resetInfrastructure: false });
     boundary.reset();
   };

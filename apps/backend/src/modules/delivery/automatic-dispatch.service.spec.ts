@@ -1,3 +1,4 @@
+import { OrderNotAssignableException } from './delivery-assignment.service';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { AutomaticDispatchService } from './automatic-dispatch.service';
 import { Order } from '../orders/entities/order.entity';
@@ -32,7 +33,7 @@ function buildHarness(opts: {
   // default order, since `??` treats `null` the same as `undefined` —
   // only substitute the default when the caller genuinely omitted
   // `order` altogether.
-  const ordersRepository = { findOne: jest.fn(async () => ('order' in opts ? opts.order : { id: 'order-1', segments: [] })) };
+  const ordersRepository = { findOne: jest.fn(async () => ('order' in opts ? opts.order : { id: 'order-1', fulfillmentType: 'DELIVERY', segments: [] })) };
   const dispatchAlertsRepository = {
     create: jest.fn((data: any) => data),
     save: jest.fn(async (row: any) => {
@@ -122,7 +123,7 @@ function buildTimeoutHarness(opts: {
     }),
   };
   const ordersRepository = {
-    findOne: jest.fn(async ({ where: { id } }: any) => ({ id, segments: [] })),
+    findOne: jest.fn(async ({ where: { id } }: any) => ({ id, fulfillmentType: 'DELIVERY', segments: [] })),
   };
   const orderStateMachine = {
     transitionInTransaction: jest.fn(async (_manager: any, params: { orderId: string; to: string }) => {
@@ -226,6 +227,28 @@ function buildTimeoutHarness(opts: {
 }
 
 describe('AutomaticDispatchService', () => {
+  it('a PICKUP order is never dispatched and raises NO "no eligible driver" alert (the customer collects it)', async () => {
+    const { service, deliveryAssignmentService, driverRankingService, alerts } = buildHarness({
+      isAutomaticDispatchEnabled: true,
+      order: { id: 'order-1', fulfillmentType: 'PICKUP', segments: [] },
+      candidateDriverIds: ['driver-1'],
+    });
+    await service.attemptAutomaticDispatch('order-1');
+    expect(driverRankingService.rankCandidates).not.toHaveBeenCalled();
+    expect(deliveryAssignmentService.assignDriver).not.toHaveBeenCalled();
+    expect(alerts).toEqual([]);
+  });
+
+  it('an order someone else already handled (OrderNotAssignableException) is a no-op — NOT a false "no eligible driver" alert', async () => {
+    const { service, alerts } = buildHarness({
+      isAutomaticDispatchEnabled: true,
+      candidateDriverIds: ['driver-1'],
+      assignDriverError: new OrderNotAssignableException('already assigned', 'ORDER_NOT_ASSIGNABLE'),
+    });
+    await expect(service.attemptAutomaticDispatch('order-1')).resolves.toBeUndefined();
+    expect(alerts).toEqual([]);
+  });
+
   it('CONFIRMED RULE: does nothing at all when AUTOMATIC_DISPATCH_ENABLED is OFF — order stays available for manual Admin flow', async () => {
     const { service, deliveryAssignmentService, driverRankingService } = buildHarness({
       isAutomaticDispatchEnabled: false,
@@ -291,6 +314,68 @@ describe('AutomaticDispatchService', () => {
     const { service, driverRankingService } = buildHarness({ isAutomaticDispatchEnabled: true, order: null });
     await service.attemptAutomaticDispatch('missing-order');
     expect(driverRankingService.rankCandidates).not.toHaveBeenCalled();
+  });
+});
+
+describe('AutomaticDispatchService — one redispatch after a DRIVER hand-back, excluding that driver (U3)', () => {
+  it('the releasing driver is removed from the ranked candidates; the rest keep the unchanged ranking order', async () => {
+    const { service, deliveryAssignmentService, driverRankingService } = buildHarness({
+      isAutomaticDispatchEnabled: true,
+      candidateDriverIds: ['releaser', 'driver-b', 'driver-c'],
+    });
+    await service.redispatchAfterDriverRelease('order-1', 'releaser');
+    expect(driverRankingService.rankCandidates).toHaveBeenCalledTimes(1); // the existing ranking, unchanged and called once
+    expect(deliveryAssignmentService.assignDriver).toHaveBeenCalledTimes(1);
+    expect(deliveryAssignmentService.assignDriver).toHaveBeenCalledWith({ orderId: 'order-1', candidateDriverIds: ['driver-b', 'driver-c'] });
+  });
+
+  it('if the releasing driver was the only eligible one: NO assignment, the existing NO_ELIGIBLE_DRIVER alert is raised once', async () => {
+    const { service, deliveryAssignmentService, alerts } = buildHarness({ isAutomaticDispatchEnabled: true, candidateDriverIds: ['releaser'] });
+    await service.redispatchAfterDriverRelease('order-1', 'releaser');
+    expect(deliveryAssignmentService.assignDriver).not.toHaveBeenCalled();
+    expect(alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'NO_ELIGIBLE_DRIVER' })]);
+  });
+
+  it('automatic dispatch OFF: nothing happens — the order waits for an admin (same switch as every automatic dispatch)', async () => {
+    const { service, deliveryAssignmentService, driverRankingService, alerts } = buildHarness({ isAutomaticDispatchEnabled: false, candidateDriverIds: ['driver-b'] });
+    await service.redispatchAfterDriverRelease('order-1', 'releaser');
+    expect(driverRankingService.rankCandidates).not.toHaveBeenCalled();
+    expect(deliveryAssignmentService.assignDriver).not.toHaveBeenCalled();
+    expect(alerts).toHaveLength(0);
+  });
+
+  it('an admin assigned it meanwhile (ORDER_NOT_ASSIGNABLE): the attempt stops quietly — no alert, no error', async () => {
+    const { service, alerts } = buildHarness({
+      isAutomaticDispatchEnabled: true,
+      candidateDriverIds: ['driver-b'],
+      assignDriverError: new OrderNotAssignableException('assigned meanwhile', 'ORDER_NOT_ASSIGNABLE', OrderStatus.ASSIGNED_TO_DRIVER),
+    });
+    await expect(service.redispatchAfterDriverRelease('order-1', 'releaser')).resolves.toBeUndefined();
+    expect(alerts).toHaveLength(0);
+  });
+
+  it('an unexpected failure (e.g. the assignment transaction failed) never fails the driver\'s release request — it is logged', async () => {
+    const { service } = buildHarness({ isAutomaticDispatchEnabled: true, candidateDriverIds: ['driver-b'], assignDriverError: new Error('db down') });
+    const logged = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
+    await expect(service.redispatchAfterDriverRelease('order-1', 'releaser')).resolves.toBeUndefined();
+    expect(logged).toHaveBeenCalledWith(expect.stringContaining('db down'));
+  });
+
+  it('a PICKUP order is never redispatched (it never has a driver to release, and is never dispatched)', async () => {
+    const { service, driverRankingService, alerts } = buildHarness({
+      isAutomaticDispatchEnabled: true,
+      order: { id: 'order-1', fulfillmentType: 'PICKUP', segments: [] },
+      candidateDriverIds: ['driver-b'],
+    });
+    await service.redispatchAfterDriverRelease('order-1', 'releaser');
+    expect(driverRankingService.rankCandidates).not.toHaveBeenCalled();
+    expect(alerts).toHaveLength(0);
+  });
+
+  it('without exclusions attemptAutomaticDispatch is unchanged (every ranked candidate offered)', async () => {
+    const { service, deliveryAssignmentService } = buildHarness({ isAutomaticDispatchEnabled: true, candidateDriverIds: ['a', 'b'] });
+    await service.attemptAutomaticDispatch('order-1');
+    expect(deliveryAssignmentService.assignDriver).toHaveBeenCalledWith({ orderId: 'order-1', candidateDriverIds: ['a', 'b'] });
   });
 });
 

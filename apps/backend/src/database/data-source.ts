@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import * as path from 'path';
 import { DataSource } from 'typeorm';
+import { buildDatabaseSslOptions } from '../config/database-ssl';
 
 /**
  * Used by the TypeORM CLI only (migration:generate/run/revert — see
@@ -10,7 +11,7 @@ import { DataSource } from 'typeorm';
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  ssl: process.env.DB_SSL === 'true',
+  ssl: buildDatabaseSslOptions(process.env),
   // CRITICAL: without this the pg driver returns every PostgreSQL bigint
   // (all `*_minor` money columns, wallet/financial/offer amounts, counters)
   // as a JavaScript STRING even though the entities declare `number`.

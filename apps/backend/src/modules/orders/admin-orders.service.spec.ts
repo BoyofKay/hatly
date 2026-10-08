@@ -1,6 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
 import { AdminOrdersService } from './admin-orders.service';
 import { Order } from './entities/order.entity';
+import { OrderStatusEvent } from './entities/order-status-event.entity';
+import { DispatchAlert } from '../delivery/entities/dispatch-alert.entity';
 import { OrderVendorSegment } from './entities/order-vendor-segment.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { Payment } from '../payments/entities/payment.entity';
@@ -20,6 +22,8 @@ function buildHarness(seed: {
   financialEvents?: any[];
   driverCashRemainders?: any[];
   adHocPurchaseRecords?: any[];
+  statusEvents?: any[];
+  dispatchAlerts?: any[];
 }) {
   const dataSource = {
     getRepository: (EntityClass: any) => {
@@ -37,6 +41,8 @@ function buildHarness(seed: {
           },
         };
       }
+      if (EntityClass === OrderStatusEvent) return { find: async () => seed.statusEvents ?? [] };
+      if (EntityClass === DispatchAlert) return { find: async () => seed.dispatchAlerts ?? [] };
       if (EntityClass === OrderItem) {
         return {
           createQueryBuilder: () => {
@@ -200,5 +206,47 @@ describe('AdminOrdersService.getOne', () => {
     });
     const result = await service.getOne('order-1');
     expect((result.customer as any).passwordHash).toBeUndefined();
+  });
+});
+
+
+describe('AdminOrdersService.getOne — operational facts (Control Tower milestone)', () => {
+  const driverRow = { id: 'driver-1', userId: 'driver-user-1' };
+  const driverUser = { id: 'driver-user-1', fullName: 'Driver One', phone: '+201000000010' };
+  const delivery = { id: 'delivery-1', orderId: 'order-1', driverId: 'driver-1', assignedAt: new Date('2026-10-03T10:00:00Z'), acceptDeadlineAt: new Date('2026-10-03T10:00:30Z'), reassignmentCount: 1 };
+  const order = (status: string) => ({ id: 'order-1', orderNumber: 'HT-100001', status, customerId: 'customer-1', paymentMethod: 'COD', subtotalMinor: 1, discountMinor: 0 });
+
+  it('exposes the status timeline, the delivery dispatch facts and the dispatch alerts', async () => {
+    const { service } = buildHarness({
+      order: order('ASSIGNED_TO_DRIVER'),
+      delivery,
+      driver: driverRow,
+      driverUser,
+      statusEvents: [
+        { toStatus: 'PENDING', createdAt: new Date('2026-10-03T09:00:00Z'), actorRole: 'CUSTOMER' },
+        { toStatus: 'READY_FOR_PICKUP', createdAt: new Date('2026-10-03T09:30:00Z'), actorRole: 'ADMIN' },
+        { toStatus: 'ASSIGNED_TO_DRIVER', createdAt: new Date('2026-10-03T10:00:00Z'), actorRole: 'ADMIN' },
+      ],
+      dispatchAlerts: [{ id: 'alert-1', reason: 'NO_ELIGIBLE_DRIVER', createdAt: new Date('2026-10-03T09:31:00Z'), resolvedAt: new Date('2026-10-03T10:00:00Z') }],
+    });
+    const detail = await service.getOne('order-1');
+    expect(detail.timeline.map((t) => t.status)).toEqual(['PENDING', 'READY_FOR_PICKUP', 'ASSIGNED_TO_DRIVER']);
+    expect(detail.delivery).toMatchObject({ assignedAt: delivery.assignedAt, acceptDeadlineAt: delivery.acceptDeadlineAt, reassignmentCount: 1 });
+    expect(detail.dispatchAlerts).toEqual([{ id: 'alert-1', reason: 'NO_ELIGIBLE_DRIVER', createdAt: new Date('2026-10-03T09:31:00Z'), resolvedAt: new Date('2026-10-03T10:00:00Z') }]);
+    expect(detail.driver).toMatchObject({ id: 'driver-1', fullName: 'Driver One' });
+  });
+
+  it('a RELEASED order (back to READY_FOR_PICKUP) does not report the driver it was taken from as its driver', async () => {
+    const { service } = buildHarness({ order: order('READY_FOR_PICKUP'), delivery, driver: driverRow, driverUser });
+    const detail = await service.getOne('order-1');
+    expect(detail.driver).toBeNull();
+    expect(detail.delivery).toMatchObject({ assignedAt: null, acceptDeadlineAt: null, reassignmentCount: 1 });
+  });
+
+  it.each(['PICKED_UP', 'ON_THE_WAY', 'DELIVERED', 'FAILED_DELIVERY'])('a %s order keeps its driver of record', async (status) => {
+    const { service } = buildHarness({ order: order(status), delivery, driver: driverRow, driverUser });
+    const detail = await service.getOne('order-1');
+    expect(detail.driver).toMatchObject({ id: 'driver-1' });
+    expect(detail.delivery?.acceptDeadlineAt).toBeNull(); // the accept window only matters while ASSIGNED_TO_DRIVER
   });
 });

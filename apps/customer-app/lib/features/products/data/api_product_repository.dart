@@ -44,6 +44,10 @@ class ApiProductRepository implements ProductRepository {
     String? search,
     int? page,
     int? limit,
+    bool? availableOnly,
+    bool? hasOffers,
+    int? minPriceMinor,
+    int? maxPriceMinor,
   }) {
     return _client.request(
       (dio) => dio.get(
@@ -54,6 +58,11 @@ class ApiProductRepository implements ProductRepository {
           if (search != null && search.isNotEmpty) 'search': search,
           if (page != null) 'page': page,
           if (limit != null) 'limit': limit,
+          // Filters V1.
+          if (availableOnly == true) 'availableOnly': 'true',
+          if (hasOffers == true) 'hasOffers': 'true',
+          if (minPriceMinor != null) 'minPriceMinor': minPriceMinor,
+          if (maxPriceMinor != null) 'maxPriceMinor': maxPriceMinor,
         },
       ),
       (data) => (data['data'] as List)

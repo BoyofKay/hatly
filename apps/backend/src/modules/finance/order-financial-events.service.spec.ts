@@ -223,3 +223,42 @@ describe('OrderFinancialEventsService', () => {
     expect(recordedEvents).toHaveLength(0);
   });
 });
+
+describe('OrderFinancialEventsService — COLLECTED (U2: the pickup order leaves the vendor)', () => {
+  const segment = { id: 'seg-a', groupType: CartGroupType.CATALOG, vendorBranchId: 'branch-a', subtotalMinor: 1000 };
+  const branch = { id: 'branch-a', commissionRateBasisPoints: 1000 };
+
+  it('recognizes vendor commission exactly as at a delivery pickup — same event, rate and per-segment idempotency key', async () => {
+    const { service, recordedEvents } = buildHarness({ segments: [segment], branches: [branch] });
+    await service.handleTransition({ id: 'order-1', paymentMethod: 'COD' } as any, OrderStatus.COLLECTED);
+    expect(recordedEvents).toEqual([
+      expect.objectContaining({
+        type: FinancialEventType.VENDOR_COMMISSION_RECOGNIZED,
+        idempotencyKey: 'vendor-commission:seg-a',
+        amountMinor: 100,
+        orderVendorSegmentId: 'seg-a',
+        vendorBranchId: 'branch-a',
+      }),
+    ]);
+  });
+
+  it('books nothing for the driver (there is none) — no reimbursement even for a legacy Manual Transfer pickup, no driver commission', async () => {
+    const { service, recordedEvents } = buildHarness({
+      segments: [segment],
+      branches: [branch],
+      delivery: { id: 'delivery-x', driverId: 'driver-x' },
+      drivers: [{ id: 'driver-x', commissionRateBasisPoints: 1000 }],
+    });
+    await service.handleTransition({ id: 'order-1', paymentMethod: 'MANUAL_TRANSFER', deliveryFeeMinor: 0 } as any, OrderStatus.COLLECTED);
+    expect(recordedEvents.map((e) => e.type)).toEqual([FinancialEventType.VENDOR_COMMISSION_RECOGNIZED]);
+  });
+
+  it('a cancelled segment earns no commission; no configured rate fails closed (no event fabricated)', async () => {
+    const cancelled = buildHarness({ segments: [{ ...segment, status: 'CANCELLED' }], branches: [branch] });
+    await cancelled.service.handleTransition({ id: 'order-1', paymentMethod: 'COD' } as any, OrderStatus.COLLECTED);
+    expect(cancelled.recordedEvents).toHaveLength(0);
+    const noRate = buildHarness({ segments: [segment], branches: [{ id: 'branch-a', commissionRateBasisPoints: null }] });
+    await noRate.service.handleTransition({ id: 'order-1', paymentMethod: 'COD' } as any, OrderStatus.COLLECTED);
+    expect(noRate.recordedEvents).toHaveLength(0);
+  });
+});

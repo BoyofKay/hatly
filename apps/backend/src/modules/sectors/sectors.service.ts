@@ -31,6 +31,7 @@ export class SectorsService {
         slug: dto.slug,
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? true,
+        imageUrl: dto.imageUrl ?? null,
       }),
     );
   }
@@ -66,6 +67,7 @@ export class SectorsService {
     if (dto.name !== undefined) sector.name = dto.name;
     if (dto.nameAr !== undefined) sector.nameAr = dto.nameAr;
     if (dto.sortOrder !== undefined) sector.sortOrder = dto.sortOrder;
+    if (dto.imageUrl !== undefined) sector.imageUrl = dto.imageUrl;
     return this.sectorsRepository.save(sector);
   }
 

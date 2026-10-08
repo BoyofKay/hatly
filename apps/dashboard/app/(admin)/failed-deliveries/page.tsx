@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { FailedDeliveryQueueItem, listFailedDeliveryQueue } from '../../../lib/api/admin-failed-deliveries';
+import { apiErrorMessage } from '../../../lib/api/errors';
 
 /**
  * Failed Delivery Operations UI (Chunk 2d). Consumes the existing,
@@ -22,7 +23,7 @@ export default function FailedDeliveriesPage() {
     try {
       setItems(await listFailedDeliveryQueue());
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load failed deliveries.');
+      setError(apiErrorMessage(err, 'Failed to load failed deliveries.'));
     }
   }
 
@@ -71,7 +72,11 @@ export default function FailedDeliveriesPage() {
             <tbody>
               {items.map((item) => (
                 <tr key={item.orderId} className="border-b last:border-0">
-                  <td className="px-4 py-2 font-mono text-xs">{item.orderId.slice(0, 8)}</td>
+                  <td className="px-4 py-2">
+                    <Link href={`/order-search/${item.orderId}`} className="font-medium text-hatly-orange hover:underline" dir="ltr">
+                      {item.orderNumber}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2">{item.failedAt ? new Date(item.failedAt).toLocaleString() : '—'}</td>
                   <td className="px-4 py-2">{item.failureReason ?? '—'}</td>
                   <td className="px-4 py-2">{item.customerName ?? item.customerId.slice(0, 8)}</td>

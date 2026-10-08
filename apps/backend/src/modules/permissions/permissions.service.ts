@@ -24,6 +24,17 @@ export class PermissionsService {
     return grant != null;
   }
 
+  /**
+   * Whether this ADMIN/SUPER_ADMIN actor holds `permission`, applying the same rule as PermissionsGuard: a SUPER_ADMIN holds
+   * every permission automatically (approved requirement 7), an ADMIN needs an explicit grant, anyone else holds none. Use
+   * this — not `hasPermission(user.id, …)` — for in-handler checks, which otherwise silently deny a SUPER_ADMIN.
+   */
+  async actorHolds(actor: { id: string; role: string }, permission: Permission): Promise<boolean> {
+    if (actor.role === Role.SUPER_ADMIN) return true;
+    if (actor.role !== Role.ADMIN) return false;
+    return this.hasPermission(actor.id, permission);
+  }
+
   async listPermissions(userId: string): Promise<Permission[]> {
     const grants = await this.repo.find({ where: { userId } });
     return grants.map((g) => g.permission);

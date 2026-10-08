@@ -67,6 +67,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get somethingWentWrong => 'حدث خطأ ما';
 
   @override
+  String get routeNotFoundTitle => 'الصفحة غير موجودة';
+
+  @override
   String get logout => 'تسجيل الخروج';
 
   @override
@@ -371,6 +374,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get customRequestSubmit => 'أضف إلى السلة';
 
   @override
+  String get customRequestAddImage => 'إضافة صورة';
+
+  @override
+  String get customRequestRemoveImage => 'إزالة الصورة';
+
+  @override
   String get cartCustomRequestBadge => 'طلب مخصص';
 
   @override
@@ -497,6 +506,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get orderStatusDelivered => 'تم التوصيل';
 
   @override
+  String get orderStatusCollected => 'تم الاستلام';
+
+  @override
   String get orderStatusCancelled => 'ملغى';
 
   @override
@@ -519,6 +531,51 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get sortPriceHighToLow => 'السعر: من الأعلى إلى الأقل';
+
+  @override
+  String get sortOffers => 'العروض';
+
+  @override
+  String get filterAction => 'فلترة';
+
+  @override
+  String get sortAction => 'ترتيب';
+
+  @override
+  String get clearAll => 'مسح الكل';
+
+  @override
+  String get apply => 'تطبيق';
+
+  @override
+  String get filterOpenNow => 'مفتوح الآن';
+
+  @override
+  String get filterHasOffers => 'عروض';
+
+  @override
+  String get filterRatingLabel => 'التقييم';
+
+  @override
+  String get filterRatingAny => 'الكل';
+
+  @override
+  String get filterRating4Plus => '4.0 فأعلى';
+
+  @override
+  String get filterRating3Plus => '3.0 فأعلى';
+
+  @override
+  String get filterAvailableOnly => 'متوفر فقط';
+
+  @override
+  String get filterPriceRangeLabel => 'نطاق السعر';
+
+  @override
+  String get filterPriceMinHint => 'من';
+
+  @override
+  String get filterPriceMaxHint => 'إلى';
 
   @override
   String get checkoutTitle => 'إتمام الطلب';
@@ -827,7 +884,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get cartErrorMixedCartTypes =>
-      'لا يمكن الجمع بين منتجات المتاجر وخدمة هاتلي في سلة واحدة. أفرغ السلة للتبديل.';
+      'لا يمكن الجمع بين منتجات المتاجر وطلبات خدمة هاتلي في سلة واحدة. امسح السلة للتبديل بينهما.';
 
   @override
   String get cartEmptyTitle => 'سلتك مستنيا طلبك';
@@ -1064,6 +1121,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get checkoutTransferUnavailable => 'التحويل اليدوي غير متاح حاليًا';
 
   @override
+  String get checkoutPickupCashNote =>
+      'طلبات الاستلام تُدفع نقدًا في الفرع عند استلامها.';
+
+  @override
   String get checkoutTransferUnavailableWeighed =>
       'غير متاح للطلبات التي تحتوي على منتجات بالوزن لأن السعر النهائي يُحسب بعد الوزن';
 
@@ -1178,6 +1239,14 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get checkoutBlockerGeneric =>
       'لا يمكن إتمام الطلب حاليًا. راجع سلتك وحاول مرة أخرى.';
+
+  @override
+  String get checkoutBlockerAdHocPickupRequired =>
+      'طلب خدمة هاتلي هذا بدون موقع استلام. احذفه من السلة وأضفه مرة أخرى مع موقع المكان.';
+
+  @override
+  String get checkoutBlockerAdHocDestinationRequired =>
+      'طلب خدمة هاتلي هذا بدون وجهة. احذفه من السلة وأضفه مرة أخرى مع الوجهة.';
 
   @override
   String get checkoutBlockerUnavailable =>
@@ -1372,7 +1441,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addressCityLabel => 'المدينة';
 
   @override
-  String get addressBuildingLabel => 'رقم العقار';
+  String get addressBuildingLabel => 'العمارة';
 
   @override
   String get addressFloorLabel => 'الدور';
@@ -1416,4 +1485,409 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get addressOpenSettings => 'فتح إعدادات التطبيق';
+
+  @override
+  String get hatlyServiceEntryTitle => 'خدمة هاتلي';
+
+  @override
+  String get hatlyServiceEntrySubtitle =>
+      'محتاج حاجة من مكان مش موجود عندنا؟ اطلبها من هاتلي.';
+
+  @override
+  String get hatlyServiceScreenTitle => 'خدمة هاتلي';
+
+  @override
+  String get hatlyServiceTypeSectionTitle => 'محتاج إيه؟';
+
+  @override
+  String get hatlyServiceTypeBuyFromPlace => 'هاتلي من مكان';
+
+  @override
+  String get hatlyServiceTypeBuyFromPlaceHint =>
+      'قولنا هاتلك إيه ومن فين، وإحنا هنجيبه لك.';
+
+  @override
+  String get hatlyServiceTypeDeliverToPlace => 'وصّلي لمكان';
+
+  @override
+  String get hatlyServiceTypeDeliverToPlaceHint =>
+      'قولنا هنوصّل إيه وفين، وإحنا هنستلمه ونوصّله.';
+
+  @override
+  String get hatlyServiceExistingGroupNotice =>
+      'عندك بالفعل طلب خدمة هاتلي في سلتك. هذا الصنف هيتضاف إليه.';
+
+  @override
+  String get hatlyServicePlaceNameLabel => 'اسم الطلب';
+
+  @override
+  String get hatlyServicePlaceNameHint => 'مثال: كارفور مول مصر، أو بيت ماما';
+
+  @override
+  String get hatlyServicePlaceNameRequired => 'اكتب اسمًا مختصرًا لهذا الطلب';
+
+  @override
+  String get hatlyServiceDescriptionLabel => 'اوصف اللي محتاجه';
+
+  @override
+  String get hatlyServiceDescriptionHint =>
+      'كن محددًا قدر الإمكان — الصنف، الماركة، الكمية، أي تفاصيل تساعدنا.';
+
+  @override
+  String get hatlyServiceDescriptionRequired => 'اوصف اللي محتاجه';
+
+  @override
+  String get hatlyServiceImagesLabel => 'صور (اختياري)';
+
+  @override
+  String get hatlyServiceLocationPickupTitle => 'موقع الاستلام (مطلوب)';
+
+  @override
+  String get hatlyServiceLocationDestinationTitle => 'موقع التوصيل (مطلوب)';
+
+  @override
+  String get hatlyServiceLocationDestinationHint =>
+      'حدد بالضبط أين يجب توصيل هذا الطلب — هاتلي لا يمكنه تخمين ذلك نيابة عنك.';
+
+  @override
+  String get hatlyServiceLocationPickupHint =>
+      'حدد بالضبط المكان الذي يجب أن تشتري هاتلي منه — هاتلي لا يمكنه تخمين ذلك نيابة عنك.';
+
+  @override
+  String get hatlyServiceReviewTitle => 'راجع طلبك';
+
+  @override
+  String get hatlyServiceReviewEdit => 'تعديل';
+
+  @override
+  String get hatlyServiceReviewTypeLabel => 'الخدمة';
+
+  @override
+  String get hatlyServiceReviewPlaceLabel => 'اسم الطلب';
+
+  @override
+  String get hatlyServiceReviewDescriptionLabel => 'التفاصيل';
+
+  @override
+  String get hatlyServiceReviewImagesLabel => 'الصور';
+
+  @override
+  String get hatlyServiceReviewLocationLabel => 'الموقع';
+
+  @override
+  String get hatlyServiceReviewLocationSet => 'تم تحديده — سيُستخدم لهذا الطلب';
+
+  @override
+  String get hatlyServiceReviewLocationRequired =>
+      'غير محدد — يجب تحديده قبل إمكانية إضافة هذا الطلب';
+
+  @override
+  String get hatlyServiceContinueToReview => 'مراجعة الطلب';
+
+  @override
+  String get hatlyServiceSubmit => 'أضف إلى السلة';
+
+  @override
+  String get hatlyServiceAddedConfirmation => 'تمت الإضافة إلى السلة';
+
+  @override
+  String get orderHatlyServiceTypeLabel => 'نوع الخدمة';
+
+  @override
+  String get orderHatlyServicePickupLocationLabel => 'موقع الاستلام';
+
+  @override
+  String get orderHatlyServiceDestinationLocationLabel => 'موقع التوصيل';
+
+  @override
+  String get orderHatlyServiceLocationCoordinates => 'محدد على الخريطة';
+
+  @override
+  String get cartErrorAdHocPlaceNameRequired =>
+      'اكتب اسمًا مختصرًا لهذا الطلب.';
+
+  @override
+  String get cartErrorAdHocServiceTypeRequired => 'اختر نوع خدمة هاتلي.';
+
+  @override
+  String get cartErrorAdHocLocationMismatch =>
+      'هذا الموقع لا ينطبق على نوع الخدمة هذا.';
+
+  @override
+  String get cartErrorAdHocIncompleteCoordinate =>
+      'حدد الموقع مرة أخرى — لم يتم التقاطه بشكل صحيح.';
+
+  @override
+  String get cartErrorAdHocSingleLocationOnly =>
+      'طلب خدمة هاتلي يمكن أن يشمل موقعًا واحدًا فقط. أفرغ السلة لبدء طلب جديد.';
+
+  @override
+  String get cartErrorAdHocPickupOnly =>
+      'خدمة هاتلي غير متاحة مع الاستلام من المتجر — غيّر إلى التوصيل أولًا.';
+
+  @override
+  String get cartErrorAdHocDestinationRequired =>
+      'من فضلك اختر وجهة لطلب التوصيل هذا قبل إضافته إلى السلة.';
+
+  @override
+  String get cartErrorAdHocPickupRequired =>
+      'من فضلك اختر موقع المكان المطلوب الشراء منه قبل إضافة هذا الطلب إلى السلة.';
+
+  @override
+  String get profileMyAddresses => 'عناويني';
+
+  @override
+  String get profileDefaultAddressTitle => 'العنوان الافتراضي';
+
+  @override
+  String get profileNoDefaultAddress => 'لا يوجد عنوان افتراضي بعد';
+
+  @override
+  String get profileManageAddresses => 'إدارة';
+
+  @override
+  String get profileWalletCardTitle => 'محفظة هاتلي';
+
+  @override
+  String get walletTitle => 'المحفظة';
+
+  @override
+  String get walletBalanceLabel => 'رصيد المحفظة';
+
+  @override
+  String get walletHistoryTitle => 'سجل المعاملات';
+
+  @override
+  String get walletEmptyHistory => 'لا توجد معاملات بعد';
+
+  @override
+  String get walletTypeOrderPayment => 'دفع طلب';
+
+  @override
+  String get walletTypeOrderRefund => 'استرداد طلب';
+
+  @override
+  String get walletTypeAdminCredit => 'رصيد مضاف';
+
+  @override
+  String get walletTypeLoyaltyRedemption => 'استبدال نقاط';
+
+  @override
+  String get walletTypeDriverCashRemainder => 'باقي نقدي';
+
+  @override
+  String get walletTypeAdjustment => 'تسوية رصيد';
+
+  @override
+  String get walletTypeExpiration => 'رصيد منتهي الصلاحية';
+
+  @override
+  String get profileLoyaltyCardTitle => 'نقاط هاتلي';
+
+  @override
+  String get loyaltyTitle => 'نقاط هاتلي';
+
+  @override
+  String get loyaltyBalanceLabel => 'رصيد النقاط';
+
+  @override
+  String get loyaltyPointsSuffix => 'نقطة';
+
+  @override
+  String get loyaltyHistoryTitle => 'سجل النقاط';
+
+  @override
+  String get loyaltyEmptyHistory => 'لا يوجد نشاط نقاط بعد';
+
+  @override
+  String get loyaltyTypeEarning => 'نقاط مكتسبة';
+
+  @override
+  String get loyaltyTypeEarningReversed => 'نقاط معكوسة (استرداد)';
+
+  @override
+  String get loyaltyTypeRedemption => 'تم التحويل إلى المحفظة';
+
+  @override
+  String get loyaltyTypeAdminAdjustment => 'تسوية';
+
+  @override
+  String get loyaltyTypeExpiration => 'نقاط منتهية الصلاحية';
+
+  @override
+  String get loyaltyConvertAction => 'تحويل إلى المحفظة';
+
+  @override
+  String get loyaltyConvertSheetTitle => 'تحويل النقاط إلى المحفظة';
+
+  @override
+  String get loyaltyConvertSheetRule =>
+      'كل 500 نقطة = 5 جنيه. حوّل بمضاعفات 100 نقطة، بحد أدنى 500 نقطة.';
+
+  @override
+  String get loyaltyConvertAvailableLabel => 'المتاح';
+
+  @override
+  String get loyaltyConvertAmountLabel => 'عدد النقاط للتحويل';
+
+  @override
+  String get loyaltyConvertAmountHint => 'مثال: 500';
+
+  @override
+  String get loyaltyConvertSubmit => 'تحويل';
+
+  @override
+  String get loyaltyConvertSuccess => 'تم التحويل إلى محفظة هاتلي';
+
+  @override
+  String get loyaltyErrorInsufficientPoints =>
+      'لا يوجد لديك نقاط كافية لهذا التحويل.';
+
+  @override
+  String get loyaltyErrorBelowMinimum => 'أدخل 500 نقطة على الأقل.';
+
+  @override
+  String get loyaltyErrorInvalidMultiple => 'أدخل قيمة من مضاعفات 100 نقطة.';
+
+  @override
+  String get addressSetDefaultAction => 'اجعله الافتراضي';
+
+  @override
+  String get addressSetDefaultError =>
+      'فشل تعيينه كعنوان افتراضي. حاول مرة أخرى.';
+
+  @override
+  String get profileAppearanceTitle => 'المظهر';
+
+  @override
+  String get themeModeSystem => 'النظام';
+
+  @override
+  String get themeModeLight => 'فاتح';
+
+  @override
+  String get themeModeDark => 'داكن';
+
+  @override
+  String get hatlyServicePricePending => 'سيتم تأكيد السعر أثناء تجهيز الطلب';
+
+  @override
+  String get checkoutHatlyServiceCodNote =>
+      'طلبات خدمة هاتلي تُدفع عند الاستلام فقط. سيتم تأكيد السعر أثناء تجهيز الطلب، وسيظهر لك الإجمالي النهائي في تفاصيل الطلب.';
+
+  @override
+  String get cartErrorTooManyImages =>
+      'عدد الصور أكبر من المسموح به لهذا الطلب.';
+
+  @override
+  String get cartErrorInvalidImage =>
+      'تعذّر استخدام إحدى الصور. أعد رفعها وحاول مرة أخرى.';
+
+  @override
+  String get cartErrorContentRequired => 'اكتب وصف الطلب أو أرفق صورة.';
+
+  @override
+  String get serviceTemporarilyUnavailable =>
+      'هذه الخدمة غير متاحة حاليًا. يرجى المحاولة لاحقًا أو التواصل مع هاتلي.';
+
+  @override
+  String get checkoutErrorAddressRequired =>
+      'اختر عنوان التوصيل أولًا ثم أعد المحاولة.';
+
+  @override
+  String get checkoutErrorEmptyCart =>
+      'سلتك فارغة. أضف طلبًا ثم حاول مرة أخرى.';
+
+  @override
+  String get checkoutErrorNoActiveCart =>
+      'لم نجد سلة نشطة لإتمام الطلب. ربما تم إرسال طلبك بالفعل — راجع قائمة الطلبات.';
+
+  @override
+  String get checkoutErrorQuoteRequired =>
+      'راجع ملخص الطلب ثم أكّد الطلب مرة أخرى.';
+
+  @override
+  String get checkoutErrorPaymentMethodRequired => 'اختر طريقة الدفع.';
+
+  @override
+  String get checkoutErrorOnlinePaymentUnavailable =>
+      'الدفع الإلكتروني غير متاح حاليًا.';
+
+  @override
+  String get addressZoneSection => 'منطقة التوصيل';
+
+  @override
+  String get addressZoneLabel => 'المنطقة';
+
+  @override
+  String get addressZoneHelp =>
+      'المنطقة اللي بتختارها هي اللي بتحدد إذا كان التوصيل متاح وقيمة رسوم التوصيل.';
+
+  @override
+  String get addressZoneRequired => 'اختار المنطقة';
+
+  @override
+  String addressZoneFeeHint(String fee) {
+    return 'رسوم التوصيل للمنطقة دي: $fee — الرسوم النهائية بتتأكد في صفحة الدفع.';
+  }
+
+  @override
+  String get addressZonesLoadError => 'معرفناش نحمّل مناطق التوصيل. حاول تاني.';
+
+  @override
+  String get addressZonesEmpty => 'مفيش مناطق توصيل متاحة دلوقتي.';
+
+  @override
+  String get addressDetailedLabel => 'العنوان بالتفصيل';
+
+  @override
+  String get addressDetailedHint =>
+      'مثال: شارع أبو نصيب جنب جامع الكردي، منزل 15';
+
+  @override
+  String get addressLocationOptionalSection => 'الموقع على الخريطة (اختياري)';
+
+  @override
+  String get addressLocationOptionalHelp =>
+      'تحديد الموقع بيساعد المندوب يوصلك أسرع، بس مش مطلوب عشان تحفظ العنوان.';
+
+  @override
+  String get addressRemoveLocation => 'شيل الموقع';
+
+  @override
+  String get addressZoneMissingBanner =>
+      'العنوان ده محتاج تختار له منطقة التوصيل قبل ما تطلب عليه.';
+
+  @override
+  String get addressZoneUnavailableBanner =>
+      'منطقة التوصيل بتاعة العنوان ده مش متاحة دلوقتي. اختار منطقة تانية.';
+
+  @override
+  String get addressChooseZoneAction => 'اختار المنطقة';
+
+  @override
+  String get checkoutAddressZoneRequired =>
+      'اختار منطقة التوصيل للعنوان ده عشان نقدر نوصّلك.';
+
+  @override
+  String get checkoutAddressZoneUnavailable =>
+      'هاتلي مش بيوصّل للمنطقة دي دلوقتي. اختار منطقة أو عنوان تاني.';
+
+  @override
+  String checkoutDeliveryZonePricing(String area) {
+    return 'رسوم التوصيل حسب المنطقة: $area';
+  }
+
+  @override
+  String checkoutHatlyServiceFeeFormula(String zoneFee, String multiplier) {
+    return 'رسوم توصيل منطقتك $zoneFee × $multiplier';
+  }
+
+  @override
+  String get addressZoneAutoSelected =>
+      'دي المنطقة الوحيدة المتاحة في المدينة دي، فاخترناها لك.';
+
+  @override
+  String get addressCityNoZones =>
+      'مفيش مناطق توصيل متاحة في المدينة دي دلوقتي.';
 }

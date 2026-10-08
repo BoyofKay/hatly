@@ -14,6 +14,12 @@ import { CheckoutInput } from './checkout-plan';
  */
 const ALL_METHODS = ['INSTAPAY', 'VODAFONE_CASH', 'ORANGE_CASH', 'ETISALAT_CASH', 'WE_PAY'];
 const addr = { line1: 'Street 1', latitude: 30.1, longitude: 31.2 };
+/** PD-009 (amended): Hatly Service requires the address's ACTIVE zone — its fee is the price input, pin or not. */
+const HATLY_ZONE = {
+  id: 'zone-h', name: 'Abu Naseeb', nameAr: 'أبو نصيب', city: 'Belbeis', cityAr: 'بلبيس', governorate: 'Sharqia', governorateAr: 'الشرقية',
+  deliveryFeeMinor: 1500, isActive: true, serviceAreaId: 'area-1', serviceArea: { id: 'area-1', isActive: true },
+};
+const hatlyAddr = { ...addr, deliveryZoneId: 'zone-h' };
 
 const product = (id: string, over: any = {}) => ({ id, name: `P ${id}`, priceMinor: 10000, isAvailable: true, deletedAt: null, categoryId: 'cat', pricingUnit: PricingUnit.PIECE, ...over });
 const item = (id: string, p: any, quantity = 1, extra: any = {}) => ({ id, productId: p.id, product: p, quantity, notes: null, freeTextDescription: null, imageUrls: null, selectedOptionValues: [], ...extra });
@@ -21,7 +27,7 @@ const group = (id: string, branchId: string, items: any[]) => ({ id, groupType: 
 const cart = (groups: any[], over: any = {}) => ({ id: 'cart-1', customerId: 'c1', fulfillmentType: FulfillmentType.DELIVERY, orderNote: null, groups, ...over });
 const branch = (id: string, over: any = {}) => ({ id, name: `B ${id}`, isActive: true, pickupEnabled: true, deliveryEnabled: true, serviceAreaId: 'area-1', preparationTimeMinutes: null, address: 'x', latitude: 30, longitude: 31, vendor: { name: `V ${id}`, isActive: true }, ...over });
 
-function harness(opts: { branches: any[]; balance?: number; enabled?: string[]; fee?: number; couponResult?: any; subtotalPlan?: any; area?: any; eta?: number }) {
+function harness(opts: { branches: any[]; balance?: number; enabled?: string[]; fee?: number; couponResult?: any; subtotalPlan?: any; area?: any; eta?: number; zones?: any[] }) {
   const businessConfig = {
     getEnabledElectronicPaymentMethods: jest.fn(async () => opts.enabled ?? ALL_METHODS),
     get: jest.fn(async () => 'configured'),
@@ -40,6 +46,21 @@ function harness(opts: { branches: any[]; balance?: number; enabled?: string[]; 
       additionalVendorChargeMinor: 0,
       ...(opts.eta === undefined ? { totalEtaSeconds: 600 } : opts.eta > 0 ? { totalEtaSeconds: opts.eta } : {}),
     })),
+    // The real zone composition (base = zone fee, + 500 per extra vendor) — the formula itself is pinned in the fee-service spec.
+    calculateForZone: jest.fn(async (branches: any[], zone: any) => ({
+      pricingSource: 'DELIVERY_ZONE',
+      deliveryZoneId: zone.id,
+      zoneDeliveryFeeMinorUsed: zone.deliveryFeeMinor,
+      deliveryFeeMinor: zone.deliveryFeeMinor + 500 * (branches.length - 1),
+      vendorSequence: branches.map((b) => ({ vendorBranchId: b.id, distanceToCustomerMeters: null })),
+      legDistancesMeters: [],
+      rawTotalDistanceMeters: null,
+      roundedTotalDistanceMeters: null,
+      pricePer100mMinorUsed: null,
+      minimumDeliveryFeeMinorUsed: null,
+      additionalVendorFeeMinorUsed: 500,
+      additionalVendorChargeMinor: 500 * (branches.length - 1),
+    })),
   };
   const offers = {
     planFlashSaleForCart: jest.fn(async () => ({ plans: new Map(), lockedOffers: new Map() })),
@@ -48,12 +69,13 @@ function harness(opts: { branches: any[]; balance?: number; enabled?: string[]; 
     planCouponForCart: jest.fn(async () => opts.couponResult ?? { status: 'REJECTED', reasonCode: 'COUPON_NOT_FOUND', message: 'nope' }),
   };
   const wallet = { getBalance: jest.fn(async () => opts.balance ?? 0), lockCustomerWallet: jest.fn(async () => undefined) };
-  const address = new AddressValidationService({ findOne: async () => null } as any, { resolveForPoint: async () => ('area' in opts ? opts.area : { id: 'area-1' }) } as any);
+  const address = new AddressValidationService({ findOne: async () => null } as any, { findOne: async (o: any) => (opts.zones ?? []).find((z: any) => z.id === o.where.id) ?? null } as any, { resolveForPoint: async () => ('area' in opts ? opts.area : { id: 'area-1' }) } as any);
   const manager = { find: jest.fn(async (E: any) => (E === VendorBranch ? opts.branches : [])) };
-  const planner = new CheckoutPlannerService(new CartPricingService(), businessConfig as any, deliveryFee as any, { calculateCharge: jest.fn(async () => ({ chargeMinor: 900 })) } as any, offers as any, address, wallet as any);
+  const hatlyPricing = { calculateCharge: jest.fn(async () => ({ chargeMinor: 900 })) };
+  const planner = new CheckoutPlannerService(new CartPricingService(), businessConfig as any, deliveryFee as any, hatlyPricing as any, offers as any, address, wallet as any);
   const plan = (c: any, input: Partial<CheckoutInput> = {}) =>
     planner.plan(manager as any, c, { customerId: 'c1', address: addr, mode: 'ORDER', multiVendorEnabled: true, paymentMethod: 'COD', ...input });
-  return { plan, deliveryFee, offers, wallet, businessConfig };
+  return { plan, deliveryFee, offers, wallet, businessConfig, hatlyPricing };
 }
 const oneVendor = (over: any = {}, qty = 1) => cart([group('g1', 'b1', [item('i1', product('p1'), qty)])], over);
 const twoVendors = () => cart([group('g1', 'b1', [item('i1', product('p1'))]), group('g2', 'b2', [item('i2', product('p2', { priceMinor: 20000 }))])]);
@@ -80,6 +102,32 @@ describe('CheckoutPlannerService — totals', () => {
     const p = await h.plan(oneVendor({ fulfillmentType: FulfillmentType.PICKUP }), { address: null });
     expect(p).toMatchObject({ deliveryFeeMinor: 0, totalMinor: 10000, address: null, eligibility: null });
     expect(h.deliveryFee.calculate).not.toHaveBeenCalled();
+  });
+
+  it('U2: a PICKUP order is cash at the counter only — Wallet, Manual Transfer, Pay at Delivery are refused (PICKUP_CASH_ONLY)', async () => {
+    const pickup = () => oneVendor({ fulfillmentType: FulfillmentType.PICKUP });
+    const h = harness({ branches: [branch('b1')], balance: 50000 });
+    const attempts: Array<Partial<CheckoutInput>> = [
+      { paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: 'INSTAPAY' as never },
+      { paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'INSTAPAY' as never },
+      { paymentMethod: 'WALLET' },
+      { paymentMethod: 'COD', useWallet: true },
+    ];
+    for (const input of attempts) {
+      await expect(h.plan(pickup(), { address: null, ...input })).rejects.toMatchObject({ response: { details: { code: 'PICKUP_CASH_ONLY' } } });
+    }
+    expect(h.wallet.lockCustomerWallet).not.toHaveBeenCalled(); // never touches the wallet for a pickup order
+    const cash = await h.plan(pickup(), { address: null, paymentMethod: 'COD' });
+    expect(cash.payment).toMatchObject({ method: 'COD', walletAppliedMinor: 0, amountDueMinor: 10000, electronicMethod: null, awaitsPaymentApproval: false });
+  });
+
+  it('U2: a quote for a pickup reports the refusal as a blocker (never applies the wallet); a delivery order keeps every method', async () => {
+    const h = harness({ branches: [branch('b1')], balance: 50000 });
+    const q = await h.plan(oneVendor({ fulfillmentType: FulfillmentType.PICKUP }), { address: null, mode: 'QUOTE', paymentMethod: 'COD', useWallet: true });
+    expect(q.blockers.map((b: any) => b.code)).toContain('PICKUP_CASH_ONLY');
+    expect(q.payment.walletAppliedMinor).toBe(0);
+    const delivery = await h.plan(oneVendor(), { useWallet: true });
+    expect(delivery.payment.walletAppliedMinor).toBeGreaterThan(0);
   });
 
   it('PICKUP is refused for two vendors and for a branch without pickup', async () => {
@@ -287,5 +335,201 @@ describe('CheckoutPlannerService — ETA (only from real inputs)', () => {
   it('pickup ETA is preparation only', async () => {
     const h = harness({ branches: [branch('b1', { preparationTimeMinutes: 12 })] });
     expect((await h.plan(oneVendor({ fulfillmentType: FulfillmentType.PICKUP }), { address: null })).eta).toEqual({ available: true, preparationMinutes: 12, travelMinutes: 0, totalMinutes: 12 });
+  });
+});
+
+describe('CheckoutPlannerService — Hatly Service locations (customer-supplied only, never a Hatly default)', () => {
+  const adHocItem = { id: 'ai1', productId: null, product: null, quantity: 1, notes: null, freeTextDescription: 'Two croissants', imageUrls: [], selectedOptionValues: [] };
+  const adHocCart = (type: 'BUY_FROM_PLACE' | 'DELIVER_TO_PLACE', over: any = {}) =>
+    cart([{ id: 'g1', groupType: CartGroupType.AD_HOC_SERVICE, vendorBranchId: null, adHocPlaceName: 'Corner Bakery', vendorNote: null, adHocServiceType: type, adHocPickupLatitude: null, adHocPickupLongitude: null, adHocDestinationLatitude: null, adHocDestinationLongitude: null, items: [adHocItem], ...over }]);
+  const CODE = (e: any) => e?.response?.details?.code;
+  // Every request here comes from an address with an ACTIVE zone (required for Hatly Service), so each test isolates its own rule.
+  const hatlyHarness = () => {
+    const h = harness({ branches: [], zones: [HATLY_ZONE] });
+    return { ...h, plan: (c: any, input: Partial<CheckoutInput> = {}) => h.plan(c, { address: hatlyAddr, ...input }) };
+  };
+
+  it('BUY_FROM_PLACE with no customer-chosen pickup is rejected (BUY_FROM_PLACE_PICKUP_REQUIRED) — the Hatly default pickup is never read, no charge is computed', async () => {
+    const { plan, businessConfig, hatlyPricing } = hatlyHarness();
+    await expect(plan(adHocCart('BUY_FROM_PLACE'))).rejects.toMatchObject({ response: { details: { code: 'BUY_FROM_PLACE_PICKUP_REQUIRED' } } });
+    expect(businessConfig.getRequired).not.toHaveBeenCalled();
+    expect(hatlyPricing.calculateCharge).not.toHaveBeenCalled();
+  });
+
+  it('DELIVER_TO_PLACE with no customer-chosen destination is rejected (DELIVER_TO_PLACE_DESTINATION_REQUIRED) — the Hatly default destination is never read', async () => {
+    const { plan, businessConfig, hatlyPricing } = hatlyHarness();
+    await expect(plan(adHocCart('DELIVER_TO_PLACE'))).rejects.toMatchObject({ response: { details: { code: 'DELIVER_TO_PLACE_DESTINATION_REQUIRED' } } });
+    expect(businessConfig.getRequired).not.toHaveBeenCalled();
+    expect(hatlyPricing.calculateCharge).not.toHaveBeenCalled();
+  });
+
+  it('a half-supplied coordinate pair counts as missing (never partially defaulted)', async () => {
+    const { plan } = hatlyHarness();
+    await expect(plan(adHocCart('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5 }))).rejects.toMatchObject({ response: { details: { code: 'BUY_FROM_PLACE_PICKUP_REQUIRED' } } });
+    await expect(plan(adHocCart('DELIVER_TO_PLACE', { adHocDestinationLongitude: 31.6 }))).rejects.toMatchObject({ response: { details: { code: 'DELIVER_TO_PLACE_DESTINATION_REQUIRED' } } });
+  });
+
+  it('valid BUY_FROM_PLACE: pickup = the customer\'s chosen place, destination = the customer\'s own delivery address (Hatly config untouched)', async () => {
+    const { plan, businessConfig, hatlyPricing } = hatlyHarness();
+    const result = await plan(adHocCart('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 }));
+    expect(hatlyPricing.calculateCharge).toHaveBeenCalledWith({
+      serviceType: 'BUY_FROM_PLACE',
+      resolvedPickup: { latitude: 30.5, longitude: 31.5 },
+      resolvedDestination: null,
+      deliveryZone: expect.objectContaining({ id: 'zone-h', deliveryFeeMinor: 1500 }),
+    });
+    expect(result.delivery.adHocLocations).toEqual({ pickupLatitude: 30.5, pickupLongitude: 31.5, destinationLatitude: null, destinationLongitude: null });
+    expect(businessConfig.getRequired).not.toHaveBeenCalled();
+  });
+
+  it('valid DELIVER_TO_PLACE: origin = the customer\'s own delivery address, destination = the customer\'s chosen place (Hatly config untouched)', async () => {
+    const { plan, businessConfig, hatlyPricing } = hatlyHarness();
+    const result = await plan(adHocCart('DELIVER_TO_PLACE', { adHocDestinationLatitude: 30.55, adHocDestinationLongitude: 31.66 }));
+    expect(hatlyPricing.calculateCharge).toHaveBeenCalledWith({
+      serviceType: 'DELIVER_TO_PLACE',
+      resolvedPickup: null,
+      resolvedDestination: { latitude: 30.55, longitude: 31.66 },
+      deliveryZone: expect.objectContaining({ id: 'zone-h', deliveryFeeMinor: 1500 }),
+    });
+    expect(result.delivery.adHocLocations).toEqual({ pickupLatitude: null, pickupLongitude: null, destinationLatitude: 30.55, destinationLongitude: 31.66 });
+    expect(businessConfig.getRequired).not.toHaveBeenCalled();
+  });
+
+  it('a missing customer address is rejected for an ORDER of either type (DELIVERY_ADDRESS_REQUIRED) and no charge is computed from any default', async () => {
+    const { plan, hatlyPricing, businessConfig } = hatlyHarness();
+    for (const c of [
+      adHocCart('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 }),
+      adHocCart('DELIVER_TO_PLACE', { adHocDestinationLatitude: 30.55, adHocDestinationLongitude: 31.66 }),
+    ]) {
+      const error = await plan(c, { address: null }).catch((e) => e);
+      expect(CODE(error)).toBe('DELIVERY_ADDRESS_REQUIRED');
+    }
+    expect(hatlyPricing.calculateCharge).not.toHaveBeenCalled();
+    expect(businessConfig.getRequired).not.toHaveBeenCalled();
+  });
+
+  it('a QUOTE without an address prices nothing (fee unknown) rather than pricing against any Hatly location', async () => {
+    const { plan, hatlyPricing } = hatlyHarness();
+    const result = await plan(adHocCart('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 }), { address: null, mode: 'QUOTE' });
+    expect(result.delivery.feeMinor).toBeNull();
+    expect(hatlyPricing.calculateCharge).not.toHaveBeenCalled();
+  });
+});
+
+describe('CheckoutPlannerService — Delivery Zones (PD-009)', () => {
+  const zoneRow = (over: any = {}) => ({
+    id: 'zone-1', name: 'Abu Naseeb', nameAr: 'أبو نصيب', city: 'Belbeis', cityAr: 'بلبيس', governorate: 'Sharqia', governorateAr: 'الشرقية',
+    deliveryFeeMinor: 1800, isActive: true, serviceAreaId: 'area-1', serviceArea: { id: 'area-1', isActive: true }, ...over,
+  });
+  const zoneAddr = { line1: 'شارع أبو نصيب جنب جامع الكردي، منزل 15', deliveryZoneId: 'zone-1' };
+  const CODE = (e: any) => e?.response?.details?.code;
+  const adHoc = (type: string, over: any = {}) =>
+    cart([{ id: 'g1', groupType: CartGroupType.AD_HOC_SERVICE, vendorBranchId: null, adHocPlaceName: 'Pharmacy', adHocServiceType: type, vendorNote: null, items: [item('i1', { id: null }, 1, { productId: null, product: null, freeTextDescription: 'x' })], ...over }]);
+
+  it('a pin-less address with an active zone is serviceable and priced by the ZONE (not by distance); the snapshot freezes the zone', async () => {
+    const h = harness({ branches: [branch('b1')], zones: [zoneRow()] });
+    const p = await h.plan(oneVendor(), { address: zoneAddr });
+    expect(h.deliveryFee.calculate).not.toHaveBeenCalled();
+    expect(h.deliveryFee.calculateForZone).toHaveBeenCalledWith([expect.objectContaining({ id: 'b1' })], expect.objectContaining({ id: 'zone-1', deliveryFeeMinor: 1800 }));
+    expect(p).toMatchObject({ deliveryFeeMinor: 1800, totalMinor: 11800, eligibility: { serviceable: true, pricingSource: 'DELIVERY_ZONE' } });
+    expect(p.address).toEqual({
+      ...zoneAddr,
+      governorate: 'الشرقية',
+      city: 'بلبيس',
+      deliveryZone: { id: 'zone-1', name: 'Abu Naseeb', nameAr: 'أبو نصيب', city: 'Belbeis', cityAr: 'بلبيس', governorate: 'Sharqia', governorateAr: 'الشرقية' },
+    });
+  });
+
+  it('multi-vendor: zone fee + the unchanged additional-vendor fee per extra vendor', async () => {
+    const h = harness({ branches: [branch('b1'), branch('b2')], zones: [zoneRow()] });
+    const p = await h.plan(twoVendors(), { address: zoneAddr });
+    expect(p.deliveryFeeMinor).toBe(1800 + 500);
+  });
+
+  it('a pin keeps the existing distance pricing even when the address also carries a zone', async () => {
+    const h = harness({ branches: [branch('b1')], zones: [zoneRow()] });
+    const p = await h.plan(oneVendor(), { address: { ...addr, deliveryZoneId: 'zone-1' } });
+    expect(h.deliveryFee.calculate).toHaveBeenCalled();
+    expect(h.deliveryFee.calculateForZone).not.toHaveBeenCalled();
+    expect(p.eligibility?.pricingSource).toBe('DISTANCE');
+  });
+
+  it('ORDER: inactive zone → DELIVERY_ZONE_UNAVAILABLE; no pin and no zone → ADDRESS_ZONE_REQUIRED; nothing is priced', async () => {
+    const inactive = harness({ branches: [branch('b1')], zones: [zoneRow({ isActive: false })] });
+    expect(CODE(await inactive.plan(oneVendor(), { address: zoneAddr }).catch((e) => e))).toBe('DELIVERY_ZONE_UNAVAILABLE');
+    const none = harness({ branches: [branch('b1')], zones: [] });
+    expect(CODE(await none.plan(oneVendor(), { address: { line1: 'x' } }).catch((e) => e))).toBe('ADDRESS_ZONE_REQUIRED');
+    expect(inactive.deliveryFee.calculateForZone).not.toHaveBeenCalled();
+    expect(none.deliveryFee.calculateForZone).not.toHaveBeenCalled();
+  });
+
+  it('QUOTE: an inactive zone is a blocker, not a silently-retained fee', async () => {
+    const h = harness({ branches: [branch('b1')], zones: [zoneRow({ isActive: false })] });
+    const p = await h.plan(oneVendor(), { address: zoneAddr, mode: 'QUOTE' });
+    expect(p.deliveryFeeMinor).toBeNull();
+    expect(p.blockers.map((b) => b.code)).toContain('DELIVERY_ZONE_UNAVAILABLE');
+  });
+
+  it('the quote fingerprint changes when the zone changes, and when the zone FEE changes', async () => {
+    const a = await harness({ branches: [branch('b1')], zones: [zoneRow(), zoneRow({ id: 'zone-2', nameAr: 'ب', name: 'B' })] }).plan(oneVendor(), { address: zoneAddr, mode: 'QUOTE' });
+    const otherZone = await harness({ branches: [branch('b1')], zones: [zoneRow(), zoneRow({ id: 'zone-2', nameAr: 'ب', name: 'B' })] }).plan(oneVendor(), { address: { ...zoneAddr, deliveryZoneId: 'zone-2' }, mode: 'QUOTE' });
+    const repriced = await harness({ branches: [branch('b1')], zones: [zoneRow({ deliveryFeeMinor: 2500 })] }).plan(oneVendor(), { address: zoneAddr, mode: 'QUOTE' });
+    expect(new Set([a.inputsHash, otherZone.inputsHash, repriced.inputsHash]).size).toBe(3);
+    expect([a.deliveryFeeMinor, repriced.deliveryFeeMinor]).toEqual([1800, 2500]);
+  });
+
+  it('a frozen quote made for another zone fee is NOT honoured — the current fee is computed', async () => {
+    const h = harness({ branches: [branch('b1')], zones: [zoneRow({ deliveryFeeMinor: 2500 })] });
+    const stale = await harness({ branches: [branch('b1')], zones: [zoneRow()] }).plan(oneVendor(), { address: zoneAddr, mode: 'QUOTE' });
+    const p = await h.plan(oneVendor(), { address: zoneAddr, frozen: { inputsHash: stale.inputsHash, breakdown: stale.delivery.breakdown as any } });
+    expect(p.delivery.source).toBe('FRESH');
+    expect(p.deliveryFeeMinor).toBe(2500);
+  });
+
+  it('Hatly Service with a pin-less zone address is NOT rejected for a missing pin: priced from the zone', async () => {
+    const h = harness({ branches: [], zones: [zoneRow()] });
+    const p = await h.plan(adHoc('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 }), { address: zoneAddr });
+    expect(h.hatlyPricing.calculateCharge).toHaveBeenCalledWith(
+      expect.objectContaining({ deliveryZone: expect.objectContaining({ id: 'zone-1', deliveryFeeMinor: 1800 }) }),
+    );
+    expect(p.blockers.map((b) => b.code)).not.toContain('HATLY_SERVICE_ADDRESS_LOCATION_REQUIRED');
+    expect(p.eligibility).toMatchObject({ serviceable: true, pricingSource: 'DELIVERY_ZONE' });
+    expect(p.address?.deliveryZone?.nameAr).toBe('أبو نصيب');
+  });
+
+  it('Hatly Service WITH a pin is priced from the ZONE exactly like without one: no distance, no radius check, same call', async () => {
+    // The pin is outside every service area: for Hatly Service it neither decides serviceability nor price.
+    const h = harness({ branches: [], zones: [zoneRow()], area: null });
+    const cartWithPlace = adHoc('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 });
+    const pinned = await h.plan(cartWithPlace, { address: { ...zoneAddr, latitude: 30.42, longitude: 31.56 } });
+    const pinless = await h.plan(cartWithPlace, { address: zoneAddr });
+    expect(pinned.eligibility).toMatchObject({ serviceable: true, pricingSource: 'DELIVERY_ZONE' });
+    const [first, second] = h.hatlyPricing.calculateCharge.mock.calls.map((c: any[]) => c[0]);
+    expect(first).toEqual(second);
+    expect(first).not.toHaveProperty('customerLocation');
+    expect(h.deliveryFee.calculate).not.toHaveBeenCalled();
+    expect(pinned.deliveryFeeMinor).toBe(pinless.deliveryFeeMinor);
+  });
+
+  it('Hatly Service with a pinned address but NO zone is rejected (ADDRESS_ZONE_REQUIRED) — no fallback to distance pricing', async () => {
+    const h = harness({ branches: [], zones: [zoneRow()] });
+    const error = await h.plan(adHoc('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 }), { address: addr }).catch((e) => e);
+    expect(CODE(error)).toBe('ADDRESS_ZONE_REQUIRED');
+    expect(h.hatlyPricing.calculateCharge).not.toHaveBeenCalled();
+    expect(h.deliveryFee.calculate).not.toHaveBeenCalled();
+  });
+
+  it('the quote fingerprint of a Hatly Service quote changes with the zone fee (a re-priced zone makes the old quote stale)', async () => {
+    const c = adHoc('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 });
+    const a = await harness({ branches: [], zones: [zoneRow()] }).plan(c, { address: zoneAddr, mode: 'QUOTE' });
+    const b = await harness({ branches: [], zones: [zoneRow({ deliveryFeeMinor: 2500 })] }).plan(c, { address: zoneAddr, mode: 'QUOTE' });
+    expect(a.inputsHash).not.toBe(b.inputsHash);
+  });
+
+  it('Hatly Service follows the same address serviceability: an inactive zone blocks the order, nothing is charged', async () => {
+    const h = harness({ branches: [], zones: [zoneRow({ isActive: false })] });
+    const error = await h.plan(adHoc('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 }), { address: zoneAddr }).catch((e) => e);
+    expect(CODE(error)).toBe('DELIVERY_ZONE_UNAVAILABLE');
+    expect(h.hatlyPricing.calculateCharge).not.toHaveBeenCalled();
   });
 });

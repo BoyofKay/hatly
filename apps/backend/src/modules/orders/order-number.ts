@@ -22,3 +22,14 @@ export async function nextOrderNumber(manager: EntityManager): Promise<string> {
 export function isOrderNumber(value: string): boolean {
   return /^HT-\d{6,}$/.test(value);
 }
+
+/**
+ * M3b (Launch-Readiness Gap Audit, G-04). Same UUID shape
+ * `AdminOrdersController`'s own `:id(...)` route constraint already
+ * uses — reused here (not duplicated as a second, possibly-divergent
+ * regex) so an Admin Order Search `search` box can distinguish an id
+ * lookup from a free-text one before it ever reaches the database.
+ */
+export function isUuid(value: string): boolean {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
+}

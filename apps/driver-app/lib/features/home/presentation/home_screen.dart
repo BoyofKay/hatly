@@ -11,11 +11,59 @@ import '../../deliveries/domain/delivery.dart';
 /// `GET driver/deliveries`). CONFIRMED (locked decision): no
 /// Accept/Reject anywhere — a delivery already appearing here means
 /// it has already been assigned, by the system or by Admin.
-class HomeScreen extends ConsumerWidget {
+///
+/// M4 — Driver polling / refresh fallback. `ConsumerStatefulWidget` (was
+/// stateless) specifically so this screen can own its own poll lifecycle:
+/// starts on mount, pauses while the app is backgrounded, resumes on
+/// foreground, and stops on unmount (logout navigates away from this
+/// screen, which disposes it) — see `DriverPollingService`'s own comment
+/// for why this never replaces push notifications or duplicates requests.
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startPolling();
+  }
+
+  void _startPolling() {
+    ref.read(driverPollingServiceProvider).start(() async {
+      ref.invalidate(deliveriesProvider);
+      await ref.read(deliveriesProvider.future);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _startPolling();
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        ref.read(driverPollingServiceProvider).stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Establishes this screen's own keep-alive subscription on the
+    // `autoDispose` polling-service provider — see that provider's comment.
+    ref.watch(driverPollingServiceProvider);
     final onlineAsync = ref.watch(driverOnlineStateProvider);
     final deliveriesAsync = ref.watch(deliveriesProvider);
     final isOnline = onlineAsync.valueOrNull ?? false;
@@ -27,6 +75,7 @@ class HomeScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
+              ref.read(driverPollingServiceProvider).stop();
               ref.read(driverOnlineStateProvider.notifier).resetOnLogout();
               await ref.read(authStateProvider.notifier).logout();
             },

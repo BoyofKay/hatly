@@ -25,6 +25,11 @@ dependencies:
 
   geolocator: ^13.0.1
 
+  # M4 — Proof of Delivery: a delivery photo capture step before a delivery can be
+  # marked DELIVERED. Same package/version the Customer app already uses for its own
+  # photo-capture flows (apps/customer-app/pubspec.yaml) — no new pattern invented.
+  image_picker: ^1.0.7
+
   # PHASE I-A, CHUNK 5 addition: opens the customer's location in an
   # external maps app (no internal map/navigation built — per the
   # locked decision, google_maps_flutter above remains unused for

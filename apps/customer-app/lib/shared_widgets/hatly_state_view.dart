@@ -24,29 +24,35 @@ class HatlyStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dark Mode fix: this shared empty/error state (used by nearly every
+    // list screen in the app) used to hardcode `HatlyColors.textMuted`/
+    // `textDark` — fixed near-black colours that rendered as barely-legible
+    // dark-on-dark text on a dark background. Now theme-aware; identical to
+    // the old constants in Light Mode.
+    final p = context.palette;
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: HatlyColors.textMuted),
+            Icon(icon, size: 48, color: p.textMuted),
             const SizedBox(height: 16),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: HatlyColors.textDark),
+              // Polish pass: was a raw `TextStyle` (Roboto fallback, not the
+              // approved Inter+Cairo family) — now the app's own type scale,
+              // same visual weight as before.
+              style: context.type.body
+                  .copyWith(fontWeight: FontWeight.w600, color: p.textPrimary),
             ),
             if (subtitle != null) ...[
               const SizedBox(height: 6),
               Text(
                 subtitle!,
                 textAlign: TextAlign.center,
-                style:
-                    const TextStyle(fontSize: 13, color: HatlyColors.textMuted),
+                style: context.type.caption.copyWith(color: p.textMuted),
               ),
             ],
             if (onRetry != null) ...[

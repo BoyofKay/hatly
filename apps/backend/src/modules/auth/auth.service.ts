@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import ms = require('ms');
@@ -9,6 +10,7 @@ import { RefreshTokenStore } from './refresh-token.store';
 import { User } from '../users/entities/user.entity';
 import { Role } from '../../common/enums/role.enum';
 import { BusinessConfigService } from '../business-config/business-config.service';
+import { LoginAttemptLimiter } from './login-attempt-limiter';
 
 export interface TokenPair {
   accessToken: string;
@@ -17,6 +19,8 @@ export interface TokenPair {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly usersService: UsersService,
     private readonly otpService: OtpService,
@@ -24,6 +28,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly businessConfigService: BusinessConfigService,
+    private readonly loginAttemptLimiter: LoginAttemptLimiter,
   ) {}
 
   /**
@@ -104,6 +109,8 @@ export class AuthService {
     try {
       payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get<string>('auth.refreshSecret'),
+        // Pin the algorithm: only the HS256 tokens this service issues are accepted (no `none`/algorithm-confusion).
+        algorithms: ['HS256'],
       });
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token.');
@@ -113,17 +120,26 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token.');
     }
 
-    const consumed = await this.refreshTokenStore.consume(payload.sub, payload.jti);
-    if (!consumed) {
+    // Atomic rotation + reuse detection (see RefreshTokenStore). The successor jti is minted here so the swap is one Redis step.
+    const successorJti = randomUUID();
+    const outcome = await this.refreshTokenStore.rotate(payload.sub, payload.jti, this.refreshTtlSeconds(), successorJti);
+    if (outcome.status === 'REUSED') {
+      // A refresh token that was ALREADY rotated away was presented again: treat as theft/replay. The store has already revoked
+      // this user's session; only the user id is logged — never a token, its jti, or any claim.
+      this.logger.warn(JSON.stringify({ event: 'auth.refresh_token_reuse_detected', userId: payload.sub }));
+      throw new UnauthorizedException('Invalid or expired refresh token.');
+    }
+    if (outcome.status !== 'ROTATED') {
       throw new UnauthorizedException('Invalid or expired refresh token.');
     }
 
     const user = await this.usersService.findById(payload.sub);
     if (!user || !user.isActive) {
+      await this.refreshTokenStore.revoke(payload.sub);
       throw new UnauthorizedException('Invalid or expired refresh token.');
     }
 
-    return this.issueTokens(user);
+    return this.issueTokens(user, successorJti);
   }
 
   async logout(userId: string): Promise<void> {
@@ -148,16 +164,22 @@ export class AuthService {
    * than leaving it Driver-specific.
    */
   private async authenticateWithPassword(phone: string, password: string, allowedRoles: Role[]): Promise<TokenPair> {
+    // Per-account failed-attempt brake: refused BEFORE any password hashing, whatever IP the guesses come from.
+    await this.loginAttemptLimiter.assertAllowed(phone);
+
     const user = await this.usersService.findByPhoneWithPasswordHash(phone);
     if (!user || !allowedRoles.includes(user.role) || !user.isActive || !user.passwordHash) {
+      await this.loginAttemptLimiter.recordFailure(phone); // unknown phones count too: the 429 must not reveal account existence
       throw new UnauthorizedException('Invalid credentials.');
     }
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
+      await this.loginAttemptLimiter.recordFailure(phone);
       throw new UnauthorizedException('Invalid credentials.');
     }
 
+    await this.loginAttemptLimiter.clear(phone);
     return this.issueTokens(user);
   }
 
@@ -348,16 +370,21 @@ export class AuthService {
     return user.isPhoneVerified;
   }
 
-  private async issueTokens(user: User): Promise<TokenPair> {
+  private refreshTtlSeconds(): number {
+    return Math.floor(ms(this.configService.get<string>('auth.refreshExpiresIn')!) / 1000);
+  }
+
+  /** `presetJti`: the already-stored successor jti from a refresh rotation; absent for a fresh login (which stores a new one). */
+  private async issueTokens(user: User, presetJti?: string): Promise<TokenPair> {
     const refreshExpiresIn = this.configService.get<string>('auth.refreshExpiresIn')!;
-    const refreshTtlSeconds = Math.floor(ms(refreshExpiresIn) / 1000);
-    const jti = await this.refreshTokenStore.issue(user.id, refreshTtlSeconds);
+    const jti = presetJti ?? (await this.refreshTokenStore.issue(user.id, this.refreshTtlSeconds()));
 
     const basePayload = { sub: user.id, role: user.role, phone: user.phone };
 
     const accessToken = this.jwtService.sign(basePayload, {
       secret: this.configService.get<string>('auth.accessSecret'),
       expiresIn: this.configService.get<string>('auth.accessExpiresIn'),
+      algorithm: 'HS256',
     });
 
     const refreshToken = this.jwtService.sign(
@@ -365,6 +392,7 @@ export class AuthService {
       {
         secret: this.configService.get<string>('auth.refreshSecret'),
         expiresIn: refreshExpiresIn,
+        algorithm: 'HS256',
       },
     );
 

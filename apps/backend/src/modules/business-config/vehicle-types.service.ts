@@ -24,6 +24,10 @@ export class VehicleTypesService {
     return this.repo.find({ where: { isActive: true }, order: { name: 'ASC' } });
   }
 
+  async findById(id: string): Promise<VehicleType | null> {
+    return this.repo.findOne({ where: { id } });
+  }
+
   async create(dto: CreateVehicleTypeDto): Promise<VehicleType> {
     return this.repo.save(this.repo.create(dto));
   }

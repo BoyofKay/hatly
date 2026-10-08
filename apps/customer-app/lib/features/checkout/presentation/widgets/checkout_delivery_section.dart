@@ -24,8 +24,10 @@ class CheckoutDeliverySection extends StatelessWidget {
     final p = context.palette;
     final isPickup = quote.fulfillment?.isPickup ?? false;
     final feeMinor = delivery.feeMinor;
-    final hasDetails =
-        delivery.hasBreakdown || quote.vendors.any((v) => v.name != null);
+    final hasDetails = delivery.hasBreakdown ||
+        delivery.hatlyService != null ||
+        (delivery.pricedByZone && delivery.deliveryZone != null) ||
+        quote.vendors.any((v) => v.name != null);
 
     return HatlySection(
       title: isPickup
@@ -72,14 +74,48 @@ class CheckoutDeliverySection extends StatelessWidget {
                             child: Text(l10n.checkoutDeliveryFeePending,
                                 textAlign: TextAlign.end,
                                 style: context.type.small))
-                        : LtrText(formatMinorUnits(feeMinor, context),
-                            key: const Key('checkout-delivery-fee'),
-                            style: context.type.body
-                                .copyWith(fontWeight: FontWeight.w600)),
+                        // Flexible: a Hatly Service charge can be a large number (e.g. 1,105.85) and, at large text sizes on a narrow
+                        // screen, an unconstrained fee next to its label overflowed the row.
+                        : Flexible(
+                            child: LtrText(formatMinorUnits(feeMinor, context),
+                                key: const Key('checkout-delivery-fee'),
+                                style: context.type.body
+                                    .copyWith(fontWeight: FontWeight.w600)),
+                          ),
                 ],
               ),
             ),
             children: [
+              // PD-009: say where the fee comes from — the selected area (no map pin needed) and, for Hatly Service, that area's
+              // fee times the configured multiplier. Both numbers come from the server; nothing is computed here.
+              if (delivery.pricedByZone && delivery.deliveryZone != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      l10n.checkoutDeliveryZonePricing(delivery.deliveryZone!
+                          .areaLabel(Localizations.localeOf(context).languageCode == 'ar')),
+                      key: const Key('checkout-delivery-zone'),
+                      style: context.type.small,
+                    ),
+                  ),
+                ),
+              if (delivery.hatlyService != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Text(
+                      l10n.checkoutHatlyServiceFeeFormula(
+                        formatMinorUnits(delivery.hatlyService!.zoneDeliveryFeeMinor, context),
+                        delivery.hatlyService!.multiplierText,
+                      ),
+                      key: const Key('checkout-hatly-service-fee'),
+                      style: context.type.small,
+                    ),
+                  ),
+                ),
               if (delivery.hasBreakdown) ...[
                 _row(context, l10n.checkoutBreakdownBase,
                     delivery.baseFeeMinor!),

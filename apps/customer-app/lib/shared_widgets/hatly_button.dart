@@ -30,12 +30,28 @@ class HatlyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final effectiveOnPressed = isLoading ? null : onPressed;
+    final p = context.palette;
+    // Dark Mode fix: the loading spinner used to always hardcode
+    // `HatlyColors.surfaceWhite`, regardless of variant — invisible on
+    // `secondary`/`tertiary` (no fill to contrast against) and mismatched
+    // with `primary`'s own dark-mode foreground (`colorScheme.onPrimary` ==
+    // `legacyOnOrange` in hatly_theme.dart, dark ink in Dark Mode). Each
+    // variant's spinner now matches that same variant's own label colour.
+    final foregroundColor = switch (variant) {
+      HatlyButtonVariant.primary => Theme.of(context).colorScheme.onPrimary,
+      HatlyButtonVariant.secondary => p.textPrimary,
+      HatlyButtonVariant.tertiary => p.link,
+      // White-on-error/urgent has good contrast in both themes — the
+      // destructive fill is never orange, so the primary button's dark-ink
+      // foreground would be unreadable here.
+      HatlyButtonVariant.destructive => Colors.white,
+    };
     final child = isLoading
-        ? const SizedBox(
+        ? SizedBox(
             width: 20,
             height: 20,
             child: CircularProgressIndicator(
-                strokeWidth: 2, color: HatlyColors.surfaceWhite),
+                strokeWidth: 2, color: foregroundColor),
           )
         : icon != null
             ? Row(
@@ -60,11 +76,18 @@ class HatlyButton extends StatelessWidget {
         button = TextButton(onPressed: effectiveOnPressed, child: child);
         break;
       case HatlyButtonVariant.destructive:
+        // Dark Mode fix: `HatlyColors.error` (fixed) is now `p.urgent` (the
+        // theme's own dark-mode-tuned error/urgent colour — identical value
+        // in Light Mode), and `foregroundColor` is now set explicitly
+        // instead of silently inheriting the primary button theme's
+        // dark-ink-in-Dark-Mode default, which was unreadable on this red
+        // fill.
         button = ElevatedButton(
           onPressed: effectiveOnPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: HatlyColors.error,
-            disabledBackgroundColor: HatlyColors.error.withOpacity(0.4),
+            backgroundColor: p.urgent,
+            foregroundColor: foregroundColor,
+            disabledBackgroundColor: p.urgent.withOpacity(0.4),
             minimumSize: const Size.fromHeight(48),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(HatlyRadius.button)),

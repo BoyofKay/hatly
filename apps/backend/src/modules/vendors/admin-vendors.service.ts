@@ -153,4 +153,31 @@ export class AdminVendorsService {
     branch.isActive = false;
     return this.branchesRepository.save(branch);
   }
+
+  /**
+   * M1 (Launch-Readiness Gap Audit, G-01) — the first write path for
+   * `isOpen` anywhere in the backend. Mirrors `activateVendorBranch`
+   * exactly on purpose: same read-then-save shape, no transaction/row
+   * lock, matching this service's own established convention for a
+   * single independent boolean flag (contrast with the locked,
+   * transactional writers elsewhere in this codebase that touch
+   * money/stock, where a lost update would actually corrupt state — a
+   * boolean has no such failure mode; the last write is always a
+   * valid, intentional value, never a partial or merged one). Existing
+   * `getVendorBranch` supplies the 404 for an unknown id; every other
+   * field on the branch is left untouched, same as `activate`/
+   * `deactivate`. Setting the same state again is a no-op save — safe
+   * to retry.
+   */
+  async openVendorBranch(id: string): Promise<VendorBranch> {
+    const branch = await this.getVendorBranch(id);
+    branch.isOpen = true;
+    return this.branchesRepository.save(branch);
+  }
+
+  async closeVendorBranch(id: string): Promise<VendorBranch> {
+    const branch = await this.getVendorBranch(id);
+    branch.isOpen = false;
+    return this.branchesRepository.save(branch);
+  }
 }

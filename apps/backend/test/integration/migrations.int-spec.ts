@@ -28,7 +28,13 @@ describe('Real migrations on a clean PostgreSQL database', () => {
   });
 
   afterAll(async () => {
-    if (dataSource?.isInitialized) await dataSource.destroy();
+    // This spec drops the schema and reverts migrations. Leave the shared integration database fully migrated even if a test
+    // above failed midway, so later specs never run against a half-built schema.
+    try {
+      if (dataSource?.isInitialized) await resetAndMigrate(dataSource);
+    } finally {
+      if (dataSource?.isInitialized) await dataSource.destroy();
+    }
   });
 
   it('the schema really is empty before migrating, then every migration applies successfully and in order', async () => {

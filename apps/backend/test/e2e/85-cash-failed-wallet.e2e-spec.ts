@@ -40,7 +40,11 @@ describe('E2E — cash remainder, failed delivery, wallet & loyalty, cancellatio
     await s.vendorPrepares(vendor, order.id);
     const delivery = await deliveryOf(order.id);
     const chain = { ASSIGNED: [], PICKED_UP: ['PICKED_UP'], ON_THE_WAY: ['PICKED_UP', 'ON_THE_WAY'], DELIVERED: ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED'] }[to];
-    for (const st of chain) expectData(await step(delivery.id, st));
+    for (const st of chain) {
+      // M4 — Proof of Delivery is required for the DELIVERED transition.
+      const extra = st === 'DELIVERED' ? { proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) } : {};
+      expectData(await step(delivery.id, st, extra));
+    }
     return { order, delivery };
   };
 
@@ -177,8 +181,10 @@ describe('E2E — cash remainder, failed delivery, wallet & loyalty, cancellatio
       expect((await q('SELECT quantity FROM products WHERE id = $1', [tracked.id]))[0].quantity).toBe(3); // goods are with the driver: stock NOT restored
       expect(await q("SELECT id FROM financial_events WHERE order_id = $1 AND type = 'MANUAL_TRANSFER_REFUND_RECORDED'", [order.id])).toEqual([]);
       expect(await pointsBalance(c.id)).toBe(0); // no loyalty for a failed delivery
-      // terminal
-      expect((await step(delivery.id, 'DELIVERED')).status).toBe(400);
+      // terminal — a real proofPhotoUrl is supplied so this 400 is genuinely the state
+      // machine's terminal-state rejection (FAILED_DELIVERY is terminal), not M4's own
+      // separate "photo required" guard masking it.
+      expect((await step(delivery.id, 'DELIVERED', { proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) })).status).toBe(400);
       expect((await step(delivery.id, 'ON_THE_WAY')).status).toBe(400);
     });
 
@@ -278,27 +284,34 @@ describe('E2E — cash remainder, failed delivery, wallet & loyalty, cancellatio
       await s.setConfig('LOYALTY_POINTS_PER_EGP', 1);
     });
 
-    it('converts points to wallet credit at 100 points = 1 EGP, atomically debiting points and crediting the wallet, and is idempotent per key', async () => {
+    // Consolidated customer-commerce milestone (Parts C/D — Loyalty V1 + conversion): APPROVED V1 rate is
+    // 100 points/EGP (unchanged from the rate these tests always used), but the conversion rule tightened —
+    // minimum 500 points, multiples of 100 only (a non-multiple is now REJECTED, never partially converted
+    // with the remainder forfeited, which is what this file's tests previously characterized). Every test
+    // below now uses compliant amounts; each test's own original intent (idempotency, concurrency, cross-
+    // customer key collision, ledger sum) is preserved exactly, only the numbers changed.
+    it('converts points to wallet credit at 100 points = 1 EGP (minimum 500), atomically debiting points and crediting the wallet, and is idempotent per key', async () => {
       const c = await s.customer();
-      await orderThrough(c, 'DELIVERED', 5); // 500 points
+      await orderThrough(c, 'DELIVERED', 8); // 800 points
       const convert = (points: unknown, idempotencyKey: unknown = 'key-1', actor = c) => world.api('post', '/customer/loyalty/convert', { token: actor.accessToken, body: { points, idempotencyKey } });
-      const first = await convert(200);
+      const first = await convert(500);
       expect(first.status).toBe(201);
-      expect(first.body.data).toEqual({ convertedPoints: 200, walletCreditMinor: 200, pointsBalance: 300, walletBalance: 200 });
-      const replay = await convert(200);
-      expect(replay.body.data).toMatchObject({ convertedPoints: 200, walletCreditMinor: 200, pointsBalance: 300, walletBalance: 200 });
+      expect(first.body.data).toEqual({ convertedPoints: 500, walletCreditMinor: 500, pointsBalance: 300, walletBalance: 500 });
+      const replay = await convert(500);
+      expect(replay.body.data).toMatchObject({ convertedPoints: 500, walletCreditMinor: 500, pointsBalance: 300, walletBalance: 500 });
       expect(await pointsBalance(c.id)).toBe(300);
-      expect(await walletBalance(c.id)).toBe(200);
+      expect(await walletBalance(c.id)).toBe(500);
       expect((await q('SELECT id FROM wallet_transactions WHERE customer_id = $1', [c.id]))).toHaveLength(1);
     });
 
-    it('CHARACTERIZATION (approved rule): points beyond a whole multiple of the rate are forfeited — 250 points spend all 250 and credit 200', async () => {
+    it('APPROVED V1 RULE: a non-multiple-of-100 amount is rejected outright — nothing is forfeited or partially converted', async () => {
       const c = await s.customer();
-      await orderThrough(c, 'DELIVERED', 3); // 300 points
-      const res = await world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 250, idempotencyKey: 'odd-250' } });
-      expect(res.status).toBe(201);
-      expect(res.body.data).toEqual({ convertedPoints: 250, walletCreditMinor: 200, pointsBalance: 50, walletBalance: 200 });
-      expect(await pointsBalance(c.id)).toBe(50);
+      await orderThrough(c, 'DELIVERED', 6); // 600 points
+      const res = await world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 550, idempotencyKey: 'odd-550' } });
+      expect(res.status).toBe(400);
+      expect(res.body.error.details).toMatchObject({ code: 'INVALID_CONVERSION_MULTIPLE', multipleOf: 100 });
+      expect(await pointsBalance(c.id)).toBe(600); // untouched — nothing moves on a rejected conversion
+      expect(await walletBalance(c.id)).toBe(0);
     });
 
     it('validates conversions: below the minimum, more than the balance, non-integers, missing key — and nothing moves', async () => {
@@ -306,59 +319,59 @@ describe('E2E — cash remainder, failed delivery, wallet & loyalty, cancellatio
       await orderThrough(c, 'DELIVERED', 2); // 200 points
       const convert = (body: object) => world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body });
       const below = await convert({ points: 99, idempotencyKey: 'a' });
-      expect(below.body.error.details).toMatchObject({ code: 'BELOW_MINIMUM_CONVERSION', minimum: 100 });
-      const tooMany = await convert({ points: 300, idempotencyKey: 'b' });
-      expect(tooMany.body.error.details).toMatchObject({ code: 'INSUFFICIENT_POINTS', available: 200, requested: 300 });
+      expect(below.body.error.details).toMatchObject({ code: 'BELOW_MINIMUM_CONVERSION', minimum: 500 });
+      const tooMany = await convert({ points: 500, idempotencyKey: 'b' });
+      expect(tooMany.body.error.details).toMatchObject({ code: 'INSUFFICIENT_POINTS', available: 200, requested: 500 });
       expect((await convert({ points: 1.5, idempotencyKey: 'c' })).status).toBe(400);
       expect((await convert({ points: -100, idempotencyKey: 'd' })).status).toBe(400);
-      expect((await convert({ points: 100 })).status).toBe(400);
+      expect((await convert({ points: 500 })).status).toBe(400); // missing idempotencyKey
       expect(await pointsBalance(c.id)).toBe(200);
       expect(await walletBalance(c.id)).toBe(0);
     });
 
-    it('concurrent conversions can never spend the same points twice (3 × 100 of 200 → 2 succeed, 1 refused)', async () => {
+    it('concurrent conversions can never spend the same points twice (3 × 500 of 1000 → 2 succeed, 1 refused)', async () => {
       const c = await s.customer();
-      await orderThrough(c, 'DELIVERED', 2);
-      const results = await Promise.all(['k1', 'k2', 'k3'].map((k) => world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 100, idempotencyKey: k } })));
+      await orderThrough(c, 'DELIVERED', 10); // 1000 points
+      const results = await Promise.all(['k1', 'k2', 'k3'].map((k) => world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 500, idempotencyKey: k } })));
       expect(results.filter((r) => r.status === 201)).toHaveLength(2);
       expect(results.filter((r) => r.status === 400)).toHaveLength(1);
       expect(await pointsBalance(c.id)).toBe(0);
-      expect(await walletBalance(c.id)).toBe(200);
+      expect(await walletBalance(c.id)).toBe(1000);
     });
 
     it('the same idempotency key sent twice AT THE SAME TIME converts once', async () => {
       const c = await s.customer();
-      await orderThrough(c, 'DELIVERED', 2);
-      const results = await Promise.all([1, 2, 3].map(() => world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 100, idempotencyKey: 'same-key' } })));
+      await orderThrough(c, 'DELIVERED', 5); // 500 points
+      const results = await Promise.all([1, 2, 3].map(() => world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 500, idempotencyKey: 'same-key' } })));
       expect(results.every((r) => r.status === 201)).toBe(true);
-      expect(await pointsBalance(c.id)).toBe(100);
-      expect(await walletBalance(c.id)).toBe(100);
+      expect(await pointsBalance(c.id)).toBe(0);
+      expect(await walletBalance(c.id)).toBe(500);
     });
 
     it("another customer reusing someone else's idempotency key must not receive that customer's data nor be treated as a replay", async () => {
       const a = await s.customer();
       const b = await s.customer();
-      await orderThrough(a, 'DELIVERED', 2);
-      await orderThrough(b, 'DELIVERED', 3);
-      expectData(await world.api('post', '/customer/loyalty/convert', { token: a.accessToken, body: { points: 100, idempotencyKey: 'shared-key' } }), 201);
-      const collide = await world.api('post', '/customer/loyalty/convert', { token: b.accessToken, body: { points: 100, idempotencyKey: 'shared-key' } });
+      await orderThrough(a, 'DELIVERED', 5); // 500 points
+      await orderThrough(b, 'DELIVERED', 6); // 600 points
+      expectData(await world.api('post', '/customer/loyalty/convert', { token: a.accessToken, body: { points: 500, idempotencyKey: 'shared-key' } }), 201);
+      const collide = await world.api('post', '/customer/loyalty/convert', { token: b.accessToken, body: { points: 500, idempotencyKey: 'shared-key' } });
       // B must not be told "done" for a conversion that never happened for B, nor be shown A's numbers
       expect(collide.status).toBe(409);
       expect(collide.body.error.details).toEqual({ code: 'IDEMPOTENCY_KEY_IN_USE' });
       expect(await walletBalance(b.id)).toBe(0);
-      expect(await pointsBalance(b.id)).toBe(300);
+      expect(await pointsBalance(b.id)).toBe(600);
       // and B can simply retry with a fresh key
-      expect((await world.api('post', '/customer/loyalty/convert', { token: b.accessToken, body: { points: 100, idempotencyKey: 'b-own-key' } })).status).toBe(201);
-      expect(await walletBalance(b.id)).toBe(100);
+      expect((await world.api('post', '/customer/loyalty/convert', { token: b.accessToken, body: { points: 500, idempotencyKey: 'b-own-key' } })).status).toBe(201);
+      expect(await walletBalance(b.id)).toBe(500);
     });
 
     it('a cash remainder and a loyalty conversion both land on the same wallet ledger; the balance is their exact sum', async () => {
       const c = await s.customer();
-      const { order, delivery } = await orderThrough(c, 'DELIVERED', 2);
+      const { order, delivery } = await orderThrough(c, 'DELIVERED', 5); // 500 points
       const rem = expectData(await world.api('post', `/driver/deliveries/${delivery.id}/cash-remainder`, { token: driver.accessToken, body: { cashReceivedMinor: order.totalMinor + 1234 } }), 201);
       expectData(await world.api('patch', `/admin/cash-remainders/${rem.id}/approve`, { token: walletAdmin.accessToken }));
-      expectData(await world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 100, idempotencyKey: 'sum-key' } }), 201);
-      expect(await walletBalance(c.id)).toBe(1234 + 100);
+      expectData(await world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 500, idempotencyKey: 'sum-key' } }), 201);
+      expect(await walletBalance(c.id)).toBe(1234 + 500);
       const types = (await q('SELECT type FROM wallet_transactions WHERE customer_id = $1 ORDER BY created_at', [c.id])).map((r: any) => r.type);
       expect(types).toEqual(['DRIVER_CASH_REMAINDER', 'LOYALTY_REDEMPTION']);
     });

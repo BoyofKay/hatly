@@ -29,6 +29,13 @@ dependencies:
 
   # Secure storage for auth tokens
   flutter_secure_storage: ^9.2.2
+  # Dark Mode: local, non-sensitive persistence for the customer's explicit
+  # theme-mode choice (core/storage/theme_preference_storage.dart) — the
+  # project's existing storage (flutter_secure_storage) is Keychain/
+  # EncryptedSharedPreferences-backed for auth tokens specifically; a display
+  # preference doesn't need that, so the standard, minimal Flutter package for
+  # plain local key-value settings is used instead.
+  shared_preferences: ^2.3.2
 
   # Push notifications
   firebase_core: ^3.4.0
@@ -61,7 +68,15 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # On-device smoke test of the real marketplace media against a running backend (integration_test/, run with
+  # `flutter drive` — see that file's header). Not part of `flutter test`.
+  integration_test:
+    sdk: flutter
   flutter_lints: ^4.0.0
+  # Test-only: lets transfer_instructions_screen_test.dart fake the
+  # WhatsApp launcher (that screen calls openWhatsAppWithMessage directly,
+  # unlike the support flow's injectable whatsAppLauncherProvider).
+  url_launcher_platform_interface: ^2.3.2
 
 flutter:
   uses-material-design: true

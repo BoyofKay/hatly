@@ -44,7 +44,8 @@ describe('E2E — customer order cancellation (PD-005)', () => {
   const claim = (c: Actor, orderId: string) => world.api('post', `/payments/manual-transfer/orders/${orderId}/claim`, { token: c.accessToken, body: {} });
   const approve = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/approve`, { token: reviewer.accessToken });
   const reject = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/reject`, { token: reviewer.accessToken, body: { reason: 'no money' } });
-  const driverStep = (driver: Actor, deliveryId: string, status: string) => world.api('patch', `/driver/deliveries/${deliveryId}/status`, { token: driver.accessToken, body: { status } });
+  const driverStep = (driver: Actor, deliveryId: string, status: string, extra: Record<string, unknown> = {}) =>
+    world.api('patch', `/driver/deliveries/${deliveryId}/status`, { token: driver.accessToken, body: { status, ...extra } });
   const expectConsistent = (row: any) => expect(num(row.total_minor)).toBe(num(row.subtotal_minor) + num(row.delivery_fee_minor) - num(row.discount_minor));
   const placed = async (products: Array<{ id: string }>, paymentMethod = 'COD', quantities: number[] = []) => {
     const customer = await s.customer();
@@ -145,7 +146,9 @@ describe('E2E — customer order cancellation (PD-005)', () => {
       };
       await refused('ASSIGNED_TO_DRIVER');
       for (const status of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) {
-        expectData(await driverStep(driver, delivery.id, status));
+        // M4 — Proof of Delivery is required for the DELIVERED transition.
+        const extra = status === 'DELIVERED' ? { proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) } : {};
+        expectData(await driverStep(driver, delivery.id, status, extra));
         await refused(status);
       }
     });

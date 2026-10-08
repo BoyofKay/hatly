@@ -7,6 +7,20 @@ import { RequestContextService } from '../../common/request-context/request-cont
 import { logBusinessEvent } from '../../common/logging/log-business-event';
 import { BusinessEvent } from '../../common/logging/business-events';
 
+// Customer Wallet (Profile). Same pagination defaults/ceiling as
+// CustomerOrdersService's own DEFAULT_PAGE/DEFAULT_LIMIT/MAX_LIMIT —
+// not a new convention.
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 50;
+
+export interface CustomerWalletTransactionsResult {
+  data: WalletTransaction[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
 /**
  * Customer Wallet Ledger Foundation (Chunk B). CONFIRMED scope: this
  * service only creates ledger rows and derives a balance from them —
@@ -201,6 +215,33 @@ export class WalletService {
       manager,
     );
     return params.amountMinor;
+  }
+
+  /**
+   * Customer Wallet (Profile). Paginated, newest-first — the exact
+   * immutable ledger rows `getBalance` already sums, now exposed
+   * read-only to their own owner. Deliberately returns the
+   * `WalletTransaction` entity itself (not a separate view/DTO): every
+   * column on it is already customer-safe (see that entity's own
+   * comment) EXCEPT `createdByUserId`, which the controller strips
+   * before responding — never a second parallel ledger or projection
+   * table, just a narrower read of the one that already exists.
+   */
+  async listTransactionsForCustomer(
+    customerId: string,
+    params: { page?: number; limit?: number },
+  ): Promise<CustomerWalletTransactionsResult> {
+    const page = params.page && params.page > 0 ? params.page : DEFAULT_PAGE;
+    const limit = params.limit && params.limit > 0 ? Math.min(params.limit, MAX_LIMIT) : DEFAULT_LIMIT;
+
+    const [data, total] = await this.walletTransactionsRepository.findAndCount({
+      where: { customerId },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { data, page, limit, total };
   }
 
   /** Everything already credited back to the wallet for one order (ORDER_REFUND rows) — the basis of wallet refund idempotency. */

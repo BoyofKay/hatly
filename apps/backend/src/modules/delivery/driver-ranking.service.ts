@@ -174,12 +174,12 @@ export class DriverRankingService {
           longitude: firstSegment.adHocPickupLongitudeSnapshot,
         };
       }
-      // DELIVER_TO_PLACE — starting point is the customer's own address.
-      if (!order.deliveryAddressSnapshot) return null;
-      return {
-        latitude: order.deliveryAddressSnapshot.latitude,
-        longitude: order.deliveryAddressSnapshot.longitude,
-      };
+      // DELIVER_TO_PLACE — starting point is the customer's own address. PD-009: an address located only by its Delivery Zone
+      // has no point to rank from; no coordinate is invented (not even the zone's representative one), so the order is left to
+      // manual dispatch — the same fail-closed outcome as any other unresolvable pickup.
+      const snapshot = order.deliveryAddressSnapshot;
+      if (!snapshot || snapshot.latitude == null || snapshot.longitude == null) return null;
+      return { latitude: snapshot.latitude, longitude: snapshot.longitude };
     }
 
     // CATALOG

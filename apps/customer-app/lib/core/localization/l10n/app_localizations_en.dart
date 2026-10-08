@@ -67,6 +67,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get somethingWentWrong => 'Something went wrong';
 
   @override
+  String get routeNotFoundTitle => 'Page not found';
+
+  @override
   String get logout => 'Log out';
 
   @override
@@ -370,6 +373,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customRequestSubmit => 'Add to cart';
 
   @override
+  String get customRequestAddImage => 'Add photo';
+
+  @override
+  String get customRequestRemoveImage => 'Remove photo';
+
+  @override
   String get cartCustomRequestBadge => 'Custom Request';
 
   @override
@@ -499,6 +508,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get orderStatusDelivered => 'Delivered';
 
   @override
+  String get orderStatusCollected => 'Collected';
+
+  @override
   String get orderStatusCancelled => 'Cancelled';
 
   @override
@@ -521,6 +533,51 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sortPriceHighToLow => 'Price: High to Low';
+
+  @override
+  String get sortOffers => 'Offers';
+
+  @override
+  String get filterAction => 'Filter';
+
+  @override
+  String get sortAction => 'Sort';
+
+  @override
+  String get clearAll => 'Clear All';
+
+  @override
+  String get apply => 'Apply';
+
+  @override
+  String get filterOpenNow => 'Open Now';
+
+  @override
+  String get filterHasOffers => 'Offers';
+
+  @override
+  String get filterRatingLabel => 'Rating';
+
+  @override
+  String get filterRatingAny => 'Any';
+
+  @override
+  String get filterRating4Plus => '4.0+';
+
+  @override
+  String get filterRating3Plus => '3.0+';
+
+  @override
+  String get filterAvailableOnly => 'Available Only';
+
+  @override
+  String get filterPriceRangeLabel => 'Price Range';
+
+  @override
+  String get filterPriceMinHint => 'Min';
+
+  @override
+  String get filterPriceMaxHint => 'Max';
 
   @override
   String get checkoutTitle => 'Checkout';
@@ -826,7 +883,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cartErrorMixedCartTypes =>
-      'Store items and Hatly Service cannot share a cart. Clear your cart to switch.';
+      'Store items and Hatly Service requests can\'t share a cart. Clear your cart to switch.';
 
   @override
   String get cartEmptyTitle => 'Your cart is waiting for your order';
@@ -1067,6 +1124,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Manual transfer is not available right now';
 
   @override
+  String get checkoutPickupCashNote =>
+      'Pickup orders are paid in cash at the branch when you collect them.';
+
+  @override
   String get checkoutTransferUnavailableWeighed =>
       'Not available for orders with weighed items — the final price is known after weighing';
 
@@ -1183,6 +1244,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get checkoutBlockerGeneric =>
       'This order can\'t be placed right now. Review your cart and try again.';
+
+  @override
+  String get checkoutBlockerAdHocPickupRequired =>
+      'This Hatly Service request has no pickup location. Remove it from your cart and add it again with the place\'s location.';
+
+  @override
+  String get checkoutBlockerAdHocDestinationRequired =>
+      'This Hatly Service request has no destination. Remove it from your cart and add it again with the destination.';
 
   @override
   String get checkoutBlockerUnavailable =>
@@ -1422,4 +1491,418 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addressOpenSettings => 'Open app settings';
+
+  @override
+  String get hatlyServiceEntryTitle => 'Hatly Service';
+
+  @override
+  String get hatlyServiceEntrySubtitle =>
+      'Need something from a place we don\'t list? Ask Hatly to get it.';
+
+  @override
+  String get hatlyServiceScreenTitle => 'Hatly Service';
+
+  @override
+  String get hatlyServiceTypeSectionTitle => 'What do you need?';
+
+  @override
+  String get hatlyServiceTypeBuyFromPlace => 'Buy from a place';
+
+  @override
+  String get hatlyServiceTypeBuyFromPlaceHint =>
+      'Tell us what to get and where from — we\'ll buy and bring it to you.';
+
+  @override
+  String get hatlyServiceTypeDeliverToPlace => 'Deliver to a place';
+
+  @override
+  String get hatlyServiceTypeDeliverToPlaceHint =>
+      'Tell us what to deliver and where to — we\'ll pick it up and drop it off.';
+
+  @override
+  String get hatlyServiceExistingGroupNotice =>
+      'You already have a Hatly Service request in your cart. This item will be added to it.';
+
+  @override
+  String get hatlyServicePlaceNameLabel => 'Name this request';
+
+  @override
+  String get hatlyServicePlaceNameHint =>
+      'e.g. Carrefour Mall of Egypt, or Mom\'s house';
+
+  @override
+  String get hatlyServicePlaceNameRequired => 'Give this request a short name';
+
+  @override
+  String get hatlyServiceDescriptionLabel => 'Describe what you need';
+
+  @override
+  String get hatlyServiceDescriptionHint =>
+      'Be as specific as you can — item, brand, quantity, anything that helps.';
+
+  @override
+  String get hatlyServiceDescriptionRequired => 'Describe what you need';
+
+  @override
+  String get hatlyServiceImagesLabel => 'Photos (optional)';
+
+  @override
+  String get hatlyServiceLocationPickupTitle => 'Pickup location (required)';
+
+  @override
+  String get hatlyServiceLocationDestinationTitle =>
+      'Destination location (required)';
+
+  @override
+  String get hatlyServiceLocationDestinationHint =>
+      'Choose exactly where this should be delivered — Hatly can\'t guess this for you.';
+
+  @override
+  String get hatlyServiceLocationPickupHint =>
+      'Choose exactly where Hatly should buy this from — Hatly can\'t guess this for you.';
+
+  @override
+  String get hatlyServiceReviewTitle => 'Review your request';
+
+  @override
+  String get hatlyServiceReviewEdit => 'Edit';
+
+  @override
+  String get hatlyServiceReviewTypeLabel => 'Service';
+
+  @override
+  String get hatlyServiceReviewPlaceLabel => 'Request name';
+
+  @override
+  String get hatlyServiceReviewDescriptionLabel => 'Details';
+
+  @override
+  String get hatlyServiceReviewImagesLabel => 'Photos';
+
+  @override
+  String get hatlyServiceReviewLocationLabel => 'Location';
+
+  @override
+  String get hatlyServiceReviewLocationSet =>
+      'Set — will be used for this request';
+
+  @override
+  String get hatlyServiceReviewLocationRequired =>
+      'Not set — required before this request can be added';
+
+  @override
+  String get hatlyServiceContinueToReview => 'Review request';
+
+  @override
+  String get hatlyServiceSubmit => 'Add to cart';
+
+  @override
+  String get hatlyServiceAddedConfirmation => 'Added to cart';
+
+  @override
+  String get orderHatlyServiceTypeLabel => 'Service type';
+
+  @override
+  String get orderHatlyServicePickupLocationLabel => 'Pickup location';
+
+  @override
+  String get orderHatlyServiceDestinationLocationLabel =>
+      'Destination location';
+
+  @override
+  String get orderHatlyServiceLocationCoordinates => 'Set on the map';
+
+  @override
+  String get cartErrorAdHocPlaceNameRequired =>
+      'Give this request a short name.';
+
+  @override
+  String get cartErrorAdHocServiceTypeRequired =>
+      'Choose a Hatly Service type.';
+
+  @override
+  String get cartErrorAdHocLocationMismatch =>
+      'That location doesn\'t apply to this service type.';
+
+  @override
+  String get cartErrorAdHocIncompleteCoordinate =>
+      'Set the location again — it wasn\'t captured correctly.';
+
+  @override
+  String get cartErrorAdHocSingleLocationOnly =>
+      'A Hatly Service request can only include one location. Clear your cart to start a new one.';
+
+  @override
+  String get cartErrorAdHocPickupOnly =>
+      'Hatly Service isn\'t available for pickup — switch to delivery first.';
+
+  @override
+  String get cartErrorAdHocDestinationRequired =>
+      'Please choose a destination for this delivery request before adding it to your cart.';
+
+  @override
+  String get cartErrorAdHocPickupRequired =>
+      'Please choose the location of the place to buy from before adding this request to your cart.';
+
+  @override
+  String get profileMyAddresses => 'My Addresses';
+
+  @override
+  String get profileDefaultAddressTitle => 'Default Address';
+
+  @override
+  String get profileNoDefaultAddress => 'No default address yet';
+
+  @override
+  String get profileManageAddresses => 'Manage';
+
+  @override
+  String get profileWalletCardTitle => 'Hatly Wallet';
+
+  @override
+  String get walletTitle => 'Wallet';
+
+  @override
+  String get walletBalanceLabel => 'Wallet Balance';
+
+  @override
+  String get walletHistoryTitle => 'Transaction History';
+
+  @override
+  String get walletEmptyHistory => 'No transactions yet';
+
+  @override
+  String get walletTypeOrderPayment => 'Order payment';
+
+  @override
+  String get walletTypeOrderRefund => 'Order refund';
+
+  @override
+  String get walletTypeAdminCredit => 'Credit';
+
+  @override
+  String get walletTypeLoyaltyRedemption => 'Points redeemed';
+
+  @override
+  String get walletTypeDriverCashRemainder => 'Cash remainder';
+
+  @override
+  String get walletTypeAdjustment => 'Adjustment';
+
+  @override
+  String get walletTypeExpiration => 'Expired balance';
+
+  @override
+  String get profileLoyaltyCardTitle => 'Hatly Points';
+
+  @override
+  String get loyaltyTitle => 'Hatly Points';
+
+  @override
+  String get loyaltyBalanceLabel => 'Points Balance';
+
+  @override
+  String get loyaltyPointsSuffix => 'pts';
+
+  @override
+  String get loyaltyHistoryTitle => 'Points History';
+
+  @override
+  String get loyaltyEmptyHistory => 'No points activity yet';
+
+  @override
+  String get loyaltyTypeEarning => 'Points earned';
+
+  @override
+  String get loyaltyTypeEarningReversed => 'Points reversed (refund)';
+
+  @override
+  String get loyaltyTypeRedemption => 'Converted to Wallet';
+
+  @override
+  String get loyaltyTypeAdminAdjustment => 'Adjustment';
+
+  @override
+  String get loyaltyTypeExpiration => 'Expired points';
+
+  @override
+  String get loyaltyConvertAction => 'Convert to Wallet';
+
+  @override
+  String get loyaltyConvertSheetTitle => 'Convert Points to Wallet';
+
+  @override
+  String get loyaltyConvertSheetRule =>
+      'Every 500 points = 5 EGP. Convert in multiples of 100 points, 500 minimum.';
+
+  @override
+  String get loyaltyConvertAvailableLabel => 'Available';
+
+  @override
+  String get loyaltyConvertAmountLabel => 'Points to convert';
+
+  @override
+  String get loyaltyConvertAmountHint => 'e.g. 500';
+
+  @override
+  String get loyaltyConvertSubmit => 'Convert';
+
+  @override
+  String get loyaltyConvertSuccess => 'Converted to your Hatly Wallet';
+
+  @override
+  String get loyaltyErrorInsufficientPoints =>
+      'You don\'t have enough points for this conversion.';
+
+  @override
+  String get loyaltyErrorBelowMinimum => 'Enter at least 500 points.';
+
+  @override
+  String get loyaltyErrorInvalidMultiple =>
+      'Enter an amount in multiples of 100 points.';
+
+  @override
+  String get addressSetDefaultAction => 'Set as default';
+
+  @override
+  String get addressSetDefaultError =>
+      'Failed to set as default. Please try again.';
+
+  @override
+  String get profileAppearanceTitle => 'Appearance';
+
+  @override
+  String get themeModeSystem => 'System';
+
+  @override
+  String get themeModeLight => 'Light';
+
+  @override
+  String get themeModeDark => 'Dark';
+
+  @override
+  String get hatlyServicePricePending =>
+      'The price will be confirmed while your order is being prepared';
+
+  @override
+  String get checkoutHatlyServiceCodNote =>
+      'Hatly Service requests are paid on delivery only. The price is confirmed while your order is being prepared, and the final total appears in the order details.';
+
+  @override
+  String get cartErrorTooManyImages =>
+      'There are more photos than allowed for this request.';
+
+  @override
+  String get cartErrorInvalidImage =>
+      'One of the photos could not be used. Upload it again and retry.';
+
+  @override
+  String get cartErrorContentRequired =>
+      'Describe the request or attach a photo.';
+
+  @override
+  String get serviceTemporarilyUnavailable =>
+      'This service is not available right now. Please try again later or contact Hatly.';
+
+  @override
+  String get checkoutErrorAddressRequired =>
+      'Choose a delivery address first, then try again.';
+
+  @override
+  String get checkoutErrorEmptyCart =>
+      'Your cart is empty. Add a request and try again.';
+
+  @override
+  String get checkoutErrorNoActiveCart =>
+      'There is no active cart to place. Your order may already have been sent — check your orders.';
+
+  @override
+  String get checkoutErrorQuoteRequired =>
+      'Review the order summary, then confirm the order again.';
+
+  @override
+  String get checkoutErrorPaymentMethodRequired => 'Choose a payment method.';
+
+  @override
+  String get checkoutErrorOnlinePaymentUnavailable =>
+      'Online payment is not available yet.';
+
+  @override
+  String get addressZoneSection => 'Delivery area';
+
+  @override
+  String get addressZoneLabel => 'Area';
+
+  @override
+  String get addressZoneHelp =>
+      'The area you choose decides whether we can deliver there and the delivery fee.';
+
+  @override
+  String get addressZoneRequired => 'Choose your area';
+
+  @override
+  String addressZoneFeeHint(String fee) {
+    return 'Delivery fee for this area: $fee — the final fee is confirmed at checkout.';
+  }
+
+  @override
+  String get addressZonesLoadError =>
+      'Couldn\'t load the delivery areas. Please try again.';
+
+  @override
+  String get addressZonesEmpty => 'No delivery areas are available right now.';
+
+  @override
+  String get addressDetailedLabel => 'Detailed address';
+
+  @override
+  String get addressDetailedHint =>
+      'e.g. Abu Naseeb St., next to Al-Kurdi Mosque, house 15';
+
+  @override
+  String get addressLocationOptionalSection => 'Map location (optional)';
+
+  @override
+  String get addressLocationOptionalHelp =>
+      'A pin helps the driver find you faster, but it isn\'t required to save the address.';
+
+  @override
+  String get addressRemoveLocation => 'Remove pin';
+
+  @override
+  String get addressZoneMissingBanner =>
+      'Choose a delivery area for this address before ordering to it.';
+
+  @override
+  String get addressZoneUnavailableBanner =>
+      'This address\'s delivery area isn\'t available right now. Choose another area.';
+
+  @override
+  String get addressChooseZoneAction => 'Choose area';
+
+  @override
+  String get checkoutAddressZoneRequired =>
+      'Choose a delivery area for this address so we can deliver to you.';
+
+  @override
+  String get checkoutAddressZoneUnavailable =>
+      'Hatly doesn\'t deliver to this area right now. Choose another area or address.';
+
+  @override
+  String checkoutDeliveryZonePricing(String area) {
+    return 'Delivery fee by area: $area';
+  }
+
+  @override
+  String checkoutHatlyServiceFeeFormula(String zoneFee, String multiplier) {
+    return 'Your area\'s delivery fee $zoneFee × $multiplier';
+  }
+
+  @override
+  String get addressZoneAutoSelected =>
+      'This is the only delivery area in this city, so it\'s selected for you.';
+
+  @override
+  String get addressCityNoZones =>
+      'No delivery areas are available in this city right now.';
 }

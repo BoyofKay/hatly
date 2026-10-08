@@ -109,4 +109,33 @@ export class AdminVendorBranchesController {
     const branch = await this.adminVendorsService.deactivateVendorBranch(id);
     return { data: branch };
   }
+
+  /**
+   * M1 (Launch-Readiness Gap Audit, G-01). `isOpen` previously had no
+   * write path anywhere in the backend — a branch created via
+   * `createVendorBranch` (`isOpen: false`) could never be opened
+   * except by the dev-seed script writing straight to the database.
+   * Explicit open/close endpoints (not a blind toggle), matching this
+   * controller's own `activate`/`deactivate` shape exactly — same
+   * reasoning: an explicit target state is unambiguous under a retry
+   * or a race between two admins, where a "toggle" would not be.
+   * Deliberately gated by the existing, previously-unused
+   * `OPEN_CLOSE_VENDOR_BRANCHES` permission (not `MANAGE_VENDORS`) —
+   * `permission.enum.ts`'s own `MANAGE_VENDORS` doc comment already
+   * describes `OPEN_CLOSE_VENDOR_BRANCHES` as scoped specifically to
+   * "toggling a branch's open/active state", i.e. exactly this.
+   */
+  @Patch(':id/open')
+  @RequiresPermission(Permission.OPEN_CLOSE_VENDOR_BRANCHES)
+  async open(@Param('id') id: string) {
+    const branch = await this.adminVendorsService.openVendorBranch(id);
+    return { data: branch };
+  }
+
+  @Patch(':id/close')
+  @RequiresPermission(Permission.OPEN_CLOSE_VENDOR_BRANCHES)
+  async close(@Param('id') id: string) {
+    const branch = await this.adminVendorsService.closeVendorBranch(id);
+    return { data: branch };
+  }
 }

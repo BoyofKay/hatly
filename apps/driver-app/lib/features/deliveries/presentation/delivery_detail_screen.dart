@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/utils/maps_helper.dart';
 import '../data/driver_providers.dart';
 import '../domain/delivery.dart';
+import 'cash_collection_sheet.dart';
+import 'proof_of_delivery_sheet.dart';
 
 /// CONFIRMED (locked decision): the lifecycle action buttons below are
 /// the ONLY status-changing actions this screen offers — no Accept,
@@ -39,14 +41,25 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
   final Map<String, String> _weightInputs = {};
   final Map<String, String> _purchaseInputs = {};
 
-  Future<void> _updateStatus(String status, {DriverFailedDeliveryReason? failureReason}) async {
+  Future<void> _updateStatus(
+    String status, {
+    DriverFailedDeliveryReason? failureReason,
+    String? proofPhotoUrl,
+    String? recipientName,
+  }) async {
     if (_isSubmitting) return;
     setState(() {
       _isSubmitting = true;
       _actionError = null;
     });
     try {
-      await ref.read(driverApiProvider).updateDeliveryStatus(widget.deliveryId, status, failureReason: failureReason);
+      await ref.read(driverApiProvider).updateDeliveryStatus(
+            widget.deliveryId,
+            status,
+            failureReason: failureReason,
+            proofPhotoUrl: proofPhotoUrl,
+            recipientName: recipientName,
+          );
       ref.invalidate(deliveryDetailProvider(widget.deliveryId));
       ref.invalidate(deliveriesProvider);
     } on DioException catch (error) {
@@ -55,6 +68,56 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  /// M4. The "Delivered" action now has two required real-evidence steps before it
+  /// ever calls `_updateStatus`: (1) cash collection — ONLY for COD/PAY_AT_DELIVERY
+  /// orders with a real `amountDueMinor`, and ONLY submits a cash-remainder claim
+  /// when the driver actually collected more than what was due; (2) Proof of
+  /// Delivery — always required, a real uploaded photo the backend itself verifies
+  /// ownership of. Cancelling either step leaves the delivery completely untouched
+  /// (no status change) — CONFIRMED, `_updateStatus('DELIVERED', ...)` is only ever
+  /// reached after both steps resolve.
+  Future<void> _completeDelivery(Delivery delivery) async {
+    if (_isSubmitting) return;
+
+    if (delivery.hasCollectionOnDelivery && delivery.amountDueMinor != null) {
+      final cashResult = await showModalBottomSheet<CashCollectionResult>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => CashCollectionSheet(amountDueMinor: delivery.amountDueMinor!),
+      );
+      if (cashResult == null || !mounted) return;
+
+      if (cashResult.cashReceivedMinor > delivery.amountDueMinor!) {
+        setState(() {
+          _isSubmitting = true;
+          _actionError = null;
+        });
+        try {
+          await ref.read(driverApiProvider).submitCashRemainder(widget.deliveryId, cashResult.cashReceivedMinor);
+        } on DioException catch (error) {
+          final message = error.response?.data is Map ? (error.response?.data as Map)['message'] : null;
+          setState(() => _actionError = (message as String?) ?? 'Could not record the cash collected.');
+          return;
+        } finally {
+          if (mounted) setState(() => _isSubmitting = false);
+        }
+      }
+    }
+    if (!mounted) return;
+
+    final podResult = await showModalBottomSheet<ProofOfDeliveryResult>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ProofOfDeliverySheet(
+        uploadPhoto: (bytes, filename) => ref.read(driverApiProvider).uploadProofPhoto(bytes, filename),
+        pickPhoto: ref.read(proofOfDeliveryPhotoPickerProvider),
+      ),
+    );
+    if (podResult == null || !mounted) return;
+
+    await _updateStatus('DELIVERED', proofPhotoUrl: podResult.photoUrl, recipientName: podResult.recipientName);
   }
 
   /// Driver Core + Dispatch Foundation milestone. A reason is REQUIRED before the "Failed Delivery"
@@ -151,7 +214,9 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
           children: [
             Text('Status: ${delivery.orderStatus}'),
             Text('Payment: ${delivery.paymentMethod}${delivery.electronicPaymentMethod != null ? ' (${delivery.electronicPaymentMethod})' : ''}'),
-            Text('Total: ${(delivery.totalMinor / 100).toStringAsFixed(2)}'),
+            Text(delivery.totalMinor == null
+                ? 'Total: price pending (confirmed during preparation)'
+                : 'Total: ${(delivery.totalMinor! / 100).toStringAsFixed(2)}'),
             // Driver Core + Dispatch Foundation milestone: the amount to actually collect — distinct
             // from Total above whenever a wallet credit already covered part of the order. Shown only
             // when there is something to collect on delivery (COD / PAY_AT_DELIVERY); a Manual
@@ -177,17 +242,32 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
                 ),
               ],
             ),
+            if (delivery.deliveryAddress.areaLabel != null)
+              Text(
+                delivery.deliveryAddress.areaLabel!,
+                key: const Key('delivery-area'),
+                textDirection: TextDirection.rtl,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             Text(delivery.deliveryAddress.line1),
+            if (_addressDetails(delivery.deliveryAddress) != null)
+              Text(_addressDetails(delivery.deliveryAddress)!, key: const Key('delivery-address-details')),
             if (delivery.deliveryAddress.instructions != null)
               Text('Instructions: ${delivery.deliveryAddress.instructions}'),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.map_outlined),
-              label: const Text('Open in Maps'),
-              onPressed: () => openInMaps(
-                latitude: delivery.deliveryAddress.latitude,
-                longitude: delivery.deliveryAddress.longitude,
+            if (delivery.deliveryAddress.hasPin)
+              OutlinedButton.icon(
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('Open in Maps'),
+                onPressed: () => openInMaps(
+                  latitude: delivery.deliveryAddress.latitude!,
+                  longitude: delivery.deliveryAddress.longitude!,
+                ),
+              )
+            else
+              const Text(
+                'No map pin — use the area and the written address above.',
+                key: Key('delivery-no-pin'),
               ),
-            ),
           ],
         ),
         for (final segment in delivery.segments)
@@ -233,7 +313,9 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
                         ? null
                         : action.$2 == 'FAILED_DELIVERY'
                             ? _pickFailureReasonAndSubmit
-                            : () => _updateStatus(action.$2),
+                            : action.$2 == 'DELIVERED'
+                                ? () => _completeDelivery(delivery)
+                                : () => _updateStatus(action.$2),
                     style: action.$2 == 'FAILED_DELIVERY'
                         ? FilledButton.styleFrom(backgroundColor: Colors.grey.shade600)
                         : null,
@@ -340,4 +422,15 @@ class _ItemTile extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Building / floor / apartment / landmark in one line, or null when the customer gave none.
+String? _addressDetails(DeliveryAddress a) {
+  final parts = <String>[
+    if (a.buildingNumber != null) 'Building ${a.buildingNumber}',
+    if (a.floor != null) 'Floor ${a.floor}',
+    if (a.apartment != null) 'Apt ${a.apartment}',
+    if (a.landmark != null) a.landmark!,
+  ];
+  return parts.isEmpty ? null : parts.join(' · ');
 }

@@ -1,4 +1,4 @@
-import { IsBoolean, IsLatitude, IsLongitude, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateIf } from 'class-validator';
 
 export class UpdateAddressDto {
   @IsOptional()
@@ -9,22 +9,29 @@ export class UpdateAddressDto {
   @IsOptional()
   @IsString()
   @MaxLength(255)
+  @Matches(/\S/)
   line1?: string;
 
+  /** PD-009: (re)select the Delivery Zone. Changing to a different zone requires it to be active. */
   @IsOptional()
-  @IsLatitude()
-  latitude?: number;
+  @IsUUID()
+  deliveryZoneId?: string;
 
-  @IsOptional()
+  /** Optional map pin — both or neither; `null` for both removes it. */
+  @ValidateIf((_, v) => v !== undefined && v !== null)
+  @IsLatitude()
+  latitude?: number | null;
+
+  @ValidateIf((_, v) => v !== undefined && v !== null)
   @IsLongitude()
-  longitude?: number;
+  longitude?: number | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(500)
   instructions?: string;
 
-  /** Structured Egyptian address details (all optional at this layer; the checkout form asks for them). */
+  /** Governorate / city are DERIVED from the selected zone on save; a client value is accepted for compatibility but replaced. */
   @IsOptional()
   @IsString()
   @MaxLength(80)

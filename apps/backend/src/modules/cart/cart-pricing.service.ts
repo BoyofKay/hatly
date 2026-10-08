@@ -34,7 +34,14 @@ export class CartPricingService {
     // CONFIRMED BUSINESS DECISION: Hatly has no minimum-order
     // requirement — removed entirely, not just relaxed. readyForCheckout
     // no longer depends on any minimum-order term.
-    const readyForCheckout = totalItemCount > 0 && allCatalogItemsAvailable && !hasUnpricedItems;
+    //
+    // A Hatly Service request whose price is not confirmed yet does NOT make the cart "not ready": checkout supports it by design
+    // (CheckoutPlannerService — an explicit pending price, COD only, the amount confirmed while the order is prepared). This
+    // flag used to also require `!hasUnpricedItems`, a Phase 2D placeholder ("whether an unpriced cart may check out at all is
+    // left to Step 4") that outlived Step 4 and silently disabled the customer's "Continue to checkout" for every Hatly Service
+    // request. `hasUnpricedItems` stays as information only. The checkout quote remains the authority on whether the order can
+    // actually be placed (address, service area, configuration…), each with its own specific blocker.
+    const readyForCheckout = totalItemCount > 0 && allCatalogItemsAvailable;
 
     return {
       id: cart.id,

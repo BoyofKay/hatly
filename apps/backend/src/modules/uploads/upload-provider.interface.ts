@@ -14,6 +14,14 @@ export interface UploadResult {
 
 export interface UploadProvider {
   store(params: { base64Content: string; filename: string }): Promise<UploadResult>;
+
+  /**
+   * Providers whose stored references are NOT directly servable (private object storage) implement this: given the file name
+   * part of a stored reference (`<uuid>.<ext>`), return a short-lived signed URL to redirect the reader to — or null when the
+   * name is not one this provider ever issued. Providers that serve their own references (local disk, public buckets/CDN)
+   * omit it. See private-media-redirect.ts.
+   */
+  createReadUrl?(fileName: string): string | null;
 }
 
 export const UPLOAD_PROVIDER = Symbol('UPLOAD_PROVIDER');

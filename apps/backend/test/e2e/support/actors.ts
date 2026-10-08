@@ -13,6 +13,8 @@ import { Permission } from '../../../src/modules/permissions/permission.enum';
 import { User } from '../../../src/modules/users/entities/user.entity';
 import { World } from './world';
 
+export const PNG_1X1_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
 export const DEFAULT_PASSWORD = 'E2e-Passw0rd!';
 
 export interface Actor {
@@ -158,6 +160,41 @@ export class Scenario {
     return { id: area.id, lat, lng };
   }
 
+  /**
+   * PD-009: a Delivery Zone over HTTP as SUPER_ADMIN (inside `serviceAreaId`, or a fresh default service area). Belbeis names by
+   * default so snapshots read like production ("بلبيس — <nameAr>"). No representative coordinates.
+   */
+  async deliveryZone(p: { serviceAreaId?: string; name?: string; nameAr?: string; feeMinor?: number } = {}): Promise<{ id: string; serviceAreaId: string; feeMinor: number }> {
+    const superAdmin = await this.superAdmin();
+    const serviceAreaId = p.serviceAreaId ?? (await this.serviceArea()).id;
+    const suffix = nextPhone().slice(-6);
+    const zone = expectData(
+      await this.world.api('post', '/admin/delivery-zones', {
+        token: superAdmin.accessToken,
+        body: {
+          serviceAreaId,
+          governorate: 'Sharqia',
+          governorateAr: 'الشرقية',
+          city: 'Belbeis',
+          cityAr: 'بلبيس',
+          name: p.name ?? `Zone ${suffix}`,
+          nameAr: p.nameAr ?? `منطقة ${suffix}`,
+          deliveryFeeMinor: p.feeMinor ?? 1500,
+        },
+      }),
+      201,
+    );
+    return { id: zone.id, serviceAreaId, feeMinor: zone.deliveryFeeMinor };
+  }
+
+  private defaultZoneId?: string;
+
+  /** A zone for addresses whose price comes from their map pin (the zone is required on every address but not used for pricing). */
+  async defaultDeliveryZoneId(): Promise<string> {
+    this.defaultZoneId ??= (await this.deliveryZone()).id;
+    return this.defaultZoneId;
+  }
+
   // ---------- vendors ----------
 
   /**
@@ -218,6 +255,27 @@ export class Scenario {
     expectData(await this.world.api('patch', `/admin/vendor-branches/${vendor.branchId}/sector`, { token: superAdmin.accessToken, body: { marketplaceSectorId: sectorId } }));
   }
 
+  /** Consolidated customer-commerce milestone (Sector Subcategories): full-set-replace assignment, mirrors `assignSector`. */
+  async assignSubcategories(vendor: VendorFixture, subcategoryIds: string[]): Promise<void> {
+    const superAdmin = await this.superAdmin();
+    expectData(
+      await this.world.api('patch', `/admin/vendor-branches/${vendor.branchId}/subcategories`, {
+        token: superAdmin.accessToken,
+        body: { subcategoryIds },
+      }),
+    );
+  }
+
+  /** Creates an active subcategory under an existing sector. */
+  async subcategory(sectorId: string, name = 'Burgers'): Promise<{ id: string }> {
+    const superAdmin = await this.superAdmin();
+    const subcategory = expectData(
+      await this.world.api('post', '/admin/subcategories', { token: superAdmin.accessToken, body: { sectorId, name } }),
+      201,
+    );
+    return { id: subcategory.id };
+  }
+
   async product(
     vendor: VendorFixture,
     p: { name?: string; priceMinor?: number; pricingUnit?: 'PIECE' | 'WEIGHT'; inventoryMode?: 'OPEN' | 'TRACKED'; quantity?: number } = {},
@@ -245,11 +303,13 @@ export class Scenario {
 
   // ---------- customers' addresses ----------
 
-  async address(customer: Actor, p: { lat: number; lng: number; label?: string }): Promise<{ id: string }> {
+  /** A saved address: with a map pin (`lat`/`lng`, distance-priced) or — PD-009 — pin-less, located by `zoneId` only. */
+  async address(customer: Actor, p: { lat?: number; lng?: number; label?: string; zoneId?: string; line1?: string }): Promise<{ id: string }> {
+    const pin = p.lat !== undefined && p.lng !== undefined ? { latitude: p.lat, longitude: p.lng } : {};
     const address = expectData(
       await this.world.api('post', '/addresses', {
         token: customer.accessToken,
-        body: { label: p.label ?? 'Home', line1: '9 Customer Street', latitude: p.lat, longitude: p.lng },
+        body: { label: p.label ?? 'Home', line1: p.line1 ?? '9 Customer Street', ...pin, deliveryZoneId: p.zoneId ?? (await this.defaultDeliveryZoneId()) },
       }),
       201,
     );
@@ -275,10 +335,9 @@ export class Scenario {
    * A dispatch-eligible driver: created by an admin over HTTP, logs in over HTTP, goes online and
    * reports a location over HTTP.
    *
-   * DOCUMENTED SEAM (exception #3): there is no HTTP endpoint anywhere that sets a driver's
-   * verificationStatus to APPROVED, assigns a vehicle type, or marks the driver available — the
-   * dispatch engine requires all three. Operations do it directly in the database today (see the
-   * Group 8 report, "driver onboarding gap"), so the factory does the same in one UPDATE.
+   * Every onboarding step is the product's own admin endpoint: verification (Driver Core milestone), availability
+   * (a new driver is available — Control Tower milestone) and the vehicle type (Operational Completion milestone —
+   * `PATCH admin/drivers/:id/vehicle-type`, which closed the last direct-SQL seam here).
    */
   async driver(p: { lat: number; lng: number; fullName?: string }): Promise<DriverFixture> {
     const superAdmin = await this.superAdmin();
@@ -290,20 +349,18 @@ export class Scenario {
     );
     const actor = await this.login('/auth/driver/login', { phone, fullName, role: Role.DRIVER });
     const vehicleTypeId = await this.ensureVehicleType();
-    // Verification goes through the real admin endpoint (Driver Core + Dispatch Foundation milestone) —
-    // exercises it the same way every other Scenario fixture exercises the real API, rather than reaching
-    // around it. vehicle_type_id/is_available have no dedicated admin endpoint (out of this milestone's
-    // scope) and stay direct SQL, same as before.
     expectData(
       await this.world.api('patch', `/admin/drivers/${created.id}/verification`, {
         token: superAdmin.accessToken,
         body: { status: 'APPROVED' },
       }),
     );
-    await this.world.ds.query(`UPDATE drivers SET vehicle_type_id = $2, is_available = true WHERE user_id = $1`, [
-      actor.id,
-      vehicleTypeId,
-    ]);
+    expectData(
+      await this.world.api('patch', `/admin/drivers/${created.id}/vehicle-type`, {
+        token: superAdmin.accessToken,
+        body: { vehicleTypeId },
+      }),
+    );
     expectData(await this.world.api('patch', '/driver/online-status', { token: actor.accessToken, body: { isOnline: true } }));
     expectData(await this.world.api('patch', '/driver/location', { token: actor.accessToken, body: { latitude: p.lat, longitude: p.lng } }));
     const [row] = await this.world.ds.query(`SELECT id FROM drivers WHERE user_id = $1`, [actor.id]);
@@ -321,6 +378,21 @@ export class Scenario {
     const fixture = this.drivers.find((d) => d.driverId === row?.driver_id);
     if (!fixture) throw new Error(`No delivery/driver fixture found for order ${orderId}`);
     return fixture;
+  }
+
+  /**
+   * M4 — Proof of Delivery. A real upload through the actual `POST /uploads` endpoint
+   * (never a fabricated URL — the DELIVERED transition validates the URL is a real,
+   * owned upload via UploadsService.findOwnedUrls), owned by whichever token is passed.
+   * Content is a real, minimal 1x1 PNG: since M5 Batch 1 the uploads pipeline validates the
+   * image BYTES (JPEG/PNG/WebP signature, size ceiling), so a fabricated payload is refused.
+   */
+  async uploadFakePhoto(token: string): Promise<string> {
+    const res = expectData<{ id: string; url: string }>(
+      await this.world.api('post', '/uploads', { token, body: { base64Content: PNG_1X1_BASE64, filename: 'proof.png' } }),
+      201,
+    );
+    return res.url;
   }
 
   // ---------- ordering ----------

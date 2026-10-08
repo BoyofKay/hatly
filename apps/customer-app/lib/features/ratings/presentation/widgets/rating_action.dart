@@ -144,6 +144,7 @@ class _RatingSheetState extends State<_RatingSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final p = context.palette;
     return Padding(
       padding: EdgeInsets.fromLTRB(
           20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
@@ -170,8 +171,9 @@ class _RatingSheetState extends State<_RatingSheet> {
           ),
           if (_errorMessage != null) ...[
             const SizedBox(height: 8),
-            Text(_errorMessage!,
-                style: const TextStyle(color: Colors.red, fontSize: 13)),
+            // Audit F-D5: fixed `Colors.red` — identical to the old
+            // constant in Light Mode.
+            Text(_errorMessage!, style: TextStyle(color: p.urgent, fontSize: 13)),
           ],
           const SizedBox(height: 16),
           SizedBox(

@@ -34,6 +34,10 @@ class SortMenuButton extends StatelessWidget {
         )
         .$2;
 
+    // Dark Mode fix (audit F-D4): `Colors.grey.shade100`/`HatlyColors.textDark`
+    // were fixed light-mode-only colours. Theme-aware now; identical to the
+    // old constants in Light Mode.
+    final p = context.palette;
     return PopupMenuButton<String?>(
       initialValue: value,
       onSelected: onChanged,
@@ -47,14 +51,13 @@ class SortMenuButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.grey.shade100,
+          color: p.surfaceSoft,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.sort_rounded,
-                size: 16, color: HatlyColors.textDark),
+            Icon(Icons.sort_rounded, size: 16, color: p.textPrimary),
             const SizedBox(width: 6),
             Text(
               selectedLabel,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/hatly_theme.dart';
+import '../../../../shared_widgets/hatly_logo.dart';
 
 /// Shown only while SessionController is restoring (checking secure
 /// storage for a persisted session) — the router keeps the user here
@@ -17,14 +18,7 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'هاتلي',
-              style: TextStyle(
-                color: HatlyColors.surfaceWhite,
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            HatlyLogo(size: 140),
             SizedBox(height: 24),
             CircularProgressIndicator(color: HatlyColors.surfaceWhite),
           ],

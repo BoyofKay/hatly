@@ -18,20 +18,30 @@ class HatlyPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dark Mode fix (audit F-D6): the spinner used to hardcode
+    // `Colors.white`, independent of this button's own dark-mode foreground
+    // (`legacyOnOrange` in hatly_theme.dart, passed straight through as
+    // `ColorScheme.fromSeed(onPrimary: legacyOnOrange, ...)`).
+    // `colorScheme.onPrimary` is exactly that same value, so the spinner
+    // always matches the label colour Flutter itself paints on this
+    // ElevatedButton — identical (white) in Light Mode.
+    final foregroundColor = Theme.of(context).colorScheme.onPrimary;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         onPressed: isLoading ? null : onPressed,
         child: isLoading
-            ? const SizedBox(
+            ? SizedBox(
                 height: 20,
                 width: 20,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2.5, color: Colors.white),
+                    strokeWidth: 2.5, color: foregroundColor),
               )
-            : Text(label,
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            // Polish pass: no longer overrides with a hardcoded 16/w600 style —
+            // inherits the same `ElevatedButtonThemeData.textStyle` (13/w500)
+            // every other primary button (`HatlyButton`) already uses, so the
+            // two shared button widgets render identical label text.
+            : Text(label),
       ),
     );
   }

@@ -14,14 +14,17 @@ Widget hatlyRouterApp({
   Locale locale = const Locale('ar'),
   bool dark = false,
   double textScale = 1.0,
+  GoRouter? router,
 }) {
   HatlyTypography.useGoogleFonts = false;
-  final router = GoRouter(initialLocation: initialLocation, routes: routes);
+  // A test that needs to DRIVE navigation (deep links, Back) builds the router itself and passes it in.
+  final router_ =
+      router ?? GoRouter(initialLocation: initialLocation, routes: routes);
   return ProviderScope(
     overrides: overrides,
     child: MaterialApp.router(
       debugShowCheckedModeBanner: false,
-      routerConfig: router,
+      routerConfig: router_,
       theme: HatlyTheme.light(),
       darkTheme: HatlyTheme.dark(),
       themeMode: dark ? ThemeMode.dark : ThemeMode.light,

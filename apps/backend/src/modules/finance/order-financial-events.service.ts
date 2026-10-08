@@ -51,6 +51,8 @@ export class OrderFinancialEventsService {
         return this.handlePickedUp(order);
       case OrderStatus.DELIVERED:
         return this.handleDelivered(order);
+      case OrderStatus.COLLECTED:
+        return this.handleCollected(order);
       case OrderStatus.CANCELLED:
         return this.handleCancelled(order);
       case OrderStatus.FAILED_DELIVERY:
@@ -71,6 +73,38 @@ export class OrderFinancialEventsService {
    * never earnings, never vendor settlement.
    */
   private async handlePickedUp(order: Order): Promise<void> {
+    const catalogSegments = await this.recognizeVendorCommission(order);
+
+    if (order.paymentMethod === 'MANUAL_TRANSFER' && catalogSegments.length > 0) {
+      const vendorAmountMinor = catalogSegments.reduce((sum, s) => sum + (s.subtotalMinor ?? 0), 0);
+      const delivery = await this.deliveriesRepository.findOne({ where: { orderId: order.id } });
+      if (delivery?.driverId && vendorAmountMinor > 0) {
+        await this.financialEventService.record({
+          type: FinancialEventType.DRIVER_REIMBURSEMENT_OWED,
+          direction: FinancialEventDirection.PAYABLE,
+          idempotencyKey: `manual-transfer-reimbursement:${order.id}`,
+          amountMinor: vendorAmountMinor,
+          orderId: order.id,
+          deliveryId: delivery.id,
+          driverId: delivery.driverId,
+          reason:
+            'Driver paid the vendor(s) from their own money at pickup — Hatly already collected the customer payment via Manual Transfer.',
+        });
+      }
+    }
+  }
+
+  /**
+   * U2 (approved): a PICKUP order leaves the vendor when the customer collects it — vendor commission is recognized then,
+   * exactly as at a delivery order's PICKED_UP (same event, same rate rule, same per-segment idempotency key, so it can
+   * never be booked twice). No driver is involved: no reimbursement, no driver commission.
+   */
+  private async handleCollected(order: Order): Promise<void> {
+    await this.recognizeVendorCommission(order);
+  }
+
+  /** The vendor-commission recognition shared by PICKED_UP (delivery) and COLLECTED (pickup). Returns the segments it covered. */
+  private async recognizeVendorCommission(order: Order): Promise<OrderVendorSegment[]> {
     const segments = await this.segmentsRepository.find({ where: { orderId: order.id } });
     // A segment the vendor cancelled is never fulfilled: no commission is earned on it and the
     // driver never pays that vendor (Group 8 finding — both were booked on cancelled segments).
@@ -99,24 +133,7 @@ export class OrderFinancialEventsService {
         rateSnapshot: { commissionRateBasisPoints: branch.commissionRateBasisPoints },
       });
     }
-
-    if (order.paymentMethod === 'MANUAL_TRANSFER' && catalogSegments.length > 0) {
-      const vendorAmountMinor = catalogSegments.reduce((sum, s) => sum + (s.subtotalMinor ?? 0), 0);
-      const delivery = await this.deliveriesRepository.findOne({ where: { orderId: order.id } });
-      if (delivery?.driverId && vendorAmountMinor > 0) {
-        await this.financialEventService.record({
-          type: FinancialEventType.DRIVER_REIMBURSEMENT_OWED,
-          direction: FinancialEventDirection.PAYABLE,
-          idempotencyKey: `manual-transfer-reimbursement:${order.id}`,
-          amountMinor: vendorAmountMinor,
-          orderId: order.id,
-          deliveryId: delivery.id,
-          driverId: delivery.driverId,
-          reason:
-            'Driver paid the vendor(s) from their own money at pickup — Hatly already collected the customer payment via Manual Transfer.',
-        });
-      }
-    }
+    return catalogSegments;
   }
 
   /** CONFIRMED: driver commission recognized at delivery, on the driver's own delivery-fee earnings, at the driver's own configured rate. */

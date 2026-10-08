@@ -33,4 +33,10 @@ export class CreateSectorDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  /** Part F (Marketplace image/asset readiness): a plain URL reference, same pattern as `Vendor.logoUrl`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  imageUrl?: string;
 }

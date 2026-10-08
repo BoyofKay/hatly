@@ -121,7 +121,7 @@ describe('E2E — authorization / IDOR', () => {
         body: { customerId: customerA.id, deliveryAddress: { line1: 'x', latitude: 30.4, longitude: 31.5 }, paymentMethod: 'COD' },
       });
       expect(order.status).toBe(400);
-      const addr = await world.api('post', '/addresses', { token: customerB.accessToken, body: { line1: 'x', latitude: 30.4, longitude: 31.5, userId: customerA.id } });
+      const addr = await world.api('post', '/addresses', { token: customerB.accessToken, body: { deliveryZoneId: await s.defaultDeliveryZoneId(), line1: 'x', latitude: 30.4, longitude: 31.5, userId: customerA.id } });
       expect(addr.status).toBe(400);
       const convert = await world.api('post', '/customer/loyalty/convert', { token: customerB.accessToken, body: { customerId: customerA.id, points: 1, idempotencyKey: 'k1' } });
       expect(convert.status).toBe(400);
@@ -284,11 +284,15 @@ describe('E2E — authorization / IDOR', () => {
       { permission: Permission.MANAGE_VENDOR_STAFF, method: 'get', path: '/admin/vendor-staff' },
       { permission: Permission.MANAGE_VENDORS, method: 'get', path: '/admin/vendors' },
       { permission: Permission.VIEW_ORDERS, method: 'get', path: `/admin/orders/${NEVER_EXISTS}` },
+      { permission: Permission.VIEW_ORDERS, method: 'get', path: '/admin/orders?search=nonexistent' },
+      { permission: Permission.VIEW_CUSTOMERS, method: 'get', path: '/admin/customers?search=nonexistent' },
+      { permission: Permission.VIEW_CUSTOMERS, method: 'get', path: `/admin/customers/${NEVER_EXISTS}` },
       { permission: Permission.MANAGE_VENDOR_COMMISSION, method: 'patch', path: `/admin/vendor-branches/${NEVER_EXISTS}/commission-rate`, body: { commissionRateBasisPoints: 100 } },
       { permission: Permission.MANAGE_DRIVER_COMMISSION, method: 'patch', path: `/admin/drivers/${NEVER_EXISTS}/commission-rate`, body: { commissionRateBasisPoints: 100 } },
       { permission: Permission.MANAGE_EMPLOYEE_LOANS, method: 'get', path: `/admin/employee-loans/employee/${NEVER_EXISTS}` },
       { permission: Permission.CLOSE_VENDOR_SETTLEMENTS, method: 'post', path: `/admin/settlement/vendor-branches/${NEVER_EXISTS}/close`, body: {} },
       { permission: Permission.CLOSE_DRIVER_SETTLEMENTS, method: 'post', path: `/admin/settlement/drivers/${NEVER_EXISTS}/close`, body: {} },
+      { permission: Permission.OPEN_CLOSE_VENDOR_BRANCHES, method: 'patch', path: `/admin/vendor-branches/${NEVER_EXISTS}/open` },
     ];
     let unprivileged: Actor;
     let onlyOne: Map<Permission, Actor>;
@@ -349,6 +353,25 @@ describe('E2E — authorization / IDOR', () => {
       expect((await world.api('get', '/admin/business-config', { token: admin.accessToken })).status).toBe(403);
     });
 
+    it('M3b (G-08): GET admin/users and GET admin/permissions are SUPER_ADMIN-only, same as grant/revoke — an ADMIN (even holding every listed permission) is refused, unauthenticated is refused, SUPER_ADMIN sees the real roster and the real enum', async () => {
+      const greedyAdmin = await s.admin(PROBES.map((p) => p.permission), 'Every-Permission Admin');
+
+      const usersAsAdmin = await world.api('get', '/admin/users', { token: greedyAdmin.accessToken });
+      const catalogAsAdmin = await world.api('get', '/admin/permissions', { token: greedyAdmin.accessToken });
+      expect([usersAsAdmin.status, catalogAsAdmin.status]).toEqual([403, 403]);
+
+      const usersUnauth = await world.api('get', '/admin/users', {});
+      const catalogUnauth = await world.api('get', '/admin/permissions', {});
+      expect([usersUnauth.status, catalogUnauth.status]).toEqual([401, 401]);
+
+      const usersAsSuperAdmin = expectData<any[]>(await world.api('get', '/admin/users', { token: superAdmin.accessToken }));
+      expect(usersAsSuperAdmin.some((u) => u.id === greedyAdmin.id)).toBe(true);
+      expect(usersAsSuperAdmin.every((u) => u.passwordHash === undefined)).toBe(true);
+
+      const catalogAsSuperAdmin = expectData<string[]>(await world.api('get', '/admin/permissions', { token: superAdmin.accessToken }));
+      expect(catalogAsSuperAdmin).toEqual(expect.arrayContaining(Object.values(Permission)));
+    });
+
     it('a customer, vendor manager and driver are refused on every admin probe', async () => {
       for (const actor of [customerA, vendorA.manager, driverA]) {
         for (const probe of PROBES) {
@@ -369,6 +392,56 @@ describe('E2E — authorization / IDOR', () => {
       const stillWorks = await world.api('get', '/vendor/orders', { token: vendorB.manager.accessToken });
       expect(stillWorks.status).toBe(200); // documented limitation: JwtStrategy.validate() does not consult the database
       expectData(await world.api('patch', `/admin/vendor-staff/${staffRows[0].id}/activate`, { token: superAdmin.accessToken }));
+    });
+  });
+
+  describe('VendorBranch open/close (M1, Launch-Readiness Gap Audit G-01)', () => {
+    it('an admin holding OPEN_CLOSE_VENDOR_BRANCHES can open a closed branch and close it again, over real HTTP', async () => {
+      // Two actors, deliberately: `opener` holds ONLY OPEN_CLOSE_VENDOR_BRANCHES, proving that
+      // permission alone is sufficient for the mutation (GET /admin/vendor-branches/:id itself
+      // requires the separate MANAGE_VENDORS permission, so verification reads use a superAdmin).
+      const opener = await s.admin([Permission.OPEN_CLOSE_VENDOR_BRANCHES], 'Branch Opener');
+      const reader = await s.superAdmin();
+
+      // s.vendor() activates the branch but never opens it — this is the exact real-world
+      // "created, still closed" state the audit found had no write path at all before M1.
+      const before = expectData(await world.api('get', `/admin/vendor-branches/${vendorA.branchId}`, { token: reader.accessToken }));
+      expect(before.isOpen).toBe(false);
+
+      const opened = expectData(
+        await world.api('patch', `/admin/vendor-branches/${vendorA.branchId}/open`, { token: opener.accessToken }),
+      );
+      expect(opened.isOpen).toBe(true);
+      expect(opened.isActive).toBe(true); // untouched by the open action
+
+      // The new state is immediately visible on the existing read path — no second source of truth.
+      const afterOpen = expectData(await world.api('get', `/admin/vendor-branches/${vendorA.branchId}`, { token: reader.accessToken }));
+      expect(afterOpen.isOpen).toBe(true);
+
+      const closed = expectData(
+        await world.api('patch', `/admin/vendor-branches/${vendorA.branchId}/close`, { token: opener.accessToken }),
+      );
+      expect(closed.isOpen).toBe(false);
+
+      const afterClose = expectData(await world.api('get', `/admin/vendor-branches/${vendorA.branchId}`, { token: reader.accessToken }));
+      expect(afterClose.isOpen).toBe(false);
+    });
+
+    it('an admin without OPEN_CLOSE_VENDOR_BRANCHES cannot open or close a branch, and the state is unchanged', async () => {
+      const noPermission = await s.admin([Permission.MANAGE_VENDORS], 'Admin — MANAGE_VENDORS only');
+      const res = await world.api('patch', `/admin/vendor-branches/${vendorA.branchId}/open`, { token: noPermission.accessToken });
+      expect(res.status).toBe(403);
+    });
+
+    it('a vendor manager cannot open or close a branch (admin-only capability)', async () => {
+      const res = await world.api('patch', `/admin/vendor-branches/${vendorA.branchId}/open`, { token: vendorA.manager.accessToken });
+      expect(res.status).toBe(403);
+    });
+
+    it('opening/closing a nonexistent branch is a 404, not a silent success', async () => {
+      const opener = await s.admin([Permission.OPEN_CLOSE_VENDOR_BRANCHES], 'Branch Opener 2');
+      expect((await world.api('patch', `/admin/vendor-branches/${NEVER_EXISTS}/open`, { token: opener.accessToken })).status).toBe(404);
+      expect((await world.api('patch', `/admin/vendor-branches/${NEVER_EXISTS}/close`, { token: opener.accessToken })).status).toBe(404);
     });
   });
 

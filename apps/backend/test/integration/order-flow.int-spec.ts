@@ -76,32 +76,48 @@ describe('Real order flow (OrderCreationService / OrderStateMachineService) on P
 
   const productQuantity = async (id: string): Promise<number> => (await ds.query('SELECT quantity FROM products WHERE id = $1', [id]))[0].quantity;
 
-  it('createOrder: prices with real numbers (not concatenated bigint strings), decrements TRACKED stock with the real SQL, creates the Manual Transfer payment, marks the cart ORDERED', async () => {
+  it('createOrder: prices with real numbers (not concatenated bigint strings), decrements TRACKED stock with the real SQL, marks the cart ORDERED (pickup paid in cash: no payment row)', async () => {
     const creation = app.get(OrderCreationService);
     const customer = await data.user();
     const branch = await data.vendorBranch();
     const product = await trackedProduct(branch, 10, 15_000);
     const cart = await pickupCart(customer.id, branch, product, 2);
-    // Manual Transfer is only offered once an admin has configured where to send the money (PD-006).
-    const config = app.get(BusinessConfigService);
-    await config.set('MANUAL_TRANSFER_DESTINATION', { label: 'Test', phoneOrAccountNumber: '01000000000' }, customer.id);
-    await config.set('CUSTOMER_SERVICE_WHATSAPP_NUMBER', '+201000000000', customer.id);
-    try {
-    const order = await creation.createOrder(customer.id, { deliveryAddress: address, paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: ElectronicPaymentMethod.INSTAPAY } as never);
+    // U2: a pickup order is cash at the counter (COD). The Manual Transfer payment row is proven on real PostgreSQL by the
+    // delivery-order e2e suite (65-checkout-quote); a pickup can no longer use it (next test).
+    const order = await creation.createOrder(customer.id, { deliveryAddress: address, paymentMethod: 'COD' } as never);
     await trackOrderGraph(order.id);
 
     expect(order.subtotalMinor).toBe(30_000); // 15_000 x 2 — a string-typed bigint would have produced garbage
     expect(order.deliveryFeeMinor).toBe(0); // PICKUP: no delivery fee, no map call
     expect(order.totalMinor).toBe(30_000);
     expect(order.status).toBe(OrderStatus.PENDING);
+    expect(order.paymentMethod).toBe('COD');
     expect(order.segments).toHaveLength(1);
     expect(order.segments[0].status).toBe(OrderVendorSegmentStatus.PENDING);
     expect(order.segments[0].items[0].unitPriceMinor).toBe(15_000);
 
     expect(await productQuantity(product.id)).toBe(8);
     expect((await ds.getRepository(Cart).findOneByOrFail({ id: cart.id })).status).toBe(CartStatus.ORDERED);
-    const [payment] = await ds.query('SELECT status, method, amount_minor FROM payments WHERE order_id = $1', [order.id]);
-    expect(payment).toEqual({ status: 'PENDING', method: 'MANUAL_TRANSFER', amount_minor: 30_000 });
+    expect(await ds.query('SELECT id FROM payments WHERE order_id = $1', [order.id])).toEqual([]); // cash: no payment row
+  });
+
+  it('U2: a pickup order cannot be paid by Manual Transfer (PICKUP_CASH_ONLY) — refused before anything is written: no order, stock and cart untouched', async () => {
+    const creation = app.get(OrderCreationService);
+    const customer = await data.user();
+    const branch = await data.vendorBranch();
+    const product = await trackedProduct(branch, 10, 15_000);
+    const cart = await pickupCart(customer.id, branch, product, 2);
+    const config = app.get(BusinessConfigService);
+    await config.set('MANUAL_TRANSFER_DESTINATION', { label: 'Test', phoneOrAccountNumber: '01000000000' }, customer.id);
+    await config.set('CUSTOMER_SERVICE_WHATSAPP_NUMBER', '+201000000000', customer.id);
+    try {
+      const refused = await creation
+        .createOrder(customer.id, { deliveryAddress: address, paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: ElectronicPaymentMethod.INSTAPAY } as never)
+        .catch((e) => e);
+      expect(refused.getResponse().details.code).toBe('PICKUP_CASH_ONLY');
+      expect((await ds.query('SELECT count(*)::int AS n FROM orders WHERE customer_id = $1', [customer.id]))[0].n).toBe(0);
+      expect(await productQuantity(product.id)).toBe(10);
+      expect((await ds.getRepository(Cart).findOneByOrFail({ id: cart.id })).status).toBe(CartStatus.ACTIVE);
     } finally {
       await ds.query("DELETE FROM business_config WHERE key IN ('MANUAL_TRANSFER_DESTINATION', 'CUSTOMER_SERVICE_WHATSAPP_NUMBER')");
     }

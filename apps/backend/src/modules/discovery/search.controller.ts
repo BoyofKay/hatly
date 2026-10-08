@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { SearchService } from './search.service';
 import { SearchQueryDto } from './dto/search-query.dto';
+import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
 
 /**
  * Customer Search. Public — CONFIRMED, matches the existing
@@ -17,6 +18,7 @@ export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
   @Public()
+  @Throttled(RateLimitPolicies.search)
   @Get()
   async search(@Query() query: SearchQueryDto) {
     const result = await this.searchService.search({

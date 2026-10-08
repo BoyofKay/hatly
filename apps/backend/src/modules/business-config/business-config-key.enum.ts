@@ -57,20 +57,37 @@ export enum BusinessConfigKey {
   REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR = 'REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR',
 
   /**
-   * PHASE 3 HATLY-SERVICE-LOCATION addition. Both deliberately NOT
-   * seeded with any value — the real office coordinates were never
-   * supplied and must not be invented. Value shape:
-   * `{ latitude, longitude, label }`.
+   * PHASE 3 HATLY-SERVICE-LOCATION addition. Deliberately NOT seeded
+   * with any value — the real office coordinates were never supplied
+   * and must not be invented. Value shape: `{ latitude, longitude,
+   * label }`.
    *
-   * PICKUP_LOCATION: used for a BUY_FROM_PLACE ("هاتلي من مكان") group
-   * when the customer hasn't supplied their own pickup coordinate.
-   *
-   * DESTINATION_LOCATION: used for a DELIVER_TO_PLACE ("وصلي لمكان")
-   * group when the customer hasn't supplied their own destination
-   * coordinate. These are two SEPARATE, independently configured
-   * points — not the same location reused for both roles (confirmed).
+   * NO LONGER READ ANYWHERE as a Hatly Service fallback (same status as
+   * HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION below). It used to supply the
+   * pickup of a BUY_FROM_PLACE ("هاتلي من مكان") group when the customer
+   * had not chosen the place's location — which sent the courier to
+   * Hatly's own office to "buy from a place". A BUY_FROM_PLACE request with
+   * no customer-chosen pickup now fails checkout validation instead
+   * (`BUY_FROM_PLACE_PICKUP_REQUIRED`). Kept only so a row an Admin may
+   * already have set is not orphaned. Hatly's own location stays available
+   * for genuine Hatly operational purposes, never as a stand-in for a
+   * customer-supplied place or address.
    */
   HATLY_SERVICE_DEFAULT_PICKUP_LOCATION = 'HATLY_SERVICE_DEFAULT_PICKUP_LOCATION',
+
+  /**
+   * Launch-Readiness Gap Audit fix (Hatly Service location semantics).
+   * NO LONGER READ ANYWHERE — kept only so any row an Admin may already
+   * have set for it in a live database is not orphaned/unexplained.
+   * Originally documented (before this fix) as a fallback DESTINATION
+   * for a DELIVER_TO_PLACE ("وصلي لمكان") group with no customer-
+   * supplied destination — that was the actual bug: silently routing a
+   * customer's DELIVERY to Hatly's own office address misrepresents
+   * where their item actually goes, unlike the pickup-side fallback
+   * above (which never misrepresents a delivery destination). A
+   * DELIVER_TO_PLACE request with no destination now fails checkout
+   * validation instead (`DELIVER_TO_PLACE_DESTINATION_REQUIRED`).
+   */
   HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION = 'HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION',
 
   /**
@@ -118,6 +135,19 @@ export enum BusinessConfigKey {
    * permission (confirmed reuse — no new permission for this).
    */
   HATLY_SERVICE_DISTANCE_MULTIPLIER = 'HATLY_SERVICE_DISTANCE_MULTIPLIER',
+
+  /**
+   * PD-009 (supersedes HATLY_SERVICE_DISTANCE_MULTIPLIER for pricing — that key is no longer read by any pricing path and is
+   * kept only so historical config rows stay meaningful). APPROVED rule:
+   *
+   *   Hatly Service delivery fee = the address's ACTIVE Delivery Zone fee × this multiplier
+   *
+   * Zone-based only (PD-009 amended): coordinates never take part in the price. A positive decimal factor (e.g. 1.5), validated
+   * on write. Its approved default (1.5) is
+   * seeded as DATA by migration 1700005100000 — never a constant in code; an unset key fails closed. Every Hatly Service order
+   * freezes the value it used (`multiplierUsed` in its delivery breakdown).
+   */
+  HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER = 'HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER',
 
   /**
    * PHASE F addition. CONFIRMED: settlement frequency (WEEKLY or

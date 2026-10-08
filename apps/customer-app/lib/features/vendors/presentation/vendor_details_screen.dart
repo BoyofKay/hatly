@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/localization/l10n/app_localizations.dart';
 import '../../../core/theme/hatly_theme.dart';
+import '../../../shared_widgets/filter_action_button.dart';
+import '../../../shared_widgets/hatly_loading_view.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/hatly_image.dart';
 import '../../../shared_widgets/availability_badge.dart';
@@ -11,6 +13,8 @@ import '../../../shared_widgets/ltr_text.dart';
 import '../../../shared_widgets/sort_menu_button.dart';
 import '../../products/data/product_providers.dart';
 import '../../products/domain/product_category.dart';
+import '../../products/domain/product_filters.dart';
+import '../../products/presentation/widgets/product_filter_sheet.dart';
 import '../../products/presentation/widgets/product_list_tile.dart';
 import '../../products/presentation/widgets/product_list_tile_skeleton.dart';
 import '../data/vendor_providers.dart';
@@ -40,6 +44,9 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen> {
   String? _selectedCategoryId;
   String? _sortOption;
   String _searchQuery = '';
+  // Filters V1. The committed/active filter state — the filter sheet
+  // only ever replaces this wholesale, on Apply.
+  ProductFilters _filters = ProductFilters.empty;
 
   @override
   Widget build(BuildContext context) {
@@ -47,8 +54,12 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen> {
     final detailsAsync = ref.watch(vendorDetailsProvider(widget.vendorId));
 
     return detailsAsync.when(
-      loading: () =>
-          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      // Polish pass: the loading state was missing its AppBar (no back
+      // button — a real navigation regression on a screen reached via
+      // `context.push`, since the AppBar only appeared once loading
+      // finished into the error branch) and used a raw
+      // `CircularProgressIndicator` instead of the shared `HatlyLoadingView`.
+      loading: () => Scaffold(appBar: AppBar(), body: const HatlyLoadingView()),
       error: (error, stackTrace) => Scaffold(
         appBar: AppBar(),
         body: HatlyStateView(
@@ -68,6 +79,8 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen> {
           onSortChanged: (sort) => setState(() => _sortOption = sort),
           searchQuery: _searchQuery,
           onSearchChanged: (query) => setState(() => _searchQuery = query),
+          filters: _filters,
+          onFiltersChanged: (filters) => setState(() => _filters = filters),
         ),
       ),
     );
@@ -83,6 +96,8 @@ class _VendorDetailsContent extends ConsumerWidget {
     required this.onSortChanged,
     required this.searchQuery,
     required this.onSearchChanged,
+    required this.filters,
+    required this.onFiltersChanged,
   });
 
   final VendorDetails details;
@@ -92,6 +107,8 @@ class _VendorDetailsContent extends ConsumerWidget {
   final ValueChanged<String?> onSortChanged;
   final String searchQuery;
   final ValueChanged<String> onSearchChanged;
+  final ProductFilters filters;
+  final ValueChanged<ProductFilters> onFiltersChanged;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -110,8 +127,24 @@ class _VendorDetailsContent extends ConsumerWidget {
       search: searchQuery.isEmpty ? null : searchQuery,
       page: null,
       limit: null,
+      availableOnly: filters.availableOnly,
+      hasOffers: filters.hasOffers,
+      minPriceMinor: filters.minPriceMinor,
+      maxPriceMinor: filters.maxPriceMinor,
     );
     final productsAsync = ref.watch(productListProvider(productListParams));
+
+    // Filters V1: real bounds derived from the vendor's own currently-loaded (unfiltered-by-price)
+    // product list — never a hardcoded/arbitrary business limit, never a second network call.
+    final loadedPrices =
+        productsAsync.valueOrNull?.map((p) => p.priceMinor).toList() ??
+            const <int>[];
+    final minAvailablePriceMinor = loadedPrices.isEmpty
+        ? null
+        : loadedPrices.reduce((a, b) => a < b ? a : b);
+    final maxAvailablePriceMinor = loadedPrices.isEmpty
+        ? null
+        : loadedPrices.reduce((a, b) => a > b ? a : b);
 
     return CustomScrollView(
       slivers: [
@@ -147,6 +180,10 @@ class _VendorDetailsContent extends ConsumerWidget {
             onSearchChanged: onSearchChanged,
             sortOption: sortOption,
             onSortChanged: onSortChanged,
+            filters: filters,
+            onFiltersChanged: onFiltersChanged,
+            minAvailablePriceMinor: minAvailablePriceMinor,
+            maxAvailablePriceMinor: maxAvailablePriceMinor,
           ),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 8)),
@@ -225,6 +262,7 @@ class _VendorHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final p = context.palette;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -252,10 +290,13 @@ class _VendorHeader extends StatelessWidget {
                     ),
                     child: Text(
                       l10n.promotionBadge,
+                      // Polish pass: was hardcoded white-on-orange (2.6:1,
+                      // fails accessibility) — `p.accentOn` is the correct
+                      // dark ink (7:1) for a new badge like this.
                       style: Theme.of(context)
                           .textTheme
                           .labelLarge
-                          ?.copyWith(color: HatlyColors.surfaceWhite),
+                          ?.copyWith(color: p.accentOn),
                     ),
                   ),
                   const SizedBox(height: HatlySpacing.xs),
@@ -281,22 +322,26 @@ class _BranchInfoSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final p = context.palette;
     final todayHours = branch.openingHours[_todayKey()];
 
     return Container(
       margin: const EdgeInsets.fromLTRB(
           HatlySpacing.md, HatlySpacing.md, HatlySpacing.md, 0),
       padding: const EdgeInsets.all(HatlySpacing.ms),
+      // Polish pass: was `HatlyColors.background`/`HatlyColors.textMuted`
+      // (fixed light-mode constants) — this container stayed a bright
+      // off-white box on a dark screen in Dark Mode. `p.surfaceSoft`/
+      // `p.textMuted` are the theme-aware equivalents.
       decoration: BoxDecoration(
-          color: HatlyColors.background,
+          color: p.surfaceSoft,
           borderRadius: BorderRadius.circular(HatlyRadius.card)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.location_on_outlined,
-                  size: 18, color: HatlyColors.textMuted),
+              Icon(Icons.location_on_outlined, size: 18, color: p.textMuted),
               const SizedBox(width: HatlySpacing.sm),
               Expanded(
                   child: Text(branch.address,
@@ -343,16 +388,27 @@ class _ProductSearchAndSortBar extends StatelessWidget {
     required this.onSearchChanged,
     required this.sortOption,
     required this.onSortChanged,
+    required this.filters,
+    required this.onFiltersChanged,
+    required this.minAvailablePriceMinor,
+    required this.maxAvailablePriceMinor,
   });
 
   final String searchQuery;
   final ValueChanged<String> onSearchChanged;
   final String? sortOption;
   final ValueChanged<String?> onSortChanged;
+  final ProductFilters filters;
+  final ValueChanged<ProductFilters> onFiltersChanged;
+  final int? minAvailablePriceMinor;
+  final int? maxAvailablePriceMinor;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // Dark Mode fix (audit F-D3): fixed `Colors.grey.shade100` search fill —
+    // identical to the old constant in Light Mode.
+    final p = context.palette;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -367,13 +423,31 @@ class _ProductSearchAndSortBar extends StatelessWidget {
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(vertical: 10),
                 filled: true,
-                fillColor: Colors.grey.shade100,
+                fillColor: p.surfaceSoft,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
                   borderSide: BorderSide.none,
                 ),
               ),
             ),
+          ),
+          const SizedBox(width: 8),
+          FilterActionButton(
+            key: const Key('product-filter-action'),
+            label: l10n.filterAction,
+            activeCount: filters.activeCount,
+            onTap: () async {
+              final result = await showModalBottomSheet<ProductFilters>(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => ProductFilterSheet(
+                  initialFilters: filters,
+                  minAvailablePriceMinor: minAvailablePriceMinor,
+                  maxAvailablePriceMinor: maxAvailablePriceMinor,
+                ),
+              );
+              if (result != null) onFiltersChanged(result);
+            },
           ),
           const SizedBox(width: 8),
           SortMenuButton(
@@ -386,6 +460,7 @@ class _ProductSearchAndSortBar extends StatelessWidget {
               ('bestSelling', l10n.sortBestSelling),
               ('price_asc', l10n.sortPriceLowToHigh),
               ('price_desc', l10n.sortPriceHighToLow),
+              ('offers', l10n.sortOffers),
             ],
           ),
         ],
@@ -450,6 +525,13 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dark Mode fix (audit F-D3): fixed `Colors.grey.shade100`/`textDark` —
+    // identical to the old constants in Light Mode.
+    // Polish pass: the selected state used to stay hardcoded white-on-orange
+    // (2.6:1 contrast) — now `p.accentOn` (7:1), matching this chip's own two
+    // "deliberately identical" twins (`_SubcategoryChip`, `_RatingChip`),
+    // which were fixed the same way.
+    final p = context.palette;
     return ChoiceChip(
       label: Text(label),
       selected: selected,
@@ -458,9 +540,9 @@ class _CategoryChip extends StatelessWidget {
       labelStyle: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: selected ? Colors.white : HatlyColors.textDark,
+        color: selected ? p.accentOn : p.textPrimary,
       ),
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: p.surfaceSoft,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20), side: BorderSide.none),
     );

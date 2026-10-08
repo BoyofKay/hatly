@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
@@ -28,6 +28,7 @@ import { LoyaltyService } from '../loyalty/loyalty.service';
 import { RequestContextService } from '../../common/request-context/request-context.service';
 import { logBusinessEvent } from '../../common/logging/log-business-event';
 import { BusinessEvent } from '../../common/logging/business-events';
+import { FulfillmentType } from '../cart/fulfillment-type.enum';
 
 /**
  * The order state machine.
@@ -94,6 +95,10 @@ const TRANSITIONS: TransitionRule[] = [
   // transition directly below is untouched (dispatch/assignment
   // authority is a separate concern from cancellation authority).
   { from: OrderStatus.READY_FOR_PICKUP, to: OrderStatus.CANCELLED, allowedRoles: [Role.VENDOR, Role.VENDOR_MANAGER, Role.ADMIN] },
+  // U2 (approved): the customer collected a PICKUP order at the branch — confirmed by that branch's vendor staff, an
+  // Admin (MANAGE_ORDER_ISSUES) as support fallback; the same actors who may cancel it here. Terminal, like DELIVERED.
+  // Only for a PICKUP order (enforced in applyTransition, under the order lock).
+  { from: OrderStatus.READY_FOR_PICKUP, to: OrderStatus.COLLECTED, allowedRoles: [Role.VENDOR, Role.VENDOR_MANAGER, Role.ADMIN] },
 
   { from: OrderStatus.ASSIGNED_TO_DRIVER, to: OrderStatus.PICKED_UP, allowedRoles: [Role.DRIVER] },
   { from: OrderStatus.ASSIGNED_TO_DRIVER, to: OrderStatus.READY_FOR_PICKUP, allowedRoles: [Role.DRIVER, Role.ADMIN] }, // driver rejects / reassignment
@@ -160,6 +165,13 @@ export type OrderTransitionParams = {
      * as `null` when omitted, never validated/required here.
      */
     failureReason?: string;
+    /**
+     * Operational Completion milestone — set when a DRIVER acts on an order as the driver of its delivery. Ownership was
+     * checked before the transaction, but an admin reassignment could commit in between (the driver would then move an
+     * order that is no longer theirs — reproduced: a PICKED_UP order whose delivery names ANOTHER driver). Re-checked here,
+     * under the order lock and then the delivery row lock (Order → Delivery, the established lock order).
+     */
+    actingDriverId?: string;
   };
 
 @Injectable()
@@ -225,6 +237,14 @@ export class OrderStateMachineService {
       throw new NotFoundException('Order not found.');
     }
 
+    if (params.actingDriverId !== undefined) {
+      const delivery = await manager.findOne(Delivery, { where: { orderId: order.id }, lock: { mode: 'pessimistic_write' } });
+      if (!delivery || delivery.driverId !== params.actingDriverId) {
+        // Same answer as the driver ownership checks (DriverAuthorizationService): this is not (any longer) their delivery.
+        throw new NotFoundException('Delivery not found.');
+      }
+    }
+
     const rule = TRANSITIONS.find(
       (t) => t.from === order.status && t.to === params.to,
     );
@@ -247,6 +267,21 @@ export class OrderStateMachineService {
       );
     }
 
+    // Fulfilment guards (U2), under the order lock so no endpoint can bypass them: a PICKUP order is collected by its customer
+    // and is never handed to a driver (PD-006.C); only a PICKUP order can be COLLECTED (a delivery order ends DELIVERED).
+    if (params.to === OrderStatus.ASSIGNED_TO_DRIVER && order.fulfillmentType === FulfillmentType.PICKUP) {
+      throw new ConflictException({
+        message: 'A pickup order is collected by the customer at the branch — it is never assigned to a driver.',
+        details: { code: 'PICKUP_ORDER_NOT_DISPATCHABLE' },
+      });
+    }
+    if (params.to === OrderStatus.COLLECTED && order.fulfillmentType !== FulfillmentType.PICKUP) {
+      throw new ConflictException({
+        message: 'Only a pickup order can be marked collected — a delivery order is completed by its driver.',
+        details: { code: 'NOT_A_PICKUP_ORDER' },
+      });
+    }
+
     // PAYMENT GATING (PD-006): a MANUAL_TRANSFER order cannot be prepared or dispatched before its payment is approved. Enforced
     // here, under the order lock, so no client (app, vendor, admin, dispatch) can bypass it.
     if (params.to === OrderStatus.PREPARING || params.to === OrderStatus.ASSIGNED_TO_DRIVER) {
@@ -260,7 +295,8 @@ export class OrderStateMachineService {
     // Only WEIGHT items are checked — a PIECE item (pricingUnitSnapshot
     // null or PIECE) is never blocked. Non-cancelled segments only —
     // a cancelled segment's items were never going to be picked up.
-    if (params.to === OrderStatus.PICKED_UP) {
+    // U2: a pickup order leaves the vendor at COLLECTED — the same "finally picked up" moment, so the same gate applies.
+    if (params.to === OrderStatus.PICKED_UP || params.to === OrderStatus.COLLECTED) {
       const segments = await manager.find(OrderVendorSegment, { where: { orderId: order.id } });
       const activeSegmentIds = segments
         .filter((s) => s.status !== OrderVendorSegmentStatus.CANCELLED)
@@ -277,8 +313,9 @@ export class OrderStateMachineService {
         );
         if (missingWeight) {
           throw new BadRequestException({
-            message:
-              'All weighed items must have their actual weight recorded before the order can be marked picked up.',
+            message: `All weighed items must have their actual weight recorded before the order can be marked ${
+              params.to === OrderStatus.COLLECTED ? 'collected' : 'picked up'
+            }.`,
             details: { code: 'WEIGHT_NOT_RECORDED' },
           });
         }
@@ -403,7 +440,8 @@ export class OrderStateMachineService {
     // LoyaltyService.awardOrderEarning's own comment for the full
     // eligible-spending calculation and duplicate-earning
     // protection.
-    if (params.to === OrderStatus.DELIVERED) {
+    // U2 (approved): a collected pickup order earns exactly like a delivered one.
+    if (params.to === OrderStatus.DELIVERED || params.to === OrderStatus.COLLECTED) {
       await this.loyaltyService.awardOrderEarning(manager, order.id);
     }
 
@@ -509,7 +547,8 @@ export class OrderStateMachineService {
     // update must never block or roll back the driver's actual
     // DELIVERED action. See BestSellingCacheService's own comment for
     // why this is guaranteed to run at most once per order.
-    if (params.to === OrderStatus.DELIVERED) {
+    // U2 (approved): a collected pickup order is a completed sale too.
+    if (params.to === OrderStatus.DELIVERED || params.to === OrderStatus.COLLECTED) {
       try {
         await this.bestSellingCacheService.recordDeliveredSales(updatedOrder.id);
       } catch (error) {
@@ -561,6 +600,9 @@ export class OrderStateMachineService {
             updatedOrder.customerId,
             updatedOrder.id,
           );
+          break;
+        case OrderStatus.COLLECTED: // U2 (approved)
+          await this.pushNotificationService.sendOrderCollectedNotification(updatedOrder.customerId, updatedOrder.id);
           break;
         default:
           break;

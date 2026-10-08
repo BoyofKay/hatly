@@ -1,22 +1,17 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { AdminDispatchService } from './admin-dispatch.service';
+import { OrderNotAssignableException } from './delivery-assignment.service';
 
 function buildHarness(opts: {
-  order?: any;
-  delivery?: any;
-  previousDriver?: any;
+  status?: string;
+  fulfillmentType?: string;
   rankedCandidateIds?: string[];
   eligibleDriverIds?: string[];
 }) {
-  const ordersRepository = { findOne: jest.fn(async () => opts.order ?? { id: 'order-1', segments: [] }) };
-  const deliveriesRepository = {
-    findOne: jest.fn(async () => opts.delivery ?? null),
-    save: jest.fn(async (d: any) => d),
+  const ordersRepository = {
+    findOne: jest.fn(async () => ({ id: 'order-1', status: opts.status ?? 'READY_FOR_PICKUP', fulfillmentType: opts.fulfillmentType ?? 'DELIVERY', segments: [] })),
   };
-  const driversRepository = {
-    findOne: jest.fn(async () => opts.previousDriver ?? null),
-    save: jest.fn(async (d: any) => d),
-  };
+  const deliveriesRepository = { findOne: jest.fn(), save: jest.fn() };
   const driverRankingService = {
     rankCandidates: jest.fn(async () => opts.rankedCandidateIds ?? []),
     isDriverEligibleForOrder: jest.fn(async (_order: any, driverId: string) =>
@@ -25,18 +20,16 @@ function buildHarness(opts: {
   };
   const deliveryAssignmentService = {
     assignDriver: jest.fn(async (params: any) => ({ id: 'delivery-1', ...params })),
+    reassignDriver: jest.fn(async (params: any) => ({ id: 'delivery-1', ...params })),
   };
-  const orderStateMachine = { transition: jest.fn(async () => ({ id: 'order-1' })) };
 
   const service = new AdminDispatchService(
     ordersRepository as any,
     deliveriesRepository as any,
-    driversRepository as any,
     driverRankingService as any,
     deliveryAssignmentService as any,
-    orderStateMachine as any,
   );
-  return { service, driverRankingService, deliveryAssignmentService, orderStateMachine, driversRepository };
+  return { service, driverRankingService, deliveryAssignmentService, deliveriesRepository };
 }
 
 describe('AdminDispatchService', () => {
@@ -84,39 +77,55 @@ describe('AdminDispatchService', () => {
     });
   });
 
-  it('reassign() releases the previous driver, moves the order back to READY_FOR_PICKUP, then assigns the new one', async () => {
-    const { service, driversRepository, orderStateMachine, deliveryAssignmentService } = buildHarness({
-      delivery: { id: 'delivery-1', orderId: 'order-1', driverId: 'old-driver', reassignmentCount: 0 },
-      previousDriver: { id: 'old-driver', isAvailable: false },
-      eligibleDriverIds: ['new-driver'],
-    });
+  it('reassign() validates everything first, then hands the release + new assignment to the ONE atomic primitive', async () => {
+    const { service, deliveryAssignmentService, deliveriesRepository } = buildHarness({ status: 'ASSIGNED_TO_DRIVER', eligibleDriverIds: ['new-driver'] });
 
-    await service.reassign('order-1', 'new-driver', false);
+    await service.reassign('order-1', 'new-driver', false, 'old-driver');
 
-    expect(driversRepository.save).toHaveBeenCalledWith(expect.objectContaining({ isAvailable: true }));
-    expect(orderStateMachine.transition).toHaveBeenCalledWith(
-      expect.objectContaining({ orderId: 'order-1', to: 'READY_FOR_PICKUP' }),
-    );
-    expect(deliveryAssignmentService.assignDriver).toHaveBeenCalledWith({
-      orderId: 'order-1',
-      candidateDriverIds: ['new-driver'],
-    });
-  });
-
-  it('reassign() throws NotFoundException when no existing delivery exists for the order', async () => {
-    const { service } = buildHarness({ delivery: null });
-    await expect(service.reassign('order-1', 'new-driver')).rejects.toThrow(NotFoundException);
-  });
-
-  it('reassign() also enforces OVERRIDE_DISPATCH for the new driver, same as assign()', async () => {
-    const { service, deliveryAssignmentService } = buildHarness({
-      delivery: { id: 'delivery-1', orderId: 'order-1', driverId: 'old-driver', reassignmentCount: 0 },
-      previousDriver: { id: 'old-driver', isAvailable: false },
-      eligibleDriverIds: [],
-    });
-
-    await expect(service.reassign('order-1', 'ineligible-driver', false)).rejects.toThrow(BadRequestException);
+    expect(deliveryAssignmentService.reassignDriver).toHaveBeenCalledWith({ orderId: 'order-1', newDriverId: 'new-driver', expectedCurrentDriverId: 'old-driver' });
     expect(deliveryAssignmentService.assignDriver).not.toHaveBeenCalled();
+    // nothing is mutated here any more (the old non-atomic free → bump → release sequence is gone)
+    expect(deliveriesRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('reassign() also enforces OVERRIDE_DISPATCH for the new driver — and refuses BEFORE anything changes', async () => {
+    const { service, deliveryAssignmentService } = buildHarness({ status: 'ASSIGNED_TO_DRIVER', eligibleDriverIds: [] });
+    await expect(service.reassign('order-1', 'ineligible-driver', false)).rejects.toThrow(BadRequestException);
+    expect(deliveryAssignmentService.reassignDriver).not.toHaveBeenCalled();
+  });
+
+  it.each(['READY_FOR_PICKUP', 'PICKED_UP', 'ON_THE_WAY', 'DELIVERED', 'CANCELLED'])(
+    'reassign() of an order that is %s is refused (ORDER_NOT_REASSIGNABLE) without touching any driver',
+    async (status) => {
+      const { service, deliveryAssignmentService } = buildHarness({ status, eligibleDriverIds: ['new-driver'] });
+      const error = await service.reassign('order-1', 'new-driver', true).catch((e) => e);
+      expect(error).toBeInstanceOf(OrderNotAssignableException);
+      expect(error.getResponse().details).toMatchObject({ code: 'ORDER_NOT_REASSIGNABLE', currentStatus: status });
+      expect(deliveryAssignmentService.reassignDriver).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['PENDING', 'PREPARING', 'ASSIGNED_TO_DRIVER', 'PICKED_UP', 'CANCELLED'])(
+    'assign() of an order that is %s is refused (ORDER_NOT_ASSIGNABLE) — never overwrites an existing assignment',
+    async (status) => {
+      const { service, deliveryAssignmentService } = buildHarness({ status, eligibleDriverIds: ['d'] });
+      const error = await service.assign('order-1', 'd', true).catch((e) => e);
+      expect(error).toBeInstanceOf(OrderNotAssignableException);
+      expect(error.getResponse().details.code).toBe('ORDER_NOT_ASSIGNABLE');
+      expect(deliveryAssignmentService.assignDriver).not.toHaveBeenCalled();
+    },
+  );
+
+  it('a PICKUP order cannot be assigned to a driver (the customer collects it)', async () => {
+    const { service, deliveryAssignmentService } = buildHarness({ fulfillmentType: 'PICKUP', eligibleDriverIds: ['d'] });
+    await expect(service.assign('order-1', 'd', true)).rejects.toBeInstanceOf(OrderNotAssignableException);
+    expect(deliveryAssignmentService.assignDriver).not.toHaveBeenCalled();
+  });
+
+  it('an unknown order is a 404, not a crash', async () => {
+    const { service } = buildHarness({});
+    (service as any).ordersRepository.findOne.mockResolvedValueOnce(null);
+    await expect(service.assign('missing', 'd', true)).rejects.toThrow(NotFoundException);
   });
 });
 
@@ -126,18 +135,14 @@ describe('AdminDispatchService.listDispatchable (Phase I-A, Chunk 6)', () => {
     const deliveries = opts.deliveries ?? [];
     const ordersRepository = { find: jest.fn(async () => orders) };
     const deliveriesRepository = { find: jest.fn(async () => deliveries) };
-    const driversRepository = {};
     const driverRankingService = {};
     const deliveryAssignmentService = {};
-    const orderStateMachine = {};
 
     const service = new AdminDispatchService(
       ordersRepository as any,
       deliveriesRepository as any,
-      driversRepository as any,
       driverRankingService as any,
       deliveryAssignmentService as any,
-      orderStateMachine as any,
     );
     return { service };
   }

@@ -13,6 +13,7 @@ import {
   deactivateOffer,
   listOffers,
 } from '../../../lib/api/admin-offers';
+import { apiErrorMessage } from '../../../lib/api/errors';
 
 /**
  * Admin Offers Management UI. Reuses the existing Admin catalog/branch
@@ -54,7 +55,7 @@ export default function AdminOffersPage() {
   useEffect(() => {
     listVendorBranches()
       .then(setBranches)
-      .catch((err) => setListError(err?.response?.data?.message ?? 'Failed to load branches.'));
+      .catch((err) => setListError(apiErrorMessage(err, 'Failed to load branches.')));
   }, []);
 
   useEffect(() => {
@@ -74,7 +75,7 @@ export default function AdminOffersPage() {
       setProducts(productsData);
       setCategories(categoriesData);
     } catch (err: any) {
-      setListError(err?.response?.data?.message ?? 'Failed to load offers.');
+      setListError(apiErrorMessage(err, 'Failed to load offers.'));
     }
   }
 
@@ -130,7 +131,7 @@ export default function AdminOffersPage() {
     } catch (err: any) {
       // Mutual-exclusion and other structured backend errors surface
       // their real message directly — never a generic/raw stack trace.
-      setCreateError(err?.response?.data?.message ?? 'Failed to create offer.');
+      setCreateError(apiErrorMessage(err, 'Failed to create offer.'));
     } finally {
       setIsCreating(false);
     }
@@ -142,7 +143,7 @@ export default function AdminOffersPage() {
       offer.isActive ? await deactivateOffer(offer.id) : await activateOffer(offer.id);
       await refresh(selectedBranchId);
     } catch (err: any) {
-      setActionErrorById((prev) => ({ ...prev, [offer.id]: err?.response?.data?.message ?? 'Failed to update offer.' }));
+      setActionErrorById((prev) => ({ ...prev, [offer.id]: apiErrorMessage(err, 'Failed to update offer.' )}));
     }
   }
 

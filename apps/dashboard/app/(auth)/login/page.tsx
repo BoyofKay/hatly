@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginWithPassword } from '../../../lib/auth/session';
+import { apiErrorMessage } from '../../../lib/api/errors';
 
 /**
  * PHASE I-B, CHUNK 9: real Dashboard login — phone + password only,
@@ -34,7 +35,14 @@ export default function LoginPage() {
         setIsSubmitting(false);
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Invalid phone number or password.');
+      // 401 = wrong phone/password (the backend's own "Invalid credentials." stays deliberately vague). Anything else — the
+      // login rate limit / account lock (429), a validation error, an outage — shows its own reason: it used to read the
+      // non-existent `response.data.message` and so told a throttled user their (correct) password was wrong.
+      setError(
+        err?.response?.status === 401
+          ? 'Invalid phone number or password.'
+          : apiErrorMessage(err, 'Could not sign in. Please try again.'),
+      );
       setIsSubmitting(false);
     }
   }

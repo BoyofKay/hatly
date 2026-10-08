@@ -87,4 +87,16 @@ describe('LoggingInterceptor', () => {
     expect(logged.statusCode).toBe(500);
     logSpy.mockRestore();
   });
+
+  it('M5 Batch 1: logs the path only, never the query string (phone numbers, coordinates, search terms)', async () => {
+    const { interceptor } = buildInterceptor('corr-q');
+    const logSpy = jest.spyOn((interceptor as any).logger, 'log').mockImplementation(() => undefined);
+    const { context } = buildContext({ originalUrl: '/vendors?lat=30.1&lng=31.2&phone=%2B201000000000' });
+
+    await lastValueFrom(interceptor.intercept(context, { handle: () => of('ok') }));
+
+    const line = String(logSpy.mock.calls[0][0]);
+    expect(line).toContain('"path":"/vendors"');
+    expect(line).not.toMatch(/lat=|phone|201000000000/);
+  });
 });

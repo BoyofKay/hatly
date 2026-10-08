@@ -65,9 +65,17 @@ Map<String, dynamic> orderDetailsJson({
           'delayed': false,
         },
     'timeline': [
-      {'status': 'PENDING', 'at': '2026-09-01T12:00:00.000Z', 'actorRole': 'CUSTOMER'},
+      {
+        'status': 'PENDING',
+        'at': '2026-09-01T12:00:00.000Z',
+        'actorRole': 'CUSTOMER'
+      },
       if (status != 'PENDING')
-        {'status': status, 'at': '2026-09-01T12:10:00.000Z', 'actorRole': 'VENDOR'},
+        {
+          'status': status,
+          'at': '2026-09-01T12:10:00.000Z',
+          'actorRole': 'VENDOR'
+        },
     ],
     'customerCanCancel': canCancel,
     'payment': {
@@ -186,9 +194,21 @@ Map<String, dynamic> trackingJson({
         'delayed': false,
       },
       'timeline': [
-        {'status': 'PENDING', 'at': '2026-09-01T12:00:00.000Z', 'actorRole': 'CUSTOMER'},
-        {'status': 'CONFIRMED', 'at': '2026-09-01T12:05:00.000Z', 'actorRole': 'VENDOR'},
-        {'status': 'PREPARING', 'at': '2026-09-01T12:10:00.000Z', 'actorRole': 'VENDOR'},
+        {
+          'status': 'PENDING',
+          'at': '2026-09-01T12:00:00.000Z',
+          'actorRole': 'CUSTOMER'
+        },
+        {
+          'status': 'CONFIRMED',
+          'at': '2026-09-01T12:05:00.000Z',
+          'actorRole': 'VENDOR'
+        },
+        {
+          'status': 'PREPARING',
+          'at': '2026-09-01T12:10:00.000Z',
+          'actorRole': 'VENDOR'
+        },
       ],
       'segments': [
         {

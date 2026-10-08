@@ -33,7 +33,8 @@ export class LoggingInterceptor implements NestInterceptor {
     const response = context.switchToHttp().getResponse();
     const correlationId = this.requestContextService.getCorrelationId();
     const method = request.method;
-    const path = request.originalUrl ?? request.url;
+    // Path only: the query string can carry search terms, phone numbers or coordinates — never logged.
+    const path = String(request.originalUrl ?? request.url ?? '').split('?')[0];
 
     const start = Date.now();
 

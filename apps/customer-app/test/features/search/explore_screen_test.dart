@@ -194,7 +194,6 @@ Widget _app({
                       child: const Text('open-search'))))),
       GoRoute(path: '/search', builder: (c, s) => const SearchScreen()),
       for (final path in [
-        '/category-products',
         '/vendors',
         '/vendors/:id',
         '/products/:id',
@@ -319,7 +318,7 @@ void main() {
       await tester.tap(find.byType(CategoryCard).at(1));
       await tester.pumpAndSettle();
       expect(visited.single,
-          startsWith('/category-products?sectorId=sec1&sectorName='));
+          startsWith('/vendors?sectorId=sec1&sectorName='));
       expect(Uri.parse(visited.single).queryParameters['sectorName'], 'فئة 1');
     });
 
@@ -378,7 +377,7 @@ void main() {
       await tester.tap(find.text('فئة 9'));
       await tester.pumpAndSettle();
       expect(visited.single,
-          startsWith('/category-products?sectorId=sec9&sectorName='));
+          startsWith('/vendors?sectorId=sec9&sectorName='));
     });
 
     testWidgets(
@@ -408,7 +407,7 @@ void main() {
 
       await tester.tap(find.descendant(of: row, matching: find.text('فئة 0')));
       await tester.pumpAndSettle();
-      expect(visited.single, startsWith('/category-products?sectorId=sec0&'));
+      expect(visited.single, startsWith('/vendors?sectorId=sec0&'));
 
       await tester.pumpWidget(const SizedBox());
       await _open(tester,
@@ -664,7 +663,7 @@ void main() {
       await tester.tap(find.byType(CategoryCard));
       await tester.pumpAndSettle();
       expect(visited.single,
-          startsWith('/category-products?sectorId=r&sectorName='));
+          startsWith('/vendors?sectorId=r&sectorName='));
     });
 
     testWidgets(

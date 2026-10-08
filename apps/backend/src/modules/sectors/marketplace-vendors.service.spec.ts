@@ -1,6 +1,33 @@
 import { NotFoundException } from '@nestjs/common';
 import { MarketplaceVendorsService } from './marketplace-vendors.service';
 
+/**
+ * Filters V1. `listBySector` now ALWAYS runs one extra batch query to
+ * resolve each returned branch's real `hasOffer` value (see that
+ * method's own comment) — every existing test in this file exercises
+ * that path whether or not it cares about offers, so this stub must
+ * exist everywhere, always answering "no branch has an active offer"
+ * unless a specific test overrides it. Dedicated offer-filter/-sort
+ * behavior is covered in its own new spec file, not here.
+ */
+function makeEmptyOffersRepository() {
+  return {
+    createQueryBuilder: jest.fn(() => ({
+      select: () => ({
+        where: () => ({
+          andWhere: () => ({
+            andWhere: () => ({
+              andWhere: () => ({
+                getRawMany: async () => [],
+              }),
+            }),
+          }),
+        }),
+      }),
+    })),
+  };
+}
+
 function buildHarness(seed: { sectors?: any[]; branches?: any[] }) {
   const sectors = new Map((seed.sectors ?? []).map((s) => [s.id, s]));
   const allBranches = seed.branches ?? [];
@@ -72,9 +99,18 @@ function buildHarness(seed: { sectors?: any[]; branches?: any[] }) {
       throw new Error('resolveForPoint should not be called when latitude/longitude are omitted');
     }),
   };
+  // No test in this file exercises `subcategoryId` filtering (that's covered by
+  // marketplace-vendors.service.subcategory.spec.ts) — this stub fails loudly if it's ever reached.
+  const subcategoriesRepository = {
+    findOne: jest.fn(async () => {
+      throw new Error('subcategoriesRepository should not be queried when subcategoryId is omitted');
+    }),
+  };
   const service = new MarketplaceVendorsService(
     sectorsRepository as any,
+    subcategoriesRepository as any,
     branchesRepository as any,
+    makeEmptyOffersRepository() as any,
     serviceAreaResolverService as any,
   );
   return { service };
@@ -295,10 +331,17 @@ describe('MarketplaceVendorsService — ServiceArea filtering (Phase I-B)', () =
     }
     const branchesRepository = { createQueryBuilder: jest.fn(() => makeQb()) };
     const serviceAreaResolverService = { resolveForPoint: jest.fn(async () => opts.resolvedZone) };
+    const subcategoriesRepository = {
+      findOne: jest.fn(async () => {
+        throw new Error('subcategoriesRepository should not be queried when subcategoryId is omitted');
+      }),
+    };
 
     const service = new MarketplaceVendorsService(
       sectorsRepository as any,
+      subcategoriesRepository as any,
       branchesRepository as any,
+      makeEmptyOffersRepository() as any,
       serviceAreaResolverService as any,
     );
     return { service, serviceAreaResolverService };

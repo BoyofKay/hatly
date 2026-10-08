@@ -6,8 +6,10 @@ import {
   VendorBranch,
   activateVendorBranch,
   assignVendorBranchSector,
+  closeVendorBranch,
   deactivateVendorBranch,
   getVendorBranch,
+  openVendorBranch,
   updateVendorBranch,
 } from '../../../../lib/api/admin-vendors';
 import {
@@ -32,6 +34,7 @@ import {
 } from '../../../../lib/api/admin-catalog';
 import { MarketplaceSector, listSectors } from '../../../../lib/api/sectors';
 import { ServiceArea, listServiceAreas } from '../../../../lib/api/admin-service-areas';
+import { apiErrorMessage } from '../../../../lib/api/errors';
 
 /**
  * Real Branch detail/edit/activate + Sector assignment (reuses the
@@ -57,6 +60,7 @@ export default function BranchDetailPage() {
   const [deliveryEnabled, setDeliveryEnabled] = useState(true);
   const [pickupEnabled, setPickupEnabled] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTogglingOpen, setIsTogglingOpen] = useState(false);
   const [selectedSectorId, setSelectedSectorId] = useState('');
   const [selectedServiceAreaId, setSelectedServiceAreaId] = useState('');
   const [serviceAreaError, setServiceAreaError] = useState<string | null>(null);
@@ -104,7 +108,7 @@ export default function BranchDetailPage() {
       setProducts(p);
       if (!productCategoryId && c.length > 0) setProductCategoryId(c[0].id);
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load branch.');
+      setError(apiErrorMessage(err, 'Failed to load branch.'));
     }
   }
 
@@ -128,7 +132,7 @@ export default function BranchDetailPage() {
       });
       setBranch(updated);
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to save branch.');
+      setActionError(apiErrorMessage(err, 'Failed to save branch.'));
     } finally {
       setIsSaving(false);
     }
@@ -141,7 +145,29 @@ export default function BranchDetailPage() {
       const updated = branch.isActive ? await deactivateVendorBranch(id) : await activateVendorBranch(id);
       setBranch(updated);
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to update status.');
+      setActionError(apiErrorMessage(err, 'Failed to update status.'));
+    }
+  }
+
+  /**
+   * M1 (Launch-Readiness Gap Audit, G-01) — the first UI control for
+   * `isOpen` anywhere in the dashboard. Explicit open/close calls
+   * (never a blind toggle client-side, matching the new backend
+   * endpoints), guarded by `isTogglingOpen` against a double-submit,
+   * and re-set from the server's own response rather than assumed —
+   * same shape as `handleToggleActive` above, plus the guard.
+   */
+  async function handleToggleOpen() {
+    if (!branch || isTogglingOpen) return;
+    setIsTogglingOpen(true);
+    setActionError(null);
+    try {
+      const updated = branch.isOpen ? await closeVendorBranch(id) : await openVendorBranch(id);
+      setBranch(updated);
+    } catch (err: any) {
+      setActionError(apiErrorMessage(err, 'Failed to update availability.'));
+    } finally {
+      setIsTogglingOpen(false);
     }
   }
 
@@ -153,7 +179,7 @@ export default function BranchDetailPage() {
       const updated = await assignVendorBranchSector(id, selectedSectorId);
       setBranch(updated);
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to assign sector.');
+      setActionError(apiErrorMessage(err, 'Failed to assign sector.'));
     }
   }
 
@@ -167,7 +193,7 @@ export default function BranchDetailPage() {
     } catch (err: any) {
       // Covers the backend's own validation — invalid or inactive
       // ServiceArea is rejected server-side, never assumed valid here.
-      setServiceAreaError(err?.response?.data?.message ?? 'Failed to assign service area.');
+      setServiceAreaError(apiErrorMessage(err, 'Failed to assign service area.'));
     }
   }
 
@@ -179,7 +205,7 @@ export default function BranchDetailPage() {
       setShowCategoryForm(false);
       await refresh();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to create category.');
+      setActionError(apiErrorMessage(err, 'Failed to create category.'));
     }
   }
 
@@ -188,7 +214,7 @@ export default function BranchDetailPage() {
       category.isActive ? await deactivateCategory(category.id) : await activateCategory(category.id);
       await refresh();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to update category.');
+      setActionError(apiErrorMessage(err, 'Failed to update category.'));
     }
   }
 
@@ -199,7 +225,7 @@ export default function BranchDetailPage() {
       await updateCategory(category.id, { name: newName });
       await refresh();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to rename category.');
+      setActionError(apiErrorMessage(err, 'Failed to rename category.'));
     }
   }
 
@@ -229,7 +255,7 @@ export default function BranchDetailPage() {
       setShowProductForm(false);
       await refresh();
     } catch (err: any) {
-      setProductError(err?.response?.data?.message ?? 'Failed to create product.');
+      setProductError(apiErrorMessage(err, 'Failed to create product.'));
     }
   }
 
@@ -238,7 +264,7 @@ export default function BranchDetailPage() {
       product.isAvailable ? await deactivateProduct(product.id) : await activateProduct(product.id);
       await refresh();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to update product.');
+      setActionError(apiErrorMessage(err, 'Failed to update product.'));
     }
   }
 
@@ -250,7 +276,7 @@ export default function BranchDetailPage() {
       await setProductInventoryToZero(product.id);
       await refresh();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to set inventory to zero.');
+      setActionError(apiErrorMessage(err, 'Failed to set inventory to zero.'));
     }
   }
 
@@ -265,7 +291,7 @@ export default function BranchDetailPage() {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      setImportError(err?.response?.data?.message ?? 'Failed to download template.');
+      setImportError(apiErrorMessage(err, 'Failed to download template.'));
     }
   }
 
@@ -285,7 +311,7 @@ export default function BranchDetailPage() {
       const summary = await validateAdminImport(importFile);
       setImportSummary(summary);
     } catch (err: any) {
-      setImportError(err?.response?.data?.message ?? 'Failed to validate file.');
+      setImportError(apiErrorMessage(err, 'Failed to validate file.'));
     } finally {
       setIsValidatingImport(false);
     }
@@ -302,7 +328,7 @@ export default function BranchDetailPage() {
       setImportFile(null);
       await refresh();
     } catch (err: any) {
-      setImportError(err?.response?.data?.message ?? 'Failed to apply import.');
+      setImportError(apiErrorMessage(err, 'Failed to apply import.'));
     } finally {
       setIsApplyingImport(false);
     }
@@ -323,7 +349,7 @@ export default function BranchDetailPage() {
       await updateProduct(product.id, { name: newName });
       await refresh();
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to rename product.');
+      setActionError(apiErrorMessage(err, 'Failed to rename product.'));
     }
   }
 
@@ -346,14 +372,32 @@ export default function BranchDetailPage() {
       <div className="rounded border bg-white p-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold">{branch.name}</h1>
-          <button
-            onClick={handleToggleActive}
-            className={`rounded px-3 py-1 text-sm font-medium ${
-              branch.isActive ? 'bg-gray-200 text-gray-700' : 'bg-green-600 text-white'
-            }`}
-          >
-            {branch.isActive ? 'Deactivate' : 'Activate'}
-          </button>
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded px-2 py-0.5 text-xs font-medium ${
+                branch.isOpen ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+              }`}
+            >
+              {branch.isOpen ? 'Open' : 'Closed'}
+            </span>
+            <button
+              onClick={handleToggleOpen}
+              disabled={isTogglingOpen}
+              className={`rounded px-3 py-1 text-sm font-medium disabled:opacity-50 ${
+                branch.isOpen ? 'bg-gray-200 text-gray-700' : 'bg-green-600 text-white'
+              }`}
+            >
+              {isTogglingOpen ? '...' : branch.isOpen ? 'Close' : 'Open'}
+            </button>
+            <button
+              onClick={handleToggleActive}
+              className={`rounded px-3 py-1 text-sm font-medium ${
+                branch.isActive ? 'bg-gray-200 text-gray-700' : 'bg-green-600 text-white'
+              }`}
+            >
+              {branch.isActive ? 'Deactivate' : 'Activate'}
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSaveBranch} className="mt-4 space-y-3">

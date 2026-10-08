@@ -53,7 +53,10 @@ class FakeOrdersApi implements OrdersApi {
     if (gate != null) await gate!.future;
     if (failWith != null) throw failWith!;
     return CreatedOrderResult(
-        id: orderId, orderNumber: 'HT-100001', totalMinor: 11500, paymentMethod: request.paymentMethod ?? 'COD');
+        id: orderId,
+        orderNumber: 'HT-100001',
+        totalMinor: 11500,
+        paymentMethod: request.paymentMethod ?? 'COD');
   }
 }
 

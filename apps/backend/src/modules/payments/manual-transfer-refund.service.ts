@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Payment } from './entities/payment.entity';
 import { PaymentStatus } from './payment-status.enum';
 import { FinancialEventService } from '../finance/financial-event.service';
@@ -9,6 +9,7 @@ import { FinancialEvent } from '../finance/entities/financial-event.entity';
 import { PendingRefundStatus } from './pending-refund-status.enum';
 import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/order-status.enum';
+import { LoyaltyService } from '../loyalty/loyalty.service';
 
 /**
  * CONFIRMED (Phase F, decision 9): "the original Payment remains
@@ -36,6 +37,8 @@ export class ManualTransferRefundService {
   constructor(
     @InjectRepository(Payment) private readonly paymentsRepository: Repository<Payment>,
     private readonly financialEventService: FinancialEventService,
+    private readonly loyaltyService: LoyaltyService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -72,11 +75,12 @@ export class ManualTransferRefundService {
       });
     }
 
+    const idempotencyKey = `manual-transfer-refund:${params.paymentId}`;
     await this.financialEventService.record(
       {
         type: FinancialEventType.MANUAL_TRANSFER_REFUND_RECORDED,
         direction: FinancialEventDirection.PAYABLE,
-        idempotencyKey: `manual-transfer-refund:${params.paymentId}`,
+        idempotencyKey,
         amountMinor: params.amountMinor,
         orderId: payment.orderId,
         paymentId: payment.id,
@@ -87,6 +91,23 @@ export class ManualTransferRefundService {
       manager,
     );
     // Deliberately no write to `payment` itself — PAID stays PAID.
+
+    // Consolidated customer-commerce milestone (Loyalty V1): this is the ONE refund path in this
+    // codebase with no order-status gate at all, so it is the one place a refund can land against an
+    // order that already reached DELIVERED and already earned loyalty — see
+    // LoyaltyService.reverseEarningForRefund's own doc comment for why every OTHER refund path
+    // (partial-cancellation, Failed-Delivery) never needs this call at all (no-op for them regardless).
+    const reverseLoyalty = (m: EntityManager) =>
+      this.loyaltyService.reverseEarningForRefund(m, {
+        orderId: payment.orderId,
+        refundedAmountMinor: params.amountMinor,
+        idempotencyKey: `loyalty-reversal:${idempotencyKey}`,
+      });
+    if (manager) {
+      await reverseLoyalty(manager);
+    } else {
+      await this.dataSource.transaction((m) => reverseLoyalty(m));
+    }
   }
 
   /** Idempotency key of the ONE whole-payment refund (order cancelled / admin-recorded) — unchanged since Phase F. */

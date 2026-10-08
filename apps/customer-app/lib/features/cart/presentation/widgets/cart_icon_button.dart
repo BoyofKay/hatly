@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../../shared_widgets/ltr_text.dart';
 import '../../data/cart_providers.dart';
@@ -12,11 +13,16 @@ class CartIconButton extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cartAsync = ref.watch(cartControllerProvider);
     final itemCount = cartAsync.valueOrNull?.itemCount ?? 0;
+    final p = context.palette;
 
     return Stack(
       alignment: Alignment.center,
       children: [
         IconButton(
+          // Polish pass: every other icon-only AppBar action in this app
+          // (e.g. `_RoundIconButton`, favorite-heart buttons) has a tooltip;
+          // this one — reused on nearly every screen's AppBar — didn't.
+          tooltip: AppLocalizations.of(context).cart,
           icon: const Icon(Icons.shopping_bag_outlined),
           onPressed: () => context.push('/cart'),
         ),
@@ -38,8 +44,12 @@ class CartIconButton extends ConsumerWidget {
               child: LtrText(
                 '$itemCount',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    color: Colors.white,
+                // Polish pass: was hardcoded `Colors.white` on the brand-orange
+                // fill — 2.6:1 contrast, fails accessibility (see
+                // hatly_palette.dart's own documented rule). `p.accentOn` is
+                // the correct dark ink (7:1) for new components.
+                style: TextStyle(
+                    color: p.accentOn,
                     fontSize: 10,
                     fontWeight: FontWeight.w700),
               ),

@@ -8,6 +8,7 @@ import '../../../shared_widgets/hatly_surface.dart';
 import '../../../core/theme/hatly_theme.dart';
 import '../data/addresses_providers.dart';
 import '../domain/saved_address.dart';
+import 'widgets/address_area_lines.dart';
 
 /// Returned via `context.pop(savedAddress)` — the caller (CheckoutScreen)
 /// awaits `context.push<SavedAddress>('/checkout/address')`.
@@ -127,7 +128,18 @@ class _AddressSelectionScreenState
               final p = context.palette;
               return HatlySurface(
                 key: Key('address-tile-${address.id}'),
-                onTap: () => context.pop(address),
+                // PD-009: an address that needs a delivery zone is completed first (the customer picks the zone), then
+                // the completed address is returned — it is never returned half-usable, and no zone is guessed.
+                onTap: () async {
+                  if (!address.needsZoneSelection) {
+                    context.pop(address);
+                    return;
+                  }
+                  final completed = await context.push<SavedAddress>('/addresses/add', extra: address);
+                  if (!context.mounted) return;
+                  ref.invalidate(savedAddressesProvider);
+                  if (completed != null && !completed.needsZoneSelection) context.pop(completed);
+                },
                 semanticLabel: address.label?.isNotEmpty == true
                     ? '${address.label}, ${address.line1}'
                     : address.line1,
@@ -168,16 +180,7 @@ class _AddressSelectionScreenState
                           ),
                           if (address.label?.isNotEmpty == true)
                             Text(address.line1, style: context.type.small),
-                          if (address.city?.isNotEmpty == true ||
-                              address.governorate?.isNotEmpty == true)
-                            Text(
-                                [
-                                  if (address.city?.isNotEmpty == true)
-                                    address.city!,
-                                  if (address.governorate?.isNotEmpty == true)
-                                    address.governorate!,
-                                ].join('، '),
-                                style: context.type.caption),
+                          AddressAreaLines(address: address),
                         ],
                       ),
                     ),

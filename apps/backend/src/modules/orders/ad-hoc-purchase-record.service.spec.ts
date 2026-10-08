@@ -19,9 +19,11 @@ function buildHarness(seed: {
   const orders = new Map(seed.orders.map((o) => [o.id, o]));
   const deliveries = new Map((seed.deliveries ?? []).map((d) => [d.id, d]));
   const records = new Map<string, any>();
+  const locks: string[] = [];
 
   const manager = {
     findOne: async (EntityClass: any, opts: any) => {
+      if (opts?.lock) locks.push(EntityClass.name);
       if (EntityClass === OrderItem) return items.get(opts.where.id) ?? null;
       if (EntityClass === OrderVendorSegment) return segments.get(opts.where.id) ?? null;
       if (EntityClass === Order) return orders.get(opts.where.id) ?? null;
@@ -75,7 +77,7 @@ function buildHarness(seed: {
     vendorStaffAuthorizationService as any,
     driverAuthorizationService as any,
   );
-  return { service, items, segments, orders, deliveries, records, financialEventService };
+  return { service, items, segments, orders, deliveries, records, financialEventService, locks };
 }
 
 function customItem(overrides: Partial<any> = {}) {
@@ -324,5 +326,123 @@ describe('AdHocPurchaseRecordService — shared eligibility/financial rules', ()
     });
     await service.recordVendorPrice('item-1', 5000, 'vendor-user-1');
     await expect(service.recordDriverPurchase('item-1', 6000, 'driver-user-1')).rejects.toThrow(ConflictException);
+  });
+});
+
+
+describe('AdHocPurchaseRecordService.confirmHatlyServicePrice (operations confirm a Hatly Service price)', () => {
+  const hatlyItem = (over: Partial<any> = {}) => customItem(over);
+  const hatlySegment = (over: Partial<any> = {}) => segment({ vendorBranchId: null, groupType: 'AD_HOC_SERVICE', subtotalMinor: 0, ...over });
+  const pendingOrder = (over: Partial<any> = {}) =>
+    order({ status: 'PENDING', subtotalMinor: 0, deliveryFeeMinor: 11000, discountMinor: 0, totalMinor: null, amountDueMinor: null, walletAmountMinor: 0, hasPendingAdHocPricing: true, ...over });
+
+  it('records an ADMIN price, recomputes subtotal/total/amount due authoritatively and clears the pending flag', async () => {
+    const { service, orders, segments, items, records } = buildHarness({ items: [hatlyItem()], segments: [hatlySegment()], orders: [pendingOrder()] });
+    const { record, alreadyApplied } = await service.confirmHatlyServicePrice('item-1', 25000, 'admin-1');
+    expect(alreadyApplied).toBe(false);
+    expect(record).toMatchObject({ amountMinor: 25000, recordedByRole: 'ADMIN', recordedByUserId: 'admin-1', recordedByDriverId: null });
+    expect(records.size).toBe(1);
+    expect(items.get('item-1').actualAmountMinor).toBe(25000);
+    expect(segments.get('seg-1').subtotalMinor).toBe(25000);
+    expect(orders.get('order-1')).toMatchObject({ subtotalMinor: 25000, totalMinor: 36000, amountDueMinor: 36000, hasPendingAdHocPricing: false });
+  });
+
+  it('never fires DRIVER_REIMBURSEMENT_OWED (no driver advanced any money)', async () => {
+    const { service, financialEventService } = buildHarness({ items: [hatlyItem()], segments: [hatlySegment()], orders: [pendingOrder()] });
+    await service.confirmHatlyServicePrice('item-1', 25000, 'admin-1');
+    expect(financialEventService.record).not.toHaveBeenCalled();
+  });
+
+  it('keeps the total UNKNOWN (null, never a partial number) while another Hatly Service item is still pending', async () => {
+    const { service, orders } = buildHarness({
+      items: [hatlyItem({ id: 'item-1' }), hatlyItem({ id: 'item-2' })],
+      segments: [hatlySegment()],
+      orders: [pendingOrder()],
+    });
+    await service.confirmHatlyServicePrice('item-1', 10000, 'admin-1');
+    expect(orders.get('order-1')).toMatchObject({ subtotalMinor: 10000, totalMinor: null, amountDueMinor: null, hasPendingAdHocPricing: true });
+    await service.confirmHatlyServicePrice('item-2', 5000, 'admin-1');
+    expect(orders.get('order-1')).toMatchObject({ subtotalMinor: 15000, totalMinor: 26000, amountDueMinor: 26000, hasPendingAdHocPricing: false });
+  });
+
+  it('is idempotent: the same confirmation again returns the existing record, changes nothing and does not double-count', async () => {
+    const { service, orders, records } = buildHarness({ items: [hatlyItem()], segments: [hatlySegment()], orders: [pendingOrder()] });
+    const first = await service.confirmHatlyServicePrice('item-1', 25000, 'admin-1');
+    const again = await service.confirmHatlyServicePrice('item-1', 25000, 'admin-2');
+    expect(again.alreadyApplied).toBe(true);
+    expect(again.record.id).toBe(first.record.id);
+    expect(records.size).toBe(1);
+    expect(orders.get('order-1')).toMatchObject({ subtotalMinor: 25000, totalMinor: 36000 });
+  });
+
+  it('refuses a DIFFERENT amount for an already-priced item (a recorded price is evidence and is never rewritten)', async () => {
+    const { service, orders } = buildHarness({ items: [hatlyItem()], segments: [hatlySegment()], orders: [pendingOrder()] });
+    await service.confirmHatlyServicePrice('item-1', 25000, 'admin-1');
+    await expect(service.confirmHatlyServicePrice('item-1', 30000, 'admin-1')).rejects.toMatchObject({ response: { details: { code: 'PURCHASE_ALREADY_RECORDED' } } });
+    expect(orders.get('order-1').subtotalMinor).toBe(25000);
+  });
+
+  it('an item already priced by the DRIVER is not silently re-priced by operations, even at the same amount', async () => {
+    const { service } = buildHarness({
+      items: [hatlyItem()], segments: [hatlySegment()], orders: [pendingOrder()],
+      deliveries: [{ id: 'd1', orderId: 'order-1', driverId: 'driver-of-driver-user-1' }],
+    });
+    await service.recordDriverPurchase('item-1', 25000, 'driver-user-1');
+    await expect(service.confirmHatlyServicePrice('item-1', 25000, 'admin-1')).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it.each([0, -5, 1.5, NaN])('rejects a non-positive-integer amount (%s) before touching anything', async (amount) => {
+    const { service, records } = buildHarness({ items: [hatlyItem()], segments: [hatlySegment()], orders: [pendingOrder()] });
+    await expect(service.confirmHatlyServicePrice('item-1', amount as number, 'admin-1')).rejects.toMatchObject({ response: { details: { code: 'INVALID_FINAL_AMOUNT' } } });
+    expect(records.size).toBe(0);
+  });
+
+  it('only a Hatly Service (AD_HOC_SERVICE) request can be confirmed by operations — never a vendor custom item or a catalog product', async () => {
+    const vendorScoped = buildHarness({ items: [hatlyItem()], segments: [segment({ groupType: 'CATALOG' })], orders: [pendingOrder()] });
+    await expect(vendorScoped.service.confirmHatlyServicePrice('item-1', 100, 'admin-1')).rejects.toMatchObject({ response: { details: { code: 'NOT_A_HATLY_SERVICE_ITEM' } } });
+    const catalogItem = buildHarness({ items: [hatlyItem({ productId: 'product-1' })], segments: [hatlySegment()], orders: [pendingOrder()] });
+    await expect(catalogItem.service.confirmHatlyServicePrice('item-1', 100, 'admin-1')).rejects.toMatchObject({ response: { details: { code: 'NOT_A_CUSTOM_ITEM' } } });
+  });
+
+  it.each(['DELIVERED', 'CANCELLED', 'FAILED_DELIVERY'])('refuses to price an order that is already %s', async (status) => {
+    const { service, records } = buildHarness({ items: [hatlyItem()], segments: [hatlySegment()], orders: [pendingOrder({ status })] });
+    await expect(service.confirmHatlyServicePrice('item-1', 100, 'admin-1')).rejects.toMatchObject({ response: { details: { code: 'ORDER_NOT_PRICEABLE' } } });
+    expect(records.size).toBe(0);
+  });
+
+  it('an unknown item is a plain 404', async () => {
+    const { service } = buildHarness({ items: [], segments: [], orders: [] });
+    await expect(service.confirmHatlyServicePrice('nope', 100, 'admin-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('locks the ORDER row before the ITEM row (the single lock order every pricing path uses, so concurrent pricing can neither lose an update nor deadlock)', async () => {
+    const admin = buildHarness({ items: [hatlyItem()], segments: [hatlySegment()], orders: [pendingOrder()] });
+    await admin.service.confirmHatlyServicePrice('item-1', 100, 'admin-1');
+    expect(admin.locks.slice(0, 2)).toEqual(['Order', 'OrderItem']);
+    const driver = buildHarness({ items: [hatlyItem()], segments: [hatlySegment()], orders: [pendingOrder()], deliveries: [{ id: 'd1', orderId: 'order-1', driverId: 'driver-of-u' }] });
+    await driver.service.recordDriverPurchase('item-1', 100, 'u');
+    expect(driver.locks.slice(0, 2)).toEqual(['Order', 'OrderItem']);
+  });
+});
+
+describe('totals finalization for the existing Driver/Vendor pricing paths', () => {
+  it('a Driver recording the last pending Hatly Service amount now also makes the total and amount due known (they stayed null forever before)', async () => {
+    const { service, orders } = buildHarness({
+      items: [customItem()], segments: [segment({ vendorBranchId: null, groupType: 'AD_HOC_SERVICE', subtotalMinor: 0 })],
+      orders: [order({ subtotalMinor: 0, deliveryFeeMinor: 5000, discountMinor: 0, totalMinor: null, amountDueMinor: null, walletAmountMinor: 0, hasPendingAdHocPricing: true })],
+      deliveries: [{ id: 'd1', orderId: 'order-1', driverId: 'driver-of-driver-user-1' }],
+    });
+    await service.recordDriverPurchase('item-1', 4500, 'driver-user-1');
+    expect(orders.get('order-1')).toMatchObject({ subtotalMinor: 4500, totalMinor: 9500, amountDueMinor: 9500, hasPendingAdHocPricing: false });
+  });
+
+  it('a total that is already known is never rewritten by the finalization step', async () => {
+    const { service, orders } = buildHarness({
+      items: [customItem()], segments: [segment()],
+      orders: [order({ subtotalMinor: 10000, deliveryFeeMinor: 3000, totalMinor: 13000, amountDueMinor: 13000 })],
+      ownedBranchIds: ['branch-1'],
+    });
+    await service.recordVendorPrice('item-1', 5000, 'vendor-user-1');
+    expect(orders.get('order-1')).toMatchObject({ totalMinor: 18000, amountDueMinor: 13000 }); // delta logic unchanged; amountDue is not this step's concern
   });
 });

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/hatly_theme.dart';
 
 /// Empty / error / prompt message for Explore. Palette-aware (works in dark
-/// mode), unlike the legacy shared state view which is light-only.
+/// mode). Note: `HatlyStateView` (shared_widgets) is also theme-aware now —
+/// this widget predates that fix and was kept as-is for this Explore screen
+/// rather than consolidated, to avoid a wider call-site migration outside
+/// this polish pass's scope.
 class ExploreMessage extends StatelessWidget {
   const ExploreMessage({
     super.key,

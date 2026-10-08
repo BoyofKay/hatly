@@ -159,6 +159,10 @@ class FixtureProductRepository implements ProductRepository {
     String? search,
     int? page,
     int? limit,
+    bool? availableOnly,
+    bool? hasOffers,
+    int? minPriceMinor,
+    int? maxPriceMinor,
   }) async {
     await Future.delayed(const Duration(milliseconds: 600));
     // Discovery params are accepted (to satisfy the interface) but not

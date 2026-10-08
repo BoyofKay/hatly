@@ -17,6 +17,7 @@ class HatlyPalette extends ThemeExtension<HatlyPalette> {
     required this.surfaceSoft,
     required this.textPrimary,
     required this.textMuted,
+    required this.textDisabled,
     required this.border,
     required this.shadow,
     required this.accent,
@@ -40,6 +41,11 @@ class HatlyPalette extends ThemeExtension<HatlyPalette> {
   final Color surfaceSoft;
   final Color textPrimary;
   final Color textMuted;
+
+  /// Disabled icon/text ONLY (e.g. `QuantityStepper`'s disabled step
+  /// button) — dimmer than [textMuted], which stays readable body text.
+  /// Pair with [surfaceSoft] for a disabled control's fill.
+  final Color textDisabled;
   final Color border;
   final Color shadow;
 
@@ -69,6 +75,7 @@ class HatlyPalette extends ThemeExtension<HatlyPalette> {
     surfaceSoft: Color(0xFFF1F1F1),
     textPrimary: Color(0xFF1A1A1A),
     textMuted: Color(0xFF6B6B6B),
+    textDisabled: Color(0xFFB0B0B0), // == the legacy HatlyColors.textDisabled
     border: Color(0xFFE5E5E5),
     shadow: Color(0x14000000), // 8% black — soft
     accent: _brandOrange,
@@ -90,6 +97,7 @@ class HatlyPalette extends ThemeExtension<HatlyPalette> {
     surfaceSoft: Color(0xFF2A2A2D),
     textPrimary: Color(0xFFF2F2F2),
     textMuted: Color(0xFFA8A8AD),
+    textDisabled: Color(0xFF6A6A6D),
     border: Color(0xFF38383A),
     shadow: Color(0x66000000),
     accent: _brandOrange,
@@ -110,6 +118,7 @@ class HatlyPalette extends ThemeExtension<HatlyPalette> {
     Color? surfaceSoft,
     Color? textPrimary,
     Color? textMuted,
+    Color? textDisabled,
     Color? border,
     Color? shadow,
     Color? accent,
@@ -128,6 +137,7 @@ class HatlyPalette extends ThemeExtension<HatlyPalette> {
       surfaceSoft: surfaceSoft ?? this.surfaceSoft,
       textPrimary: textPrimary ?? this.textPrimary,
       textMuted: textMuted ?? this.textMuted,
+      textDisabled: textDisabled ?? this.textDisabled,
       border: border ?? this.border,
       shadow: shadow ?? this.shadow,
       accent: accent ?? this.accent,
@@ -152,6 +162,7 @@ class HatlyPalette extends ThemeExtension<HatlyPalette> {
       surfaceSoft: c(surfaceSoft, other.surfaceSoft),
       textPrimary: c(textPrimary, other.textPrimary),
       textMuted: c(textMuted, other.textMuted),
+      textDisabled: c(textDisabled, other.textDisabled),
       border: c(border, other.border),
       shadow: c(shadow, other.shadow),
       accent: c(accent, other.accent),

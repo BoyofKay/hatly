@@ -74,6 +74,8 @@ export class DriverController {
       to: dto.status as OrderStatus,
       cancellationReason: dto.cancellationReason,
       failureReason: dto.failureReason,
+      proofPhotoUrl: dto.proofPhotoUrl,
+      recipientName: dto.recipientName,
     });
     return { data: order };
   }

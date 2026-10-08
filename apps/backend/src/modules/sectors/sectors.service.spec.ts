@@ -44,12 +44,19 @@ function baseDto(overrides: Partial<CreateSectorDto> = {}): CreateSectorDto {
 }
 
 describe('SectorsService.create', () => {
-  it('creates a sector with defaults (sortOrder 0, isActive true)', async () => {
+  it('creates a sector with defaults (sortOrder 0, isActive true, imageUrl null)', async () => {
     const { service, sectors } = buildHarness({});
     const sector = await service.create(baseDto());
     expect(sector.sortOrder).toBe(0);
     expect(sector.isActive).toBe(true);
+    expect(sector.imageUrl).toBeNull();
     expect(sectors.size).toBe(1);
+  });
+
+  it('Part F (Marketplace image/asset readiness): accepts an optional imageUrl', async () => {
+    const { service } = buildHarness({});
+    const sector = await service.create(baseDto({ imageUrl: 'https://cdn.hatly.example/sectors/restaurants.png' } as any));
+    expect(sector.imageUrl).toBe('https://cdn.hatly.example/sectors/restaurants.png');
   });
 
   it('rejects a duplicate slug', async () => {
@@ -95,13 +102,14 @@ describe('SectorsService — list/get/update/activate/deactivate', () => {
     await expect(service.getOne('missing')).rejects.toThrow(NotFoundException);
   });
 
-  it('update only touches name/nameAr/sortOrder, never slug or isActive', async () => {
+  it('update only touches name/nameAr/sortOrder/imageUrl, never slug or isActive', async () => {
     const { service } = buildHarness({
       sectors: [{ id: 's1', slug: 'restaurants', name: 'Old', isActive: true, sortOrder: 0 }],
     });
-    const updated = await service.update('s1', { name: 'Restaurants Updated', sortOrder: 5 });
+    const updated = await service.update('s1', { name: 'Restaurants Updated', sortOrder: 5, imageUrl: 'https://cdn.example/x.png' });
     expect(updated.name).toBe('Restaurants Updated');
     expect(updated.sortOrder).toBe(5);
+    expect(updated.imageUrl).toBe('https://cdn.example/x.png');
     expect(updated.slug).toBe('restaurants'); // untouched — UpdateSectorDto has no slug field at all
     expect(updated.isActive).toBe(true);
   });

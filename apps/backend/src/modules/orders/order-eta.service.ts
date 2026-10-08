@@ -46,7 +46,9 @@ export class OrderEtaService {
     const none = (state: OrderEtaState, reason?: string): OrderEtaView => ({ state, reason, estimatedAt: null, estimatedUntil: null, delayed: false });
 
     if (input.status === OrderStatus.CANCELLED) return none('CANCELLED');
-    if (input.status === OrderStatus.DELIVERED || input.status === OrderStatus.FAILED_DELIVERY) return none('COMPLETED');
+    if (input.status === OrderStatus.DELIVERED || input.status === OrderStatus.COLLECTED || input.status === OrderStatus.FAILED_DELIVERY) {
+      return none('COMPLETED');
+    }
     // A pending/rejected Manual Transfer: fulfilment cannot proceed, so no segment could genuinely have started preparing —
     // never present a countdown that implies otherwise.
     if (input.paymentBlocksFulfilment) return none('UNAVAILABLE', 'PAYMENT_NOT_APPROVED');

@@ -7,6 +7,7 @@ import { Address } from '../../addresses/entities/address.entity';
 import { BusinessConfigService } from '../../business-config/business-config.service';
 import { BusinessConfigKey } from '../../business-config/business-config-key.enum';
 import { DeliveryFeeBreakdown } from '../../delivery-fee/delivery-fee-calculation.service';
+import { HatlyServiceCharge } from '../../finance/hatly-service-pricing.service';
 import { ELECTRONIC_PAYMENT_METHODS } from '../../payments/electronic-payment-method.enum';
 import { AddressValidationService } from './address-validation.service';
 import { CheckoutPlannerService } from './checkout-planner.service';
@@ -143,6 +144,8 @@ export class CheckoutQuoteService {
 
     const breakdown = plan.delivery.breakdown as (Partial<DeliveryFeeBreakdown> & { chargeMinor?: number }) | null;
     const isRegistered = breakdown != null && Array.isArray(breakdown.vendorSequence);
+    const hatlyCharge = !isRegistered && breakdown != null ? (breakdown as unknown as Partial<HatlyServiceCharge>) : null;
+    const pricedByZone = plan.eligibility?.pricingSource === 'DELIVERY_ZONE';
     const amounts: QuotedAmounts = {
       subtotalMinor: plan.subtotalMinor,
       discountMinor: plan.discountMinor,
@@ -162,6 +165,8 @@ export class CheckoutQuoteService {
           : null;
 
     const weightedOrUnpriced = plan.hasWeightedItem || plan.hasPendingAdHocPricing;
+    // U2 (approved): a pickup order is paid in cash at the counter — no wallet, no transfer, no Pay at Delivery.
+    const pickupCashOnly = plan.fulfillmentType === FulfillmentType.PICKUP;
     const canPlaceOrder =
       plan.blockers.length === 0 &&
       plan.payment.method !== null &&
@@ -184,6 +189,9 @@ export class CheckoutQuoteService {
     return {
       data: {
         canPlaceOrder,
+        // Explicit: at least one Hatly Service item has no confirmed price yet. The total / amount due are then `null` (unknown), the
+        // order is COD-only, and the final amount is confirmed during preparation — never a numeric 0.
+        hasPendingPricing: plan.hasPendingAdHocPricing,
         blockers: plan.blockers,
         fulfillment: {
           type: plan.fulfillmentType,
@@ -211,7 +219,15 @@ export class CheckoutQuoteService {
           additionalVendorFeeMinor: isRegistered ? Number(breakdown!.additionalVendorFeeMinorUsed) : null,
           additionalVendorChargeMinor: isRegistered ? Number(breakdown!.additionalVendorChargeMinor) : null,
           vendorCount: plan.segments.length,
-          distanceMeters: isRegistered ? Number(breakdown!.roundedTotalDistanceMeters) : null,
+          // PD-009: DISTANCE (map pin) or DELIVERY_ZONE (no pin — the selected zone's fee is the base fee). Null until priced.
+          pricingSource: plan.eligibility?.serviceable ? plan.eligibility.pricingSource ?? null : null,
+          deliveryZone: plan.address?.deliveryZone ?? null,
+          distanceMeters: isRegistered && !pricedByZone && breakdown!.roundedTotalDistanceMeters != null ? Number(breakdown!.roundedTotalDistanceMeters) : null,
+          // Hatly Service: fee = the delivery zone's fee × multiplier — both parts shown, never a hidden formula.
+          hatlyService:
+            hatlyCharge && typeof hatlyCharge.multiplierUsed === 'number' && typeof hatlyCharge.zoneDeliveryFeeMinorUsed === 'number'
+              ? { zoneDeliveryFeeMinor: hatlyCharge.zoneDeliveryFeeMinorUsed, multiplier: hatlyCharge.multiplierUsed }
+              : null,
           vendors: isRegistered
             ? (breakdown!.vendorSequence ?? []).map((stop) => ({
                 vendorBranchId: stop.vendorBranchId,
@@ -248,15 +264,23 @@ export class CheckoutQuoteService {
           wallet: {
             balanceMinor: plan.payment.walletBalanceMinor,
             appliedMinor: plan.payment.walletAppliedMinor,
-            // Wallet is an independent source; it is not offered for weighed / unpriced orders (final amount unknown).
-            available: !weightedOrUnpriced,
+            // Wallet is an independent source; it is not offered for weighed / unpriced orders (final amount unknown), nor for pickup.
+            available: !weightedOrUnpriced && !pickupCashOnly,
           },
           options: {
             cod: true,
-            payAtDelivery: !plan.hasPendingAdHocPricing,
+            payAtDelivery: !plan.hasPendingAdHocPricing && !pickupCashOnly,
             manualTransfer: {
-              available: transferConfigured && !plan.hasWeightedItem && !plan.hasPendingAdHocPricing,
-              reason: !transferConfigured ? 'NOT_CONFIGURED' : plan.hasWeightedItem ? 'WEIGHED_ITEMS' : plan.hasPendingAdHocPricing ? 'UNPRICED_ORDER' : null,
+              available: transferConfigured && !plan.hasWeightedItem && !plan.hasPendingAdHocPricing && !pickupCashOnly,
+              reason: pickupCashOnly
+                ? 'PICKUP_CASH_ONLY'
+                : !transferConfigured
+                  ? 'NOT_CONFIGURED'
+                  : plan.hasWeightedItem
+                    ? 'WEIGHED_ITEMS'
+                    : plan.hasPendingAdHocPricing
+                      ? 'UNPRICED_ORDER'
+                      : null,
             },
             electronicMethods: ELECTRONIC_PAYMENT_METHODS.filter((m) => enabledMethods.includes(m)),
           },

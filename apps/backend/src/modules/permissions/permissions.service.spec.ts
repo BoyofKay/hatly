@@ -95,3 +95,23 @@ describe('PermissionsService', () => {
     expect(() => service.assertGrantableRole(Role.DRIVER)).toThrow();
   });
 });
+
+describe('PermissionsService.actorHolds (Control Tower milestone)', () => {
+  const build = (grants: Array<{ userId: string; permission: string }>) =>
+    new PermissionsService({ findOne: jest.fn(async ({ where }: any) => grants.find((g) => g.userId === where.userId && g.permission === where.permission) ?? null) } as any);
+
+  it('a SUPER_ADMIN holds every permission without a grant (same rule as PermissionsGuard)', async () => {
+    await expect(build([]).actorHolds({ id: 'sa', role: 'SUPER_ADMIN' }, Permission.OVERRIDE_DISPATCH)).resolves.toBe(true);
+  });
+
+  it('an ADMIN holds only what was granted', async () => {
+    const s = build([{ userId: 'a', permission: Permission.OVERRIDE_DISPATCH }]);
+    await expect(s.actorHolds({ id: 'a', role: 'ADMIN' }, Permission.OVERRIDE_DISPATCH)).resolves.toBe(true);
+    await expect(s.actorHolds({ id: 'a', role: 'ADMIN' }, Permission.MANAGE_DRIVERS)).resolves.toBe(false);
+  });
+
+  it('a non-admin (even with a stray grant row) holds nothing', async () => {
+    const s = build([{ userId: 'c', permission: Permission.OVERRIDE_DISPATCH }]);
+    await expect(s.actorHolds({ id: 'c', role: 'CUSTOMER' }, Permission.OVERRIDE_DISPATCH)).resolves.toBe(false);
+  });
+});

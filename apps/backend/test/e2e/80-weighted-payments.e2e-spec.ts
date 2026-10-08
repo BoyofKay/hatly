@@ -152,7 +152,11 @@ describe('E2E — weighted products & payments', () => {
       const driver = await s.driverAssignedTo(order.id);
       const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: driver.accessToken })).find((d) => d.orderId === order.id);
       expect(delivery.totalMinor).toBe(30000 + order.deliveryFeeMinor);
-      for (const st of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body: { status: st } }));
+      for (const st of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) {
+        // M4 — Proof of Delivery is required for the DELIVERED transition.
+        const body = st === 'DELIVERED' ? { status: st, proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) } : { status: st };
+        expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body }));
+      }
       expect((await eventsOf(order.id, 'VENDOR_COMMISSION_RECOGNIZED'))[0].amount_minor).toBe(3000); // 10% of the 300.00 actually weighed
       expect((await world.ds.query('SELECT points_delta FROM loyalty_points_transactions WHERE order_id = $1', [order.id]))[0].points_delta).toBe(300); // 1 point per EGP of the final amount
     });
@@ -200,15 +204,33 @@ describe('E2E — weighted products & payments', () => {
       expect((await world.api('get', '/cart', { token: c.accessToken })).body.data.groups).toHaveLength(1); // cart intact after every refusal
     });
 
-    // PD-001 / PD-006: wallet payment now EXISTS as a payment source (full behaviour: 66-wallet-snapshots-tracking). What stays true:
-    // an empty wallet cannot pay, and the customer has no dedicated wallet endpoint — the balance is exposed by the checkout quote.
-    it('WALLET as a payment source needs a balance (empty wallet → WALLET_INSUFFICIENT_BALANCE); there is still no customer wallet endpoint', async () => {
+    // PD-001 / PD-006: wallet payment is a real payment source (full behaviour: 66-wallet-snapshots-tracking). What this asserts:
+    // an empty wallet cannot pay, and the customer wallet API (`GET /customer/wallet`, `GET /customer/wallet/transactions`) is
+    // customer-only and reports that empty wallet consistently — the rejected attempt must not have moved any money.
+    it('WALLET as a payment source needs a balance (empty wallet → WALLET_INSUFFICIENT_BALANCE); the customer wallet endpoints agree', async () => {
       const c = await cartWith();
       const res = await place(c, 'WALLET');
       expect(res.status).toBe(400);
       expect(res.body.error.details.code).toBe('WALLET_INSUFFICIENT_BALANCE');
-      const paths = ['/wallet', '/customer/wallet', '/wallet/balance', '/customer/wallet/balance'];
-      for (const path of paths) expect([401, 403, 404]).toContain((await world.api('get', path, { token: c.accessToken })).status);
+
+      // The rejected attempt left the wallet untouched and no ledger row behind.
+      expect(expectData(await world.api('get', '/customer/wallet', { token: c.accessToken }))).toEqual({ balanceMinor: 0 });
+      const ledger = await world.api('get', '/customer/wallet/transactions', { token: c.accessToken });
+      expect(ledger.status).toBe(200);
+      expect(ledger.body.data).toEqual([]);
+      expect(ledger.body.meta.total).toBe(0);
+    });
+
+    it('the wallet endpoints are customer-only; the old guessed paths do not exist', async () => {
+      const c = await s.customer();
+      for (const path of ['/customer/wallet', '/customer/wallet/transactions']) {
+        expect((await world.api('get', path)).status).toBe(401);
+        expect((await world.api('get', path, { token: reviewer.accessToken })).status).toBe(403);
+        expect((await world.api('get', path, { token: c.accessToken })).status).toBe(200);
+      }
+      for (const path of ['/wallet', '/wallet/balance', '/customer/wallet/balance']) {
+        expect([401, 403, 404]).toContain((await world.api('get', path, { token: c.accessToken })).status);
+      }
     });
 
     it('Customer Support contact is independent of Manual Transfer: GET /support/contact serves only the WhatsApp number, customer-only, and never fails when it is unset', async () => {

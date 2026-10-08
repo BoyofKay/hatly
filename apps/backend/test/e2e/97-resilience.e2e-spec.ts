@@ -114,8 +114,11 @@ describe('E2E — transaction failure, retry and provider isolation', () => {
       for (const st of ['PICKED_UP', 'ON_THE_WAY']) expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body: { status: st } }));
       boundary.push.length = 0;
 
+      // M4 — Proof of Delivery is required for the DELIVERED transition, and is recorded (idempotently)
+      // as its own step BEFORE the transition — captured once, reused across the faulted attempt and the retry.
+      const proofPhotoUrl = await s.uploadFakePhoto(driver.accessToken);
       await withFault('loyalty_points_transactions', 'INSERT', 'true', async () => {
-        expectGeneric5xx(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body: { status: 'DELIVERED' } }));
+        expectGeneric5xx(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body: { status: 'DELIVERED', proofPhotoUrl } }));
       });
 
       expect((await q('SELECT status FROM orders WHERE id = $1', [order.id]))[0].status).toBe('ON_THE_WAY');
@@ -125,7 +128,7 @@ describe('E2E — transaction failure, retry and provider isolation', () => {
       expect(await count('financial_events', "order_id = $1 AND type = 'DRIVER_COMMISSION_RECOGNIZED'", [order.id])).toBe(0);
       expect(boundary.push.filter((p) => p.data.type === 'ORDER_DELIVERED')).toEqual([]);
 
-      expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body: { status: 'DELIVERED' } }));
+      expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body: { status: 'DELIVERED', proofPhotoUrl } }));
       expect((await q('SELECT status FROM orders WHERE id = $1', [order.id]))[0].status).toBe('DELIVERED');
       expect(await count('loyalty_points_transactions', 'order_id = $1', [order.id])).toBe(1);
       expect(boundary.push.filter((p) => p.data.type === 'ORDER_DELIVERED')).toHaveLength(1);
@@ -164,7 +167,11 @@ describe('E2E — transaction failure, retry and provider isolation', () => {
       const order = await s.checkout(c, home);
       await s.vendorPrepares(vendor, order.id);
       const delivery = await deliveryOf(order.id);
-      for (const st of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body: { status: st } }));
+      for (const st of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) {
+        // M4 — Proof of Delivery is required for the DELIVERED transition.
+        const body = st === 'DELIVERED' ? { status: st, proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) } : { status: st };
+        expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body }));
+      }
       const remainder = expectData(await world.api('post', `/driver/deliveries/${delivery.id}/cash-remainder`, { token: driver.accessToken, body: { cashReceivedMinor: order.totalMinor + 900 } }), 201);
       const approve = () => world.api('patch', `/admin/cash-remainders/${remainder.id}/approve`, { token: reviewer.accessToken });
 
@@ -181,22 +188,29 @@ describe('E2E — transaction failure, retry and provider isolation', () => {
     });
 
     it('a loyalty conversion failing mid-way debits nothing; retrying with the SAME idempotency key then converts exactly once', async () => {
+      // Consolidated customer-commerce milestone (Parts C/D): 3 units at 200 EGP = 600 points earned —
+      // enough to convert the APPROVED V1 minimum (500) and still leave a nonzero remainder to assert on,
+      // same shape this test always had, just scaled up to comply with the new minimum.
       const product = await s.product(vendor, { priceMinor: 20000, inventoryMode: 'OPEN' });
       const c = await s.customer();
-      await s.addToCart(c, product.id, 1);
+      await s.addToCart(c, product.id, 3);
       const order = await s.checkout(c, home);
       await s.vendorPrepares(vendor, order.id);
       const delivery = await deliveryOf(order.id);
-      for (const st of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body: { status: st } }));
-      const convert = () => world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 100, idempotencyKey: 'retry-key' } });
+      for (const st of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) {
+        // M4 — Proof of Delivery is required for the DELIVERED transition.
+        const body = st === 'DELIVERED' ? { status: st, proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) } : { status: st };
+        expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body }));
+      }
+      const convert = () => world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 500, idempotencyKey: 'retry-key' } });
       await withFault('wallet_transactions', 'INSERT', 'true', async () => {
         expectGeneric5xx(await convert());
       });
-      expect(Number((await q('SELECT COALESCE(SUM(points_delta),0) AS b FROM loyalty_points_transactions WHERE customer_id = $1', [c.id]))[0].b)).toBe(200);
+      expect(Number((await q('SELECT COALESCE(SUM(points_delta),0) AS b FROM loyalty_points_transactions WHERE customer_id = $1', [c.id]))[0].b)).toBe(600);
       const ok = await convert();
       expect(ok.status).toBe(201);
-      expect(ok.body.data).toMatchObject({ pointsBalance: 100, walletBalance: 100 });
-      expect((await convert()).body.data).toMatchObject({ pointsBalance: 100, walletBalance: 100 }); // replay of the same key
+      expect(ok.body.data).toMatchObject({ pointsBalance: 100, walletBalance: 500 });
+      expect((await convert()).body.data).toMatchObject({ pointsBalance: 100, walletBalance: 500 }); // replay of the same key
     });
 
     it('a failure in POST-commit bookkeeping (vendor commission ledger) never fails the driver\'s request — but the ledger gap is loud in the logs (CHARACTERIZATION: there is no retry/outbox)', async () => {
@@ -215,23 +229,32 @@ describe('E2E — transaction failure, retry and provider isolation', () => {
     });
 
     it('concurrent checkouts while one of them is failing: the failure never blocks, corrupts or double-spends the others', async () => {
-      const product = await s.product(vendor, { priceMinor: 10000, inventoryMode: 'TRACKED', quantity: 3 });
+      // Stock covers all four racers on purpose. With fewer units than racers, WHICH racer reaches the atomic stock update last is
+      // a scheduling accident, and the last one correctly gets a plain "sold out" 400 instead of ever reaching the injected fault.
+      // Enough stock makes the outcome independent of ordering while still proving what matters: the injected failure rolls back
+      // only its own order (its unit is returned), never blocks the others, and stock is never double-spent or negative.
+      const product = await s.product(vendor, { priceMinor: 10000, inventoryMode: 'TRACKED', quantity: 4 });
       const carts: Actor[] = [];
       for (let i = 0; i < 4; i += 1) {
         const c = await s.customer(`Fault Racer ${i}`);
         await s.addToCart(c, product.id, 1);
         carts.push(c);
       }
+      const latecomer = await s.customer('Fault Latecomer'); // not part of the race; tries once everything is genuinely sold out
+      await s.addToCart(latecomer, product.id, 1);
       const body = { deliveryAddress: { line1: 'x', latitude: home.lat, longitude: home.lng }, paymentMethod: 'COD' };
       let results: Array<{ status: number }> = [];
-      // the fault only affects the FIRST customer's cart; the other three (3 units in stock) must still all succeed
+      // the fault only affects the FIRST customer's cart; the other three must still all succeed
       await withFault('carts', 'UPDATE', `NEW.status = 'ORDERED' AND NEW.customer_id = '${carts[0].id}'`, async () => {
         results = await Promise.all(carts.map((c) => withQuoteToken(world, c.accessToken, body).then((b) => world.api('post', '/orders', { token: c.accessToken, body: b }))));
       });
       expect(results[0].status).toBe(500);
       expect(results.slice(1).every((r) => r.status === 201)).toBe(true);
+      expect(await stock(product.id)).toBe(1); // three orders took three units; the failed one's unit was rolled back, not lost
+      // the failed customer retries (fault gone) and now gets the last unit
+      expect((await world.api('post', '/orders', { token: carts[0].accessToken, body: await withQuoteToken(world, carts[0].accessToken, body) })).status).toBe(201);
       expect(await stock(product.id)).toBe(0);
-      expect((await world.api('post', '/orders', { token: carts[0].accessToken, body: await withQuoteToken(world, carts[0].accessToken, body) })).status).toBe(400); // now genuinely sold out
+      expect((await world.api('post', '/orders', { token: latecomer.accessToken, body: await withQuoteToken(world, latecomer.accessToken, body) })).status).toBe(400); // now genuinely sold out
       expect(await stock(product.id)).toBe(0); // and never negative
     });
   });
@@ -281,7 +304,9 @@ describe('E2E — transaction failure, retry and provider isolation', () => {
         await s.vendorPrepares(vendor, order.id);
         const delivery = await deliveryOf(order.id);
         for (const st of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) {
-          const res = await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body: { status: st } });
+          // M4 — Proof of Delivery is required for the DELIVERED transition.
+          const body = st === 'DELIVERED' ? { status: st, proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) } : { status: st };
+          const res = await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body });
           expect({ mode, st, status: res.status }).toEqual({ mode, st, status: 200 });
         }
         expect((await q('SELECT status FROM orders WHERE id = $1', [order.id]))[0].status).toBe('DELIVERED');

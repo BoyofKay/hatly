@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/config/api_config.dart';
 import 'core/localization/l10n/app_localizations.dart';
 import 'core/network/providers.dart';
 import 'core/routing/app_router.dart';
@@ -13,6 +15,11 @@ import 'core/theme/hatly_theme.dart';
 /// to a shared design-tokens package only once both apps are stable
 /// enough that churn there is worth the coupling).
 void main() {
+  // Fail fast (release only) if the app was built without a reachable backend URL — see apiBaseUrlProblem.
+  if (kReleaseMode) {
+    final problem = apiBaseUrlProblem(kApiBaseUrl);
+    if (problem != null) throw StateError(problem);
+  }
   runApp(const ProviderScope(child: HatlyDriverApp()));
 }
 

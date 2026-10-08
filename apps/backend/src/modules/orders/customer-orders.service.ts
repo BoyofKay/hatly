@@ -9,10 +9,12 @@ import { PaymentStatus } from '../payments/payment-status.enum';
 import { Delivery } from '../delivery/entities/delivery.entity';
 import { Driver } from '../delivery/entities/driver.entity';
 import { OrderStatusEvent } from './entities/order-status-event.entity';
+import { loadOrderTimeline } from './order-status-history.service';
 import { OrderEtaService, OrderEtaView } from './order-eta.service';
 import { customerCancellationBlock } from './customer-cancellation-rule';
 import { paymentBlocksFulfilment } from './order-payment-gate.service';
 import { DeliveryFeeBreakdown } from '../delivery-fee/delivery-fee-calculation.service';
+import { CustomItemPriceStatus, customItemPriceStatus } from './custom-item-price-status';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 20;
@@ -31,7 +33,8 @@ export const ORDER_LIST_TAB_STATUSES: Record<OrderListTab, OrderStatus[]> = {
     OrderStatus.PICKED_UP,
     OrderStatus.ON_THE_WAY,
   ],
-  completed: [OrderStatus.DELIVERED],
+  // U2: a collected pickup order is the pickup counterpart of a delivered one.
+  completed: [OrderStatus.DELIVERED, OrderStatus.COLLECTED],
   // An undelivered (FAILED_DELIVERY) order is not ongoing and did not complete: it is listed with the cancelled ones.
   cancelled: [OrderStatus.CANCELLED, OrderStatus.FAILED_DELIVERY],
 };
@@ -90,6 +93,8 @@ export interface CustomerOrderItemView {
   quantity: number;
   unitPriceMinor: number | null;
   actualAmountMinor: number | null;
+  /** Explicit price state of a custom / Hatly Service item (`null` for a normal catalog item). */
+  priceStatus: CustomItemPriceStatus | null;
   optionsSnapshot: Array<{ name: string; valueName: string; priceDeltaMinor: number }>;
   notes: string | null;
   pricingUnitSnapshot: string | null;
@@ -112,6 +117,19 @@ export interface CustomerOrderSegmentView {
   branchAddress: string | null;
   status: string;
   subtotalMinor: number | null;
+  /**
+   * Standalone Hatly Service milestone. All five are non-null only for an AD_HOC_SERVICE segment (`groupType`
+   * above), frozen at order-creation time on `OrderVendorSegment` itself — never re-derived from the current
+   * cart, which may no longer exist by the time the order is viewed. Genuinely new exposure: these columns
+   * already existed on the entity (populated by OrderCreationService) but were never read/returned by this
+   * customer-facing view before this milestone — a real, minimal, additive gap, not a new business rule.
+   */
+  adHocPlaceNameSnapshot: string | null;
+  adHocServiceTypeSnapshot: string | null;
+  adHocPickupLatitudeSnapshot: number | null;
+  adHocPickupLongitudeSnapshot: number | null;
+  adHocDestinationLatitudeSnapshot: number | null;
+  adHocDestinationLongitudeSnapshot: number | null;
   items: CustomerOrderItemView[];
   offerDiscountTypeSnapshot: string | null;
   offerDiscountValueSnapshot: number | null;
@@ -128,10 +146,13 @@ export interface OrderDeliveryBreakdownView {
   additionalVendorFeeMinor: number;
   additionalVendorChargeMinor: number;
   vendorCount: number;
-  distanceMeters: number;
+  /** PD-009: where the base fee came from (orders frozen before zones are all DISTANCE). */
+  pricingSource: 'DISTANCE' | 'DELIVERY_ZONE';
+  /** Null when the fee came from a Delivery Zone — no distance was part of the price. */
+  distanceMeters: number | null;
   /** The fee frozen at creation. After a vendor cancels, `deliveryFeeMinor` on the order is the CURRENT fee. */
   frozenTotalFeeMinor: number;
-  vendors: Array<{ vendorBranchId: string; distanceToCustomerMeters: number }>;
+  vendors: Array<{ vendorBranchId: string; distanceToCustomerMeters: number | null }>;
 }
 
 export interface CustomerOrderDetailsView {
@@ -147,6 +168,8 @@ export interface CustomerOrderDetailsView {
   deliveryFeeMinor: number | null;
   discountMinor: number;
   totalMinor: number | null;
+  /** True while at least one Hatly Service item still has no confirmed price; the total / amount due are then unknown (`null`), never 0. */
+  hasPendingPricing: boolean;
   paymentMethod: string;
   electronicPaymentMethod: string | null;
   walletAmountMinor: number;
@@ -311,6 +334,7 @@ export class CustomerOrdersService {
       deliveryFeeMinor: order.deliveryFeeMinor ?? null,
       discountMinor: order.discountMinor,
       totalMinor: order.totalMinor ?? null,
+      hasPendingPricing: order.hasPendingAdHocPricing === true,
       paymentMethod: order.paymentMethod,
       electronicPaymentMethod: order.electronicPaymentMethod ?? null,
       walletAmountMinor: Number(order.walletAmountMinor ?? 0),
@@ -333,6 +357,12 @@ export class CustomerOrdersService {
         branchAddress: segment.branchAddressSnapshot ?? null,
         status: segment.status,
         subtotalMinor: segment.subtotalMinor ?? null,
+        adHocPlaceNameSnapshot: segment.adHocPlaceNameSnapshot ?? null,
+        adHocServiceTypeSnapshot: segment.adHocServiceTypeSnapshot ?? null,
+        adHocPickupLatitudeSnapshot: segment.adHocPickupLatitudeSnapshot ?? null,
+        adHocPickupLongitudeSnapshot: segment.adHocPickupLongitudeSnapshot ?? null,
+        adHocDestinationLatitudeSnapshot: segment.adHocDestinationLatitudeSnapshot ?? null,
+        adHocDestinationLongitudeSnapshot: segment.adHocDestinationLongitudeSnapshot ?? null,
         offerDiscountTypeSnapshot: segment.offerDiscountTypeSnapshot ?? null,
         offerDiscountValueSnapshot: segment.offerDiscountValueSnapshot ?? null,
         offerEligibleSubtotalMinorSnapshot: segment.offerEligibleSubtotalMinorSnapshot ?? null,
@@ -349,6 +379,7 @@ export class CustomerOrdersService {
           quantity: item.quantity,
           unitPriceMinor: item.unitPriceMinor ?? null,
           actualAmountMinor: item.actualAmountMinor ?? null,
+          priceStatus: customItemPriceStatus(item),
           optionsSnapshot: item.optionsSnapshot ?? [],
           notes: item.notes ?? null,
           pricingUnitSnapshot: item.pricingUnitSnapshot ?? null,
@@ -391,7 +422,11 @@ export class CustomerOrdersService {
       timeline: await this.loadTimeline(orderId),
       segments: order.segments.map((s) => ({
         id: s.id,
-        vendorName: s.vendorNameSnapshot ?? (s.vendorBranchId ? nameByBranchId.get(s.vendorBranchId) ?? null : null),
+        // Standalone Hatly Service milestone: an AD_HOC_SERVICE segment has neither a vendorNameSnapshot nor a
+        // vendorBranchId — without this fallback, tracking would show a blank vendor name for it (matches the
+        // exact `vendorName ?? adHocPlaceName` fallback the Flutter cart/checkout UI already uses).
+        vendorName:
+          s.vendorNameSnapshot ?? (s.vendorBranchId ? nameByBranchId.get(s.vendorBranchId) ?? null : null) ?? s.adHocPlaceNameSnapshot ?? null,
         status: s.status,
         expectedReadyAt: s.expectedReadyAt ?? null,
         preparationEstimateMinutes: s.preparationEstimateMinutes ?? null,
@@ -416,8 +451,7 @@ export class CustomerOrdersService {
   }
 
   private async loadTimeline(orderId: string): Promise<OrderTimelineEntryView[]> {
-    const events = await this.statusEventsRepository.find({ where: { orderId }, order: { createdAt: 'ASC' } });
-    return events.map((e) => ({ status: e.toStatus, at: e.createdAt, actorRole: e.actorRole ?? null }));
+    return loadOrderTimeline(this.statusEventsRepository, orderId);
   }
 
   /** "Order created" is not "payment successful": a transfer nobody has approved yet is awaiting approval. */
@@ -461,7 +495,8 @@ export class CustomerOrdersService {
       additionalVendorFeeMinor: Number(b.additionalVendorFeeMinorUsed ?? 0),
       additionalVendorChargeMinor: charge,
       vendorCount: b.vendorSequence.length,
-      distanceMeters: Number(b.roundedTotalDistanceMeters ?? 0),
+      pricingSource: b.pricingSource === 'DELIVERY_ZONE' ? 'DELIVERY_ZONE' : 'DISTANCE',
+      distanceMeters: b.pricingSource === 'DELIVERY_ZONE' || b.roundedTotalDistanceMeters == null ? null : Number(b.roundedTotalDistanceMeters),
       frozenTotalFeeMinor: b.deliveryFeeMinor,
       vendors: b.vendorSequence.map((s) => ({ vendorBranchId: s.vendorBranchId, distanceToCustomerMeters: s.distanceToCustomerMeters })),
     };

@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { Public } from '../../common/decorators/public.decorator';
 import { ProductsService } from './products.service';
 import { OfferConsumptionService } from '../offers/offer-consumption.service';
@@ -9,15 +9,23 @@ import { OfferConsumptionService } from '../offers/offer-consumption.service';
 /**
  * CONFIRMED (Discovery & Ranking, decision 9): extends the existing
  * vendor-menu endpoint rather than creating a parallel one.
+ *
+ * Filters V1 additions: `availableOnly`/`hasOffers`/`minPriceMinor`/
+ * `maxPriceMinor`, plus `'offers'` added to `sort` — all optional,
+ * backward compatible (omitting every one reproduces the exact
+ * pre-Filters-V1 behavior). Boolean query params use this codebase's
+ * established `?value === 'true' : value === 'false' : value` string
+ * -> boolean `@Transform`, same as `ListCatalogProductsQueryDto`/
+ * `SearchAdminCustomersQueryDto`.
  */
-class ListProductsQueryDto {
+export class ListProductsQueryDto {
   @IsOptional()
   @IsUUID()
   categoryId?: string;
 
   @IsOptional()
-  @IsIn(['highestRated', 'bestSelling', 'newest', 'price_asc', 'price_desc'])
-  sort?: 'highestRated' | 'bestSelling' | 'newest' | 'price_asc' | 'price_desc';
+  @IsIn(['highestRated', 'bestSelling', 'newest', 'price_asc', 'price_desc', 'offers'])
+  sort?: 'highestRated' | 'bestSelling' | 'newest' | 'price_asc' | 'price_desc' | 'offers';
 
   @IsOptional()
   @IsString()
@@ -34,6 +42,28 @@ class ListProductsQueryDto {
   @IsInt()
   @Min(1)
   limit?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  availableOnly?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  hasOffers?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minPriceMinor?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxPriceMinor?: number;
 }
 
 /**
@@ -85,6 +115,10 @@ export class ProductsController {
       search: query.search,
       page: query.page,
       limit: query.limit,
+      availableOnly: query.availableOnly,
+      hasOffers: query.hasOffers,
+      minPriceMinor: query.minPriceMinor,
+      maxPriceMinor: query.maxPriceMinor,
     });
 
     // Customer Product-Level Offers Display. ONE batch resolution for

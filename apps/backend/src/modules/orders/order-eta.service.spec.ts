@@ -51,8 +51,13 @@ describe('OrderEtaService — derived, operational, never fabricated', () => {
     expect(r).toMatchObject({ state: 'ESTIMATED', delayed: true });
   });
 
-  it('CANCELLED / DELIVERED / FAILED_DELIVERY have a terminal state and no time', async () => {
-    for (const [status, state] of [[OrderStatus.CANCELLED, 'CANCELLED'], [OrderStatus.DELIVERED, 'COMPLETED'], [OrderStatus.FAILED_DELIVERY, 'COMPLETED']] as const) {
+  it('CANCELLED / DELIVERED / COLLECTED / FAILED_DELIVERY have a terminal state and no time', async () => {
+    for (const [status, state] of [
+      [OrderStatus.CANCELLED, 'CANCELLED'],
+      [OrderStatus.DELIVERED, 'COMPLETED'],
+      [OrderStatus.COLLECTED, 'COMPLETED'], // U2: a collected pickup order shows no countdown
+      [OrderStatus.FAILED_DELIVERY, 'COMPLETED'],
+    ] as const) {
       expect(await svc().compute({ ...base, status, segments: [{ status: 'PENDING', expectedReadyAt: at(5) }] }, NOW)).toEqual({ state, reason: undefined, estimatedAt: null, estimatedUntil: null, delayed: false });
     }
   });

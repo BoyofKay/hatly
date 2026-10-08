@@ -238,8 +238,8 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
     it('a saved address can be used by id — but only the caller\'s own, active one; both addressId and deliveryAddress is refused', async () => {
       const c = await cartFor([p1]);
       const other = await s.customer();
-      const mine = expectData<any>(await world.api('post', '/addresses', { token: c.accessToken, body: { line1: 'Saved Street 5', latitude: home.lat, longitude: home.lng, governorate: 'الشرقية', city: 'بلبيس', street: 'شارع النصر', buildingNumber: '12', floor: '3', apartment: '7', landmark: 'بجوار المسجد', formattedAddress: 'assistive text', label: 'Home' } }), 201);
-      const theirs = expectData<any>(await world.api('post', '/addresses', { token: other.accessToken, body: { line1: 'Their Street', latitude: home.lat, longitude: home.lng } }), 201);
+      const mine = expectData<any>(await world.api('post', '/addresses', { token: c.accessToken, body: { deliveryZoneId: await s.defaultDeliveryZoneId(), line1: 'Saved Street 5', latitude: home.lat, longitude: home.lng, governorate: 'الشرقية', city: 'بلبيس', street: 'شارع النصر', buildingNumber: '12', floor: '3', apartment: '7', landmark: 'بجوار المسجد', formattedAddress: 'assistive text', label: 'Home' } }), 201);
+      const theirs = expectData<any>(await world.api('post', '/addresses', { token: other.accessToken, body: { deliveryZoneId: await s.defaultDeliveryZoneId(), line1: 'Their Street', latitude: home.lat, longitude: home.lng } }), 201);
 
       expect((await place(c, { addressId: theirs.id, paymentMethod: 'COD' })).status).toBe(404);
       expect((await world.api('post', '/checkout/quote', { token: c.accessToken, body: { addressId: theirs.id } })).status).toBe(200 + 1); // 201 with a blocker — never their address
@@ -254,14 +254,14 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
 
     it('the default address is preselected only when it is serviceable', async () => {
       const c = await cartFor([p1]);
-      const first = expectData<any>(await world.api('post', '/addresses', { token: c.accessToken, body: { line1: 'Default One', latitude: home.lat, longitude: home.lng } }), 201);
+      const first = expectData<any>(await world.api('post', '/addresses', { token: c.accessToken, body: { deliveryZoneId: await s.defaultDeliveryZoneId(), line1: 'Default One', latitude: home.lat, longitude: home.lng } }), 201);
       expect(first.isDefault).toBe(true); // the first address becomes the default
       const q = (await quote(c, { paymentMethod: 'COD' })).data;
       expect(q.address).toMatchObject({ addressId: first.id, source: 'DEFAULT', snapshot: { line1: 'Default One' } });
       expect(q.canPlaceOrder).toBe(true);
 
       // making an unserviceable address the default: it is NOT preselected
-      const remote = expectData<any>(await world.api('post', '/addresses', { token: c.accessToken, body: { line1: 'Remote', latitude: far.lat, longitude: far.lng, isDefault: true } }), 201);
+      const remote = expectData<any>(await world.api('post', '/addresses', { token: c.accessToken, body: { deliveryZoneId: await s.defaultDeliveryZoneId(), line1: 'Remote', latitude: far.lat, longitude: far.lng, isDefault: true } }), 201);
       const q2 = (await quote(c, { paymentMethod: 'COD' })).data;
       expect(q2.address).toMatchObject({ addressId: null, source: null, snapshot: null });
       expect(q2.canPlaceOrder).toBe(false);

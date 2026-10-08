@@ -31,6 +31,8 @@ export interface FailedDeliveryRefundResult {
 
 export interface FailedDeliveryQueueItem {
   orderId: string;
+  /** The human order reference (`HT-…`) — Control Tower milestone (additive). */
+  orderNumber: string;
   failedAt: Date | null;
   failureReason: string | null;
   customerId: string;
@@ -86,6 +88,9 @@ export class FailedDeliveryResolutionService {
       .leftJoin(FailedDeliveryResolution, 'resolution', 'resolution.order_id = order.id')
       .where('order.status = :status', { status: OrderStatus.FAILED_DELIVERY })
       .andWhere('resolution.id IS NULL')
+      // Stable, oldest failure first (the order a queue is worked in) — previously unordered, so rows could jump between loads.
+      .orderBy('order.failedAt', 'ASC', 'NULLS LAST')
+      .addOrderBy('order.id', 'ASC')
       .getMany();
 
     if (failedOrders.length === 0) return [];
@@ -121,6 +126,7 @@ export class FailedDeliveryResolutionService {
       const driverUser = driver ? driverUserById.get(driver.userId) : undefined;
       return {
         orderId: order.id,
+        orderNumber: order.orderNumber,
         failedAt: order.failedAt ?? null,
         failureReason: order.failureReason ?? null,
         customerId: order.customerId,

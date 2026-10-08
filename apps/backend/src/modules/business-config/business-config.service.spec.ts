@@ -128,3 +128,35 @@ describe('BusinessConfigService', () => {
     });
   });
 });
+
+describe('BusinessConfigService — Hatly Service delivery fee multiplier (PD-009)', () => {
+  const { isValidHatlyServiceMultiplier } = jest.requireActual('./business-config.service');
+  function build(stored?: unknown) {
+    const rows = new Map<string, any>(stored === undefined ? [] : [['HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER', { key: 'HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER', value: stored }]]);
+    const repo = {
+      findOne: jest.fn(async ({ where }: any) => rows.get(where.key) ?? null),
+      create: (d: any) => ({ ...d }),
+      save: jest.fn(async (r: any) => (rows.set(r.key, r), r)),
+    };
+    const { BusinessConfigService } = jest.requireActual('./business-config.service');
+    return { service: new BusinessConfigService(repo as any), repo };
+  }
+
+  it.each([[1.5, true], [1, true], [2.25, true], [10, true], [0, false], [-1, false], [10.5, false], ['1.5', false], [null, false], [NaN, false], [1.00001, false]])(
+    'validates %p → %p',
+    (value, ok) => expect(isValidHatlyServiceMultiplier(value)).toBe(ok),
+  );
+
+  it('returns the configured value (no constant in code) and fails closed when unset or invalid', async () => {
+    await expect(build(1.5).service.getHatlyServiceDeliveryFeeMultiplier()).resolves.toBe(1.5);
+    await expect(build().service.getHatlyServiceDeliveryFeeMultiplier()).rejects.toMatchObject({ response: { details: { code: 'BUSINESS_CONFIG_NOT_SET' } } });
+    await expect(build('abc').service.getHatlyServiceDeliveryFeeMultiplier()).rejects.toMatchObject({ response: { details: { code: 'BUSINESS_CONFIG_INVALID' } } });
+  });
+
+  it('an admin write of an invalid multiplier is refused (400) and nothing is saved; a valid one is stored', async () => {
+    const { service, repo } = build(1.5);
+    await expect(service.set('HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER', 0, 'admin-1')).rejects.toMatchObject({ response: { details: { code: 'INVALID_BUSINESS_CONFIG_VALUE' } } });
+    expect(repo.save).not.toHaveBeenCalled();
+    await expect(service.set('HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER', 2, 'admin-1')).resolves.toMatchObject({ value: 2 });
+  });
+});

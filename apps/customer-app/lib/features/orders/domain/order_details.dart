@@ -86,7 +86,8 @@ class OrderDeliveryBreakdown {
     required this.additionalVendorFeeMinor,
     required this.additionalVendorChargeMinor,
     required this.vendorCount,
-    required this.distanceMeters,
+    this.distanceMeters,
+    this.pricingSource = 'DISTANCE',
     required this.frozenTotalFeeMinor,
   });
 
@@ -94,7 +95,12 @@ class OrderDeliveryBreakdown {
   final int additionalVendorFeeMinor;
   final int additionalVendorChargeMinor;
   final int vendorCount;
-  final int distanceMeters;
+
+  /// Null when the fee came from the address's Delivery Zone — no distance was part of the price (PD-009).
+  final int? distanceMeters;
+
+  /// `DISTANCE` · `DELIVERY_ZONE` (orders placed before zones are DISTANCE).
+  final String pricingSource;
   final int frozenTotalFeeMinor;
 
   factory OrderDeliveryBreakdown.fromJson(Map<String, dynamic> json) =>
@@ -105,7 +111,8 @@ class OrderDeliveryBreakdown {
         additionalVendorChargeMinor:
             (json['additionalVendorChargeMinor'] as num).toInt(),
         vendorCount: (json['vendorCount'] as num).toInt(),
-        distanceMeters: (json['distanceMeters'] as num).toInt(),
+        distanceMeters: (json['distanceMeters'] as num?)?.toInt(),
+        pricingSource: json['pricingSource'] as String? ?? 'DISTANCE',
         frozenTotalFeeMinor: (json['frozenTotalFeeMinor'] as num).toInt(),
       );
 }
@@ -149,6 +156,7 @@ class OrderItemDetails {
     this.offerMechanismSnapshot,
     this.offerSpecialPriceMinorSnapshot,
     this.actualAmountMinor,
+    this.priceStatus,
   });
 
   final String id;
@@ -191,6 +199,14 @@ class OrderItemDetails {
   /// backend never sets this for a normal catalog item.
   final int? actualAmountMinor;
 
+  /// Explicit price state of a custom / Hatly Service item: `PENDING` (no final price recorded yet) or `CONFIRMED`; null for a normal
+  /// catalog item. Older responses without the field fall back to the previous rule (product-less + no recorded amount = pending).
+  final String? priceStatus;
+
+  bool get isPricePending =>
+      priceStatus == 'PENDING' ||
+      (priceStatus == null && productId == null && actualAmountMinor == null);
+
   bool get hadFlashSale => offerMechanismSnapshot == 'FLASH_SALE';
 
   bool get isWeighted => pricingUnitSnapshot == 'WEIGHT';
@@ -232,6 +248,7 @@ class OrderItemDetails {
       offerSpecialPriceMinorSnapshot:
           json['offerSpecialPriceMinorSnapshot'] as int?,
       actualAmountMinor: json['actualAmountMinor'] as int?,
+      priceStatus: json['priceStatus'] as String?,
     );
   }
 }
@@ -253,6 +270,12 @@ class OrderSegmentDetails {
     this.couponCodeSnapshot,
     this.expectedReadyAt,
     this.preparationEstimateMinutes,
+    this.adHocPlaceNameSnapshot,
+    this.adHocServiceTypeSnapshot,
+    this.adHocPickupLatitudeSnapshot,
+    this.adHocPickupLongitudeSnapshot,
+    this.adHocDestinationLatitudeSnapshot,
+    this.adHocDestinationLongitudeSnapshot,
   });
 
   final String id;
@@ -262,6 +285,20 @@ class OrderSegmentDetails {
   final String status;
   final int? subtotalMinor;
   final List<OrderItemDetails> items;
+
+  /// Standalone Hatly Service (AD_HOC_SERVICE) snapshot fields — frozen
+  /// on `OrderVendorSegment` at order-creation time exactly like every
+  /// other `...Snapshot` field on this class, never re-derived from a
+  /// live (possibly since-deleted) cart group. Null on a CATALOG
+  /// segment. See `customer-orders.service.ts` on the backend.
+  final String? adHocPlaceNameSnapshot;
+  final String? adHocServiceTypeSnapshot;
+  final double? adHocPickupLatitudeSnapshot;
+  final double? adHocPickupLongitudeSnapshot;
+  final double? adHocDestinationLatitudeSnapshot;
+  final double? adHocDestinationLongitudeSnapshot;
+
+  bool get isAdHocService => groupType == 'AD_HOC_SERVICE';
 
   /// Customer Offers Integration. Historical SUBTOTAL_DISCOUNT
   /// snapshot — read directly from the backend's frozen
@@ -304,6 +341,16 @@ class OrderSegmentDetails {
           : null,
       preparationEstimateMinutes:
           (json['preparationEstimateMinutes'] as num?)?.toInt(),
+      adHocPlaceNameSnapshot: json['adHocPlaceNameSnapshot'] as String?,
+      adHocServiceTypeSnapshot: json['adHocServiceTypeSnapshot'] as String?,
+      adHocPickupLatitudeSnapshot:
+          (json['adHocPickupLatitudeSnapshot'] as num?)?.toDouble(),
+      adHocPickupLongitudeSnapshot:
+          (json['adHocPickupLongitudeSnapshot'] as num?)?.toDouble(),
+      adHocDestinationLatitudeSnapshot:
+          (json['adHocDestinationLatitudeSnapshot'] as num?)?.toDouble(),
+      adHocDestinationLongitudeSnapshot:
+          (json['adHocDestinationLongitudeSnapshot'] as num?)?.toDouble(),
     );
   }
 }
@@ -370,6 +417,7 @@ class OrderDetails {
     this.deliveryFeeMinor,
     this.discountMinor,
     this.totalMinor,
+    this.hasPendingPricing = false,
     required this.paymentMethod,
     this.payment,
     this.cancellationReason,
@@ -400,6 +448,10 @@ class OrderDetails {
   final int? deliveryFeeMinor;
   final int? discountMinor;
   final int? totalMinor;
+
+  /// A Hatly Service item still has no confirmed price: the subtotal shown by the server is only what is confirmed so far, and the
+  /// total / amount due are unknown (null) — never to be read or rendered as 0.
+  final bool hasPendingPricing;
   final String paymentMethod;
   final OrderPaymentDetails? payment;
   final String? cancellationReason;
@@ -442,6 +494,7 @@ class OrderDetails {
       deliveryFeeMinor: json['deliveryFeeMinor'] as int?,
       discountMinor: json['discountMinor'] as int?,
       totalMinor: json['totalMinor'] as int?,
+      hasPendingPricing: json['hasPendingPricing'] as bool? ?? false,
       paymentMethod: json['paymentMethod'] as String,
       payment: json['payment'] != null
           ? OrderPaymentDetails.fromJson(

@@ -44,7 +44,7 @@ Future<bool> openSupportWhatsApp(
 ///
 /// While the number loads, the row is shown disabled. If it turns out unavailable: [hideWhenUnavailable] hides the
 /// row entirely (contextual entries, to avoid clutter); otherwise the row stays but is disabled and says why.
-class SupportContactTile extends ConsumerWidget {
+class SupportContactTile extends ConsumerStatefulWidget {
   const SupportContactTile({
     super.key,
     required this.label,
@@ -57,18 +57,39 @@ class SupportContactTile extends ConsumerWidget {
   final bool hideWhenUnavailable;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SupportContactTile> createState() => _SupportContactTileState();
+}
+
+class _SupportContactTileState extends ConsumerState<SupportContactTile> {
+  bool _launching = false;
+
+  // Polish pass: was a plain callback with no in-flight guard — a fast
+  // double-tap could fire two concurrent WhatsApp-launch attempts (and
+  // two SnackBars on failure).
+  Future<void> _handleTap(AppLocalizations l10n) async {
+    if (_launching) return;
+    setState(() => _launching = true);
+    try {
+      await openSupportWhatsApp(context, ref,
+          message: widget.messageBuilder(l10n));
+    } finally {
+      if (mounted) setState(() => _launching = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final p = context.palette;
     final contactAsync = ref.watch(supportContactProvider);
     final loading = contactAsync.isLoading;
     final available = contactAsync.valueOrNull?.isAvailable ?? false;
 
-    if (!loading && !available && hideWhenUnavailable) {
+    if (!loading && !available && widget.hideWhenUnavailable) {
       return const SizedBox.shrink();
     }
 
-    final enabled = available;
+    final enabled = available && !_launching;
     final subtitle = loading
         ? null
         : (available
@@ -80,12 +101,9 @@ class SupportContactTile extends ConsumerWidget {
       container: true,
       button: true,
       enabled: enabled,
-      label: subtitle == null ? label : '$label، $subtitle',
+      label: subtitle == null ? widget.label : '${widget.label}، $subtitle',
       excludeSemantics: true,
-      onTap: enabled
-          ? () =>
-              openSupportWhatsApp(context, ref, message: messageBuilder(l10n))
-          : null,
+      onTap: enabled ? () => _handleTap(l10n) : null,
       child: Material(
         color: p.surface,
         shape: RoundedRectangleBorder(
@@ -94,10 +112,7 @@ class SupportContactTile extends ConsumerWidget {
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(HatlyRadius.card),
-          onTap: enabled
-              ? () => openSupportWhatsApp(context, ref,
-                  message: messageBuilder(l10n))
-              : null,
+          onTap: enabled ? () => _handleTap(l10n) : null,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: HatlyTouch.minTarget),
             child: Padding(
@@ -112,7 +127,7 @@ class SupportContactTile extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(label,
+                        Text(widget.label,
                             style: context.type.body.copyWith(
                                 color: color, fontWeight: FontWeight.w700)),
                         if (subtitle != null)
@@ -120,7 +135,7 @@ class SupportContactTile extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (loading)
+                  if (loading || _launching)
                     const SizedBox(
                         width: 18,
                         height: 18,

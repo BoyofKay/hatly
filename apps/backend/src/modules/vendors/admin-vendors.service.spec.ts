@@ -164,6 +164,55 @@ describe('AdminVendorsService — VendorBranch list/get/update/activate/deactiva
   });
 });
 
+describe('AdminVendorsService — VendorBranch open/close (M1, audit G-01)', () => {
+  it('open sets isOpen true and leaves every other field untouched', async () => {
+    const { service } = buildHarness({
+      branches: [{ id: 'b1', vendorId: 'v1', name: 'Downtown', isActive: true, isOpen: false }],
+    });
+    const opened = await service.openVendorBranch('b1');
+    expect(opened.isOpen).toBe(true);
+    expect(opened.isActive).toBe(true); // untouched
+    expect(opened.name).toBe('Downtown'); // untouched
+  });
+
+  it('close sets isOpen false', async () => {
+    const { service } = buildHarness({ branches: [{ id: 'b1', vendorId: 'v1', isActive: true, isOpen: true }] });
+    const closed = await service.closeVendorBranch('b1');
+    expect(closed.isOpen).toBe(false);
+  });
+
+  it('a newly created (closed) branch can be opened, matching the real production path', async () => {
+    const { service } = buildHarness({ vendors: [{ id: 'v1', name: 'X', isActive: false }] });
+    const created = await service.createVendorBranch(branchDto('v1'));
+    expect(created.isOpen).toBe(false);
+    const opened = await service.openVendorBranch(created.id);
+    expect(opened.isOpen).toBe(true);
+  });
+
+  it('rejects open/close for a nonexistent branch', async () => {
+    const { service } = buildHarness();
+    await expect(service.openVendorBranch('missing')).rejects.toThrow(NotFoundException);
+    await expect(service.closeVendorBranch('missing')).rejects.toThrow(NotFoundException);
+  });
+
+  it('repeating the same state is a safe no-op (idempotent under the explicit-state API)', async () => {
+    const { service } = buildHarness({ branches: [{ id: 'b1', vendorId: 'v1', isOpen: true }] });
+    const first = await service.openVendorBranch('b1');
+    const second = await service.openVendorBranch('b1');
+    expect(first.isOpen).toBe(true);
+    expect(second.isOpen).toBe(true);
+  });
+
+  it('the persisted state after either call is always a valid boolean, never corrupted by concurrent open+close', async () => {
+    const { service, branches } = buildHarness({ branches: [{ id: 'b1', vendorId: 'v1', isOpen: false }] });
+    await Promise.all([service.openVendorBranch('b1'), service.closeVendorBranch('b1')]);
+    // Whichever write lands last wins — both true and false are legitimate outcomes of a genuine
+    // race between two admins; what matters is the stored value is exactly one of the two inputs,
+    // never a merged/undefined/corrupted one.
+    expect([true, false]).toContain(branches.get('b1')!.isOpen);
+  });
+});
+
 describe('AdminVendorsService — VendorBranch ServiceArea assignment (Phase I-B)', () => {
   function buildServiceAreaHarness(opts: { branch: any; serviceAreas?: any[] }) {
     const branches = new Map([[opts.branch.id, opts.branch]]);

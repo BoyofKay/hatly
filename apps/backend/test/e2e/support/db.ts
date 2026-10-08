@@ -28,3 +28,17 @@ export async function resetE2eInfrastructure(): Promise<void> {
     else redis.disconnect();
   }
 }
+
+/** Empties ONLY the dedicated E2E Redis database (rate-limit counters now live there, shared by every app instance). */
+export async function flushE2eRedis(): Promise<void> {
+  assertIsolatedInfrastructure();
+  const redis = new Redis(E2E_REDIS_URL, { lazyConnect: true, maxRetriesPerRequest: 1 });
+  try {
+    await redis.connect();
+    if (redis.options.db !== E2E_REDIS_DB) throw new Error('Refusing to flush a non-dedicated Redis database.');
+    await redis.flushdb();
+  } finally {
+    if (redis.status === 'ready') await redis.quit();
+    else redis.disconnect();
+  }
+}

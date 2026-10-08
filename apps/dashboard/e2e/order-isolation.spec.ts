@@ -13,7 +13,8 @@ test.describe('Vendor order isolation', () => {
 
     // Never the foreign vendor's real content.
     await expect(page.getByText('Your items — status: PENDING')).toHaveCount(0);
-    await expect(page.getByText(/failed to load order/i)).toBeVisible();
+    // The backend's own answer, shown as-is — the SAME one a nonexistent id gets, so it never even confirms the order exists.
+    await expect(page.getByText('Order not found.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
   });
 

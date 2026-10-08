@@ -96,6 +96,7 @@ class _FavoriteHeartButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final p = context.palette;
     final controller = ref.watch(favoritesControllerProvider.notifier);
     // CONFIRMED: reading `.isLoading` on the whole collection's
     // AsyncValue (not a per-vendor in-flight flag — the provider's
@@ -117,7 +118,10 @@ class _FavoriteHeartButton extends ConsumerWidget {
       // navigation.
       icon: Icon(
         isFavorited ? Icons.favorite : Icons.favorite_border,
-        color: isFavorited ? HatlyColors.primaryOrange : HatlyColors.textMuted,
+        // Polish pass: the unselected state was `HatlyColors.textMuted` (fixed
+        // light-mode constant) — too dark a gray on a dark background. The
+        // equivalent heart on Vendor Details already correctly used `p.textMuted`.
+        color: isFavorited ? HatlyColors.primaryOrange : p.textMuted,
       ),
       tooltip:
           isFavorited ? l10n.favoritesRemoveAction : l10n.favoritesAddAction,
@@ -160,9 +164,12 @@ class _VendorLogo extends StatelessWidget {
             height: 64,
             shape: HatlyImageShape.circular),
         if (hasPromotion)
-          Positioned(
+          // Polish pass: was a fixed physical `right:` offset — the sibling
+          // `VendorCoverCard`'s equivalent badge already uses `PositionedDirectional`
+          // so it mirrors correctly under RTL; this one didn't.
+          PositionedDirectional(
             top: -6,
-            right: -6,
+            end: -6,
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: const BoxDecoration(

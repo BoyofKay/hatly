@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { VendorOrder, listVendorOrders } from '../../../lib/api/vendor-orders';
+import { apiErrorMessage } from '../../../lib/api/errors';
 
 /**
  * Real Vendor order list — consumes `GET vendor/orders`. Shows only
@@ -19,7 +20,7 @@ export default function VendorOrdersPage() {
     try {
       setOrders(await listVendorOrders());
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load orders.');
+      setError(apiErrorMessage(err, 'Failed to load orders.'));
     }
   }
 

@@ -10,7 +10,9 @@ import { boundary } from './support/external-boundary';
 import { Permission } from '../../src/modules/permissions/permission.enum';
 import { Role } from '../../src/common/enums/role.enum';
 
-const STATUSES = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY', 'DELIVERED', 'CANCELLED', 'FAILED_DELIVERY'] as const;
+// COLLECTED (U2) is listed so the matrix below (a DELIVERY order) proves it is unreachable for delivery and terminal;
+// the pickup-order side (READY_FOR_PICKUP → COLLECTED by its vendor / an admin) is proven in 86-pickup-collection-and-redispatch.
+const STATUSES = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP', 'ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY', 'DELIVERED', 'CANCELLED', 'FAILED_DELIVERY', 'COLLECTED'] as const;
 type Status = (typeof STATUSES)[number];
 
 describe('E2E — order lifecycle', () => {
@@ -86,7 +88,8 @@ describe('E2E — order lifecycle', () => {
       expectData(await driverStep(driver, delivery.id, 'ON_THE_WAY'));
       expect(boundary.push.some((p) => p.data.type === 'ORDER_ON_THE_WAY' && p.data.orderId === order.id)).toBe(true);
       expect(await statusOf(order.id)).toBe('ON_THE_WAY');
-      expectData(await driverStep(driver, delivery.id, 'DELIVERED'));
+      // M4 — Proof of Delivery is required for the DELIVERED transition.
+      expectData(await driverStep(driver, delivery.id, 'DELIVERED', { proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) }));
 
       const done = await orderRow(order.id);
       expect(done.status).toBe('DELIVERED');
@@ -100,7 +103,7 @@ describe('E2E — order lifecycle', () => {
       expect(customerView.status).toBe('DELIVERED');
     });
 
-    it('a terminal order is immutable: DELIVERED, CANCELLED and FAILED_DELIVERY reject every further transition', async () => {
+    it('a terminal order is immutable: DELIVERED, CANCELLED and FAILED_DELIVERY (and COLLECTED — see 86) reject every further transition', async () => {
       const vendor = await s.vendor({ serviceAreaId: area.id, lat: 30.421, lng: 31.561 });
       const product = await s.product(vendor, {});
       const customer = await s.customer();
@@ -139,6 +142,10 @@ describe('E2E — order lifecycle', () => {
       expect(await statusOf(order.id)).toBe('ASSIGNED_TO_DRIVER'); // a delivery row now exists
       const assignedDriver = await s.driverAssignedTo(order.id);
       expect(assignedDriver.driverId).toBeDefined();
+      // This matrix exercises the TRANSITION TABLE only, resetting the order's status with SQL between attempts. Since U3 a
+      // driver's hand-back (ASSIGNED_TO_DRIVER → READY_FOR_PICKUP) triggers an immediate automatic redispatch to ANOTHER
+      // driver, which would move the delivery away from `assignedDriver` mid-matrix; dispatch is proven in 70/83/86.
+      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
       const admin = await s.admin([Permission.MANAGE_ORDER_ISSUES]);
       const actors: Array<{ role: string; actor: Actor }> = [
         { role: 'CUSTOMER', actor: customer },
@@ -149,21 +156,33 @@ describe('E2E — order lifecycle', () => {
       ];
       const reset = (status: Status) => world.ds.query('UPDATE orders SET status = $2, cancellation_reason = NULL, cancelled_by_role = NULL, failure_reason = NULL, failed_at = NULL WHERE id = $1', [order.id, status]);
 
+      // M4 — Proof of Delivery is required for a DRIVER's DELIVERED transition, on this
+      // generic endpoint too (see OrdersController's own comment) — supplied once and
+      // reused: the matrix only actually reaches the state machine's DELIVERED transition
+      // when `from` is ON_THE_WAY, and ProofOfDeliveryService is idempotent per delivery,
+      // so reusing the same photo across every (from, to, role) iteration is safe.
+      const driverProofPhotoUrl = await s.uploadFakePhoto(assignedDriver.accessToken);
       const mismatches: string[] = [];
-      for (const from of STATUSES) {
-        for (const to of STATUSES) {
-          for (const { role, actor } of actors) {
-            await reset(from);
-            const res = await world.api('patch', `/orders/${order.id}/status`, { token: actor.accessToken, body: { status: to, cancellationReason: 'matrix', failureReason: 'matrix' } });
-            // SUPER_ADMIN may do everything ADMIN may (plus READY→ASSIGNED, which ADMIN also has)
-            const rolesAllowed = ALLOWED[from]?.[to] ?? [];
-            const expected = rolesAllowed.includes(role) || (role === 'SUPER_ADMIN' && rolesAllowed.includes('ADMIN'));
-            const succeeded = res.status === 200;
-            if (res.status >= 500) mismatches.push(`${role} ${from}->${to}: HTTP ${res.status}`);
-            else if (succeeded !== expected) mismatches.push(`${role} ${from}->${to}: expected ${expected ? 'allowed' : 'refused'}, got ${res.status}`);
-            if (!succeeded) expect(await statusOf(order.id)).toBe(from);
+      try {
+        for (const from of STATUSES) {
+          for (const to of STATUSES) {
+            for (const { role, actor } of actors) {
+              await reset(from);
+              const extra: Record<string, unknown> = { cancellationReason: 'matrix', failureReason: 'matrix' };
+              if (role === 'DRIVER' && to === 'DELIVERED') extra.proofPhotoUrl = driverProofPhotoUrl;
+              const res = await world.api('patch', `/orders/${order.id}/status`, { token: actor.accessToken, body: { status: to, ...extra } });
+              // SUPER_ADMIN may do everything ADMIN may (plus READY→ASSIGNED, which ADMIN also has)
+              const rolesAllowed = ALLOWED[from]?.[to] ?? [];
+              const expected = rolesAllowed.includes(role) || (role === 'SUPER_ADMIN' && rolesAllowed.includes('ADMIN'));
+              const succeeded = res.status === 200;
+              if (res.status >= 500) mismatches.push(`${role} ${from}->${to}: HTTP ${res.status}`);
+              else if (succeeded !== expected) mismatches.push(`${role} ${from}->${to}: expected ${expected ? 'allowed' : 'refused'}, got ${res.status}`);
+              if (!succeeded) expect(await statusOf(order.id)).toBe(from);
+            }
           }
         }
+      } finally {
+        await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true); // later tests in this file rely on automatic dispatch
       }
       expect(mismatches).toEqual([]);
     });
@@ -272,7 +291,8 @@ describe('E2E — order lifecycle', () => {
       expect(commissions.find((c: any) => c.vendor_branch_id === v1.branchId).amount_minor).toBe(1000);
       expect(commissions.find((c: any) => c.vendor_branch_id === v2.branchId).amount_minor).toBe(2000);
       await driverStep(driver, delivery.id, 'ON_THE_WAY');
-      expectData(await driverStep(driver, delivery.id, 'DELIVERED'));
+      // M4 — Proof of Delivery is required for the DELIVERED transition.
+      expectData(await driverStep(driver, delivery.id, 'DELIVERED', { proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) }));
     });
 
     it('MULTI_VENDOR_ORDERS_ENABLED=false refuses a multi-vendor checkout without touching the cart, but single-vendor checkout still works', async () => {
@@ -329,7 +349,11 @@ describe('E2E — order lifecycle', () => {
       expect(await statusOf(order.id)).toBe('ASSIGNED_TO_DRIVER');
       const driver = await s.driverAssignedTo(order.id);
       const delivery = await deliveryOf(driver);
-      for (const status of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) expectData(await driverStep(driver, delivery.id, status));
+      for (const status of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) {
+        // M4 — Proof of Delivery is required for the DELIVERED transition.
+        const extra = status === 'DELIVERED' ? { proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) } : {};
+        expectData(await driverStep(driver, delivery.id, status, extra));
+      }
       const commissions = await world.ds.query("SELECT vendor_branch_id, amount_minor FROM financial_events WHERE order_id = $1 AND type = 'VENDOR_COMMISSION_RECOGNIZED'", [order.id]);
       expect(commissions).toEqual([{ vendor_branch_id: v1.branchId, amount_minor: 1000 }]); // none for the cancelled vendor
 

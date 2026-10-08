@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../core/media/media_url.dart';
 import '../core/theme/hatly_theme.dart';
 
 enum HatlyImageShape { rounded, circular }
@@ -39,23 +40,24 @@ class HatlyImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (url == null || url!.isEmpty) {
-      return _placeholder();
+    final resolvedUrl = resolveMediaUrl(url);
+    if (resolvedUrl == null) {
+      return _placeholder(context);
     }
     return ClipRRect(
       borderRadius: _radius,
       child: CachedNetworkImage(
-        imageUrl: url!,
+        imageUrl: resolvedUrl,
         width: width,
         height: height,
         fit: fit,
-        placeholder: (context, _) => _placeholder(),
-        errorWidget: (context, _, __) => _failed(),
+        placeholder: (context, _) => _placeholder(context),
+        errorWidget: (context, _, __) => _failed(context),
       ),
     );
   }
 
-  Widget _placeholder() {
+  Widget _placeholder(BuildContext context) {
     return ClipRRect(
       borderRadius: _radius,
       child: Container(
@@ -69,13 +71,18 @@ class HatlyImage extends StatelessWidget {
     );
   }
 
-  Widget _failed() {
+  Widget _failed(BuildContext context) {
+    // Dark Mode fix: this used to hardcode `HatlyColors.background` (a light
+    // off-white) as the failed-image fill, which showed as a glaring bright
+    // box on a dark background. Kept byte-identical in Light Mode; Dark Mode
+    // uses the theme's neutral filled-control colour instead.
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ClipRRect(
       borderRadius: _radius,
       child: Container(
         width: width,
         height: height,
-        color: HatlyColors.background,
+        color: isDark ? context.palette.surfaceSoft : HatlyColors.background,
         child: const Center(
             child: Icon(Icons.broken_image_outlined,
                 color: HatlyColors.closedUnavailable)),

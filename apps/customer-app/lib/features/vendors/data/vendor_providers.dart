@@ -42,7 +42,16 @@ typedef VendorListKey = ({
   String? sort,
   String? search,
   double? latitude,
-  double? longitude
+  double? longitude,
+  // Consolidated customer-commerce milestone, Part E: part of the key
+  // for the same reason sort/search are — selecting a different
+  // subcategory is exactly the same kind of "start over from page 1"
+  // event.
+  String? subcategoryId,
+  // Filters V1: same "changing it means start over from page 1" reasoning.
+  bool openNow,
+  bool hasOffers,
+  double? minRating,
 });
 
 class VendorListController extends StateNotifier<AsyncValue<List<Vendor>>> {
@@ -72,6 +81,10 @@ class VendorListController extends StateNotifier<AsyncValue<List<Vendor>>> {
         limit: _limit,
         latitude: _key.latitude,
         longitude: _key.longitude,
+        subcategoryId: _key.subcategoryId,
+        openNow: _key.openNow,
+        hasOffers: _key.hasOffers,
+        minRating: _key.minRating,
       );
       _page = 1;
       _hasMore = result.hasMore;
@@ -101,6 +114,10 @@ class VendorListController extends StateNotifier<AsyncValue<List<Vendor>>> {
         limit: _limit,
         latitude: _key.latitude,
         longitude: _key.longitude,
+        subcategoryId: _key.subcategoryId,
+        openNow: _key.openNow,
+        hasOffers: _key.hasOffers,
+        minRating: _key.minRating,
       );
       _page = nextPage;
       _hasMore = result.hasMore;

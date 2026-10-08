@@ -1,7 +1,8 @@
 import { ConflictException } from '@nestjs/common';
-import { DeliveryAssignmentService } from './delivery-assignment.service';
+import { DeliveryAssignmentService, OrderNotAssignableException } from './delivery-assignment.service';
 import { Driver } from './entities/driver.entity';
 import { Delivery } from './entities/delivery.entity';
+import { Order } from '../orders/entities/order.entity';
 
 // DeliveryAssignmentService now receives its Redis client via
 // constructor injection (Group 1 — Redis reliability hardening) rather
@@ -13,25 +14,53 @@ import { Delivery } from './entities/delivery.entity';
  * only — not a re-test of the existing locking/candidate-selection
  * logic (untouched by this chunk).
  */
-function buildHarness(opts: { driver?: any; transitionSucceeds?: boolean; existingDelivery?: any } = {}) {
+function buildHarness(
+  opts: { driver?: any; transitionSucceeds?: boolean; existingDelivery?: any; orderStatus?: string; drivers?: Record<string, any>; fulfillmentType?: string } = {},
+) {
   const driver = opts.driver ?? { id: 'driver-1', userId: 'user-1', isAvailable: true, isOnline: true };
+  const writes: string[] = [];
 
   const manager = {
-    findOne: async (EntityClass: any, _opts: any) => {
-      if (EntityClass === Driver) return driver ? { ...driver } : null;
+    findOne: async (EntityClass: any, findOpts: any) => {
+      if (EntityClass === Order) return { id: findOpts.where.id, status: opts.orderStatus ?? 'READY_FOR_PICKUP', fulfillmentType: opts.fulfillmentType ?? 'DELIVERY' };
+      if (EntityClass === Driver) {
+        const row = opts.drivers ? opts.drivers[findOpts.where.id] : driver;
+        return row ? { ...row } : null;
+      }
       if (EntityClass === Delivery) return opts.existingDelivery ? { ...opts.existingDelivery } : null; // deliveries.order_id is UNIQUE
       throw new Error('unhandled findOne');
     },
-    save: async (entity: any) => entity,
+    save: async (entity: any) => {
+      writes.push(`save:${entity.driverId !== undefined ? 'delivery' : 'driver'}`);
+      return entity;
+    },
     create: (_EntityClass: any, data: any) => ({ id: 'delivery-1', ...data }),
+    createQueryBuilder: () => {
+      const qb: any = { update: () => qb, set: () => qb, where: () => qb, execute: async () => writes.push('resolve-alerts') };
+      return qb;
+    },
   };
-  const dataSource = { transaction: async (cb: any) => cb(manager) };
+  // A real transaction rolls back on error: model that by discarding the writes of a failed callback.
+  const dataSource = {
+    transaction: async (cb: any) => {
+      const before = writes.length;
+      try {
+        return await cb(manager);
+      } catch (e) {
+        writes.splice(before);
+        throw e;
+      }
+    },
+  };
 
+  const afterCommit = jest.fn(async () => undefined);
   const orderStateMachine = {
-    transition: jest.fn(async () => {
+    transitionInTransaction: jest.fn(async (_m: any, params: any) => {
       if (opts.transitionSucceeds === false) {
         throw new ConflictException('transition failed');
       }
+      writes.push(`transition:${params.to}`);
+      return { order: { id: params.orderId }, afterCommit };
     }),
   };
 
@@ -53,7 +82,7 @@ function buildHarness(opts: { driver?: any; transitionSucceeds?: boolean; existi
   (service as any).acquireLock = jest.fn(async () => true);
   (service as any).releaseLock = jest.fn(async () => undefined);
 
-  return { service, pushNotificationService, orderStateMachine };
+  return { service, pushNotificationService, orderStateMachine, writes, afterCommit };
 }
 
 describe('DeliveryAssignmentService — Driver Push Notifications', () => {
@@ -206,5 +235,98 @@ describe('DeliveryAssignmentService — Reliability & Adversarial Testing milest
     await (service as any).releaseLock('driver-1', token);
     const token2 = await (service as any).acquireLock('driver-1');
     expect(typeof token2).toBe('string');
+  });
+});
+
+describe('DeliveryAssignmentService — atomic assignment (Control Tower milestone)', () => {
+  const code = (e: any) => e?.getResponse?.()?.details?.code;
+
+  it('assigns in ONE transaction: driver locked out, delivery written, open alerts resolved, READY→ASSIGNED — push only after commit', async () => {
+    const h = buildHarness();
+    await h.service.assignDriver({ orderId: 'order-1', candidateDriverIds: ['driver-1'] });
+    expect(h.writes).toEqual(['save:driver', 'save:delivery', 'resolve-alerts', 'transition:ASSIGNED_TO_DRIVER']);
+    expect(h.afterCommit).toHaveBeenCalledTimes(1);
+    expect(h.pushNotificationService.sendOrderAssignedNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['PENDING', 'PREPARING', 'ASSIGNED_TO_DRIVER', 'PICKED_UP', 'CANCELLED', 'DELIVERED'])(
+    'an order that is %s is refused BEFORE anything is written (no driver locked out, no delivery overwritten, no push)',
+    async (orderStatus) => {
+      const h = buildHarness({ orderStatus, existingDelivery: { id: 'delivery-1', orderId: 'order-1', driverId: 'current-driver' } });
+      const error = await h.service.assignDriver({ orderId: 'order-1', candidateDriverIds: ['driver-1'] }).catch((e) => e);
+      expect(error).toBeInstanceOf(OrderNotAssignableException);
+      expect(code(error)).toBe('ORDER_NOT_ASSIGNABLE');
+      expect(h.writes).toEqual([]);
+      expect(h.pushNotificationService.sendOrderAssignedNotification).not.toHaveBeenCalled();
+    },
+  );
+
+  it('a PICKUP order (collected by the customer, no address) is never assigned to a driver — nothing written', async () => {
+    const h = buildHarness({ fulfillmentType: 'PICKUP' });
+    const error = await h.service.assignDriver({ orderId: 'order-1', candidateDriverIds: ['driver-1'] }).catch((e) => e);
+    expect(error).toBeInstanceOf(OrderNotAssignableException);
+    expect(h.writes).toEqual([]);
+  });
+
+  it('a failing transition rolls the whole assignment back (nothing half-applied)', async () => {
+    const h = buildHarness({ transitionSucceeds: false });
+    await expect(h.service.assignDriver({ orderId: 'order-1', candidateDriverIds: ['driver-1'] })).rejects.toThrow();
+    expect(h.writes).toEqual([]);
+  });
+
+  it('exhausting every candidate is a 409 with a machine-readable code', async () => {
+    const h = buildHarness({ driver: { id: 'driver-1', userId: 'u', isAvailable: false, isOnline: true } });
+    const error = await h.service.assignDriver({ orderId: 'order-1', candidateDriverIds: ['driver-1'] }).catch((e) => e);
+    expect(code(error)).toBe('NO_AVAILABLE_DRIVER');
+  });
+
+  describe('reassignDriver', () => {
+    const drivers = {
+      old: { id: 'old', userId: 'u-old', isAvailable: false, isOnline: true },
+      next: { id: 'next', userId: 'u-next', isAvailable: true, isOnline: true },
+      offline: { id: 'offline', userId: 'u-off', isAvailable: true, isOnline: false },
+    };
+    const assigned = () => ({ orderStatus: 'ASSIGNED_TO_DRIVER', drivers, existingDelivery: { id: 'delivery-1', orderId: 'order-1', driverId: 'old', reassignmentCount: 2 } });
+
+    it('releases and re-assigns in ONE transaction; counter +1; the new driver is notified after commit', async () => {
+      const h = buildHarness(assigned());
+      const delivery = await h.service.reassignDriver({ orderId: 'order-1', newDriverId: 'next', expectedCurrentDriverId: 'old' });
+      expect(h.writes).toEqual(['transition:READY_FOR_PICKUP', 'save:driver', 'save:delivery', 'resolve-alerts', 'transition:ASSIGNED_TO_DRIVER']);
+      expect(delivery).toMatchObject({ driverId: 'next', reassignmentCount: 3 });
+      expect(h.afterCommit).toHaveBeenCalledTimes(2);
+      expect(h.pushNotificationService.sendOrderAssignedNotification).toHaveBeenCalledWith('u-next', 'order-1', 'delivery-1');
+    });
+
+    it.each([
+      ['the assignment changed since the admin loaded it', { newDriverId: 'next', expectedCurrentDriverId: 'someone-else' }, 'ASSIGNMENT_CHANGED'],
+      ['the new driver is the current driver', { newDriverId: 'old' }, 'DRIVER_ALREADY_ASSIGNED'],
+      ['the new driver is offline', { newDriverId: 'offline' }, 'DRIVER_UNAVAILABLE'],
+      ['the new driver does not exist', { newDriverId: 'ghost' }, 'DRIVER_UNAVAILABLE'],
+    ])('refused when %s — and NOTHING changes (the order stays with its driver)', async (_, params, expected) => {
+      const h = buildHarness(assigned());
+      const error = await h.service.reassignDriver({ orderId: 'order-1', ...params } as any).catch((e) => e);
+      expect(code(error)).toBe(expected);
+      expect(h.writes).toEqual([]);
+      expect(h.pushNotificationService.sendOrderAssignedNotification).not.toHaveBeenCalled();
+    });
+
+    it.each(['READY_FOR_PICKUP', 'PICKED_UP', 'ON_THE_WAY', 'DELIVERED', 'FAILED_DELIVERY', 'CANCELLED'])(
+      'an order that is %s cannot be reassigned (the carrying driver is never marked available)',
+      async (orderStatus) => {
+        const h = buildHarness({ ...assigned(), orderStatus });
+        const error = await h.service.reassignDriver({ orderId: 'order-1', newDriverId: 'next' }).catch((e) => e);
+        expect(error).toBeInstanceOf(OrderNotAssignableException);
+        expect(code(error)).toBe('ORDER_NOT_REASSIGNABLE');
+        expect(h.writes).toEqual([]);
+      },
+    );
+
+    it('a busy driver lock (another assignment mid-flight for the new driver) is a clear 409, nothing changes', async () => {
+      const h = buildHarness(assigned());
+      (h.service as any).acquireLock = jest.fn(async () => null);
+      const error = await h.service.reassignDriver({ orderId: 'order-1', newDriverId: 'next' }).catch((e) => e);
+      expect(code(error)).toBe('DRIVER_UNAVAILABLE');
+      expect(h.writes).toEqual([]);
+    });
   });
 });

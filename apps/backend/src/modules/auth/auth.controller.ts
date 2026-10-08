@@ -81,7 +81,9 @@ export class AuthController {
     return { data: tokens };
   }
 
+  // Refresh is public (the access token has expired) and rotates a single-use token — keep it well below the global 100/min.
   @Public()
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() dto: RefreshTokenDto) {

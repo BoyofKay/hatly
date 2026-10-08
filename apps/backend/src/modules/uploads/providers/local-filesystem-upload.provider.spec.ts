@@ -57,4 +57,36 @@ describe('LocalFilesystemUploadProvider', () => {
     const result = await provider.store({ base64Content: 'YQ==', filename: 'malware.exe' });
     expect(result.url).not.toContain('.exe');
   });
+
+  describe('storage-boundary safety', () => {
+    it.each(['../../etc/passwd', '..\\..\\windows\\system32', '/etc/passwd', 'a/b/c.png', 'x.png/../../../y.png', 'photo.png\0.html', 'photo.PNG.exe', '.htaccess', ''])(
+      'a hostile filename (%j) can never move the file out of the storage directory or choose its name',
+      async (filename) => {
+        const provider = buildProvider(tmpDir);
+        const result = await provider.store({ base64Content: Buffer.from('x').toString('base64'), filename });
+
+        const key = result.url.slice('/uploads/files/'.length);
+        expect(key).toMatch(/^[0-9a-f-]{36}(\.(jpg|jpeg|png|webp))?$/);
+        expect(key).not.toMatch(/[\\/]|\.\./);
+        const entries = await fs.readdir(tmpDir);
+        expect(entries).toEqual([key]); // exactly one file, directly inside the directory
+      },
+    );
+
+    it('only an allow-listed image extension is ever kept; anything else is stored with NO extension (never .html/.svg/.php/.exe)', async () => {
+      const provider = buildProvider(tmpDir);
+      for (const filename of ['a.html', 'a.svg', 'a.php', 'a.exe', 'a.js', 'a.PNG.html']) {
+        const { url } = await provider.store({ base64Content: Buffer.from('x').toString('base64'), filename });
+        expect(url).not.toMatch(/\.(html|svg|php|exe|js)$/);
+      }
+    });
+
+    it('two uploads never collide or overwrite each other', async () => {
+      const provider = buildProvider(tmpDir);
+      const a = await provider.store({ base64Content: Buffer.from('one').toString('base64'), filename: 'x.png' });
+      const b = await provider.store({ base64Content: Buffer.from('two').toString('base64'), filename: 'x.png' });
+      expect(a.url).not.toBe(b.url);
+      expect((await fs.readdir(tmpDir)).length).toBe(2);
+    });
+  });
 });

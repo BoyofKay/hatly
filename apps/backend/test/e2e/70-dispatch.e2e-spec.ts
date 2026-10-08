@@ -37,7 +37,9 @@ describe('E2E — dispatch & drivers', () => {
     const driver = await s.driverAssignedTo(orderId);
     const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: driver.accessToken })).find((d) => d.orderId === orderId);
     for (const st of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) {
-      expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body: { status: st } }));
+      // M4 — Proof of Delivery is required for the DELIVERED transition (see s.uploadFakePhoto's own comment).
+      const body = st === 'DELIVERED' ? { status: st, proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) } : { status: st };
+      expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: driver.accessToken, body }));
     }
   };
   /** Takes every existing driver out of the running so a test controls exactly who is eligible. */
@@ -63,6 +65,12 @@ describe('E2E — dispatch & drivers', () => {
     boundary.reset();
     await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true);
     await retireAllDrivers();
+    // Test isolation (M5 Batch 3). Every real assignment gets a genuine 30 s acceptDeadlineAt, and the timeout sweep is global
+    // (it looks at EVERY expired assigned delivery, by design). Deliveries left assigned by earlier tests would therefore
+    // silently turn "expired" once the suite had been running for 30 s+ (a slow or loaded machine) and be picked up by a later
+    // test's own sweep, skewing its processed/alerted counts. Starting each test from a clean baseline — no leftover delivery
+    // can ever be due — makes the outcome independent of how long the suite has been running. Production logic is untouched.
+    await world.ds.query("UPDATE deliveries SET accept_deadline_at = NOW() + INTERVAL '1 hour' WHERE accept_deadline_at IS NOT NULL");
   });
   afterAll(async () => {
     try {
@@ -105,7 +113,10 @@ describe('E2E — dispatch & drivers', () => {
     it('a bicycle driver is excluded until a maximum pickup distance is configured, then only within it', async () => {
       const bike = await s.driver({ ...near });
       const [bicycleType] = await world.ds.query("INSERT INTO vehicle_types (name, max_active_deliveries, is_bicycle) VALUES ('Bicycle', 1, true) RETURNING id");
-      await world.ds.query('UPDATE drivers SET vehicle_type_id = $2 WHERE id = $1', [bike.driverId, bicycleType.id]);
+      const admin = await s.superAdmin();
+      const setVehicle = async (vehicleTypeId: string | null) =>
+        expectData(await world.api('patch', `/admin/drivers/${bike.driverId}/vehicle-type`, { token: admin.accessToken, body: { vehicleTypeId } }));
+      await setVehicle(bicycleType.id);
       const first = await readyOrder();
       expect(await status(first.id)).toBe('READY_FOR_PICKUP'); // fail closed: no limit configured
       await s.setConfig('MAX_BICYCLE_PICKUP_DISTANCE_METERS', 10);
@@ -115,7 +126,7 @@ describe('E2E — dispatch & drivers', () => {
       const ok = await readyOrder();
       expect((await deliveryRow(ok.id)).driver_id).toBe(bike.driverId);
       await world.ds.query('DELETE FROM dispatch_alerts');
-      await world.ds.query('UPDATE drivers SET vehicle_type_id = NULL WHERE id = $1', [bike.driverId]);
+      await setVehicle(null);
       await world.ds.query('DELETE FROM vehicle_types WHERE id = $1', [bicycleType.id]);
     });
 

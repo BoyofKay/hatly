@@ -66,6 +66,9 @@ export function integrationEnv(): Record<string, string> {
     STORAGE_BUCKET: '',
     STORAGE_ACCESS_KEY: '',
     STORAGE_SECRET_KEY: '',
+    // M5 Batch 1/2 knobs, pinned (empty = unset) so a developer's own .env can never change what the suite exercises.
+    STORAGE_DRIVER: 'local', STORAGE_ACCESS: 'private', STORAGE_PUBLIC_BASE_URL: '', STORAGE_FORCE_PATH_STYLE: '', STORAGE_SIGNED_URL_TTL_SECONDS: '', STORAGE_KEY_PREFIX: '',
+    CORS_ALLOWED_ORIGINS: '', TRUST_PROXY: '', ENABLE_API_DOCS: '', DB_SSL_REJECT_UNAUTHORIZED: '', ALLOW_INSECURE_DB: '', ALLOW_MISSING_SMS_PROVIDER: '', ALLOW_MISSING_PUSH_PROVIDER: '', UPLOADS_PUBLIC_URL_PREFIX: '/uploads/files',
     FCM_PROJECT_ID: '',
     FCM_CLIENT_EMAIL: '',
     FCM_PRIVATE_KEY: '',

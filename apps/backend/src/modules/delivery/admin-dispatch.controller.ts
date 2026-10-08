@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { RequiresPermission } from '../permissions/decorators/requires-permission.decorator';
 import { Permission } from '../permissions/permission.enum';
 import { PermissionsService } from '../permissions/permissions.service';
@@ -9,6 +9,7 @@ import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-
 import { AdminDispatchService } from './admin-dispatch.service';
 import { AssignDriverDto } from './dto/assign-driver.dto';
 import { ReassignDriverDto } from './dto/reassign-driver.dto';
+import { ListDispatchAlertsQueryDto } from './dto/list-dispatch-alerts-query.dto';
 import { DispatchAlert } from './entities/dispatch-alert.entity';
 
 /**
@@ -43,7 +44,7 @@ export class AdminDispatchController {
     @Param('orderId') orderId: string,
     @Body() dto: AssignDriverDto,
   ) {
-    const hasOverride = await this.permissionsService.hasPermission(user.id, Permission.OVERRIDE_DISPATCH);
+    const hasOverride = await this.permissionsService.actorHolds(user, Permission.OVERRIDE_DISPATCH);
     const delivery = await this.adminDispatchService.assign(orderId, dto.driverId, hasOverride);
     return { data: delivery };
   }
@@ -55,8 +56,8 @@ export class AdminDispatchController {
     @Param('orderId') orderId: string,
     @Body() dto: ReassignDriverDto,
   ) {
-    const hasOverride = await this.permissionsService.hasPermission(user.id, Permission.OVERRIDE_DISPATCH);
-    const delivery = await this.adminDispatchService.reassign(orderId, dto.driverId, hasOverride);
+    const hasOverride = await this.permissionsService.actorHolds(user, Permission.OVERRIDE_DISPATCH);
+    const delivery = await this.adminDispatchService.reassign(orderId, dto.driverId, hasOverride, dto.expectedCurrentDriverId);
     return { data: delivery };
   }
 }
@@ -68,10 +69,21 @@ export class AdminDispatchAlertsController {
     @InjectRepository(DispatchAlert) private readonly dispatchAlertsRepository: Repository<DispatchAlert>,
   ) {}
 
+  /**
+   * Newest first, bounded (`limit`, default 100, max 500 — this table only grows). `open=true` = only alerts not yet
+   * resolved by a successful assignment. Each alert carries its order's number (the reference an admin searches by).
+   */
   @Get()
   @RequiresPermission(Permission.ASSIGN_REASSIGN_ORDERS)
-  async list() {
-    const alerts = await this.dispatchAlertsRepository.find({ order: { createdAt: 'DESC' } });
-    return { data: alerts };
+  async list(@Query() query: ListDispatchAlertsQueryDto) {
+    const alerts = await this.dispatchAlertsRepository.find({
+      where: query.open ? { resolvedAt: IsNull() } : {},
+      relations: { order: true },
+      order: { createdAt: 'DESC' },
+      take: query.limit ?? 100,
+    });
+    return {
+      data: alerts.map(({ order, ...alert }) => ({ ...alert, orderNumber: order?.orderNumber ?? null, orderStatus: order?.status ?? null })),
+    };
   }
 }

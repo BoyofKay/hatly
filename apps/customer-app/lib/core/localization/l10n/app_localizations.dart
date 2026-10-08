@@ -212,6 +212,12 @@ abstract class AppLocalizations {
   /// **'حدث خطأ ما'**
   String get somethingWentWrong;
 
+  /// No description provided for @routeNotFoundTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'الصفحة غير موجودة'**
+  String get routeNotFoundTitle;
+
   /// No description provided for @logout.
   ///
   /// In ar, this message translates to:
@@ -758,6 +764,18 @@ abstract class AppLocalizations {
   /// **'أضف إلى السلة'**
   String get customRequestSubmit;
 
+  /// No description provided for @customRequestAddImage.
+  ///
+  /// In ar, this message translates to:
+  /// **'إضافة صورة'**
+  String get customRequestAddImage;
+
+  /// No description provided for @customRequestRemoveImage.
+  ///
+  /// In ar, this message translates to:
+  /// **'إزالة الصورة'**
+  String get customRequestRemoveImage;
+
   /// No description provided for @cartCustomRequestBadge.
   ///
   /// In ar, this message translates to:
@@ -998,6 +1016,12 @@ abstract class AppLocalizations {
   /// **'تم التوصيل'**
   String get orderStatusDelivered;
 
+  /// No description provided for @orderStatusCollected.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم الاستلام'**
+  String get orderStatusCollected;
+
   /// No description provided for @orderStatusCancelled.
   ///
   /// In ar, this message translates to:
@@ -1045,6 +1069,96 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'السعر: من الأعلى إلى الأقل'**
   String get sortPriceHighToLow;
+
+  /// No description provided for @sortOffers.
+  ///
+  /// In ar, this message translates to:
+  /// **'العروض'**
+  String get sortOffers;
+
+  /// No description provided for @filterAction.
+  ///
+  /// In ar, this message translates to:
+  /// **'فلترة'**
+  String get filterAction;
+
+  /// No description provided for @sortAction.
+  ///
+  /// In ar, this message translates to:
+  /// **'ترتيب'**
+  String get sortAction;
+
+  /// No description provided for @clearAll.
+  ///
+  /// In ar, this message translates to:
+  /// **'مسح الكل'**
+  String get clearAll;
+
+  /// No description provided for @apply.
+  ///
+  /// In ar, this message translates to:
+  /// **'تطبيق'**
+  String get apply;
+
+  /// No description provided for @filterOpenNow.
+  ///
+  /// In ar, this message translates to:
+  /// **'مفتوح الآن'**
+  String get filterOpenNow;
+
+  /// No description provided for @filterHasOffers.
+  ///
+  /// In ar, this message translates to:
+  /// **'عروض'**
+  String get filterHasOffers;
+
+  /// No description provided for @filterRatingLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'التقييم'**
+  String get filterRatingLabel;
+
+  /// No description provided for @filterRatingAny.
+  ///
+  /// In ar, this message translates to:
+  /// **'الكل'**
+  String get filterRatingAny;
+
+  /// No description provided for @filterRating4Plus.
+  ///
+  /// In ar, this message translates to:
+  /// **'4.0 فأعلى'**
+  String get filterRating4Plus;
+
+  /// No description provided for @filterRating3Plus.
+  ///
+  /// In ar, this message translates to:
+  /// **'3.0 فأعلى'**
+  String get filterRating3Plus;
+
+  /// No description provided for @filterAvailableOnly.
+  ///
+  /// In ar, this message translates to:
+  /// **'متوفر فقط'**
+  String get filterAvailableOnly;
+
+  /// No description provided for @filterPriceRangeLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'نطاق السعر'**
+  String get filterPriceRangeLabel;
+
+  /// No description provided for @filterPriceMinHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'من'**
+  String get filterPriceMinHint;
+
+  /// No description provided for @filterPriceMaxHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'إلى'**
+  String get filterPriceMaxHint;
 
   /// No description provided for @checkoutTitle.
   ///
@@ -1577,7 +1691,7 @@ abstract class AppLocalizations {
   /// No description provided for @cartErrorMixedCartTypes.
   ///
   /// In ar, this message translates to:
-  /// **'لا يمكن الجمع بين منتجات المتاجر وخدمة هاتلي في سلة واحدة. أفرغ السلة للتبديل.'**
+  /// **'لا يمكن الجمع بين منتجات المتاجر وطلبات خدمة هاتلي في سلة واحدة. امسح السلة للتبديل بينهما.'**
   String get cartErrorMixedCartTypes;
 
   /// No description provided for @cartEmptyTitle.
@@ -1970,6 +2084,12 @@ abstract class AppLocalizations {
   /// **'التحويل اليدوي غير متاح حاليًا'**
   String get checkoutTransferUnavailable;
 
+  /// No description provided for @checkoutPickupCashNote.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلبات الاستلام تُدفع نقدًا في الفرع عند استلامها.'**
+  String get checkoutPickupCashNote;
+
   /// No description provided for @checkoutTransferUnavailableWeighed.
   ///
   /// In ar, this message translates to:
@@ -2167,6 +2287,18 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'لا يمكن إتمام الطلب حاليًا. راجع سلتك وحاول مرة أخرى.'**
   String get checkoutBlockerGeneric;
+
+  /// No description provided for @checkoutBlockerAdHocPickupRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلب خدمة هاتلي هذا بدون موقع استلام. احذفه من السلة وأضفه مرة أخرى مع موقع المكان.'**
+  String get checkoutBlockerAdHocPickupRequired;
+
+  /// No description provided for @checkoutBlockerAdHocDestinationRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلب خدمة هاتلي هذا بدون وجهة. احذفه من السلة وأضفه مرة أخرى مع الوجهة.'**
+  String get checkoutBlockerAdHocDestinationRequired;
 
   /// No description provided for @checkoutBlockerUnavailable.
   ///
@@ -2519,7 +2651,7 @@ abstract class AppLocalizations {
   /// No description provided for @addressBuildingLabel.
   ///
   /// In ar, this message translates to:
-  /// **'رقم العقار'**
+  /// **'العمارة'**
   String get addressBuildingLabel;
 
   /// No description provided for @addressFloorLabel.
@@ -2599,6 +2731,732 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'فتح إعدادات التطبيق'**
   String get addressOpenSettings;
+
+  /// No description provided for @hatlyServiceEntryTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'خدمة هاتلي'**
+  String get hatlyServiceEntryTitle;
+
+  /// No description provided for @hatlyServiceEntrySubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'محتاج حاجة من مكان مش موجود عندنا؟ اطلبها من هاتلي.'**
+  String get hatlyServiceEntrySubtitle;
+
+  /// No description provided for @hatlyServiceScreenTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'خدمة هاتلي'**
+  String get hatlyServiceScreenTitle;
+
+  /// No description provided for @hatlyServiceTypeSectionTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'محتاج إيه؟'**
+  String get hatlyServiceTypeSectionTitle;
+
+  /// No description provided for @hatlyServiceTypeBuyFromPlace.
+  ///
+  /// In ar, this message translates to:
+  /// **'هاتلي من مكان'**
+  String get hatlyServiceTypeBuyFromPlace;
+
+  /// No description provided for @hatlyServiceTypeBuyFromPlaceHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'قولنا هاتلك إيه ومن فين، وإحنا هنجيبه لك.'**
+  String get hatlyServiceTypeBuyFromPlaceHint;
+
+  /// No description provided for @hatlyServiceTypeDeliverToPlace.
+  ///
+  /// In ar, this message translates to:
+  /// **'وصّلي لمكان'**
+  String get hatlyServiceTypeDeliverToPlace;
+
+  /// No description provided for @hatlyServiceTypeDeliverToPlaceHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'قولنا هنوصّل إيه وفين، وإحنا هنستلمه ونوصّله.'**
+  String get hatlyServiceTypeDeliverToPlaceHint;
+
+  /// No description provided for @hatlyServiceExistingGroupNotice.
+  ///
+  /// In ar, this message translates to:
+  /// **'عندك بالفعل طلب خدمة هاتلي في سلتك. هذا الصنف هيتضاف إليه.'**
+  String get hatlyServiceExistingGroupNotice;
+
+  /// No description provided for @hatlyServicePlaceNameLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'اسم الطلب'**
+  String get hatlyServicePlaceNameLabel;
+
+  /// No description provided for @hatlyServicePlaceNameHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'مثال: كارفور مول مصر، أو بيت ماما'**
+  String get hatlyServicePlaceNameHint;
+
+  /// No description provided for @hatlyServicePlaceNameRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اكتب اسمًا مختصرًا لهذا الطلب'**
+  String get hatlyServicePlaceNameRequired;
+
+  /// No description provided for @hatlyServiceDescriptionLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'اوصف اللي محتاجه'**
+  String get hatlyServiceDescriptionLabel;
+
+  /// No description provided for @hatlyServiceDescriptionHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'كن محددًا قدر الإمكان — الصنف، الماركة، الكمية، أي تفاصيل تساعدنا.'**
+  String get hatlyServiceDescriptionHint;
+
+  /// No description provided for @hatlyServiceDescriptionRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اوصف اللي محتاجه'**
+  String get hatlyServiceDescriptionRequired;
+
+  /// No description provided for @hatlyServiceImagesLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'صور (اختياري)'**
+  String get hatlyServiceImagesLabel;
+
+  /// No description provided for @hatlyServiceLocationPickupTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'موقع الاستلام (مطلوب)'**
+  String get hatlyServiceLocationPickupTitle;
+
+  /// No description provided for @hatlyServiceLocationDestinationTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'موقع التوصيل (مطلوب)'**
+  String get hatlyServiceLocationDestinationTitle;
+
+  /// No description provided for @hatlyServiceLocationDestinationHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'حدد بالضبط أين يجب توصيل هذا الطلب — هاتلي لا يمكنه تخمين ذلك نيابة عنك.'**
+  String get hatlyServiceLocationDestinationHint;
+
+  /// No description provided for @hatlyServiceLocationPickupHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'حدد بالضبط المكان الذي يجب أن تشتري هاتلي منه — هاتلي لا يمكنه تخمين ذلك نيابة عنك.'**
+  String get hatlyServiceLocationPickupHint;
+
+  /// No description provided for @hatlyServiceReviewTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'راجع طلبك'**
+  String get hatlyServiceReviewTitle;
+
+  /// No description provided for @hatlyServiceReviewEdit.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعديل'**
+  String get hatlyServiceReviewEdit;
+
+  /// No description provided for @hatlyServiceReviewTypeLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'الخدمة'**
+  String get hatlyServiceReviewTypeLabel;
+
+  /// No description provided for @hatlyServiceReviewPlaceLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'اسم الطلب'**
+  String get hatlyServiceReviewPlaceLabel;
+
+  /// No description provided for @hatlyServiceReviewDescriptionLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'التفاصيل'**
+  String get hatlyServiceReviewDescriptionLabel;
+
+  /// No description provided for @hatlyServiceReviewImagesLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'الصور'**
+  String get hatlyServiceReviewImagesLabel;
+
+  /// No description provided for @hatlyServiceReviewLocationLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'الموقع'**
+  String get hatlyServiceReviewLocationLabel;
+
+  /// No description provided for @hatlyServiceReviewLocationSet.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم تحديده — سيُستخدم لهذا الطلب'**
+  String get hatlyServiceReviewLocationSet;
+
+  /// No description provided for @hatlyServiceReviewLocationRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'غير محدد — يجب تحديده قبل إمكانية إضافة هذا الطلب'**
+  String get hatlyServiceReviewLocationRequired;
+
+  /// No description provided for @hatlyServiceContinueToReview.
+  ///
+  /// In ar, this message translates to:
+  /// **'مراجعة الطلب'**
+  String get hatlyServiceContinueToReview;
+
+  /// No description provided for @hatlyServiceSubmit.
+  ///
+  /// In ar, this message translates to:
+  /// **'أضف إلى السلة'**
+  String get hatlyServiceSubmit;
+
+  /// No description provided for @hatlyServiceAddedConfirmation.
+  ///
+  /// In ar, this message translates to:
+  /// **'تمت الإضافة إلى السلة'**
+  String get hatlyServiceAddedConfirmation;
+
+  /// No description provided for @orderHatlyServiceTypeLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'نوع الخدمة'**
+  String get orderHatlyServiceTypeLabel;
+
+  /// No description provided for @orderHatlyServicePickupLocationLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'موقع الاستلام'**
+  String get orderHatlyServicePickupLocationLabel;
+
+  /// No description provided for @orderHatlyServiceDestinationLocationLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'موقع التوصيل'**
+  String get orderHatlyServiceDestinationLocationLabel;
+
+  /// No description provided for @orderHatlyServiceLocationCoordinates.
+  ///
+  /// In ar, this message translates to:
+  /// **'محدد على الخريطة'**
+  String get orderHatlyServiceLocationCoordinates;
+
+  /// No description provided for @cartErrorAdHocPlaceNameRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اكتب اسمًا مختصرًا لهذا الطلب.'**
+  String get cartErrorAdHocPlaceNameRequired;
+
+  /// No description provided for @cartErrorAdHocServiceTypeRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر نوع خدمة هاتلي.'**
+  String get cartErrorAdHocServiceTypeRequired;
+
+  /// No description provided for @cartErrorAdHocLocationMismatch.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذا الموقع لا ينطبق على نوع الخدمة هذا.'**
+  String get cartErrorAdHocLocationMismatch;
+
+  /// No description provided for @cartErrorAdHocIncompleteCoordinate.
+  ///
+  /// In ar, this message translates to:
+  /// **'حدد الموقع مرة أخرى — لم يتم التقاطه بشكل صحيح.'**
+  String get cartErrorAdHocIncompleteCoordinate;
+
+  /// No description provided for @cartErrorAdHocSingleLocationOnly.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلب خدمة هاتلي يمكن أن يشمل موقعًا واحدًا فقط. أفرغ السلة لبدء طلب جديد.'**
+  String get cartErrorAdHocSingleLocationOnly;
+
+  /// No description provided for @cartErrorAdHocPickupOnly.
+  ///
+  /// In ar, this message translates to:
+  /// **'خدمة هاتلي غير متاحة مع الاستلام من المتجر — غيّر إلى التوصيل أولًا.'**
+  String get cartErrorAdHocPickupOnly;
+
+  /// No description provided for @cartErrorAdHocDestinationRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'من فضلك اختر وجهة لطلب التوصيل هذا قبل إضافته إلى السلة.'**
+  String get cartErrorAdHocDestinationRequired;
+
+  /// No description provided for @cartErrorAdHocPickupRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'من فضلك اختر موقع المكان المطلوب الشراء منه قبل إضافة هذا الطلب إلى السلة.'**
+  String get cartErrorAdHocPickupRequired;
+
+  /// No description provided for @profileMyAddresses.
+  ///
+  /// In ar, this message translates to:
+  /// **'عناويني'**
+  String get profileMyAddresses;
+
+  /// No description provided for @profileDefaultAddressTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'العنوان الافتراضي'**
+  String get profileDefaultAddressTitle;
+
+  /// No description provided for @profileNoDefaultAddress.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا يوجد عنوان افتراضي بعد'**
+  String get profileNoDefaultAddress;
+
+  /// No description provided for @profileManageAddresses.
+  ///
+  /// In ar, this message translates to:
+  /// **'إدارة'**
+  String get profileManageAddresses;
+
+  /// No description provided for @profileWalletCardTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'محفظة هاتلي'**
+  String get profileWalletCardTitle;
+
+  /// No description provided for @walletTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'المحفظة'**
+  String get walletTitle;
+
+  /// No description provided for @walletBalanceLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'رصيد المحفظة'**
+  String get walletBalanceLabel;
+
+  /// No description provided for @walletHistoryTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'سجل المعاملات'**
+  String get walletHistoryTitle;
+
+  /// No description provided for @walletEmptyHistory.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا توجد معاملات بعد'**
+  String get walletEmptyHistory;
+
+  /// No description provided for @walletTypeOrderPayment.
+  ///
+  /// In ar, this message translates to:
+  /// **'دفع طلب'**
+  String get walletTypeOrderPayment;
+
+  /// No description provided for @walletTypeOrderRefund.
+  ///
+  /// In ar, this message translates to:
+  /// **'استرداد طلب'**
+  String get walletTypeOrderRefund;
+
+  /// No description provided for @walletTypeAdminCredit.
+  ///
+  /// In ar, this message translates to:
+  /// **'رصيد مضاف'**
+  String get walletTypeAdminCredit;
+
+  /// No description provided for @walletTypeLoyaltyRedemption.
+  ///
+  /// In ar, this message translates to:
+  /// **'استبدال نقاط'**
+  String get walletTypeLoyaltyRedemption;
+
+  /// No description provided for @walletTypeDriverCashRemainder.
+  ///
+  /// In ar, this message translates to:
+  /// **'باقي نقدي'**
+  String get walletTypeDriverCashRemainder;
+
+  /// No description provided for @walletTypeAdjustment.
+  ///
+  /// In ar, this message translates to:
+  /// **'تسوية رصيد'**
+  String get walletTypeAdjustment;
+
+  /// No description provided for @walletTypeExpiration.
+  ///
+  /// In ar, this message translates to:
+  /// **'رصيد منتهي الصلاحية'**
+  String get walletTypeExpiration;
+
+  /// No description provided for @profileLoyaltyCardTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'نقاط هاتلي'**
+  String get profileLoyaltyCardTitle;
+
+  /// No description provided for @loyaltyTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'نقاط هاتلي'**
+  String get loyaltyTitle;
+
+  /// No description provided for @loyaltyBalanceLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'رصيد النقاط'**
+  String get loyaltyBalanceLabel;
+
+  /// No description provided for @loyaltyPointsSuffix.
+  ///
+  /// In ar, this message translates to:
+  /// **'نقطة'**
+  String get loyaltyPointsSuffix;
+
+  /// No description provided for @loyaltyHistoryTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'سجل النقاط'**
+  String get loyaltyHistoryTitle;
+
+  /// No description provided for @loyaltyEmptyHistory.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا يوجد نشاط نقاط بعد'**
+  String get loyaltyEmptyHistory;
+
+  /// No description provided for @loyaltyTypeEarning.
+  ///
+  /// In ar, this message translates to:
+  /// **'نقاط مكتسبة'**
+  String get loyaltyTypeEarning;
+
+  /// No description provided for @loyaltyTypeEarningReversed.
+  ///
+  /// In ar, this message translates to:
+  /// **'نقاط معكوسة (استرداد)'**
+  String get loyaltyTypeEarningReversed;
+
+  /// No description provided for @loyaltyTypeRedemption.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم التحويل إلى المحفظة'**
+  String get loyaltyTypeRedemption;
+
+  /// No description provided for @loyaltyTypeAdminAdjustment.
+  ///
+  /// In ar, this message translates to:
+  /// **'تسوية'**
+  String get loyaltyTypeAdminAdjustment;
+
+  /// No description provided for @loyaltyTypeExpiration.
+  ///
+  /// In ar, this message translates to:
+  /// **'نقاط منتهية الصلاحية'**
+  String get loyaltyTypeExpiration;
+
+  /// No description provided for @loyaltyConvertAction.
+  ///
+  /// In ar, this message translates to:
+  /// **'تحويل إلى المحفظة'**
+  String get loyaltyConvertAction;
+
+  /// No description provided for @loyaltyConvertSheetTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تحويل النقاط إلى المحفظة'**
+  String get loyaltyConvertSheetTitle;
+
+  /// No description provided for @loyaltyConvertSheetRule.
+  ///
+  /// In ar, this message translates to:
+  /// **'كل 500 نقطة = 5 جنيه. حوّل بمضاعفات 100 نقطة، بحد أدنى 500 نقطة.'**
+  String get loyaltyConvertSheetRule;
+
+  /// No description provided for @loyaltyConvertAvailableLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'المتاح'**
+  String get loyaltyConvertAvailableLabel;
+
+  /// No description provided for @loyaltyConvertAmountLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'عدد النقاط للتحويل'**
+  String get loyaltyConvertAmountLabel;
+
+  /// No description provided for @loyaltyConvertAmountHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'مثال: 500'**
+  String get loyaltyConvertAmountHint;
+
+  /// No description provided for @loyaltyConvertSubmit.
+  ///
+  /// In ar, this message translates to:
+  /// **'تحويل'**
+  String get loyaltyConvertSubmit;
+
+  /// No description provided for @loyaltyConvertSuccess.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم التحويل إلى محفظة هاتلي'**
+  String get loyaltyConvertSuccess;
+
+  /// No description provided for @loyaltyErrorInsufficientPoints.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا يوجد لديك نقاط كافية لهذا التحويل.'**
+  String get loyaltyErrorInsufficientPoints;
+
+  /// No description provided for @loyaltyErrorBelowMinimum.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل 500 نقطة على الأقل.'**
+  String get loyaltyErrorBelowMinimum;
+
+  /// No description provided for @loyaltyErrorInvalidMultiple.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل قيمة من مضاعفات 100 نقطة.'**
+  String get loyaltyErrorInvalidMultiple;
+
+  /// No description provided for @addressSetDefaultAction.
+  ///
+  /// In ar, this message translates to:
+  /// **'اجعله الافتراضي'**
+  String get addressSetDefaultAction;
+
+  /// No description provided for @addressSetDefaultError.
+  ///
+  /// In ar, this message translates to:
+  /// **'فشل تعيينه كعنوان افتراضي. حاول مرة أخرى.'**
+  String get addressSetDefaultError;
+
+  /// No description provided for @profileAppearanceTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'المظهر'**
+  String get profileAppearanceTitle;
+
+  /// No description provided for @themeModeSystem.
+  ///
+  /// In ar, this message translates to:
+  /// **'النظام'**
+  String get themeModeSystem;
+
+  /// No description provided for @themeModeLight.
+  ///
+  /// In ar, this message translates to:
+  /// **'فاتح'**
+  String get themeModeLight;
+
+  /// No description provided for @themeModeDark.
+  ///
+  /// In ar, this message translates to:
+  /// **'داكن'**
+  String get themeModeDark;
+
+  /// No description provided for @hatlyServicePricePending.
+  ///
+  /// In ar, this message translates to:
+  /// **'سيتم تأكيد السعر أثناء تجهيز الطلب'**
+  String get hatlyServicePricePending;
+
+  /// No description provided for @checkoutHatlyServiceCodNote.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلبات خدمة هاتلي تُدفع عند الاستلام فقط. سيتم تأكيد السعر أثناء تجهيز الطلب، وسيظهر لك الإجمالي النهائي في تفاصيل الطلب.'**
+  String get checkoutHatlyServiceCodNote;
+
+  /// No description provided for @cartErrorTooManyImages.
+  ///
+  /// In ar, this message translates to:
+  /// **'عدد الصور أكبر من المسموح به لهذا الطلب.'**
+  String get cartErrorTooManyImages;
+
+  /// No description provided for @cartErrorInvalidImage.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعذّر استخدام إحدى الصور. أعد رفعها وحاول مرة أخرى.'**
+  String get cartErrorInvalidImage;
+
+  /// No description provided for @cartErrorContentRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اكتب وصف الطلب أو أرفق صورة.'**
+  String get cartErrorContentRequired;
+
+  /// No description provided for @serviceTemporarilyUnavailable.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذه الخدمة غير متاحة حاليًا. يرجى المحاولة لاحقًا أو التواصل مع هاتلي.'**
+  String get serviceTemporarilyUnavailable;
+
+  /// No description provided for @checkoutErrorAddressRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر عنوان التوصيل أولًا ثم أعد المحاولة.'**
+  String get checkoutErrorAddressRequired;
+
+  /// No description provided for @checkoutErrorEmptyCart.
+  ///
+  /// In ar, this message translates to:
+  /// **'سلتك فارغة. أضف طلبًا ثم حاول مرة أخرى.'**
+  String get checkoutErrorEmptyCart;
+
+  /// No description provided for @checkoutErrorNoActiveCart.
+  ///
+  /// In ar, this message translates to:
+  /// **'لم نجد سلة نشطة لإتمام الطلب. ربما تم إرسال طلبك بالفعل — راجع قائمة الطلبات.'**
+  String get checkoutErrorNoActiveCart;
+
+  /// No description provided for @checkoutErrorQuoteRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'راجع ملخص الطلب ثم أكّد الطلب مرة أخرى.'**
+  String get checkoutErrorQuoteRequired;
+
+  /// No description provided for @checkoutErrorPaymentMethodRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر طريقة الدفع.'**
+  String get checkoutErrorPaymentMethodRequired;
+
+  /// No description provided for @checkoutErrorOnlinePaymentUnavailable.
+  ///
+  /// In ar, this message translates to:
+  /// **'الدفع الإلكتروني غير متاح حاليًا.'**
+  String get checkoutErrorOnlinePaymentUnavailable;
+
+  /// No description provided for @addressZoneSection.
+  ///
+  /// In ar, this message translates to:
+  /// **'منطقة التوصيل'**
+  String get addressZoneSection;
+
+  /// No description provided for @addressZoneLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'المنطقة'**
+  String get addressZoneLabel;
+
+  /// No description provided for @addressZoneHelp.
+  ///
+  /// In ar, this message translates to:
+  /// **'المنطقة اللي بتختارها هي اللي بتحدد إذا كان التوصيل متاح وقيمة رسوم التوصيل.'**
+  String get addressZoneHelp;
+
+  /// No description provided for @addressZoneRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختار المنطقة'**
+  String get addressZoneRequired;
+
+  /// No description provided for @addressZoneFeeHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'رسوم التوصيل للمنطقة دي: {fee} — الرسوم النهائية بتتأكد في صفحة الدفع.'**
+  String addressZoneFeeHint(String fee);
+
+  /// No description provided for @addressZonesLoadError.
+  ///
+  /// In ar, this message translates to:
+  /// **'معرفناش نحمّل مناطق التوصيل. حاول تاني.'**
+  String get addressZonesLoadError;
+
+  /// No description provided for @addressZonesEmpty.
+  ///
+  /// In ar, this message translates to:
+  /// **'مفيش مناطق توصيل متاحة دلوقتي.'**
+  String get addressZonesEmpty;
+
+  /// No description provided for @addressDetailedLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'العنوان بالتفصيل'**
+  String get addressDetailedLabel;
+
+  /// No description provided for @addressDetailedHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'مثال: شارع أبو نصيب جنب جامع الكردي، منزل 15'**
+  String get addressDetailedHint;
+
+  /// No description provided for @addressLocationOptionalSection.
+  ///
+  /// In ar, this message translates to:
+  /// **'الموقع على الخريطة (اختياري)'**
+  String get addressLocationOptionalSection;
+
+  /// No description provided for @addressLocationOptionalHelp.
+  ///
+  /// In ar, this message translates to:
+  /// **'تحديد الموقع بيساعد المندوب يوصلك أسرع، بس مش مطلوب عشان تحفظ العنوان.'**
+  String get addressLocationOptionalHelp;
+
+  /// No description provided for @addressRemoveLocation.
+  ///
+  /// In ar, this message translates to:
+  /// **'شيل الموقع'**
+  String get addressRemoveLocation;
+
+  /// No description provided for @addressZoneMissingBanner.
+  ///
+  /// In ar, this message translates to:
+  /// **'العنوان ده محتاج تختار له منطقة التوصيل قبل ما تطلب عليه.'**
+  String get addressZoneMissingBanner;
+
+  /// No description provided for @addressZoneUnavailableBanner.
+  ///
+  /// In ar, this message translates to:
+  /// **'منطقة التوصيل بتاعة العنوان ده مش متاحة دلوقتي. اختار منطقة تانية.'**
+  String get addressZoneUnavailableBanner;
+
+  /// No description provided for @addressChooseZoneAction.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختار المنطقة'**
+  String get addressChooseZoneAction;
+
+  /// No description provided for @checkoutAddressZoneRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختار منطقة التوصيل للعنوان ده عشان نقدر نوصّلك.'**
+  String get checkoutAddressZoneRequired;
+
+  /// No description provided for @checkoutAddressZoneUnavailable.
+  ///
+  /// In ar, this message translates to:
+  /// **'هاتلي مش بيوصّل للمنطقة دي دلوقتي. اختار منطقة أو عنوان تاني.'**
+  String get checkoutAddressZoneUnavailable;
+
+  /// No description provided for @checkoutDeliveryZonePricing.
+  ///
+  /// In ar, this message translates to:
+  /// **'رسوم التوصيل حسب المنطقة: {area}'**
+  String checkoutDeliveryZonePricing(String area);
+
+  /// No description provided for @checkoutHatlyServiceFeeFormula.
+  ///
+  /// In ar, this message translates to:
+  /// **'رسوم توصيل منطقتك {zoneFee} × {multiplier}'**
+  String checkoutHatlyServiceFeeFormula(String zoneFee, String multiplier);
+
+  /// No description provided for @addressZoneAutoSelected.
+  ///
+  /// In ar, this message translates to:
+  /// **'دي المنطقة الوحيدة المتاحة في المدينة دي، فاخترناها لك.'**
+  String get addressZoneAutoSelected;
+
+  /// No description provided for @addressCityNoZones.
+  ///
+  /// In ar, this message translates to:
+  /// **'مفيش مناطق توصيل متاحة في المدينة دي دلوقتي.'**
+  String get addressCityNoZones;
 }
 
 class _AppLocalizationsDelegate

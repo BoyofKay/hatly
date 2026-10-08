@@ -1,7 +1,12 @@
 import { UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt';
+import * as jwt from 'jsonwebtoken';
 import { AuthService } from './auth.service';
 import { Role } from '../../common/enums/role.enum';
+
+/** The per-account limiter is covered by login-attempt-limiter.spec.ts and its integration/e2e tests; these suites exercise token logic. */
+const noopLoginLimiter = { assertAllowed: async () => undefined, recordFailure: async () => undefined, clear: async () => undefined };
 
 function buildHarness(seed: { user?: any } = {}) {
   const usersService = {
@@ -33,6 +38,7 @@ function buildHarness(seed: { user?: any } = {}) {
     jwtService as any,
     configService as any,
     businessConfigService as any,
+    noopLoginLimiter as any,
   );
   return { service, usersService, businessConfigService };
 }
@@ -239,6 +245,7 @@ describe('Customer Authentication Modes (master implementation)', () => {
       jwtService as any,
       configService as any,
       businessConfigService as any,
+      noopLoginLimiter as any,
     );
     return { service, usersService, otpService, businessConfigService, usersByPhone, usersById };
   }
@@ -558,5 +565,118 @@ describe('Customer Authentication Modes (master implementation)', () => {
       const { service } = buildCustomerHarness();
       await expect(service.getIsPhoneVerified('missing')).rejects.toThrow(UnauthorizedException);
     });
+  });
+});
+
+describe('AuthService refresh/session security (M5 Batch 1 algorithm pin + Batch 2 reuse detection)', () => {
+  const REFRESH_SECRET = 'r-secret-r-secret-r-secret-r-secret-0001';
+  const ACCESS_SECRET = 'a-secret-a-secret-a-secret-a-secret-0002';
+
+  /** An in-memory model of RefreshTokenStore with the SAME rotate() contract as the Redis/Lua implementation. */
+  class FakeStore {
+    current = new Map<string, string>();
+    used = new Map<string, string[]>();
+    counter = 0;
+    issue = jest.fn(async (id: string) => { const jti = `jti-${++this.counter}`; this.current.set(id, jti); return jti; });
+    revoke = jest.fn(async (id: string) => { this.current.delete(id); });
+    rotate = jest.fn(async (id: string, presented: string, _ttl: number, next: string | null) => {
+      if (this.current.get(id) === presented) {
+        this.used.set(id, [presented, ...(this.used.get(id) ?? [])].slice(0, 10));
+        if (next) this.current.set(id, next); else this.current.delete(id);
+        return { status: 'ROTATED' as const };
+      }
+      if ((this.used.get(id) ?? []).includes(presented)) { this.current.delete(id); return { status: 'REUSED' as const }; }
+      return { status: 'INVALID' as const };
+    });
+  }
+
+  function realTokenHarness(userOverrides: Record<string, unknown> = {}) {
+    const user = { id: 'u1', phone: '+201000000001', role: Role.CUSTOMER, isActive: true, ...userOverrides };
+    const store = new FakeStore();
+    const configService = { get: jest.fn((k: string) => ({ 'auth.refreshExpiresIn': '30d', 'auth.accessSecret': ACCESS_SECRET, 'auth.accessExpiresIn': '15m', 'auth.refreshSecret': REFRESH_SECRET })[k]) };
+    const usersService = { findById: jest.fn(async () => user) };
+    const service = new AuthService(usersService as any, {} as any, store as any, new JwtService({}), configService as any, {} as any, noopLoginLimiter as any);
+    return { service, store, usersService, user };
+  }
+  const login = (h: ReturnType<typeof realTokenHarness>) => (h.service as any).issueTokens(h.user);
+
+  it('issues HS256 tokens; a normal refresh returns a working new pair', async () => {
+    const h = realTokenHarness();
+    const tokens = await login(h);
+    expect(jwt.decode(tokens.accessToken, { complete: true })!.header.alg).toBe('HS256');
+    expect(jwt.decode(tokens.refreshToken, { complete: true })!.header.alg).toBe('HS256');
+    const next = await h.service.refresh(tokens.refreshToken);
+    expect(next.accessToken).toBeTruthy();
+    expect((jwt.decode(next.refreshToken) as any).jti).not.toBe((jwt.decode(tokens.refreshToken) as any).jti);
+  });
+
+  it('ROTATION: each refresh yields a new refresh token that works exactly once, and the chain keeps working', async () => {
+    const h = realTokenHarness();
+    let current = (await login(h)).refreshToken;
+    for (let i = 0; i < 4; i++) {
+      const next = await h.service.refresh(current);
+      expect(next.refreshToken).not.toBe(current);
+      current = next.refreshToken;
+    }
+  });
+
+  it('REPLAY of an already-rotated token is refused with the generic message and revokes the session (the newest token dies too)', async () => {
+    const h = realTokenHarness();
+    const first = await login(h);
+    const second = await h.service.refresh(first.refreshToken); // legitimate rotation
+    const warn = jest.spyOn((h.service as any).logger, 'warn').mockImplementation(() => undefined);
+
+    await expect(h.service.refresh(first.refreshToken)).rejects.toThrow('Invalid or expired refresh token.'); // replay
+    expect(h.store.current.has('u1')).toBe(false); // session revoked
+    await expect(h.service.refresh(second.refreshToken)).rejects.toThrow(UnauthorizedException); // legitimate holder must sign in again
+
+    // The reuse is logged with the user id only — never the token, its jti or any claim.
+    const logged = String(warn.mock.calls[0][0]);
+    expect(logged).toContain('auth.refresh_token_reuse_detected');
+    expect(logged).toContain('u1');
+    for (const secret of [first.refreshToken, second.refreshToken, (jwt.decode(first.refreshToken) as any).jti]) expect(logged).not.toContain(secret);
+  });
+
+  it('a token that was never rotated away (forged, expired session, replaced by a newer login) is merely INVALID: nothing is revoked', async () => {
+    const h = realTokenHarness();
+    const old = await login(h);
+    const newer = await login(h); // a second device logs in and replaces the stored jti
+    await expect(h.service.refresh(old.refreshToken)).rejects.toThrow(UnauthorizedException);
+    expect(h.store.current.has('u1')).toBe(true); // the newer device's session is untouched
+    await expect(h.service.refresh(newer.refreshToken)).resolves.toBeDefined();
+  });
+
+  it('an unrelated user\'s session is untouched by someone else\'s reuse detection', async () => {
+    const a = realTokenHarness({ id: 'ua' });
+    const b = realTokenHarness({ id: 'ub' });
+    b.store = a.store; // same store, two users
+    (b.service as any).refreshTokenStore = a.store;
+    const aTokens = await login(a);
+    const bTokens = await (b.service as any).issueTokens(b.user);
+    await a.service.refresh(aTokens.refreshToken);
+    await expect(a.service.refresh(aTokens.refreshToken)).rejects.toThrow(UnauthorizedException); // A's reuse
+    await expect(b.service.refresh(bTokens.refreshToken)).resolves.toBeDefined(); // B unaffected
+  });
+
+  it('an inactive account is refused and its session revoked', async () => {
+    const h = realTokenHarness({ isActive: false });
+    const tokens = await login(h);
+    await expect(h.service.refresh(tokens.refreshToken)).rejects.toThrow(UnauthorizedException);
+    expect(h.store.revoke).toHaveBeenCalledWith('u1');
+  });
+
+  it('a refresh token signed with another algorithm (HS512) or `none` is refused even with the right secret', async () => {
+    const h = realTokenHarness();
+    const hs512 = jwt.sign({ sub: 'u1', jti: 'jti-1' }, REFRESH_SECRET, { algorithm: 'HS512', expiresIn: '1d' });
+    const none = jwt.sign({ sub: 'u1', jti: 'jti-1' }, '', { algorithm: 'none' } as any);
+    await expect(h.service.refresh(hs512)).rejects.toThrow(UnauthorizedException);
+    await expect(h.service.refresh(none)).rejects.toThrow(UnauthorizedException);
+  });
+
+  it('an ACCESS token cannot be used as a refresh token (different secret), and garbage is refused with one generic message', async () => {
+    const h = realTokenHarness();
+    const tokens = await login(h);
+    await expect(h.service.refresh(tokens.accessToken)).rejects.toThrow('Invalid or expired refresh token.');
+    await expect(h.service.refresh('not.a.jwt')).rejects.toThrow('Invalid or expired refresh token.');
   });
 });

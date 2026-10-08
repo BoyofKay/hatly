@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { VendorStaffMember, activateVendorStaff, createVendorStaff, deactivateVendorStaff, listVendorStaff } from '../../../lib/api/admin-vendor-staff';
 import { Vendor, VendorBranch, listVendorBranches, listVendors } from '../../../lib/api/admin-vendors';
+import { apiErrorMessage } from '../../../lib/api/errors';
 
 /**
  * Real Admin Vendor Staff management — consumes the Chunk 10 backend
@@ -37,7 +38,7 @@ export default function VendorStaffPage() {
       setStaff(staffList);
       setVendors(vendorList);
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load vendor staff.');
+      setError(apiErrorMessage(err, 'Failed to load vendor staff.'));
     }
   }
 
@@ -81,7 +82,7 @@ export default function VendorStaffPage() {
       setSuccessMessage(`Staff account "${created.fullName}" created.`);
       await refresh();
     } catch (err: any) {
-      setCreateError(err?.response?.data?.message ?? 'Failed to create staff account.');
+      setCreateError(apiErrorMessage(err, 'Failed to create staff account.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -96,7 +97,7 @@ export default function VendorStaffPage() {
     } catch (err: any) {
       setToggleErrorById((prev) => ({
         ...prev,
-        [member.id]: err?.response?.data?.message ?? 'Failed to update status.',
+        [member.id]: apiErrorMessage(err, 'Failed to update status.'),
       }));
     } finally {
       setTogglingId(null);

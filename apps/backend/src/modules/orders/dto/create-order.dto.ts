@@ -4,7 +4,7 @@ import { ElectronicPaymentMethod } from '../../payments/electronic-payment-metho
 import { ORDER_PAYMENT_METHODS, OrderPaymentMethod } from '../order-payment-method';
 
 /**
- * The delivery address as the customer confirmed it at checkout. The coordinates are the authoritative location; the
+ * The delivery address as the customer confirmed it at checkout. The coordinates (optional, PD-009) are the authoritative location; the
  * structured fields are what the customer typed; `formattedAddress` is only the map provider's suggestion. The whole thing is
  * frozen into `Order.deliveryAddressSnapshot` — there is no live address row an order could later depend on.
  */
@@ -18,11 +18,19 @@ export class DeliveryAddressDto {
   @MaxLength(255)
   line1: string;
 
+  /** PD-009: optional map pin (both or neither). Without one, `deliveryZoneId` locates the address. */
+  @IsOptional()
   @IsLatitude()
-  latitude: number;
+  latitude?: number;
 
+  @IsOptional()
   @IsLongitude()
-  longitude: number;
+  longitude?: number;
+
+  /** PD-009: the Delivery Zone the customer selected. Names/fee are always resolved server-side — never sent by the client. */
+  @IsOptional()
+  @IsUUID()
+  deliveryZoneId?: string;
 
   @IsOptional()
   @IsString()

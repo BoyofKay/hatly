@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,8 +43,15 @@ class _Recorder {
   final calls = <Uri>[];
   bool result = true;
   bool throws = false;
+
+  /// When set, [call] waits on it instead of resolving immediately — lets
+  /// a test hold the first launch open to simulate a slow launcher while
+  /// it fires a second tap.
+  Completer<void>? gate;
+
   Future<bool> call(Uri uri) async {
     calls.add(uri);
+    if (gate != null) await gate!.future;
     if (throws) throw Exception('launcher exploded');
     return result;
   }
@@ -233,6 +242,25 @@ void main() {
       await _pump(tester, const ProfileScreen(), rec);
       expect(tester.getSize(find.byKey(_profileKey)).height,
           greaterThanOrEqualTo(44));
+    });
+
+    testWidgets(
+        'double-tapping only launches WhatsApp once (Polish pass in-flight guard)',
+        (tester) async {
+      final rec = _Recorder()..gate = Completer<void>();
+      await _pump(tester, const ProfileScreen(), rec);
+
+      // Both taps fire before any frame is pumped in between — the tile
+      // itself hasn't yet rebuilt into its disabled state, so only
+      // SupportContactTile's own in-flight guard (not the rebuilt
+      // `enabled: false`) is what stops the second call.
+      await tester.tap(find.byKey(_profileKey));
+      await tester.tap(find.byKey(_profileKey));
+      await tester.pump();
+      rec.gate!.complete();
+      await tester.pumpAndSettle();
+
+      expect(rec.calls, hasLength(1));
     });
   });
 

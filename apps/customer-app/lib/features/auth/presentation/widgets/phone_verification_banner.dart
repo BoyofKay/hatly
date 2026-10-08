@@ -85,13 +85,24 @@ class _PhoneVerificationBannerState
       data: (isVerified) {
         if (isVerified) return const SizedBox.shrink();
 
+        // Dark Mode fix: this banner's fixed light-peach background/border
+        // used to render as a glaring bright box on a dark screen. Kept
+        // byte-identical in Light Mode; Dark Mode uses a `p.warning`-based
+        // tint instead (the same pattern `HatlyBadge` uses for its warning
+        // badges).
+        final p = context.palette;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Container(
           margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF4E5),
+            color: isDark
+                ? p.warning.withOpacity(0.16)
+                : const Color(0xFFFFF4E5),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFFFE0B2)),
+            border: Border.all(
+              color: isDark ? p.warning.withOpacity(0.5) : const Color(0xFFFFE0B2),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

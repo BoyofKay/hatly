@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import '../core/media/media_url.dart';
 import '../core/theme/hatly_theme.dart';
 
 /// Soft Image Container: radius 16 by default, a soft neutral fill while
@@ -45,10 +46,10 @@ class HatlySoftImage extends StatelessWidget {
               size: placeholderIconSize),
         );
 
-    final hasUrl = url != null && url!.isNotEmpty;
-    final image = hasUrl
+    final resolvedUrl = resolveMediaUrl(url);
+    final image = resolvedUrl != null
         ? CachedNetworkImage(
-            imageUrl: url!,
+            imageUrl: resolvedUrl,
             width: width,
             height: height,
             fit: fit,

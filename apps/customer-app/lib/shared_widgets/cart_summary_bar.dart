@@ -64,7 +64,14 @@ class CartSummaryBar extends ConsumerWidget {
                       const SizedBox(width: HatlySpacing.sm),
                       Expanded(
                         child: Text(
-                          formatMinorUnits(cart.subtotalMinor, context),
+                          // A cart holding a Hatly Service request with a pending price has nothing numeric to show: its subtotal is
+                          // 0 only because nothing is priced yet, and a "0" would read as free. Say the real state instead.
+                          cart.hasUnpricedItems
+                              ? l10n.hatlyServicePricePending
+                              : formatMinorUnits(cart.subtotalMinor, context),
+                          key: const Key('cart-summary-total'),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context)
                               .textTheme
                               .titleMedium

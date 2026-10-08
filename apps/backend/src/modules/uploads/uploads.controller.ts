@@ -1,5 +1,6 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { UploadsService } from './uploads.service';
 import { CreateUploadDto } from './dto/create-upload.dto';
@@ -15,6 +16,8 @@ import { CreateUploadDto } from './dto/create-upload.dto';
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
+  // Image uploads are the heaviest size-bounded write: cap per-client frequency well below the per-route default.
+  @Throttled(RateLimitPolicies.mediaUpload)
   @Post()
   async create(@Body() dto: CreateUploadDto, @CurrentUser() user: AuthenticatedUser) {
     const upload = await this.uploadsService.upload(dto.base64Content, dto.filename, user.id);

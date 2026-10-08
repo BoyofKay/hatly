@@ -25,7 +25,7 @@ function buildHarness(seed: { users?: any[] } = {}) {
 
   const dataSource = { transaction: async (cb: any) => cb(manager) };
   const driversRepository = { find: jest.fn(async () => driverRows) };
-  const service = new DriversService(dataSource as any, driversRepository as any);
+  const service = new DriversService(dataSource as any, driversRepository as any, {} as any);
   return { service, users, driverRows };
 }
 
@@ -38,6 +38,9 @@ describe('DriversService', () => {
     expect(users.get('+201000000005').role).toBe(Role.DRIVER);
     expect(driverRows).toHaveLength(1);
     expect(driver.userId).toBe(users.get('+201000000005').id);
+    // A new driver has no delivery, so they are available (Control Tower milestone fix) — still PENDING verification and
+    // offline, so ranking cannot pick them until an admin approves them and they go online.
+    expect(driver.isAvailable).toBe(true);
   });
 
   it('rejects when the phone number is already registered', async () => {
@@ -51,23 +54,31 @@ describe('DriversService', () => {
   });
 });
 
-describe('DriversService.listAll (Phase I-A, Chunk 6)', () => {
-  it('maps Driver+User into the flat AdminDriverView shape', async () => {
-    const driversRepository = {
-      find: jest.fn(async () => [
-        {
-          id: 'driver-1',
-          isOnline: true,
-          isAvailable: false,
-          verificationStatus: 'APPROVED',
-          user: { fullName: 'Ali Hassan', phone: '+201000000007' },
-        },
-      ]),
+describe('DriversService.listAll (Phase I-A, Chunk 6; operational fields — Control Tower milestone)', () => {
+  const rows = [
+    {
+      id: 'driver-1',
+      isOnline: true,
+      isAvailable: false,
+      verificationStatus: 'APPROVED',
+      lastLocationAt: new Date('2026-10-03T10:00:00Z'),
+      vehicleTypeId: 'vt-motorbike',
+      vehicleType: { name: 'Motorbike' },
+      user: { fullName: 'Ali Hassan', phone: '+201000000007' },
+    },
+    { id: 'driver-2', isOnline: false, isAvailable: true, verificationStatus: 'PENDING', vehicleType: null, user: { fullName: 'Sara', phone: '+201000000008' } },
+  ];
+
+  it('maps Driver+User into the flat AdminDriverView shape, with vehicle and the order the driver is on (ONE batched lookup)', async () => {
+    const driversRepository = { find: jest.fn(async () => rows) };
+    const dataSource = {
+      query: jest.fn(async () => [{ driver_id: 'driver-1', order_id: 'order-9', order_number: 'HT-100009', status: 'PICKED_UP' }]),
     };
-    const service = new DriversService({} as any, driversRepository as any);
+    const service = new DriversService(dataSource as any, driversRepository as any, {} as any);
 
     const result = await service.listAll();
 
+    expect(dataSource.query).toHaveBeenCalledTimes(1);
     expect(result).toEqual([
       {
         id: 'driver-1',
@@ -76,8 +87,32 @@ describe('DriversService.listAll (Phase I-A, Chunk 6)', () => {
         isOnline: true,
         isAvailable: false,
         verificationStatus: 'APPROVED',
+        vehicleTypeName: 'Motorbike',
+        vehicleTypeId: 'vt-motorbike',
+        lastLocationAt: new Date('2026-10-03T10:00:00Z'),
+        activeDelivery: { orderId: 'order-9', orderNumber: 'HT-100009', status: 'PICKED_UP' },
+      },
+      {
+        id: 'driver-2',
+        fullName: 'Sara',
+        phone: '+201000000008',
+        isOnline: false,
+        isAvailable: true,
+        verificationStatus: 'PENDING',
+        vehicleTypeName: null,
+        vehicleTypeId: null,
+        lastLocationAt: null,
+        activeDelivery: null,
       },
     ]);
+  });
+
+  it('approvedOnly narrows the query to APPROVED drivers (the dispatcher picker)', async () => {
+    const driversRepository = { find: jest.fn(async () => []) };
+    const dataSource = { query: jest.fn() };
+    await new DriversService(dataSource as any, driversRepository as any, {} as any).listAll({ approvedOnly: true });
+    expect(driversRepository.find).toHaveBeenCalledWith(expect.objectContaining({ where: { verificationStatus: 'APPROVED' } }));
+    expect(dataSource.query).not.toHaveBeenCalled(); // nothing to look up for zero drivers
   });
 });
 
@@ -86,12 +121,18 @@ describe('DriversService.setVerificationStatus (Driver Core + Dispatch Foundatio
     const driverRows = new Map(existing ? [[existing.id, existing]] : []);
     const driversRepository = {
       findOne: jest.fn(async ({ where: { id } }: any) => driverRows.get(id) ?? null),
-      save: jest.fn(async (driver: any) => {
-        driverRows.set(driver.id, driver);
-        return driver;
+      findOneOrFail: jest.fn(async ({ where: { id } }: any) => {
+        const row = driverRows.get(id);
+        if (!row) throw new Error('not found');
+        return row;
       }),
+      // column-targeted UPDATE: mutates only the given columns of the stored row
+      update: jest.fn(async ({ id }: any, partial: any) => {
+        driverRows.set(id, { ...driverRows.get(id), ...partial });
+      }),
+      save: jest.fn(),
     };
-    return { service: new DriversService({} as any, driversRepository as any), driversRepository, driverRows };
+    return { service: new DriversService({} as any, driversRepository as any, {} as any), driversRepository, driverRows };
   }
 
   it('moves a PENDING driver to APPROVED — the previously-missing writer DriverRankingService requires', async () => {
@@ -101,6 +142,15 @@ describe('DriversService.setVerificationStatus (Driver Core + Dispatch Foundatio
 
     expect(result.verificationStatus).toBe('APPROVED');
     expect(driverRows.get('driver-1').verificationStatus).toBe('APPROVED');
+  });
+
+  it('writes ONLY verification_status (never a whole-row save that could resurrect a stale is_available)', async () => {
+    const { service, driversRepository } = buildVerificationHarness({ id: 'driver-1', verificationStatus: 'PENDING', isAvailable: true });
+
+    await service.setVerificationStatus('driver-1', 'APPROVED');
+
+    expect(driversRepository.update).toHaveBeenCalledWith({ id: 'driver-1' }, { verificationStatus: 'APPROVED' });
+    expect(driversRepository.save).not.toHaveBeenCalled();
   });
 
   it('can also REJECT a driver', async () => {
@@ -123,5 +173,48 @@ describe('DriversService.setVerificationStatus (Driver Core + Dispatch Foundatio
     const { service } = buildVerificationHarness(null);
 
     await expect(service.setVerificationStatus('does-not-exist', 'APPROVED')).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('DriversService.setVehicleType (Operational Completion milestone)', () => {
+  function harness(opts: { driver?: any; vehicleType?: any }) {
+    const driversRepository = {
+      findOne: jest.fn(async () => opts.driver ?? null),
+      update: jest.fn(async () => undefined),
+      save: jest.fn(),
+      find: jest.fn(async () => (opts.driver ? [{ ...opts.driver, user: { fullName: 'D', phone: '+20' } }] : [])),
+    };
+    const vehicleTypesService = { findById: jest.fn(async () => opts.vehicleType ?? null) };
+    const dataSource = { query: jest.fn(async () => []) };
+    const service = new DriversService(dataSource as any, driversRepository as any, vehicleTypesService as any);
+    return { service, driversRepository, vehicleTypesService };
+  }
+
+  it('sets an ACTIVE catalog type, writing ONLY vehicle_type_id (never a whole-row save)', async () => {
+    const { service, driversRepository } = harness({ driver: { id: 'd1' }, vehicleType: { id: 'vt1', isActive: true } });
+    await service.setVehicleType('d1', 'vt1');
+    expect(driversRepository.update).toHaveBeenCalledWith({ id: 'd1' }, { vehicleTypeId: 'vt1' });
+    expect(driversRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('clears the type with null, without consulting the catalog', async () => {
+    const { service, driversRepository, vehicleTypesService } = harness({ driver: { id: 'd1', vehicleTypeId: 'vt1' } });
+    await service.setVehicleType('d1', null);
+    expect(vehicleTypesService.findById).not.toHaveBeenCalled();
+    expect(driversRepository.update).toHaveBeenCalledWith({ id: 'd1' }, { vehicleTypeId: null });
+  });
+
+  it('refuses an unknown type (VEHICLE_TYPE_NOT_FOUND) and an inactive one (VEHICLE_TYPE_INACTIVE) — nothing written', async () => {
+    const unknown = harness({ driver: { id: 'd1' } });
+    await expect(unknown.service.setVehicleType('d1', 'nope')).rejects.toMatchObject({ response: { details: { code: 'VEHICLE_TYPE_NOT_FOUND' } } });
+    expect(unknown.driversRepository.update).not.toHaveBeenCalled();
+    const inactive = harness({ driver: { id: 'd1' }, vehicleType: { id: 'vt1', isActive: false } });
+    await expect(inactive.service.setVehicleType('d1', 'vt1')).rejects.toMatchObject({ response: { details: { code: 'VEHICLE_TYPE_INACTIVE' } } });
+    expect(inactive.driversRepository.update).not.toHaveBeenCalled();
+  });
+
+  it('404s for an unknown driver', async () => {
+    const { service } = harness({ vehicleType: { id: 'vt1', isActive: true } });
+    await expect(service.setVehicleType('missing', 'vt1')).rejects.toThrow(NotFoundException);
   });
 });

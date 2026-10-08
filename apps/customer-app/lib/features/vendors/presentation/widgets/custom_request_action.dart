@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
-import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/hatly_theme.dart';
+import '../../../../shared_widgets/hatly_button.dart';
+import '../../../../shared_widgets/hatly_error_banner.dart';
 import '../../../cart/data/cart_providers.dart';
 import '../../../uploads/data/uploads_providers.dart';
+import '../../../cart/presentation/cart_error_messages.dart';
 
 const int _maxCustomRequestImages = 2;
 
@@ -19,29 +21,45 @@ const int _maxCustomRequestImages = 2;
 /// Service / AD_HOC_SERVICE flow, which lives entirely elsewhere in
 /// this app and is untouched by this widget.
 class CustomRequestAction extends StatelessWidget {
-  const CustomRequestAction({super.key, required this.vendorBranchId});
+  const CustomRequestAction(
+      {super.key, required this.vendorBranchId, this.pickImageOverride});
 
   final String vendorBranchId;
+
+  /// Test hook — same pattern as HatlyServiceScreen's own
+  /// `pickImageOverride`; lets a test control image-pick timing without
+  /// touching the real OS picker. Always null in production.
+  final Future<XFile?> Function()? pickImageOverride;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return OutlinedButton.icon(
+    // Polish pass: was a raw `OutlinedButton.icon` — `HatlyButton` exists
+    // specifically to replace ad hoc button combinations like this one.
+    return HatlyButton(
+      variant: HatlyButtonVariant.secondary,
+      icon: Icons.help_outline,
+      label: l10n.customRequestEntryPoint,
+      // Not full-width — this is a compact entry-point button (was a
+      // content-sized `OutlinedButton.icon`), not a full-width CTA.
+      fullWidth: false,
       onPressed: () => showModalBottomSheet(
         context: context,
         isScrollControlled: true,
-        builder: (_) => _CustomRequestSheet(vendorBranchId: vendorBranchId),
+        builder: (_) => _CustomRequestSheet(
+            vendorBranchId: vendorBranchId,
+            pickImageOverride: pickImageOverride),
       ),
-      icon: const Icon(Icons.help_outline),
-      label: Text(l10n.customRequestEntryPoint),
     );
   }
 }
 
 class _CustomRequestSheet extends ConsumerStatefulWidget {
-  const _CustomRequestSheet({required this.vendorBranchId});
+  const _CustomRequestSheet(
+      {required this.vendorBranchId, this.pickImageOverride});
 
   final String vendorBranchId;
+  final Future<XFile?> Function()? pickImageOverride;
 
   @override
   ConsumerState<_CustomRequestSheet> createState() =>
@@ -65,9 +83,21 @@ class _CustomRequestSheetState extends ConsumerState<_CustomRequestSheet> {
 
   Future<void> _pickImage() async {
     if (_selectedImages.length >= _maxCustomRequestImages) return;
-    final picked = await ImagePicker()
-        .pickImage(source: ImageSource.gallery, imageQuality: 85);
-    if (picked != null) {
+    final picked = widget.pickImageOverride != null
+        ? await widget.pickImageOverride!()
+        : await ImagePicker()
+            // Downscaled on the device (long edge 1600 px): a full-resolution photo is several MB of mobile data and
+            // server memory for no visible benefit at the size these reference photos are shown.
+            .pickImage(
+                source: ImageSource.gallery,
+                imageQuality: 85,
+                maxWidth: 1600,
+                maxHeight: 1600);
+    // Polish pass: a real setState-after-dispose bug — if the sheet is
+    // dismissed while the OS image picker is open, this fired on an
+    // already-disposed widget. Every other async method in this class
+    // already guards with `mounted`; this one didn't.
+    if (picked != null && mounted) {
       setState(() => _selectedImages.add(picked));
     }
   }
@@ -107,7 +137,8 @@ class _CustomRequestSheetState extends ConsumerState<_CustomRequestSheet> {
 
       if (!mounted) return;
       if (error != null) {
-        setState(() => _errorMessage = error.message);
+        setState(
+            () => _errorMessage = localizedCartErrorMessage(context, error));
         return;
       }
       Navigator.of(context).pop();
@@ -123,25 +154,23 @@ class _CustomRequestSheetState extends ConsumerState<_CustomRequestSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final p = context.palette;
     return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      padding: EdgeInsetsDirectional.only(
+        start: HatlySpacing.md,
+        end: HatlySpacing.md,
+        top: HatlySpacing.md,
+        bottom: MediaQuery.of(context).viewInsets.bottom + HatlySpacing.md,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(l10n.customRequestSheetTitle,
-              style:
-                  const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
+          Text(l10n.customRequestSheetTitle, style: context.type.title),
+          const SizedBox(height: HatlySpacing.xs),
           Text(l10n.customRequestSheetSubtitle,
-              style:
-                  const TextStyle(fontSize: 13, color: HatlyColors.textMuted)),
-          const SizedBox(height: 16),
+              style: context.type.caption.copyWith(color: p.textMuted)),
+          const SizedBox(height: HatlySpacing.md),
           TextField(
             controller: _textController,
             maxLines: 3,
@@ -151,29 +180,44 @@ class _CustomRequestSheetState extends ConsumerState<_CustomRequestSheet> {
               border: const OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: HatlySpacing.ms),
           Row(
             children: [
               ..._selectedImages.asMap().entries.map(
                     (entry) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsetsDirectional.only(
+                          end: HatlySpacing.sm),
                       child: Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: Image.file(File(entry.value.path),
                                 width: 64, height: 64, fit: BoxFit.cover),
                           ),
-                          Positioned(
-                            right: -4,
+                          // Polish pass: was a fixed physical `right:` offset —
+                          // now mirrors correctly under RTL, matching the
+                          // sibling Hatly Service screen's equivalent badge.
+                          PositionedDirectional(
+                            end: -4,
                             top: -4,
                             child: GestureDetector(
                               onTap: () => _removeImage(entry.key),
-                              child: const CircleAvatar(
-                                radius: 10,
-                                backgroundColor: HatlyColors.error,
-                                child: Icon(Icons.close,
-                                    size: 14, color: Colors.white),
+                              child: Semantics(
+                                button: true,
+                                label: l10n.customRequestRemoveImage,
+                                child: CircleAvatar(
+                                  radius: 10,
+                                  // Polish pass: `HatlyColors.error` (fixed) ->
+                                  // `p.urgent` (theme-aware) — the same fix
+                                  // already applied to the error text below in
+                                  // this same file. White stays: white-on-urgent
+                                  // has good contrast in both themes (unlike
+                                  // white-on-orange).
+                                  backgroundColor: p.urgent,
+                                  child: const Icon(Icons.close,
+                                      size: 14, color: Colors.white),
+                                ),
                               ),
                             ),
                           ),
@@ -182,41 +226,40 @@ class _CustomRequestSheetState extends ConsumerState<_CustomRequestSheet> {
                     ),
                   ),
               if (_selectedImages.length < _maxCustomRequestImages)
-                InkWell(
-                  onTap: _pickImage,
-                  child: Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade400),
-                      borderRadius: BorderRadius.circular(8),
+                Semantics(
+                  button: true,
+                  label: l10n.customRequestAddImage,
+                  child: InkWell(
+                    onTap: _pickImage,
+                    child: Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        // Audit F-L1: fixed `Colors.grey.shade400` border,
+                        // same anti-pattern that breaks Dark Mode elsewhere.
+                        // `p.textDisabled` is the closest existing token to the
+                        // old grey (near-identical value in Light Mode).
+                        border: Border.all(color: p.textDisabled),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.add_a_photo_outlined),
                     ),
-                    child: const Icon(Icons.add_a_photo_outlined),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: HatlySpacing.sm),
           Text(l10n.customRequestImageLimitHint(_maxCustomRequestImages),
-              style:
-                  const TextStyle(fontSize: 11, color: HatlyColors.textMuted)),
+              style: context.type.caption.copyWith(color: p.textMuted)),
           if (_errorMessage != null) ...[
-            const SizedBox(height: 8),
-            Text(_errorMessage!,
-                style: const TextStyle(color: HatlyColors.error)),
+            const SizedBox(height: HatlySpacing.sm),
+            HatlyErrorBanner(message: _errorMessage!),
           ],
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isValid && !_isSubmitting ? _submit : null,
-              child: _isSubmitting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(l10n.customRequestSubmit),
-            ),
+          const SizedBox(height: HatlySpacing.md),
+          HatlyButton(
+            label: l10n.customRequestSubmit,
+            isLoading: _isSubmitting,
+            onPressed: _isValid ? _submit : null,
           ),
         ],
       ),

@@ -316,15 +316,56 @@ describe('E2E — authentication', () => {
       expect((await world.api('post', '/auth/refresh', { body: { refreshToken: customer.accessToken } })).status).toBe(401);
     });
 
-    it('rotates refresh tokens: each is single-use, the old one is dead, the new pair works', async () => {
+    it('rotates refresh tokens: each is single-use and the new pair works (a chain of refreshes keeps working)', async () => {
       const customer = await s.customer();
       const rotated = expectData<{ accessToken: string; refreshToken: string }>(
         await world.api('post', '/auth/refresh', { body: { refreshToken: customer.refreshToken } }),
       );
       expect(rotated.refreshToken).not.toBe(customer.refreshToken);
-      expect((await world.api('post', '/auth/refresh', { body: { refreshToken: customer.refreshToken } })).status).toBe(401); // replay
       expect((await world.api('get', '/cart', { token: rotated.accessToken })).status).toBe(200);
-      expectData(await world.api('post', '/auth/refresh', { body: { refreshToken: rotated.refreshToken } }));
+      const third = expectData<{ refreshToken: string }>(await world.api('post', '/auth/refresh', { body: { refreshToken: rotated.refreshToken } }));
+      expectData(await world.api('post', '/auth/refresh', { body: { refreshToken: third.refreshToken } }));
+    });
+
+    describe('refresh-token reuse detection (M5 Batch 2)', () => {
+      const refresh = (refreshToken: string) => world.api('post', '/auth/refresh', { body: { refreshToken } });
+
+      it('replaying an already-rotated token is refused with the generic 401 AND revokes the whole session (even the newest token)', async () => {
+        const customer = await s.customer();
+        const rotated = expectData<{ refreshToken: string }>(await refresh(customer.refreshToken));
+
+        const replay = await refresh(customer.refreshToken);
+        expect(replay.status).toBe(401);
+        expect(JSON.stringify(replay.body)).not.toMatch(/reuse|replay|stolen|compromis/i); // nothing about WHY leaks to the caller
+        expect(await world.redis.get(`refresh-jti:${customer.id}`)).toBeNull();
+        expect((await refresh(rotated.refreshToken)).status).toBe(401); // the legitimate holder's newest token died too
+      });
+
+      it('the user can sign in again after a reuse event, and the new session works normally', async () => {
+        const customer = await s.customer();
+        expectData(await refresh(customer.refreshToken));
+        expect((await refresh(customer.refreshToken)).status).toBe(401);
+        const again = expectData<{ refreshToken: string }>(await world.api('post', '/auth/customer/password/login', { body: { phone: customer.phone, password: DEFAULT_PASSWORD } }));
+        expectData(await refresh(again.refreshToken));
+      });
+
+      it('a reuse event on one user never touches another user\'s session', async () => {
+        const victim = await s.customer('Reuse Victim');
+        const bystander = await s.customer('Reuse Bystander');
+        expectData(await refresh(victim.refreshToken));
+        expect((await refresh(victim.refreshToken)).status).toBe(401);
+        expect(await world.redis.get(`refresh-jti:${bystander.id}`)).not.toBeNull();
+        expectData(await refresh(bystander.refreshToken));
+      });
+
+      it('concurrent replays of one token: exactly one refresh succeeds, the rest are refused, and the session ends revoked', async () => {
+        const customer = await s.customer();
+        const results = await Promise.all(Array.from({ length: 8 }, () => refresh(customer.refreshToken)));
+        expect(results.filter((r) => r.status === 200 || r.status === 201)).toHaveLength(1);
+        expect(results.filter((r) => r.status === 401)).toHaveLength(7);
+        // Whether the winner's token survives depends on interleaving, but a replay after the win must have revoked the session.
+        expect(await world.redis.get(`refresh-jti:${customer.id}`)).toBeNull();
+      });
     });
 
     it('logout revokes the refresh token in Redis; a second login supersedes the first session (single jti per user)', async () => {

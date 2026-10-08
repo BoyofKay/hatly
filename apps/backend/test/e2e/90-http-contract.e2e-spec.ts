@@ -83,6 +83,8 @@ describe('E2E — HTTP contract', () => {
       /^GET \/api\/v1\/health(\/ready)?$/,
       /^POST \/api\/v1\/auth\/(register|login|otp\/verify|driver\/login|password\/login|refresh|customer\/password\/login|customer\/password\/register)$/,
       /^GET \/api\/v1\/sectors$/,
+      // Consolidated customer-commerce milestone (Part E — Sector Subcategories): public, same discipline as /sectors.
+      /^GET \/api\/v1\/sectors\/:sectorId\/subcategories$/,
       /^GET \/api\/v1\/vendors$/,
       /^GET \/api\/v1\/search$/,
       /^GET \/api\/v1\/vendor-branches\/:(id|branchId)(\/categories|\/products)?$/,

@@ -169,8 +169,11 @@ class CheckoutController extends StateNotifier<CheckoutState> {
     // When the wallet alone covers the total the server has resolved the method to WALLET; the order must say so (and carry
     // no electronic method — there is nothing left to pay electronically).
     final walletCoversAll = forOrder && q?.payment?.method == 'WALLET';
+    // The quote may have preselected the customer's default address (selection null = "server default"). Order creation does
+    // not resolve defaults, so the order must name the exact saved address the customer was quoted and confirmed.
+    final quotedAddressId = q?.address?.addressId;
     return CheckoutRequest(
-      addressId: s.addressId,
+      addressId: s.addressId ?? (forOrder ? quotedAddressId : null),
       paymentMethod: walletCoversAll ? 'WALLET' : s.paymentMethod,
       electronicPaymentMethod: walletCoversAll ? null : s.electronicMethod,
       useWallet: s.useWallet,
@@ -180,8 +183,10 @@ class CheckoutController extends StateNotifier<CheckoutState> {
     );
   }
 
-  /// Re-asks the server for the quote (also the retry after an error).
-  Future<void> refresh() async {
+  /// Re-asks the server for the quote (also the retry after an error). When the customer CHANGED something (address / zone,
+  /// payment, coupon…) and the new quote fails, the previous quote is dropped: its fee and token belong to the old choice and
+  /// must never stay on screen — or be submitted — as if they were the new one.
+  Future<void> refresh({bool selectionChanged = false}) async {
     final ticket = ++_sequence;
     state = state.copyWith(isQuoting: true, quoteError: null);
     try {
@@ -190,12 +195,16 @@ class CheckoutController extends StateNotifier<CheckoutState> {
       await _applyQuote(quote);
     } on ApiException catch (error) {
       if (ticket != _sequence || !mounted) return;
-      state = state.copyWith(isQuoting: false, quoteError: error);
+      state = state.copyWith(
+          isQuoting: false,
+          quoteError: error,
+          quote: selectionChanged ? null : state.quote);
     } catch (error) {
       if (ticket != _sequence || !mounted) return;
       state = state.copyWith(
           isQuoting: false,
-          quoteError: ApiException(code: 'UNKNOWN_ERROR', message: '$error'));
+          quoteError: ApiException(code: 'UNKNOWN_ERROR', message: '$error'),
+          quote: selectionChanged ? null : state.quote);
     }
   }
 
@@ -251,7 +260,7 @@ class CheckoutController extends StateNotifier<CheckoutState> {
 
   void _update(CheckoutSelection selection) {
     state = state.copyWith(selection: selection, staleNotice: null);
-    unawaited(refresh());
+    unawaited(refresh(selectionChanged: true));
   }
 
   void selectAddress(String addressId) =>

@@ -3,13 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/localization/l10n/app_localizations.dart';
 import '../../../core/theme/hatly_theme.dart';
+import '../../../shared_widgets/filter_action_button.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/hatly_text_field.dart';
 import '../../../shared_widgets/sort_menu_button.dart';
 import '../data/vendor_providers.dart';
+import '../domain/vendor_filters.dart';
 import '../../home/data/home_address_provider.dart';
 import 'widgets/vendor_card.dart';
 import 'widgets/vendor_card_skeleton.dart';
+import 'widgets/subcategory_chip_row.dart';
+import 'widgets/vendor_filter_sheet.dart';
 
 class VendorListScreen extends ConsumerStatefulWidget {
   const VendorListScreen({super.key, this.category, this.categoryName});
@@ -37,6 +41,11 @@ class VendorListScreen extends ConsumerStatefulWidget {
 class _VendorListScreenState extends ConsumerState<VendorListScreen> {
   String? _sortOption;
   String _searchQuery = '';
+  // Consolidated customer-commerce milestone, Part E.
+  String? _selectedSubcategoryId;
+  // Filters V1. The committed/active filter state — the filter sheet
+  // only ever replaces this wholesale, on Apply.
+  VendorFilters _filters = VendorFilters.empty;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +72,10 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
       // contract is preserved end-to-end into this key.
       latitude: ref.watch(homeActiveAddressProvider).valueOrNull?.latitude,
       longitude: ref.watch(homeActiveAddressProvider).valueOrNull?.longitude,
+      subcategoryId: _selectedSubcategoryId,
+      openNow: _filters.openNow,
+      hasOffers: _filters.hasOffers,
+      minRating: _filters.minRating,
     );
     final vendorsAsync = ref.watch(vendorListControllerProvider(key));
 
@@ -70,6 +83,15 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
       appBar: AppBar(title: Text(title)),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: HatlySpacing.sm),
+            child: SubcategoryChipRow(
+              sectorId: sectorId,
+              selectedSubcategoryId: _selectedSubcategoryId,
+              onChanged: (subcategoryId) =>
+                  setState(() => _selectedSubcategoryId = subcategoryId),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(HatlySpacing.md, HatlySpacing.ms,
                 HatlySpacing.md, HatlySpacing.sm),
@@ -83,6 +105,22 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
                   ),
                 ),
                 const SizedBox(width: HatlySpacing.sm),
+                FilterActionButton(
+                  key: const Key('vendor-filter-action'),
+                  label: l10n.filterAction,
+                  activeCount: _filters.activeCount,
+                  onTap: () async {
+                    final result = await showModalBottomSheet<VendorFilters>(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => VendorFilterSheet(initialFilters: _filters),
+                    );
+                    // A null result means Cancel/dismiss — the previous active
+                    // filter state is left completely untouched.
+                    if (result != null) setState(() => _filters = result);
+                  },
+                ),
+                const SizedBox(width: HatlySpacing.sm),
                 SortMenuButton(
                   value: _sortOption,
                   label: l10n.sortNewest,
@@ -90,6 +128,7 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
                   options: [
                     ('newest', l10n.sortNewest),
                     ('highestRated', l10n.sortHighestRated),
+                    ('offers', l10n.sortOffers),
                   ],
                 ),
               ],

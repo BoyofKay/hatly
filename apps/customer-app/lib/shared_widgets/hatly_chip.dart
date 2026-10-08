@@ -29,18 +29,23 @@ class HatlyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Dark Mode fix: the unselected chip used to hardcode
+    // `HatlyColors.surfaceWhite`/`textDark`/`border` — a fixed white chip
+    // with near-black text on a dark background. Now theme-aware; identical
+    // to the old constants in Light Mode. The SELECTED fill/text stay
+    // white-on-[color] (a self-contained filled badge, unaffected by the
+    // surrounding theme, same as the app's other solid status badges).
+    final p = context.palette;
     final baseColor = color ?? HatlyColors.primaryOrange;
-    final background = selected ? baseColor : HatlyColors.surfaceWhite;
+    final background = selected ? baseColor : p.surface;
     final foreground = selected
         ? HatlyColors.surfaceWhite
-        : (variant == HatlyChipVariant.status
-            ? baseColor
-            : HatlyColors.textDark);
+        : (variant == HatlyChipVariant.status ? baseColor : p.textPrimary);
     final borderColor = selected
         ? baseColor
         : (variant == HatlyChipVariant.status
             ? baseColor.withOpacity(0.4)
-            : HatlyColors.border);
+            : p.border);
 
     final chip = Container(
       padding: const EdgeInsets.symmetric(

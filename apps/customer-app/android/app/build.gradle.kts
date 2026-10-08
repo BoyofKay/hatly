@@ -19,6 +19,16 @@ val localProperties = Properties().apply {
 }
 val mapsApiKey: String = (localProperties.getProperty("MAPS_API_KEY") ?: System.getenv("MAPS_API_KEY") ?: "")
 
+// Release signing (M5 Batch 3). The upload/release keystore is NEVER in the repository: android/key.properties (git-ignored; see
+// key.properties.example) points at it. Without that file the release variant falls back to the debug key, so local
+// `flutter run --release` keeps working — such a build cannot be published (Play rejects debug-signed bundles), and a warning says so.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("key.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val hasReleaseKeystore = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    .all { !keystoreProperties.getProperty(it).isNullOrBlank() }
+
 android {
     namespace = "com.hatly.customer"
     compileSdk = flutter.compileSdkVersion
@@ -45,13 +55,31 @@ android {
         // Fills the `${mapsApiKey}` placeholder in AndroidManifest.xml's `com.google.android.geo.API_KEY` meta-data —
         // the standard mechanism `google_maps_flutter` itself reads on Android. Blank is valid (see above).
         manifestPlaceholders["mapsApiKey"] = mapsApiKey
+        // Tester builds only: a dev/tester backend served over plain http (e.g. http://<LAN IP>:3000) needs cleartext
+        // traffic, which Android blocks by default. OFF unless explicitly requested with
+        // `flutter build apk --android-project-arg=hatly.allowCleartext=true`; a normal (production) build never allows it.
+        manifestPlaceholders["usesCleartextTraffic"] = (project.findProperty("hatly.allowCleartext") == "true").toString()
+    }
+
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                logger.warn("WARNING: android/key.properties not found — signing the RELEASE build with the DEBUG key. Not publishable.")
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

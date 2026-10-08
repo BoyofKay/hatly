@@ -67,7 +67,8 @@ test.describe('Vendor order detail — critical path', () => {
 
   test('an invalid/nonexistent order id shows a clean, recoverable error — never a crash', async ({ page }) => {
     await page.goto('/orders/00000000-0000-0000-0000-000000000000');
-    await expect(page.getByText(/failed to load order/i)).toBeVisible();
+    // the backend's own reason (Operational Completion milestone: the page reads the real error envelope)
+    await expect(page.getByText('Order not found.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
   });
 });

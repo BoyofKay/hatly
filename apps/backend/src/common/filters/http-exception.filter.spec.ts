@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, HttpException, HttpStatus, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, HttpException, HttpStatus, InternalServerErrorException, Logger, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { HttpExceptionFilter } from './http-exception.filter';
 import { RequestContextService } from '../request-context/request-context.service';
 
@@ -17,9 +17,9 @@ function buildHost(overrides: { method?: string; url?: string } = {}) {
   return { req, res, host };
 }
 
-function buildFilter(correlationId = 'test-correlation-id') {
+function buildFilter(correlationId = 'test-correlation-id', exposeServerErrorMessages = true) {
   const requestContextService = { getCorrelationId: jest.fn(() => correlationId) };
-  const filter = new HttpExceptionFilter(requestContextService as unknown as RequestContextService);
+  const filter = new HttpExceptionFilter(requestContextService as unknown as RequestContextService, exposeServerErrorMessages);
   return { filter, requestContextService };
 }
 
@@ -198,6 +198,73 @@ describe('HttpExceptionFilter', () => {
         expect(id).not.toBe('no-request-context');
         expect(id).toMatch(/^[0-9a-f-]{36}$/);
         expect(res.setHeader).toHaveBeenCalledWith('x-correlation-id', id);
+      }
+    });
+  });
+
+  describe('M5 Batch 1 — server-error observability and production safety', () => {
+    let errorSpy: jest.SpyInstance;
+    beforeEach(() => {
+      errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    });
+    afterEach(() => errorSpy.mockRestore());
+
+    it('a 5xx HttpException now leaves a server-side log line with the correlation id and the full detail (it used to log nothing)', () => {
+      const { filter } = buildFilter('corr-500');
+      const { host } = buildHost({ url: '/orders?phone=%2B201000000000&q=secret' });
+
+      filter.catch(new ServiceUnavailableException('read replica lag exceeded'), host);
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const line = String(errorSpy.mock.calls[0][0]);
+      expect(line).toContain('corr-500');
+      expect(line).toContain('read replica lag exceeded');
+      expect(line).toContain('/orders');
+    });
+
+    it('server-side logs carry the PATH only — never the query string (phone numbers, coordinates, search terms)', () => {
+      const { filter } = buildFilter('corr-q');
+      const { host } = buildHost({ url: '/vendors?lat=30.1&lng=31.2&phone=%2B20100&q=x' });
+      filter.catch(new Error('boom'), host);
+      filter.catch(new InternalServerErrorException('x'), host);
+      for (const call of errorSpy.mock.calls) {
+        expect(String(call[0])).not.toMatch(/phone|lat=|lng=|q=x|%2B20100/);
+      }
+    });
+
+    it('4xx responses are not logged as server errors', () => {
+      const { filter } = buildFilter();
+      filter.catch(new BadRequestException('nope'), buildHost().host);
+      filter.catch(new NotFoundException('nope'), buildHost().host);
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('production mode: a 5xx HttpException message and details are replaced by a generic message; the correlation id stays', () => {
+      const { filter } = buildFilter('corr-prod', false);
+      const { res, host } = buildHost();
+      filter.catch(new InternalServerErrorException({ message: 'column "ssn" of relation "users" does not exist', details: { sql: 'select ...' } }), host);
+      const body = res.json.mock.calls[0][0];
+      expect(body.error.message).toBe('Something went wrong. Please try again.');
+      expect(body.error.details).toBeUndefined();
+      expect(body.error.correlationId).toBe('corr-prod');
+      expect(JSON.stringify(body)).not.toMatch(/ssn|users|select/);
+    });
+
+    it('production mode keeps the actionable 4xx message and details untouched', () => {
+      const { filter } = buildFilter('c', false);
+      const { res, host } = buildHost();
+      filter.catch(new BadRequestException({ message: 'Choose a payment method.', details: { code: 'PAYMENT_METHOD_REQUIRED' } }), host);
+      expect(res.json.mock.calls[0][0].error).toMatchObject({ message: 'Choose a payment method.', details: { code: 'PAYMENT_METHOD_REQUIRED' } });
+    });
+
+    it('an unknown error never reaches the client in any mode — only the generic message', () => {
+      for (const expose of [true, false]) {
+        const { filter } = buildFilter('c', expose);
+        const { res, host } = buildHost();
+        filter.catch(new Error('password authentication failed for user "hatly" at 10.0.3.7:5432'), host);
+        const body = res.json.mock.calls[0][0];
+        expect(body.error.message).toBe('Something went wrong. Please try again.');
+        expect(JSON.stringify(body)).not.toMatch(/hatly|10\.0\.3\.7|password/);
       }
     });
   });

@@ -52,13 +52,16 @@ class HomeCategorySection extends ConsumerWidget {
   }
 }
 
-/// Category navigation: opens the PRODUCT-FIRST listing of the sector (`GET /products?sectorId=`), shared
-/// by Home, Explore's grid, its featured row and search matches. (Vendor browsing is unchanged and still
-/// reachable through `/vendors/:id`.)
+/// Category navigation: opens the VENDOR-FIRST discovery listing of the sector (`GET
+/// /vendors?sectorId=`, via `VendorListScreen`), shared by Home, Explore's grid, its featured row and
+/// search matches. This is a deliberate, universal product decision — every marketplace category
+/// (Restaurants, Groceries, Pharmacies, ...) enters through vendor/branch selection first; there is
+/// no category that opens a product listing directly. Previously routed to a now-removed
+/// product-first `/category-products` screen — a regression relative to this same rule, fixed here.
 String categoryListingRoute(MarketplaceSector sector,
     {required bool isArabic}) {
   final name = categoryDisplayName(sector, isArabic: isArabic);
-  return '/category-products?sectorId=${sector.id}&sectorName=${Uri.encodeComponent(name)}';
+  return '/vendors?sectorId=${sector.id}&sectorName=${Uri.encodeComponent(name)}';
 }
 
 String categoryDisplayName(MarketplaceSector sector,

@@ -1,14 +1,60 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/config/api_config.dart';
 import 'core/localization/l10n/app_localizations.dart';
 import 'core/network/providers.dart';
 import 'core/routing/app_router.dart';
+import 'core/storage/theme_preference_storage.dart';
 import 'core/theme/hatly_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
+import 'core/routing/router_stack.dart';
 
-void main() {
-  runApp(const ProviderScope(child: HatlyCustomerApp()));
+/// Customer Push Notifications — background state. Runs in a separate
+/// background isolate with NO access to this app's Riverpod
+/// container, router, or session state, so — per the explicit
+/// requirement — it does the absolute minimum and nothing else: no
+/// navigation, no business mutations, no UI. It must be a top-level
+/// (or static) function and carry this pragma, or the background
+/// isolate cannot find it as its entry point.
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // The background isolate has its own separate Firebase state —
+  // this is the documented, required call, not a duplicate
+  // initialization of the main isolate's own (see FcmService.initialize()).
+  await Firebase.initializeApp();
+}
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Fail fast (release only) if the app was built without a reachable backend URL — see apiBaseUrlProblem.
+  if (kReleaseMode) {
+    final problem = apiBaseUrlProblem(kApiBaseUrl);
+    if (problem != null) throw StateError(problem);
+  }
+  try {
+    // Must be registered before runApp() per firebase_messaging's own
+    // contract. Wrapped defensively — same "never block app startup"
+    // discipline as FcmService.initialize()'s own try/catch in
+    // SessionController: an unconfigured Firebase project (no
+    // google-services.json/GoogleService-Info.plist yet, see
+    // FcmService's own comment) must not crash a cold start.
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (_) {}
+  // Dark Mode — read the customer's saved theme choice (if any) BEFORE
+  // runApp, so the very first frame already renders in the right theme
+  // (no flash of Light then a rebuild into Dark). See
+  // core/theme/theme_mode_provider.dart for why this is a Provider
+  // override rather than an async value read inside the widget tree.
+  final initialThemeMode =
+      await ThemePreferenceStorage().readThemeMode() ?? ThemeMode.light;
+  runApp(ProviderScope(
+    overrides: [initialThemeModeProvider.overrideWithValue(initialThemeMode)],
+    child: const HatlyCustomerApp(),
+  ));
 }
 
 class HatlyCustomerApp extends ConsumerWidget {
@@ -18,33 +64,23 @@ class HatlyCustomerApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
 
-    // Customer Push Notifications (Chunk B) — the tap-to-navigate
+    // Customer Push Notifications / Deep Links — the tap-to-navigate
     // wiring needs the router, which only exists here at the app
     // root (not inside SessionController, which triggers Firebase
     // initialization/token registration separately — see that
-    // class's own comment). Mirrors the Driver app's own main.dart
-    // wiring exactly (apps/driver-app/lib/main.dart). Reads
-    // `type`/`orderId` from the payload (Chunk A's approved
-    // contract); navigates to the EXISTING `/orders/:id` route — no
-    // new screen created. That route already sits behind this app's
-    // own global unauthenticated-redirect (see app_router.dart's own
-    // comment), so a tap arriving before/after a session ends is
-    // already safely handled without any extra guard needed here.
-    ref.read(fcmServiceProvider).onNotificationTapped = (data) {
-      const approvedTypes = {
-        'ORDER_CONFIRMED',
-        'ORDER_CANCELLED',
-        'ORDER_ON_THE_WAY',
-        'ORDER_DELIVERED',
-        'ORDER_FAILED_DELIVERY',
-      };
-      if (approvedTypes.contains(data['type'])) {
-        final orderId = data['orderId'];
-        if (orderId != null) {
-          router.go('/orders/$orderId');
-        }
-      }
-    };
+    // class's own comment). Parsing/validation and the auth-readiness
+    // race (terminated cold start / logged-out tap / login-after-tap)
+    // are centralized in `NotificationNavigationCoordinator` — this is
+    // the ONLY place that assigns `navigate` or `onNotificationTapped`
+    // and the ONLY place that calls `router.go` for a notification.
+    // Navigates to the EXISTING `/orders/:id` route — no new screen
+    // created.
+    final notificationNavigation = ref.read(notificationNavigationProvider);
+    // `openOnTopOfHome`, not `go`: a notification must never leave Order Details as the ONLY route (no Back, and Android's
+    // system Back would exit the app) — see core/routing/router_stack.dart.
+    notificationNavigation.navigate = router.openOnTopOfHome;
+    ref.read(fcmServiceProvider).onNotificationTapped =
+        notificationNavigation.handleTappedPayload;
 
     return MaterialApp.router(
       title: 'Hatly',

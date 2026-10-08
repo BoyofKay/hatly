@@ -122,4 +122,16 @@ export enum Permission {
    * refund execution (Chunk 2c) is separate work not yet built.
    */
   MANAGE_ORDER_ISSUES = 'MANAGE_ORDER_ISSUES',
+
+  /**
+   * M3c (Launch-Readiness Gap Audit, G-10) — Admin Customer Management.
+   * Same shape as VIEW_ORDERS: read-only, deliberately distinct from
+   * MANAGE_CUSTOMER_WALLET (a real money-movement capability — an
+   * admin who can approve a wallet credit is not necessarily the same
+   * admin who should be browsing customer profiles, and vice versa).
+   * Gates the new customer list/search and detail endpoints only; no
+   * customer mutation capability exists anywhere in this codebase, so
+   * none is gated here.
+   */
+  VIEW_CUSTOMERS = 'VIEW_CUSTOMERS',
 }

@@ -1,10 +1,11 @@
+import { DeliveryAddressView } from '../delivery-address';
 import { apiClient } from './client';
 
 export interface DispatchOrder {
   orderId: string;
   status: string;
   createdAt: string;
-  deliveryAddressSnapshot: { line1?: string; latitude?: number; longitude?: number } | null;
+  deliveryAddressSnapshot: (Partial<DeliveryAddressView> & { line1?: string }) | null;
   currentDeliveryId: string | null;
   currentDriverId: string | null;
   reassignmentCount: number;
@@ -17,6 +18,11 @@ export interface AdminDriver {
   isOnline: boolean;
   isAvailable: boolean;
   verificationStatus: string;
+  vehicleTypeName: string | null;
+  vehicleTypeId: string | null;
+  lastLocationAt: string | null;
+  /** The order this driver is currently on (assigned / picked up / on the way), if any. */
+  activeDelivery: { orderId: string; orderNumber: string; status: string } | null;
 }
 
 /** Reuses the real backend `admin/orders/dispatchable` endpoint (Chunk 6 backend addition). */
@@ -58,6 +64,58 @@ export async function assignDriver(orderId: string, driverId: string): Promise<v
   await apiClient.post(`/admin/orders/${orderId}/assign-driver`, { driverId });
 }
 
-export async function reassignDriver(orderId: string, driverId: string): Promise<void> {
-  await apiClient.post(`/admin/orders/${orderId}/reassign-driver`, { driverId });
+/**
+ * `expectedCurrentDriverId` = the driver the admin saw on the order: if the assignment changed since (another admin, the
+ * timeout sweep, the driver's own release) the backend refuses with `ASSIGNMENT_CHANGED` instead of overriding it blindly.
+ */
+export async function reassignDriver(orderId: string, driverId: string, expectedCurrentDriverId?: string): Promise<void> {
+  await apiClient.post(`/admin/orders/${orderId}/reassign-driver`, { driverId, ...(expectedCurrentDriverId ? { expectedCurrentDriverId } : {}) });
+}
+
+/**
+ * M3a (Launch-Readiness Gap Audit, G-20). Reuses the existing, unchanged
+ * `PATCH admin/drivers/:id/verification` exactly — the only two states
+ * the backend's own `UpdateDriverVerificationDto` accepts (`PENDING` is
+ * the creation default only, never a target this sets it back to).
+ */
+export async function setDriverVerification(driverId: string, status: 'APPROVED' | 'REJECTED'): Promise<AdminDriver> {
+  const res = await apiClient.patch(`/admin/drivers/${driverId}/verification`, { status });
+  return res.data.data;
+}
+
+/** An ACTIVE vehicle type an admin can give a driver (`GET admin/drivers/vehicle-types`, MANAGE_DRIVERS). */
+export interface DriverVehicleTypeOption {
+  id: string;
+  name: string;
+  nameAr: string | null;
+  isBicycle: boolean;
+}
+
+export async function listDriverVehicleTypes(): Promise<DriverVehicleTypeOption[]> {
+  const res = await apiClient.get('/admin/drivers/vehicle-types');
+  return res.data.data;
+}
+
+/** `PATCH admin/drivers/:id/vehicle-type` — sets, changes or clears (`null`) the driver's vehicle type. */
+export async function setDriverVehicleType(driverId: string, vehicleTypeId: string | null): Promise<AdminDriver> {
+  const res = await apiClient.patch(`/admin/drivers/${driverId}/vehicle-type`, { vehicleTypeId });
+  return res.data.data;
+}
+
+/** Mirrors the real backend `DispatchAlert` entity exactly (delivery/entities/dispatch-alert.entity.ts). */
+export interface DispatchAlert {
+  id: string;
+  orderId: string;
+  orderNumber: string | null;
+  orderStatus: string | null;
+  reason: 'NO_ELIGIBLE_DRIVER';
+  /** Set by the assignment that resolved it. */
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+/** `GET admin/dispatch-alerts` — newest first, bounded; `openOnly` = not yet resolved by an assignment. */
+export async function listDispatchAlerts(openOnly = false): Promise<DispatchAlert[]> {
+  const res = await apiClient.get('/admin/dispatch-alerts', { params: openOnly ? { open: true } : {} });
+  return res.data.data;
 }

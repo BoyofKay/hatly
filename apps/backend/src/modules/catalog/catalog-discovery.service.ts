@@ -6,7 +6,7 @@ import { MarketplaceSector } from '../sectors/entities/marketplace-sector.entity
 import { ServiceAreaResolverService } from '../service-areas/service-area-resolver.service';
 import { ActiveOfferSummary, OfferConsumptionService } from '../offers/offer-consumption.service';
 import { HIGHEST_RATED_MINIMUM_RATING_COUNT } from '../ratings/highest-rated-threshold';
-import { normalizedSearchTerm, resolveLimit, resolvePage, ProductSortOption } from '../discovery/discovery.constants';
+import { normalizedSearchTerm, resolveLimit, resolvePage } from '../discovery/discovery.constants';
 
 export interface MarketplaceProductItem {
   /** Null for a listing nobody has linked to a catalog product (or whose catalog product is inactive/deleted). */
@@ -64,7 +64,11 @@ export class CatalogDiscoveryService {
 
   async listBySector(params: {
     sectorId: string;
-    sort?: ProductSortOption;
+    // Filters V1 note: deliberately its OWN narrower literal union, not the shared
+    // `ProductSortOption` (which gained `'offers'` for the per-branch product list this milestone
+    // touches) — this cross-vendor catalog-grouped view is a separate, untouched feature; its own DTO
+    // (`ListSectorProductsQueryDto`) already restricts `sort` to exactly this same set.
+    sort?: 'highestRated' | 'bestSelling' | 'newest' | 'price_asc' | 'price_desc';
     search?: string;
     page?: number;
     limit?: number;

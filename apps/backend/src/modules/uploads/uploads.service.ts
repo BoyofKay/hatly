@@ -1,8 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Upload } from './entities/upload.entity';
 import { UPLOAD_PROVIDER, UploadProvider } from './upload-provider.interface';
+import { decodeBase64Image, UploadRejectedError } from './image-validation';
 
 @Injectable()
 export class UploadsService {
@@ -11,8 +12,26 @@ export class UploadsService {
     @Inject(UPLOAD_PROVIDER) private readonly uploadProvider: UploadProvider,
   ) {}
 
-  async upload(base64Content: string, filename: string, uploadedByUserId: string): Promise<Upload> {
-    const { url } = await this.uploadProvider.store({ base64Content, filename });
+  /**
+   * Image-only upload boundary. The bytes are validated FIRST (strict base64, size ceiling, JPEG/PNG/WebP signature — see
+   * image-validation.ts) and the storage extension is derived from the DETECTED type, never from the client's `filename`
+   * (kept in the signature for the callers/contract; it can no longer influence what is stored or where). Nothing reaches the
+   * storage provider unless it is a valid image.
+   */
+  async upload(base64Content: string, _filename: string, uploadedByUserId: string): Promise<Upload> {
+    let decoded: ReturnType<typeof decodeBase64Image>;
+    try {
+      decoded = decodeBase64Image(base64Content);
+    } catch (error) {
+      if (error instanceof UploadRejectedError) {
+        throw new BadRequestException({ message: error.message, details: { code: error.code } });
+      }
+      throw error;
+    }
+    const { url } = await this.uploadProvider.store({
+      base64Content: decoded.base64,
+      filename: `upload${decoded.image.extension}`,
+    });
     return this.repo.save(this.repo.create({ url, uploadedByUserId }));
   }
 

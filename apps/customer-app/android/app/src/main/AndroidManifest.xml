@@ -7,8 +7,9 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <application
-        android:label="hatly_customer"
+        android:label="Hatly Customer"
         android:name="${applicationName}"
+        android:usesCleartextTraffic="${usesCleartextTraffic}"
         android:icon="@mipmap/ic_launcher">
         <!-- google_maps_flutter's standard Android key mechanism — see app/build.gradle.kts for where `mapsApiKey` comes
              from. Only read when HATLY_MAPS_ENABLED actually builds a GoogleMap; blank is otherwise inert. -->

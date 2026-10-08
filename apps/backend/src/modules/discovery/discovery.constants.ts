@@ -12,8 +12,9 @@ export const DISCOVERY_DEFAULT_PAGE = 1;
 export const DISCOVERY_DEFAULT_LIMIT = 20;
 export const DISCOVERY_MAX_LIMIT = 50;
 
-export type VendorSortOption = 'highestRated' | 'newest';
-export type ProductSortOption = 'highestRated' | 'bestSelling' | 'newest' | 'price_asc' | 'price_desc';
+/** `'offers'` (Filters V1) added to both — see `MarketplaceVendorsService`/`ProductsService` for the real, EXISTS-backed ordering this uses (never a fabricated/arbitrary "offer strength" ranking). */
+export type VendorSortOption = 'highestRated' | 'newest' | 'offers';
+export type ProductSortOption = 'highestRated' | 'bestSelling' | 'newest' | 'price_asc' | 'price_desc' | 'offers';
 
 export function resolvePage(page?: number): number {
   return page && page > 0 ? page : DISCOVERY_DEFAULT_PAGE;

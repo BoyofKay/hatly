@@ -154,6 +154,11 @@ export class PushNotificationService {
     );
   }
 
+  /** U2 (approved): the customer collected their PICKUP order at the branch. */
+  async sendOrderCollectedNotification(customerId: string, orderId: string): Promise<void> {
+    await this.sendCustomerOrderNotification(customerId, orderId, 'ORDER_COLLECTED', 'Order collected', 'You collected your order. Enjoy!');
+  }
+
   async sendOrderFailedDeliveryNotification(customerId: string, orderId: string): Promise<void> {
     await this.sendCustomerOrderNotification(
       customerId,

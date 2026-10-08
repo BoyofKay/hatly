@@ -1,0 +1,164 @@
+# Continuous integration — verification only. No deployment, no repository secrets, no cloud or production credentials.
+# Backend: install, typecheck, unit tests, build. Backend integration (real PostgreSQL + Redis in service containers).
+# Backend E2E (same service containers; non-blocking, see the job). Customer + Driver Flutter apps: analyze + tests.
+# The database/Redis passwords below belong to throw-away containers that exist only for the duration of a job.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (typecheck, unit tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      # Root lockfile, backend workspace only (the dashboard is out of scope for this workflow).
+      - name: Install
+        run: npm ci --workspace=apps/backend --include-workspace-root
+      - name: Typecheck
+        run: npx tsc --noEmit -p apps/backend/tsconfig.json
+      - name: Unit tests
+        run: npm test --workspace=apps/backend -- --ci
+        env:
+          NODE_ENV: test
+      - name: Build
+        run: npm run build --workspace=apps/backend
+
+  backend-integration:
+    name: Backend integration (PostgreSQL + Redis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hatly
+          POSTGRES_PASSWORD: hatly
+          POSTGRES_DB: hatly_integration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hatly -d hatly_integration_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install
+        run: npm ci --workspace=apps/backend --include-workspace-root
+      # The suite resets its own disposable database (hatly_integration_test, Redis db 15) and refuses to run against anything else.
+      - name: Integration tests
+        run: npm run test:integration --workspace=apps/backend -- --ci
+
+  backend-e2e:
+    name: Backend E2E (non-blocking)
+    # Real HTTP against the fully wired app on PostgreSQL + Redis; every external provider is faked at the network edge, so no
+    # outside infrastructure is needed. It is the slowest and most timing-sensitive suite, and has not yet had a track record on
+    # hosted runners, so it only runs on the default branch / manually and never fails the workflow. Promote it to a required
+    # check once it has been green on a runner for a while.
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hatly
+          POSTGRES_PASSWORD: hatly
+          POSTGRES_DB: hatly_e2e_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hatly -d hatly_e2e_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install
+        run: npm ci --workspace=apps/backend --include-workspace-root
+      - name: E2E tests
+        run: npm run test:e2e --workspace=apps/backend -- --ci
+
+  customer-app:
+    name: Customer app (analyze, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/customer-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.3
+          cache: true
+      - run: flutter pub get
+      # Fails the build on analyzer ERRORS only. The existing info/warning lints are tracked separately and are not
+      # made fatal here so unrelated cleanup is not forced into this workflow.
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test
+
+  driver-app:
+    name: Driver app (analyze, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/driver-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.3
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - run: flutter test

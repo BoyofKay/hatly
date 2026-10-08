@@ -33,3 +33,16 @@ export async function approvePayment(paymentId: string): Promise<void> {
 export async function rejectPayment(paymentId: string, reason?: string): Promise<void> {
   await apiClient.post(`/admin/manual-transfer-payments/${paymentId}/reject`, reason ? { reason } : {});
 }
+
+/**
+ * M3a (Launch-Readiness Gap Audit, G-25). Reuses the existing, unchanged
+ * `POST admin/manual-transfer-payments/:id/refund` exactly — a manually
+ * recorded refund against an already-PAID transfer (distinct from, and
+ * never a replacement for, the automatic partial-cancellation refund
+ * path or the separate Failed-Delivery refund endpoint). The backend
+ * computes/validates everything (PAID-only, idempotent per paymentId);
+ * this never recalculates an amount.
+ */
+export async function recordManualTransferRefund(paymentId: string, amountMinor: number, reason?: string): Promise<void> {
+  await apiClient.post(`/admin/manual-transfer-payments/${paymentId}/refund`, reason ? { amountMinor, reason } : { amountMinor });
+}

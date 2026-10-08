@@ -53,15 +53,20 @@ export class LocalFilesystemUploadProvider implements UploadProvider {
    * itself.
    */
   async store(params: { base64Content: string; filename: string }): Promise<UploadResult> {
-    const dir = this.storageDir;
+    const dir = path.resolve(this.storageDir);
     await fs.mkdir(dir, { recursive: true });
 
     const safeExtension = this.extractSafeExtension(params.filename);
     const storageKey = `${randomUUID()}${safeExtension}`;
-    const fullPath = path.join(dir, storageKey);
+    const fullPath = path.resolve(dir, storageKey);
+    // Defence in depth on top of the UUID key: the resolved path must be a direct child of the storage directory.
+    if (path.dirname(fullPath) !== dir || path.basename(fullPath) !== storageKey) {
+      throw new Error('Refusing to write outside the uploads directory.');
+    }
 
     const buffer = Buffer.from(params.base64Content, 'base64');
-    await fs.writeFile(fullPath, buffer);
+    // `wx`: never overwrite an existing file.
+    await fs.writeFile(fullPath, buffer, { flag: 'wx' });
 
     return { url: `${this.publicUrlPrefix}/${storageKey}` };
   }

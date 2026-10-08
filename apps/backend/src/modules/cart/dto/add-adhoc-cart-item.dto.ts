@@ -24,9 +24,10 @@ import { AdHocServiceType } from '../ad-hoc-service-type.enum';
  *
  * `pickupLatitude`/`pickupLongitude` are only meaningful for a new
  * BUY_FROM_PLACE group; `destinationLatitude`/`destinationLongitude`
- * only for a new DELIVER_TO_PLACE group. All four are optional — when
- * omitted, CartService resolves the corresponding configured default
- * location instead of ever guessing a coordinate.
+ * only for a new DELIVER_TO_PLACE group. They are optional on this endpoint
+ * (the cart only stores them) but REQUIRED to check out: a missing pickup
+ * (BUY_FROM_PLACE) or destination (DELIVER_TO_PLACE) is rejected by the
+ * checkout planner — no configured default is ever substituted.
  *
  * `imageUrls` accepts plain strings here (not validated as arbitrary
  * URLs a client could fabricate) — CartService cross-checks every one

@@ -18,6 +18,14 @@ function buildHarness() {
       return withId;
     },
     find: async (opts: any) => [...store.values()].filter((t) => t.customerId === opts.where.customerId),
+    findAndCount: async (opts: any) => {
+      const matching = [...store.values()]
+        .filter((t) => t.customerId === opts.where.customerId)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      const skip = opts.skip ?? 0;
+      const take = opts.take ?? matching.length;
+      return [matching.slice(skip, skip + take), matching.length];
+    },
   };
   const requestContextService = { getCorrelationId: jest.fn(() => 'corr-test') };
   const service = new WalletService(repository as any, requestContextService as any);
@@ -281,5 +289,92 @@ describe('WalletService — structured business-event logging (Group 4)', () => 
     );
 
     expect(logSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('WalletService.listTransactionsForCustomer (Customer Wallet, Profile)', () => {
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  it('returns only this customer\'s own transactions, newest first', async () => {
+    const { service } = buildHarness();
+    await service.recordTransaction({
+      customerId: 'customer-1',
+      amountDeltaMinor: 1000,
+      type: WalletTransactionType.ORDER_REFUND,
+      idempotencyKey: 'k-1',
+    });
+    await wait(2);
+    await service.recordTransaction({
+      customerId: 'customer-2', // a different customer — must never leak into customer-1's list
+      amountDeltaMinor: 9999,
+      type: WalletTransactionType.ADMIN_CREDIT,
+      reason: 'not customer-1\'s',
+      idempotencyKey: 'k-2',
+    });
+    await wait(2);
+    await service.recordTransaction({
+      customerId: 'customer-1',
+      amountDeltaMinor: -500,
+      type: WalletTransactionType.ORDER_PAYMENT,
+      orderId: 'order-9',
+      idempotencyKey: 'k-3',
+    });
+
+    const result = await service.listTransactionsForCustomer('customer-1', {});
+
+    expect(result.total).toBe(2);
+    expect(result.data.map((t) => t.idempotencyKey)).toEqual(['k-3', 'k-1']); // newest first
+    expect(result.data.every((t) => t.customerId === 'customer-1')).toBe(true);
+  });
+
+  it('a customer with no transactions gets an empty page, never an error', async () => {
+    const { service } = buildHarness();
+    const result = await service.listTransactionsForCustomer('customer-empty', {});
+    expect(result.data).toEqual([]);
+    expect(result.total).toBe(0);
+  });
+
+  it('defaults to page 1 / limit 20, and caps an oversized limit at 50', async () => {
+    const { service } = buildHarness();
+    for (let i = 0; i < 3; i++) {
+      await service.recordTransaction({
+        customerId: 'customer-1',
+        amountDeltaMinor: 100,
+        type: WalletTransactionType.ORDER_REFUND,
+        idempotencyKey: `k-${i}`,
+      });
+    }
+
+    const defaults = await service.listTransactionsForCustomer('customer-1', {});
+    expect(defaults.page).toBe(1);
+    expect(defaults.limit).toBe(20);
+
+    const capped = await service.listTransactionsForCustomer('customer-1', { limit: 500 });
+    expect(capped.limit).toBe(50);
+  });
+
+  it('paginates correctly: page 2 with limit 1 returns the second-newest row', async () => {
+    const { service } = buildHarness();
+    await service.recordTransaction({
+      customerId: 'customer-1',
+      amountDeltaMinor: 100,
+      type: WalletTransactionType.ORDER_REFUND,
+      idempotencyKey: 'k-oldest',
+    });
+    await wait(2);
+    await service.recordTransaction({
+      customerId: 'customer-1',
+      amountDeltaMinor: 200,
+      type: WalletTransactionType.ORDER_REFUND,
+      idempotencyKey: 'k-newest',
+    });
+
+    const page1 = await service.listTransactionsForCustomer('customer-1', { limit: 1, page: 1 });
+    const page2 = await service.listTransactionsForCustomer('customer-1', { limit: 1, page: 2 });
+
+    expect(page1.data[0].idempotencyKey).toBe('k-newest');
+    expect(page2.data[0].idempotencyKey).toBe('k-oldest');
+    expect(page1.total).toBe(2);
+    expect(page2.total).toBe(2);
   });
 });

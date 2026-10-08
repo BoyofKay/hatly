@@ -391,6 +391,128 @@ describe('LoyaltyService.awardOrderEarning (Loyalty Earning, Chunk C)', () => {
   });
 });
 
+describe('LoyaltyService.reverseEarningForRefund (consolidated customer-commerce milestone)', () => {
+  function buildReversalHarness(params: { order?: any; earningRow?: any; priorReversals?: any[] }) {
+    const order = params.order ?? { id: 'order-1', totalMinor: 10000 };
+    const store = new Map<string, any>();
+    if (params.earningRow) store.set(params.earningRow.id, params.earningRow);
+    for (const r of params.priorReversals ?? []) store.set(r.id, r);
+
+    const repository = {
+      create: (data: any) => ({ ...data }),
+      save: async (entity: any) => {
+        const withId = { id: entity.id ?? randomUUID(), createdAt: new Date(), ...entity };
+        store.set(withId.id, withId);
+        return withId;
+      },
+    };
+    const businessConfigService = {};
+    const dataSource = {};
+    const walletService = {};
+    const requestContextService = { getCorrelationId: jest.fn(() => 'corr-test') };
+    const service = new LoyaltyService(repository as any, businessConfigService as any, dataSource as any, walletService as any, requestContextService as any);
+
+    const manager = {
+      findOne: async (EntityClass: any, opts: any) => {
+        if (EntityClass === Order) return opts.where.id === order.id ? order : null;
+        if (EntityClass === LoyaltyPointsTransaction) {
+          return [...store.values()].find((t) => t.orderId === opts.where.orderId && t.type === opts.where.type) ?? null;
+        }
+        throw new Error('unhandled findOne');
+      },
+      find: async (EntityClass: any, opts: any) => {
+        if (EntityClass === LoyaltyPointsTransaction) {
+          return [...store.values()].filter((t) => t.orderId === opts.where.orderId && t.type === opts.where.type);
+        }
+        throw new Error('unhandled find');
+      },
+      getRepository: () => repository,
+    };
+    return { service, manager, store };
+  }
+
+  const earningRow = (overrides: Partial<any> = {}) => ({
+    id: 'earning-1',
+    customerId: 'customer-1',
+    orderId: 'order-1',
+    pointsDelta: 100,
+    type: LoyaltyTransactionType.EARNING,
+    ...overrides,
+  });
+
+  it('a full refund (100% of order total) reverses the FULL amount originally earned', async () => {
+    const { service, manager, store } = buildReversalHarness({ earningRow: earningRow() });
+    await service.reverseEarningForRefund(manager as any, { orderId: 'order-1', refundedAmountMinor: 10000, idempotencyKey: 'k1' });
+    const reversal = [...store.values()].find((t) => t.type === LoyaltyTransactionType.EARNING_REVERSED);
+    expect(reversal.pointsDelta).toBe(-100);
+  });
+
+  it('a 50% partial refund reverses proportionally (50 of 100 points)', async () => {
+    const { service, manager, store } = buildReversalHarness({ earningRow: earningRow() });
+    await service.reverseEarningForRefund(manager as any, { orderId: 'order-1', refundedAmountMinor: 5000, idempotencyKey: 'k1' });
+    const reversal = [...store.values()].find((t) => t.type === LoyaltyTransactionType.EARNING_REVERSED);
+    expect(reversal.pointsDelta).toBe(-50);
+  });
+
+  it('NEVER over-reverses: a refund larger than the order total is capped at the full originally-earned amount', async () => {
+    const { service, manager, store } = buildReversalHarness({ earningRow: earningRow() });
+    await service.reverseEarningForRefund(manager as any, { orderId: 'order-1', refundedAmountMinor: 999999, idempotencyKey: 'k1' });
+    const reversal = [...store.values()].find((t) => t.type === LoyaltyTransactionType.EARNING_REVERSED);
+    expect(reversal.pointsDelta).toBe(-100); // never more than what was actually earned
+  });
+
+  it('CRITICAL: an order that never earned anything (e.g. refunded before DELIVERED) is a safe no-op — never fabricates a reversal', async () => {
+    const { service, manager, store } = buildReversalHarness({});
+    await service.reverseEarningForRefund(manager as any, { orderId: 'order-1', refundedAmountMinor: 5000, idempotencyKey: 'k1' });
+    expect(store.size).toBe(0);
+  });
+
+  it('NEVER reverses more than remains: a second partial refund only reverses what is left after a prior reversal', async () => {
+    const { service, manager, store } = buildReversalHarness({
+      earningRow: earningRow(),
+      priorReversals: [{ id: 'rev-1', customerId: 'customer-1', orderId: 'order-1', pointsDelta: -60, type: LoyaltyTransactionType.EARNING_REVERSED }],
+    });
+    // A further 50% refund would compute floor(100 * 0.5) = 50, but only 40 remains reversible (100 - 60 already reversed).
+    await service.reverseEarningForRefund(manager as any, { orderId: 'order-1', refundedAmountMinor: 5000, idempotencyKey: 'k2' });
+    const newReversal = [...store.values()].find((t) => t.id !== 'rev-1' && t.type === LoyaltyTransactionType.EARNING_REVERSED);
+    expect(newReversal.pointsDelta).toBe(-40); // capped at what remains, not the naive 50
+  });
+
+  it('is a no-op once everything already earned has been reversed', async () => {
+    const { service, manager, store } = buildReversalHarness({
+      earningRow: earningRow(),
+      priorReversals: [{ id: 'rev-1', customerId: 'customer-1', orderId: 'order-1', pointsDelta: -100, type: LoyaltyTransactionType.EARNING_REVERSED }],
+    });
+    await service.reverseEarningForRefund(manager as any, { orderId: 'order-1', refundedAmountMinor: 5000, idempotencyKey: 'k2' });
+    expect(store.size).toBe(2); // only the seeded earning row + the original prior reversal — nothing new added
+  });
+
+  it('is idempotent: a retried call with the SAME idempotencyKey never double-reverses', async () => {
+    const { service, manager, store } = buildReversalHarness({ earningRow: earningRow() });
+    await service.reverseEarningForRefund(manager as any, { orderId: 'order-1', refundedAmountMinor: 5000, idempotencyKey: 'same-key' });
+    // Simulate the real unique-index rejection a genuine retry would hit (same idempotencyKey already used).
+    const originalSave = manager.getRepository().save;
+    manager.getRepository().save = async (entity: any) => {
+      if (entity.idempotencyKey && [...store.values()].some((t) => t.idempotencyKey === entity.idempotencyKey)) {
+        const e: any = new Error('duplicate key value violates unique constraint');
+        e.code = '23505';
+        throw e;
+      }
+      return originalSave(entity);
+    };
+    await expect(
+      service.reverseEarningForRefund(manager as any, { orderId: 'order-1', refundedAmountMinor: 5000, idempotencyKey: 'same-key' }),
+    ).resolves.toBeUndefined(); // benign no-op, never throws
+    expect([...store.values()].filter((t) => t.type === LoyaltyTransactionType.EARNING_REVERSED)).toHaveLength(1);
+  });
+
+  it('a zero or negative refund amount is a safe no-op', async () => {
+    const { service, manager, store } = buildReversalHarness({ earningRow: earningRow() });
+    await service.reverseEarningForRefund(manager as any, { orderId: 'order-1', refundedAmountMinor: 0, idempotencyKey: 'k1' });
+    expect(store.size).toBe(1); // only the seeded earning row
+  });
+});
+
 describe('LoyaltyService.convertPointsToWallet (Points -> Wallet Conversion, Chunk D)', () => {
   function buildConversionHarness(params: { existingPoints?: number; pointsPerEgp?: number; existingWalletTx?: any } = {}) {
     const loyaltyStore = new Map<string, any>();
@@ -469,29 +591,33 @@ describe('LoyaltyService.convertPointsToWallet (Points -> Wallet Conversion, Chu
     return { service, loyaltyStore, walletStore };
   }
 
-  it('100 points converts to 1 EGP (100 minor units)', async () => {
-    const { service } = buildConversionHarness({ existingPoints: 200 });
-    const result = await service.convertPointsToWallet('customer-1', 100, 'idem-1');
-    expect(result.walletCreditMinor).toBe(100);
-    expect(result.convertedPoints).toBe(100);
+  it('APPROVED V1 EXAMPLE: 500 points converts to 5 EGP (500 minor units) — the minimum conversion', async () => {
+    const { service } = buildConversionHarness({ existingPoints: 600 });
+    const result = await service.convertPointsToWallet('customer-1', 500, 'idem-1');
+    expect(result.walletCreditMinor).toBe(500);
+    expect(result.convertedPoints).toBe(500);
   });
 
-  it('250 points converts to 2 EGP (200 minor units), remainder forfeited', async () => {
-    const { service } = buildConversionHarness({ existingPoints: 300 });
-    const result = await service.convertPointsToWallet('customer-1', 250, 'idem-1');
-    expect(result.walletCreditMinor).toBe(200);
-    expect(result.convertedPoints).toBe(250); // full amount deducted, not just 200
-  });
-
-  it('999 points converts to 9 EGP (900 minor units)', async () => {
+  it('1000 points converts to 10 EGP (1000 minor units)', async () => {
     const { service } = buildConversionHarness({ existingPoints: 1000 });
-    const result = await service.convertPointsToWallet('customer-1', 999, 'idem-1');
-    expect(result.walletCreditMinor).toBe(900);
+    const result = await service.convertPointsToWallet('customer-1', 1000, 'idem-1');
+    expect(result.walletCreditMinor).toBe(1000);
   });
 
-  it('CRITICAL: less than the minimum (100) is rejected', async () => {
+  it('APPROVED V1 RULE: a non-multiple-of-100 amount is rejected outright — never silently forfeits the remainder', async () => {
+    const { service, loyaltyStore, walletStore } = buildConversionHarness({ existingPoints: 1000 });
+    await expect(service.convertPointsToWallet('customer-1', 550, 'idem-1')).rejects.toMatchObject({
+      response: { details: { code: 'INVALID_CONVERSION_MULTIPLE', multipleOf: 100 } },
+    });
+    expect([...loyaltyStore.values()].filter((t) => t.type === 'REDEMPTION')).toEqual([]);
+    expect(walletStore.size).toBe(0);
+  });
+
+  it('CRITICAL: less than the minimum (500) is rejected — even a valid multiple of 100', async () => {
     const { service } = buildConversionHarness({ existingPoints: 500 });
-    await expect(service.convertPointsToWallet('customer-1', 99, 'idem-1')).rejects.toThrow(BadRequestException);
+    await expect(service.convertPointsToWallet('customer-1', 400, 'idem-1')).rejects.toMatchObject({
+      response: { details: { code: 'BELOW_MINIMUM_CONVERSION', minimum: 500 } },
+    });
   });
 
   it('zero points is rejected', async () => {
@@ -511,30 +637,32 @@ describe('LoyaltyService.convertPointsToWallet (Points -> Wallet Conversion, Chu
 
   it('CRITICAL: insufficient points is rejected, no ledger row created', async () => {
     const { service, loyaltyStore, walletStore } = buildConversionHarness({ existingPoints: 50 });
-    await expect(service.convertPointsToWallet('customer-1', 100, 'idem-1')).rejects.toThrow(BadRequestException);
+    await expect(service.convertPointsToWallet('customer-1', 500, 'idem-1')).rejects.toMatchObject({
+      response: { details: { code: 'INSUFFICIENT_POINTS' } },
+    });
     expect(loyaltyStore.size).toBe(1); // only the seed row, nothing new
     expect(walletStore.size).toBe(0);
   });
 
   it('successful conversion creates a Loyalty REDEMPTION transaction', async () => {
     const { service, loyaltyStore } = buildConversionHarness({ existingPoints: 500 });
-    await service.convertPointsToWallet('customer-1', 100, 'idem-1');
+    await service.convertPointsToWallet('customer-1', 500, 'idem-1');
     const redemption = [...loyaltyStore.values()].find((t) => t.type === 'REDEMPTION');
     expect(redemption).toBeTruthy();
-    expect(redemption.pointsDelta).toBe(-100);
+    expect(redemption.pointsDelta).toBe(-500);
   });
 
   it('successful conversion creates a Wallet LOYALTY_REDEMPTION transaction', async () => {
     const { service, walletStore } = buildConversionHarness({ existingPoints: 500 });
-    await service.convertPointsToWallet('customer-1', 100, 'idem-1');
+    await service.convertPointsToWallet('customer-1', 500, 'idem-1');
     const credit = [...walletStore.values()][0];
     expect(credit.type).toBe('LOYALTY_REDEMPTION');
-    expect(credit.amountDeltaMinor).toBe(100);
+    expect(credit.amountDeltaMinor).toBe(500);
   });
 
   it('CRITICAL: both ledger writes reference the same idempotencyKey', async () => {
     const { service, loyaltyStore, walletStore } = buildConversionHarness({ existingPoints: 500 });
-    await service.convertPointsToWallet('customer-1', 100, 'shared-key');
+    await service.convertPointsToWallet('customer-1', 500, 'shared-key');
     const redemption = [...loyaltyStore.values()].find((t) => t.type === 'REDEMPTION');
     const credit = [...walletStore.values()][0];
     expect(redemption.idempotencyKey).toBe('shared-key');
@@ -545,7 +673,7 @@ describe('LoyaltyService.convertPointsToWallet (Points -> Wallet Conversion, Chu
     const { service, loyaltyStore, walletStore } = buildConversionHarness({ existingPoints: 500 });
     loyaltyStore.set('other-redemption', { id: 'other-redemption', customerId: 'customer-2', pointsDelta: -300, type: 'REDEMPTION', idempotencyKey: 'idem-x' });
 
-    await expect(service.convertPointsToWallet('customer-1', 100, 'idem-x')).rejects.toMatchObject({
+    await expect(service.convertPointsToWallet('customer-1', 500, 'idem-x')).rejects.toMatchObject({
       response: { details: { code: 'IDEMPOTENCY_KEY_IN_USE' } },
     });
 
@@ -555,8 +683,8 @@ describe('LoyaltyService.convertPointsToWallet (Points -> Wallet Conversion, Chu
 
   it('CRITICAL: duplicate idempotency key cannot double-convert — the second call returns the existing result instead of creating new rows', async () => {
     const { service, loyaltyStore, walletStore } = buildConversionHarness({ existingPoints: 500 });
-    const first = await service.convertPointsToWallet('customer-1', 100, 'dup-key');
-    const second = await service.convertPointsToWallet('customer-1', 100, 'dup-key');
+    const first = await service.convertPointsToWallet('customer-1', 500, 'dup-key');
+    const second = await service.convertPointsToWallet('customer-1', 500, 'dup-key');
     expect(second.convertedPoints).toBe(first.convertedPoints);
     expect(second.walletCreditMinor).toBe(first.walletCreditMinor);
     // Only ONE redemption/credit pair exists, not two.
@@ -566,7 +694,7 @@ describe('LoyaltyService.convertPointsToWallet (Points -> Wallet Conversion, Chu
 
   it('conversion rate snapshot is preserved in the reason text of both rows', async () => {
     const { service, loyaltyStore, walletStore } = buildConversionHarness({ existingPoints: 500 });
-    await service.convertPointsToWallet('customer-1', 250, 'idem-1');
+    await service.convertPointsToWallet('customer-1', 500, 'idem-1');
     const redemption = [...loyaltyStore.values()].find((t) => t.type === 'REDEMPTION');
     const credit = [...walletStore.values()][0];
     expect(redemption.reason).toContain('100 points = 100 minor units');
@@ -574,15 +702,15 @@ describe('LoyaltyService.convertPointsToWallet (Points -> Wallet Conversion, Chu
   });
 
   it('current Loyalty balance is correct after conversion', async () => {
-    const { service } = buildConversionHarness({ existingPoints: 500 });
-    const result = await service.convertPointsToWallet('customer-1', 200, 'idem-1');
-    expect(result.pointsBalance).toBe(300);
+    const { service } = buildConversionHarness({ existingPoints: 600 });
+    const result = await service.convertPointsToWallet('customer-1', 500, 'idem-1');
+    expect(result.pointsBalance).toBe(100);
   });
 
   it('current Wallet balance is correct after conversion', async () => {
-    const { service } = buildConversionHarness({ existingPoints: 500 });
-    const result = await service.convertPointsToWallet('customer-1', 200, 'idem-1');
-    expect(result.walletBalance).toBe(200);
+    const { service } = buildConversionHarness({ existingPoints: 600 });
+    const result = await service.convertPointsToWallet('customer-1', 500, 'idem-1');
+    expect(result.walletBalance).toBe(500);
   });
 
   it('no reverse Wallet -> Points operation exists on the service', () => {
@@ -637,7 +765,15 @@ describe('LoyaltyService.convertPointsToWallet — structured business-event log
     };
     const businessConfigService = { getLoyaltyWalletConversionPointsPerEgp: jest.fn(async () => 100) };
     const manager = {
-      findOne: async () => ({ id: 'customer-1' }),
+      // Distinguishes the User row-lock read from the NEW in-lock idempotency re-check
+      // (LoyaltyPointsTransaction) — a single unconditional stub here would make the re-check always
+      // find a "match" and short-circuit every conversion as an already-committed no-op.
+      findOne: async (EntityClass: any, opts: any) => {
+        if (EntityClass === LoyaltyPointsTransaction) {
+          return [...loyaltyStore.values()].find((t) => t.idempotencyKey === opts.where.idempotencyKey && t.customerId === opts.where.customerId) ?? null;
+        }
+        return { id: 'customer-1' };
+      },
       find: async (_EntityClass: any, opts: any) => [...loyaltyStore.values()].filter((t) => t.customerId === opts.where.customerId),
       getRepository: (EntityClass: any) => (EntityClass === LoyaltyPointsTransaction ? repository : walletRepository),
     };
@@ -652,29 +788,29 @@ describe('LoyaltyService.convertPointsToWallet — structured business-event log
     const { service } = buildLoggingHarness();
     const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
 
-    await service.convertPointsToWallet('customer-1', 200, 'idem-log-1');
+    await service.convertPointsToWallet('customer-1', 500, 'idem-log-1');
 
     const events = logSpy.mock.calls.map((call) => JSON.parse(call[0] as string));
     expect(events.find((e) => e.event === 'loyalty.redemption')).toEqual({
       event: 'loyalty.redemption',
       correlationId: 'corr-loyalty',
       customerId: 'customer-1',
-      pointsRedeemed: 200,
-      walletCreditMinor: 200,
+      pointsRedeemed: 500,
+      walletCreditMinor: 500,
       idempotencyKey: 'idem-log-1',
     });
     const creditEvent = events.find((e) => e.event === 'wallet.credit');
-    expect(creditEvent).toMatchObject({ customerId: 'customer-1', amountDeltaMinor: 200, type: 'LOYALTY_REDEMPTION' });
+    expect(creditEvent).toMatchObject({ customerId: 'customer-1', amountDeltaMinor: 500, type: 'LOYALTY_REDEMPTION' });
     expect(Number.isInteger(creditEvent.amountDeltaMinor)).toBe(true);
   });
 
   it('F: a genuine duplicate/retry logs loyalty.redemption_duplicate at WARN instead of a second loyalty.redemption', async () => {
     const { service } = buildLoggingHarness();
-    await service.convertPointsToWallet('customer-1', 200, 'idem-log-2');
+    await service.convertPointsToWallet('customer-1', 500, 'idem-log-2');
     const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
     const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
 
-    await service.convertPointsToWallet('customer-1', 200, 'idem-log-2');
+    await service.convertPointsToWallet('customer-1', 500, 'idem-log-2');
 
     expect(logSpy.mock.calls.some((call) => (call[0] as string).includes('loyalty.redemption"'))).toBe(false);
     expect(warnSpy).toHaveBeenCalledTimes(1);

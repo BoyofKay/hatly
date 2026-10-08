@@ -1,87 +1,84 @@
 import { HatlyServicePricingService } from './hatly-service-pricing.service';
 import { AdHocServiceType } from '../cart/ad-hoc-service-type.enum';
 
-function buildHarness(opts: { multiplier?: number | null; distanceMeters?: number }) {
-  const mapProvider = {
-    distanceAndEta: jest.fn(async () => ({ distanceMeters: opts.distanceMeters ?? 1000, etaSeconds: 0 })),
-  };
+/**
+ * PD-009 (amended): Hatly Service delivery fee = the ACTIVE Delivery Zone fee × HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER.
+ * The service has no map-provider / distance dependency at all — structurally, coordinates cannot influence the price.
+ */
+function buildHarness(multiplier: number | null = 1.5) {
   const businessConfigService = {
-    getHatlyServiceDistanceMultiplier: jest.fn(async () => {
-      if (opts.multiplier == null) throw new Error('not configured');
-      return opts.multiplier;
+    getHatlyServiceDeliveryFeeMultiplier: jest.fn(async () => {
+      if (multiplier == null) throw new Error('not configured');
+      return multiplier;
     }),
   };
-  const service = new HatlyServicePricingService(mapProvider as any, businessConfigService as any);
-  return { service, mapProvider };
+  return { service: new HatlyServicePricingService(businessConfigService as any), businessConfigService };
 }
 
-describe('HatlyServicePricingService', () => {
-  it('BUY_FROM_PLACE: computes distance FROM the resolved pickup point TO the customer', async () => {
-    const { service, mapProvider } = buildHarness({ multiplier: 5, distanceMeters: 2000 });
+const place = { latitude: 30.415, longitude: 31.565 };
+const zone = (deliveryFeeMinor: number) => ({ id: 'zone-1', deliveryFeeMinor });
+const code = (e: any) => e?.response?.details?.code;
 
-    const charge = await service.calculateCharge({
-      serviceType: AdHocServiceType.BUY_FROM_PLACE,
-      resolvedPickup: { latitude: 1, longitude: 1 },
-      customerLocation: { latitude: 2, longitude: 2 },
+describe('HatlyServicePricingService — zone fee × multiplier (PD-009 amended)', () => {
+  it.each([
+    [1500, 1.5, 2250], // 15.00 × 1.5 = 22.50
+    [2500, 1.5, 3750], // 25.00 × 1.5 = 37.50
+    [1500, 2, 3000],
+    [0, 1.5, 0], // a free-delivery zone stays free
+  ])('zone fee %p × multiplier %p = %p minor units, every input frozen', async (fee, multiplier, expected) => {
+    const { service } = buildHarness(multiplier);
+    await expect(service.calculateCharge({ serviceType: AdHocServiceType.BUY_FROM_PLACE, resolvedPickup: place, deliveryZone: zone(fee) })).resolves.toEqual({
+      chargeMinor: expected,
+      pricingSource: 'DELIVERY_ZONE',
+      deliveryZoneId: 'zone-1',
+      zoneDeliveryFeeMinorUsed: fee,
+      multiplierUsed: multiplier,
     });
-
-    expect(mapProvider.distanceAndEta).toHaveBeenCalledWith(
-      { latitude: 1, longitude: 1 },
-      { latitude: 2, longitude: 2 },
-    );
-    expect(charge.chargeMinor).toBe(10000); // 2000m * 5
-    expect(charge.distanceMeters).toBe(2000);
-    expect(charge.multiplierUsed).toBe(5);
   });
 
-  it('DELIVER_TO_PLACE: computes distance FROM the customer TO the resolved destination', async () => {
-    const { service, mapProvider } = buildHarness({ multiplier: 3, distanceMeters: 1500 });
-
-    const charge = await service.calculateCharge({
-      serviceType: AdHocServiceType.DELIVER_TO_PLACE,
-      resolvedDestination: { latitude: 9, longitude: 9 },
-      customerLocation: { latitude: 3, longitude: 3 },
-    });
-
-    expect(mapProvider.distanceAndEta).toHaveBeenCalledWith(
-      { latitude: 3, longitude: 3 },
-      { latitude: 9, longitude: 9 },
-    );
-    expect(charge.chargeMinor).toBe(4500); // 1500 * 3
+  it('both service types price identically from the zone (the route never matters)', async () => {
+    const { service } = buildHarness(1.5);
+    const buy = await service.calculateCharge({ serviceType: AdHocServiceType.BUY_FROM_PLACE, resolvedPickup: place, deliveryZone: zone(1500) });
+    const deliver = await service.calculateCharge({ serviceType: AdHocServiceType.DELIVER_TO_PLACE, resolvedDestination: place, deliveryZone: zone(1500) });
+    expect(buy.chargeMinor).toBe(deliver.chargeMinor);
   });
 
-  it('FAILS CLOSED: throws when no multiplier is configured — never fabricates one', async () => {
-    const { service } = buildHarness({ multiplier: null });
-
-    await expect(
-      service.calculateCharge({
-        serviceType: AdHocServiceType.BUY_FROM_PLACE,
-        resolvedPickup: { latitude: 1, longitude: 1 },
-        customerLocation: { latitude: 2, longitude: 2 },
-      }),
-    ).rejects.toThrow();
+  it('a pin cannot influence the price: the API does not even accept a customer location', async () => {
+    const { service } = buildHarness(1.5);
+    // Defence in depth: an extra field smuggled in at runtime is simply ignored.
+    const charge = await service.calculateCharge({ serviceType: AdHocServiceType.BUY_FROM_PLACE, resolvedPickup: place, deliveryZone: zone(1500), customerLocation: { latitude: 1, longitude: 1 } } as any);
+    expect(charge.chargeMinor).toBe(2250);
   });
 
-  it('rounds to the nearest whole minor currency unit — never a fractional amount', async () => {
-    const { service } = buildHarness({ multiplier: 1.5, distanceMeters: 333 });
-
-    const charge = await service.calculateCharge({
-      serviceType: AdHocServiceType.BUY_FROM_PLACE,
-      resolvedPickup: { latitude: 1, longitude: 1 },
-      customerLocation: { latitude: 2, longitude: 2 },
-    });
-
-    expect(Number.isInteger(charge.chargeMinor)).toBe(true);
-    expect(charge.chargeMinor).toBe(Math.round(333 * 1.5));
+  it('the CURRENT multiplier is read for every new charge', async () => {
+    const h = buildHarness(1.5);
+    const first = await h.service.calculateCharge({ serviceType: AdHocServiceType.BUY_FROM_PLACE, resolvedPickup: place, deliveryZone: zone(1500) });
+    h.businessConfigService.getHatlyServiceDeliveryFeeMultiplier.mockResolvedValueOnce(2);
+    const second = await h.service.calculateCharge({ serviceType: AdHocServiceType.BUY_FROM_PLACE, resolvedPickup: place, deliveryZone: zone(1500) });
+    expect([first.chargeMinor, second.chargeMinor, second.multiplierUsed]).toEqual([2250, 3000, 2]);
   });
 
-  it('REGRESSION: uses only the injected MapProvider dependency — no second distance engine', async () => {
-    const { service, mapProvider } = buildHarness({ multiplier: 1 });
-    await service.calculateCharge({
-      serviceType: AdHocServiceType.BUY_FROM_PLACE,
-      resolvedPickup: { latitude: 1, longitude: 1 },
-      customerLocation: { latitude: 2, longitude: 2 },
-    });
-    expect(mapProvider.distanceAndEta).toHaveBeenCalledTimes(1);
+  it('rounds to a whole minor unit (half up) — never a fractional amount', async () => {
+    const charge = await buildHarness(1.25).service.calculateCharge({ serviceType: AdHocServiceType.BUY_FROM_PLACE, resolvedPickup: place, deliveryZone: zone(1001) });
+    expect(charge.chargeMinor).toBe(1251); // 1251.25
+  });
+
+  it('no zone (or a malformed zone fee) → ADDRESS_ZONE_REQUIRED; there is NO fallback to distance pricing', async () => {
+    const { service, businessConfigService } = buildHarness(1.5);
+    for (const deliveryZone of [null, undefined, { id: 'z', deliveryFeeMinor: 12.5 }, { id: 'z', deliveryFeeMinor: -1 }]) {
+      const error = await service.calculateCharge({ serviceType: AdHocServiceType.BUY_FROM_PLACE, resolvedPickup: place, deliveryZone }).catch((e) => e);
+      expect(code(error)).toBe('ADDRESS_ZONE_REQUIRED');
+    }
+    expect(businessConfigService.getHatlyServiceDeliveryFeeMultiplier).not.toHaveBeenCalled();
+  });
+
+  it('FAILS CLOSED when the multiplier is not configured — never fabricates one', async () => {
+    await expect(buildHarness(null).service.calculateCharge({ serviceType: AdHocServiceType.BUY_FROM_PLACE, resolvedPickup: place, deliveryZone: zone(1500) })).rejects.toThrow();
+  });
+
+  it("the customer's own place is still required by type (never a Hatly default)", async () => {
+    const { service } = buildHarness(1.5);
+    expect(code(await service.calculateCharge({ serviceType: AdHocServiceType.BUY_FROM_PLACE, resolvedPickup: null, deliveryZone: zone(1500) }).catch((e) => e))).toBe('BUY_FROM_PLACE_PICKUP_REQUIRED');
+    expect(code(await service.calculateCharge({ serviceType: AdHocServiceType.DELIVER_TO_PLACE, resolvedDestination: undefined, deliveryZone: zone(1500) }).catch((e) => e))).toBe('DELIVER_TO_PLACE_DESTINATION_REQUIRED');
   });
 });

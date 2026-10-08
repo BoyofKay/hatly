@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { Role } from '../../common/enums/role.enum';
 
@@ -36,6 +36,20 @@ export class UsersService {
 
   findById(id: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { id } });
+  }
+
+  /**
+   * M3b (Launch-Readiness Gap Audit, G-08) — Admin User/Permission
+   * Management. Scoped to admin-tier roles only (ADMIN + SUPER_ADMIN) —
+   * this is the roster a SUPER_ADMIN manages permissions against, never
+   * a general user directory (Customers/Drivers/Vendor staff are
+   * explicitly out of scope — see the audit's own G-10 exclusion).
+   * `passwordHash` has `select: false` on the entity itself (see
+   * User's own doc comment) — never fetched here, not just hidden
+   * after the fact.
+   */
+  listAdmins(): Promise<User[]> {
+    return this.usersRepository.find({ where: { role: In([Role.ADMIN, Role.SUPER_ADMIN]) }, order: { createdAt: 'ASC' } });
   }
 
   async createCustomer(params: {

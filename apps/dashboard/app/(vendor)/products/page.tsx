@@ -22,6 +22,7 @@ import {
   uploadVendorProductImage,
   validateVendorImport,
 } from '../../../lib/api/vendor-products';
+import { apiErrorMessage } from '../../../lib/api/errors';
 
 /**
  * Real Vendor Product Management — Chunk 12B-4. Consumes only
@@ -98,7 +99,7 @@ export default function VendorProductsPage() {
       setBranches(result);
       if (result.length > 0) setSelectedBranchId((prev) => prev || result[0].id);
     } catch (err: any) {
-      setBranchError(err?.response?.data?.message ?? 'Failed to load branches.');
+      setBranchError(apiErrorMessage(err, 'Failed to load branches.'));
     }
   }
 
@@ -113,7 +114,7 @@ export default function VendorProductsPage() {
       setProducts(productList);
       setCategories(categoryList);
     } catch (err: any) {
-      setProductError(err?.response?.data?.message ?? 'Failed to load products.');
+      setProductError(apiErrorMessage(err, 'Failed to load products.'));
     }
   }
 
@@ -192,7 +193,7 @@ export default function VendorProductsPage() {
       setShowCreateForm(false);
       await refreshBranchData(selectedBranchId);
     } catch (err: any) {
-      setCreateError(err?.response?.data?.message ?? 'Failed to create product.');
+      setCreateError(apiErrorMessage(err, 'Failed to create product.'));
     } finally {
       setIsCreating(false);
     }
@@ -248,7 +249,7 @@ export default function VendorProductsPage() {
       setEditingId(null);
       await refreshBranchData(selectedBranchId);
     } catch (err: any) {
-      setEditError(err?.response?.data?.message ?? 'Failed to save changes.');
+      setEditError(apiErrorMessage(err, 'Failed to save changes.'));
     } finally {
       setIsSaving(false);
     }
@@ -264,7 +265,7 @@ export default function VendorProductsPage() {
     } catch (err: any) {
       setToggleErrorById((prev) => ({
         ...prev,
-        [product.id]: err?.response?.data?.message ?? 'Failed to update status.',
+        [product.id]: apiErrorMessage(err, 'Failed to update status.'),
       }));
     } finally {
       setTogglingId(null);
@@ -284,7 +285,7 @@ export default function VendorProductsPage() {
     } catch (err: any) {
       setZeroErrorById((prev) => ({
         ...prev,
-        [product.id]: err?.response?.data?.message ?? 'Failed to set inventory to zero.',
+        [product.id]: apiErrorMessage(err, 'Failed to set inventory to zero.'),
       }));
     } finally {
       setSettingZeroId(null);
@@ -312,7 +313,7 @@ export default function VendorProductsPage() {
       // image action shows an error, nothing else on the page changes.
       setImageErrorById((prev) => ({
         ...prev,
-        [productId]: err?.response?.data?.message ?? 'Image upload failed.',
+        [productId]: apiErrorMessage(err, 'Image upload failed.'),
       }));
     } finally {
       setUploadingImageId(null);
@@ -331,7 +332,7 @@ export default function VendorProductsPage() {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      setImportError(err?.response?.data?.message ?? 'Failed to download template.');
+      setImportError(apiErrorMessage(err, 'Failed to download template.'));
     }
   }
 
@@ -351,7 +352,7 @@ export default function VendorProductsPage() {
       const summary = await validateVendorImport(importFile);
       setImportSummary(summary);
     } catch (err: any) {
-      setImportError(err?.response?.data?.message ?? 'Failed to validate file.');
+      setImportError(apiErrorMessage(err, 'Failed to validate file.'));
     } finally {
       setIsValidatingImport(false);
     }
@@ -368,7 +369,7 @@ export default function VendorProductsPage() {
       setImportFile(null);
       await refreshBranchData(selectedBranchId);
     } catch (err: any) {
-      setImportError(err?.response?.data?.message ?? 'Failed to apply import.');
+      setImportError(apiErrorMessage(err, 'Failed to apply import.'));
     } finally {
       setIsApplyingImport(false);
     }

@@ -13,6 +13,7 @@ import {
   listVendorBranches,
   updateVendor,
 } from '../../../../lib/api/admin-vendors';
+import { apiErrorMessage } from '../../../../lib/api/errors';
 
 /**
  * Real Vendor detail/edit/activate/deactivate + its Branches, and
@@ -52,7 +53,7 @@ export default function VendorDetailPage() {
       setLogoUrl(v.logoUrl ?? '');
       setBranches(b);
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load vendor.');
+      setError(apiErrorMessage(err, 'Failed to load vendor.'));
     }
   }
 
@@ -70,7 +71,7 @@ export default function VendorDetailPage() {
       const updated = await updateVendor(id, { name, nameAr: nameAr || undefined, logoUrl: logoUrl || undefined });
       setVendor(updated);
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to save.');
+      setActionError(apiErrorMessage(err, 'Failed to save.'));
     } finally {
       setIsSaving(false);
     }
@@ -83,7 +84,7 @@ export default function VendorDetailPage() {
       const updated = vendor.isActive ? await deactivateVendor(id) : await activateVendor(id);
       setVendor(updated);
     } catch (err: any) {
-      setActionError(err?.response?.data?.message ?? 'Failed to update status.');
+      setActionError(apiErrorMessage(err, 'Failed to update status.'));
     }
   }
 
@@ -115,7 +116,7 @@ export default function VendorDetailPage() {
       setShowBranchForm(false);
       await refresh();
     } catch (err: any) {
-      setBranchError(err?.response?.data?.message ?? 'Failed to create branch.');
+      setBranchError(apiErrorMessage(err, 'Failed to create branch.'));
     } finally {
       setIsCreatingBranch(false);
     }

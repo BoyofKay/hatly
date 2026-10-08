@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
+import '../../../../core/theme/hatly_theme.dart';
+import '../../../../shared_widgets/hatly_error_banner.dart';
+import '../../../../shared_widgets/hatly_loading_view.dart';
 import '../../../addresses/data/addresses_providers.dart';
 import '../../data/home_address_provider.dart';
 
@@ -17,42 +20,43 @@ Future<void> showAddressSelectionSheet(BuildContext context, WidgetRef ref) {
 
   return showModalBottomSheet(
     context: context,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-    ),
+    // Polish pass: was a literal `BorderRadius.circular(20)`, duplicating
+    // (and now diverging in intent from) the theme's own
+    // `bottomSheetTheme.shape` (`HatlyRadius.bottomSheetTop` = 20) — leaving
+    // `shape` unset lets every bottom sheet in the app share one definition.
     builder: (sheetContext) {
       return SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(HatlySpacing.md),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(l10n.selectAddressTitle,
-                  style: const TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 12),
+              Text(l10n.selectAddressTitle, style: sheetContext.type.title),
+              const SizedBox(height: HatlySpacing.ms),
               Consumer(
                 builder: (context, sheetRef, _) {
                   final addressesAsync = sheetRef.watch(savedAddressesProvider);
                   return addressesAsync.when(
                     loading: () => const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(child: CircularProgressIndicator()),
+                      padding: EdgeInsets.symmetric(vertical: HatlySpacing.lg),
+                      child: HatlyLoadingView(inline: true),
                     ),
                     error: (error, stackTrace) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Text(l10n.somethingWentWrong),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: HatlySpacing.sm),
+                      child: HatlyErrorBanner(message: l10n.somethingWentWrong),
                     ),
                     data: (addresses) {
                       if (addresses.isEmpty) {
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: HatlySpacing.sm),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(l10n.addressNoneSavedYet),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: HatlySpacing.ms),
                               FilledButton(
                                 onPressed: () {
                                   Navigator.of(sheetContext).pop();
@@ -71,11 +75,19 @@ Future<void> showAddressSelectionSheet(BuildContext context, WidgetRef ref) {
                             ListTile(
                               contentPadding: EdgeInsets.zero,
                               leading: const Icon(Icons.location_on_outlined),
-                              title: Text(address.label?.isNotEmpty == true
-                                  ? address.label!
-                                  : address.line1),
+                              title: Text(
+                                address.label?.isNotEmpty == true
+                                    ? address.label!
+                                    : address.line1,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               subtitle: address.label?.isNotEmpty == true
-                                  ? Text(address.line1)
+                                  ? Text(
+                                      address.line1,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    )
                                   : null,
                               onTap: () {
                                 ref

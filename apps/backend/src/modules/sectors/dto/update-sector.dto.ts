@@ -24,4 +24,10 @@ export class UpdateSectorDto {
   @IsInt()
   @Min(0)
   sortOrder?: number;
+
+  /** Part F (Marketplace image/asset readiness): a plain URL reference, same pattern as `Vendor.logoUrl`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  imageUrl?: string;
 }

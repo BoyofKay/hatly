@@ -50,6 +50,11 @@ export const BusinessEvent = {
   /** An Admin rejected a cash-remainder claim. */
   DRIVER_CASH_REMAINDER_REJECTED: 'driver_cash_remainder.rejected',
 
+  /** M4 — a Driver submitted required Proof of Delivery (photo, and optional recipient name) before an ON_THE_WAY→DELIVERED transition. */
+  PROOF_OF_DELIVERY_SUBMITTED: 'proof_of_delivery.submitted',
+  /** A retried/duplicate Proof of Delivery submission for the same Delivery was recognized (DB unique constraint on delivery_id) and the existing record was returned instead of overwriting it. */
+  PROOF_OF_DELIVERY_DUPLICATE_SUBMISSION: 'proof_of_delivery.duplicate_submission',
+
   /** An Admin recorded a decision (RESOLVED_NO_REFUND / REFUND_CUSTOMER) for a FAILED_DELIVERY order. */
   FAILED_DELIVERY_RESOLVED: 'failed_delivery.resolved',
   /** A previously-recorded REFUND_CUSTOMER decision was executed as a real Manual Transfer refund FinancialEvent. */

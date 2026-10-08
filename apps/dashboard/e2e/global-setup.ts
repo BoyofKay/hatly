@@ -19,6 +19,7 @@ import {
   STORAGE_STATE_DIR,
   VENDOR_A_STORAGE_STATE,
   VENDOR_B_STORAGE_STATE,
+  SUPER_ADMIN_STORAGE_STATE,
   FIXTURE_FILE,
   Fixtures,
   FixtureOrder,
@@ -29,6 +30,19 @@ const api = axios.create({ baseURL: API_BASE_URL, validateStatus: () => true });
 async function loginPassword(phone: string, password: string): Promise<{ accessToken: string; refreshToken: string } | null> {
   const res = await api.post('/auth/password/login', { phone, password });
   return res.status === 200 ? res.data.data : null;
+}
+
+/**
+ * M3a (Launch-Readiness Gap Audit) — idempotent: PUTs the same value every run through the real
+ * `PUT admin/business-config/:key` endpoint (an upsert — see BusinessConfigService.set), needed so
+ * the Settlement page's real close call has an operationally-configured frequency to snapshot,
+ * rather than failing closed on "Required business configuration value... has not been set."
+ */
+async function ensureBusinessConfig(superAdminToken: string, key: string, value: unknown) {
+  const res = await api.put(`/admin/business-config/${key}`, { value }, { headers: { Authorization: `Bearer ${superAdminToken}` } });
+  if (res.status !== 200) {
+    throw new Error(`[global-setup] Failed to set business config ${key}: HTTP ${res.status} ${JSON.stringify(res.data)}`);
+  }
 }
 
 /** Idempotent: creates the Vendor Manager fixture if it doesn't exist yet, reuses it otherwise. */
@@ -144,6 +158,7 @@ export default async function globalSetup(_config: FullConfig) {
 
   await ensureVendorManager(superAdmin.accessToken, VENDOR_A_PHONE, VENDOR_A_FULL_NAME, VENDOR_A_BRANCH_ID, VENDOR_A_PASSWORD);
   await ensureVendorManager(superAdmin.accessToken, VENDOR_B_PHONE, VENDOR_B_FULL_NAME, VENDOR_B_BRANCH_ID, VENDOR_B_PASSWORD);
+  await ensureBusinessConfig(superAdmin.accessToken, 'VENDOR_SETTLEMENT_FREQUENCY', 'WEEKLY');
 
   const vendorA = await loginPassword(VENDOR_A_PHONE, VENDOR_A_PASSWORD);
   const vendorB = await loginPassword(VENDOR_B_PHONE, VENDOR_B_PASSWORD);
@@ -151,12 +166,17 @@ export default async function globalSetup(_config: FullConfig) {
 
   writeFileSync(VENDOR_A_STORAGE_STATE, JSON.stringify(storageStateFor(vendorA.accessToken, vendorA.refreshToken), null, 2));
   writeFileSync(VENDOR_B_STORAGE_STATE, JSON.stringify(storageStateFor(vendorB.accessToken, vendorB.refreshToken), null, 2));
+  // M3a (Launch-Readiness Gap Audit) — the SUPER_ADMIN session above was already required for
+  // provisioning; persisting its own storageState too is the smallest possible admin-auth fixture.
+  writeFileSync(SUPER_ADMIN_STORAGE_STATE, JSON.stringify(storageStateFor(superAdmin.accessToken, superAdmin.refreshToken), null, 2));
 
   const customerApi = await registerFixtureCustomer();
   const vendorAOrders = [
     await placeFixtureOrder(customerApi, VENDOR_A_PRODUCT_ID, VENDOR_A_BRANCH_ID, { quantity: 2 }),
     await placeFixtureOrder(customerApi, VENDOR_A_PRODUCT_ID, VENDOR_A_BRANCH_ID, { quantity: 1 }),
     await placeFixtureOrder(customerApi, VENDOR_A_PRODUCT_ID, VENDOR_A_BRANCH_ID, { quantity: 3 }),
+    // [3] — M3a segment-cancellation confirmation-guard test's own dedicated order.
+    await placeFixtureOrder(customerApi, VENDOR_A_PRODUCT_ID, VENDOR_A_BRANCH_ID, { quantity: 1 }),
   ];
   const vendorBOrder = await placeFixtureOrder(customerApi, VENDOR_B_WEIGHT_PRODUCT_ID, VENDOR_B_BRANCH_ID, { quantity: 1, requestedWeightGrams: 1000 });
   writeFileSync(FIXTURE_FILE, JSON.stringify({ vendorAOrders, vendorBOrder } satisfies Fixtures, null, 2));

@@ -90,19 +90,37 @@ class CheckoutPaymentSection extends StatelessWidget {
                   onSelect('PAY_AT_DELIVERY', selection.electronicMethod),
             ),
           ],
-          const SizedBox(height: HatlySpacing.sm),
-          _PaymentOption(
-            optionKey: const Key('payment-manual-transfer'),
-            icon: Icons.swap_horiz,
-            title: l10n.checkoutPaymentManualTransfer,
-            subtitle: options.manualTransferAvailable
-                ? l10n.checkoutPaymentManualTransferHint
-                : transferReason(),
-            selected: selection.paymentMethod == 'MANUAL_TRANSFER',
-            enabled: options.manualTransferAvailable,
-            onTap: () =>
-                onSelect('MANUAL_TRANSFER', selection.electronicMethod),
-          ),
+          // U2: never offered for a pickup order (cash at the counter only) — hidden, not merely disabled.
+          if (options.manualTransferReason != 'PICKUP_CASH_ONLY') ...[
+            const SizedBox(height: HatlySpacing.sm),
+            _PaymentOption(
+              optionKey: const Key('payment-manual-transfer'),
+              icon: Icons.swap_horiz,
+              title: l10n.checkoutPaymentManualTransfer,
+              subtitle: options.manualTransferAvailable
+                  ? l10n.checkoutPaymentManualTransferHint
+                  : transferReason(),
+              selected: selection.paymentMethod == 'MANUAL_TRANSFER',
+              enabled: options.manualTransferAvailable,
+              onTap: () =>
+                  onSelect('MANUAL_TRANSFER', selection.electronicMethod),
+            ),
+          ],
+          // Hatly Service with a price still to be confirmed: cash on delivery is the only way to pay (the server rejects anything
+          // else), and the customer is told why the other methods are unavailable and when the price will be known.
+          // U2: a pickup order is paid in cash at the counter — the server offers nothing else (and refuses anything else).
+          if (options.manualTransferReason == 'PICKUP_CASH_ONLY') ...[
+            const SizedBox(height: HatlySpacing.sm),
+            Text(l10n.checkoutPickupCashNote,
+                key: const Key('checkout-pickup-cash-note'),
+                style: context.type.small.copyWith(color: p.textMuted)),
+          ],
+          if (quote.hasPendingPricing) ...[
+            const SizedBox(height: HatlySpacing.sm),
+            Text(l10n.checkoutHatlyServiceCodNote,
+                key: const Key('checkout-hatly-service-cod-note'),
+                style: context.type.small.copyWith(color: p.textMuted)),
+          ],
           if (selection.needsElectronicMethod) ...[
             const SizedBox(height: HatlySpacing.ms),
             Text(l10n.checkoutChooseElectronicMethod,

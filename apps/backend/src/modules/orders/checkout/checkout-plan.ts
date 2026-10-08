@@ -6,7 +6,7 @@ import { VendorBranch } from '../../vendors/entities/vendor-branch.entity';
 import { DeliveryFeeBreakdown } from '../../delivery-fee/delivery-fee-calculation.service';
 import { OfferItemPlan, OfferSegmentPlan } from '../../offers/offer-consumption.service';
 import { ElectronicPaymentMethod } from '../../payments/electronic-payment-method.enum';
-import { DeliveryAddressSnapshot } from '../entities/order.entity';
+import { DeliveryAddressSnapshot, DeliveryZoneSnapshot } from '../entities/order.entity';
 import { OrderPaymentMethod } from '../order-payment-method';
 
 /** What the customer asked for at checkout. Nothing here is an authoritative amount. */
@@ -33,11 +33,27 @@ export interface VendorEligibility {
   code?: string;
 }
 
+/**
+ * PD-009 — where the delivery price (and serviceability) of an address comes from:
+ *  - DISTANCE       the address has a map pin: the existing service-area radius check + distance-based fee;
+ *  - DELIVERY_ZONE  no pin, an active Delivery Zone: the zone decides serviceability and its fee is the base fee.
+ */
+export type DeliveryPricingSource = 'DISTANCE' | 'DELIVERY_ZONE';
+
+/** The zone as resolved server-side: names for the customer/snapshot, plus its current base fee for pricing. */
+export interface ResolvedDeliveryZone extends DeliveryZoneSnapshot {
+  deliveryFeeMinor: number;
+}
+
 export interface AddressEligibility {
   serviceable: boolean;
   code?: string;
   message?: string;
   serviceAreaId: string | null;
+  /** Null when the address could not be priced at all (not serviceable before a source was established). */
+  pricingSource?: DeliveryPricingSource | null;
+  /** The address's zone when it has a serviceable one (also present for pin addresses that carry a zone). */
+  deliveryZone?: ResolvedDeliveryZone | null;
   vendors: VendorEligibility[];
 }
 

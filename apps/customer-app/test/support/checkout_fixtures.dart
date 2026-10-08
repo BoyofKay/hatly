@@ -90,7 +90,11 @@ Map<String, dynamic> quoteJson({
     'payment': {
       'selected': {'method': 'COD', 'electronicMethod': null},
       'awaitsPaymentApproval': false,
-      'wallet': {'balanceMinor': 5000, 'appliedMinor': wallet, 'available': true},
+      'wallet': {
+        'balanceMinor': 5000,
+        'appliedMinor': wallet,
+        'available': true
+      },
       'options': {
         'cod': true,
         'payAtDelivery': true,
@@ -153,3 +157,36 @@ Cart cart({List<CartItem>? items}) {
     readyForCheckout: true,
   );
 }
+
+/// A cart holding ONE Hatly Service (AD_HOC_SERVICE) request whose price is not confirmed: no unit price, no line total, no
+/// group subtotal (null — never a fabricated 0).
+Cart hatlyServiceCart(
+        {String description = 'بنادول إكسترا ٥٠٠ ملجم، علبتين',
+        bool ready = true}) =>
+    Cart(
+      id: 'cart-hs',
+      fulfillmentType: 'DELIVERY',
+      groups: [
+        CartGroup(
+          id: 'g-hs',
+          groupType: 'AD_HOC_SERVICE',
+          adHocPlaceName: 'صيدلية الزاوية',
+          adHocServiceType: 'BUY_FROM_PLACE',
+          adHocPickupLatitude: 30.3,
+          adHocPickupLongitude: 31.45,
+          items: [
+            CartItem(
+              id: 'hs-1',
+              quantity: 1,
+              isAvailable: true,
+              selectedOptionValues: const [],
+              imageUrls: const [],
+              freeTextDescription: description,
+            ),
+          ],
+        ),
+      ],
+      subtotalMinor: 0,
+      hasUnpricedItems: true,
+      readyForCheckout: ready,
+    );

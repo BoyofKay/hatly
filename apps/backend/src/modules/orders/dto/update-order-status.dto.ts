@@ -13,4 +13,20 @@ export class UpdateOrderStatusDto {
   @IsOptional()
   @IsString()
   failureReason?: string;
+
+  /**
+   * M4 — Proof of Delivery. Optional at the DTO level (this DTO is shared with
+   * Admin's own status-transition path, which has no DELIVERED transition at
+   * all in the state machine and so never supplies this); actually REQUIRED
+   * enforcement for the driver's own ON_THE_WAY->DELIVERED transition happens
+   * in DriverOrderActionsService/ProofOfDeliveryService, not here.
+   */
+  @IsOptional()
+  @IsString()
+  proofPhotoUrl?: string;
+
+  /** M4 — Proof of Delivery. Optional recipient/customer confirmation. See proofPhotoUrl's own comment. */
+  @IsOptional()
+  @IsString()
+  recipientName?: string;
 }

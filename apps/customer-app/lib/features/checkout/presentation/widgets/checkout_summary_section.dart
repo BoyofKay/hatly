@@ -84,7 +84,15 @@ class _ItemRow extends StatelessWidget {
                 style: context.type.small.copyWith(color: p.textPrimary))
           else if (isCustomRequest)
             Text(l10n.cartCustomRequestPricePending,
-                style: context.type.caption),
+                style: context.type.caption)
+          else if (isAdHocService)
+            // A Hatly Service request: an explicit pending price (never a 0), confirmed while the order is prepared.
+            Flexible(
+              child: Text(l10n.hatlyServicePricePending,
+                  key: const Key('checkout-item-price-pending'),
+                  textAlign: TextAlign.end,
+                  style: context.type.caption),
+            ),
         ],
       ),
     );
@@ -121,8 +129,13 @@ class CheckoutTotals extends StatelessWidget {
       key: const Key('checkout-totals'),
       child: Column(
         children: [
-          row(l10n.checkoutSubtotalLabel,
-              formatMinorUnits(summary.subtotalMinor, context)),
+          // Pending Hatly Service price: the server's subtotal is 0 only because nothing is priced yet — shown as the pending state,
+          // never as a zero that would read as free.
+          quote.hasPendingPricing
+              ? row(l10n.checkoutSubtotalLabel, l10n.hatlyServicePricePending,
+                  ltr: false, valueKey: const Key('checkout-subtotal-pending'))
+              : row(l10n.checkoutSubtotalLabel,
+                  formatMinorUnits(summary.subtotalMinor, context)),
           if (summary.discountMinor > 0)
             row(l10n.orderDiscountLabel,
                 '-${formatMinorUnits(summary.discountMinor, context)}',
@@ -141,7 +154,9 @@ class CheckoutTotals extends StatelessWidget {
           row(
               l10n.orderTotalLabel,
               summary.totalMinor == null
-                  ? l10n.checkoutTotalPending
+                  ? (quote.hasPendingPricing
+                      ? l10n.hatlyServicePricePending
+                      : l10n.checkoutTotalPending)
                   : formatMinorUnits(summary.totalMinor!, context),
               bold: true,
               ltr: summary.totalMinor != null),

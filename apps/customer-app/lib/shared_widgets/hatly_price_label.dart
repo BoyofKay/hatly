@@ -34,9 +34,16 @@ class HatlyPriceLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+    // Dark Mode fix: the price text used to hardcode
+    // `HatlyColors.primaryOrangeDark` — a shade meant for a PRESSED button
+    // state (per its own doc comment in hatly_theme.dart), not idle text,
+    // and too dim against a dark background. `p.link` is the theme's own
+    // "emphasised orange text" token — identical value in Light Mode,
+    // brighter brand orange in Dark Mode.
     final priceStyle = Theme.of(context).textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.bold,
-          color: HatlyColors.primaryOrangeDark,
+          color: p.link,
         );
 
     if (isPending || finalAmountMinor == null) {
@@ -45,7 +52,7 @@ class HatlyPriceLabel extends StatelessWidget {
         style: Theme.of(context)
             .textTheme
             .labelLarge
-            ?.copyWith(color: HatlyColors.textMuted),
+            ?.copyWith(color: p.textMuted),
       );
     }
 

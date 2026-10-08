@@ -41,6 +41,15 @@ export const STORAGE_STATE_DIR = 'e2e/.auth';
 export const VENDOR_A_STORAGE_STATE = `${STORAGE_STATE_DIR}/vendor-a.json`;
 export const VENDOR_B_STORAGE_STATE = `${STORAGE_STATE_DIR}/vendor-b.json`;
 export const FIXTURE_FILE = `${STORAGE_STATE_DIR}/fixtures.json`;
+/**
+ * M3a (Launch-Readiness Gap Audit) — the smallest possible extension of
+ * this existing fixture mechanism to cover the new Admin pages. The
+ * SUPER_ADMIN session above was ALREADY required (to provision the
+ * Vendor Manager fixtures via the real API) — this just also persists
+ * its own storageState, the exact same way `VENDOR_A_STORAGE_STATE`
+ * already does, rather than building a separate admin-auth framework.
+ */
+export const SUPER_ADMIN_STORAGE_STATE = `${STORAGE_STATE_DIR}/super-admin.json`;
 
 export interface FixtureOrder {
   orderId: string;
@@ -53,7 +62,9 @@ export interface Fixtures {
   /**
    * Several INDEPENDENT fresh orders against Vendor A's branch — each spec that MUTATES a segment's
    * status consumes its own, so tests never fight over which one is still at PENDING.
-   * [0] = basic open/confirm test, [1] = double/rapid-click protection, [2] = isolation/invalid-id tests (never mutated).
+   * [0] = basic open/confirm test, [1] = double/rapid-click protection, [2] = isolation/invalid-id tests (never mutated),
+   * [3] = M3a (Launch-Readiness Gap Audit, G-12) segment-cancellation confirmation-guard test — its own
+   * dedicated order, never touched by [0]/[1]/[2]'s own tests.
    */
   vendorAOrders: FixtureOrder[];
   /** A fresh order against Vendor B's branch, with a WEIGHT-priced item — for the "Record Weight" tests. */

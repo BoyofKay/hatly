@@ -29,6 +29,7 @@ import { OrderWalletRefundService } from './order-wallet-refund.service';
 import { OrderEtaService } from './order-eta.service';
 import { OrderStatusEvent } from './entities/order-status-event.entity';
 import { Address } from '../addresses/entities/address.entity';
+import { DeliveryZone } from '../delivery-zones/entities/delivery-zone.entity';
 import { WalletModule } from '../wallet/wallet.module';
 import { LocationModule } from '../location/location.module';
 import { ServiceAreasModule } from '../service-areas/service-areas.module';
@@ -59,6 +60,7 @@ import { AdminOrdersService } from './admin-orders.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      DeliveryZone,
       Order,
       OrderVendorSegment,
       OrderItem,
@@ -136,6 +138,8 @@ import { AdminOrdersService } from './admin-orders.service';
   // / DriverPurchaseService. CONFIRMED: no Admin-facing controller or
   // correction path exists for weighted items anywhere in this module
   // — Admin plays no role in weight/weighted-price entry or correction.
-  exports: [OrderStateMachineService, AdHocPurchaseRecordService, OrderItemWeightRecordService],
+  // M3c (Launch-Readiness Gap Audit, G-10): AdminOrdersService exported so AdminCustomersModule can
+  // reuse its `search()` for a customer's "recent orders" summary without duplicating that query.
+  exports: [OrderStateMachineService, AdHocPurchaseRecordService, OrderItemWeightRecordService, AdminOrdersService],
 })
 export class OrdersModule {}

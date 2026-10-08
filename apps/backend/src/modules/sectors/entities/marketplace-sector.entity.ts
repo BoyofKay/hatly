@@ -41,4 +41,17 @@ export class MarketplaceSector extends BaseEntity {
 
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
+
+  /**
+   * Consolidated customer-commerce milestone (Part F — Marketplace
+   * image/asset readiness): a plain URL reference, same
+   * reuse-the-existing-column pattern as `Vendor.logoUrl` /
+   * `Product.imageUrl` / `MarketplaceSubcategory.imageUrl` — never a
+   * second asset pipeline. Nullable: seed data intentionally leaves
+   * this null rather than fabricate a URL for an asset that doesn't
+   * exist yet (see the seed script's own comment for the exact list of
+   * real image files this milestone still needs generated).
+   */
+  @Column({ name: 'image_url', type: 'varchar', length: 500, nullable: true })
+  imageUrl?: string | null;
 }

@@ -4,8 +4,19 @@ import '../storage/token_storage.dart';
 /// Central HTTP client for the customer app. Attaches the access token
 /// to every request and transparently retries once after a refresh on
 /// a 401 — callers never handle token logic themselves.
+///
+/// M4 — Session / device safety. `onSessionExpired` fires exactly once per
+/// irrecoverable 401 (no refresh token stored, or the refresh call itself
+/// fails) — i.e. the same moment `tokenStorage.clear()` already ran. This is
+/// what lets the app react to a session becoming invalid from ANY API call,
+/// not only the driver's own explicit logout button — see
+/// `core/network/providers.dart`'s wiring for what it actually does
+/// (flip `authStateProvider` to unauthenticated + stop the GPS timer),
+/// which in turn lets the router's existing auth guard redirect to
+/// `/login`, so a stale/unauthorized session can never leave the driver
+/// looking at assignment/status data that isn't really theirs anymore.
 class ApiClient {
-  ApiClient({required this.baseUrl, required this.tokenStorage}) {
+  ApiClient({required this.baseUrl, required this.tokenStorage, this.onSessionExpired}) {
     _dio = Dio(BaseOptions(baseUrl: baseUrl, connectTimeout: const Duration(seconds: 10)));
 
     _dio.interceptors.add(
@@ -18,7 +29,13 @@ class ApiClient {
           handler.next(options);
         },
         onError: (error, handler) async {
-          if (error.response?.statusCode == 401) {
+          // M4 fix: a 401 FROM `/auth/refresh` itself (an invalid/expired
+          // refresh token) must never re-enter `_tryRefresh()` — that call
+          // goes through this SAME `_dio`/interceptor, so without this guard
+          // a bad refresh token caused unbounded recursive refresh attempts
+          // (a real, pre-existing hang, not merely a theoretical one —
+          // caught by this milestone's own session-expiry test).
+          if (error.response?.statusCode == 401 && error.requestOptions.path != '/auth/refresh') {
             final refreshed = await _tryRefresh();
             if (refreshed) {
               final retryResponse = await _dio.fetch(error.requestOptions);
@@ -33,13 +50,17 @@ class ApiClient {
 
   final String baseUrl;
   final TokenStorage tokenStorage;
+  final void Function()? onSessionExpired;
   late final Dio _dio;
 
   Dio get dio => _dio;
 
   Future<bool> _tryRefresh() async {
     final refreshToken = await tokenStorage.refreshToken;
-    if (refreshToken == null) return false;
+    if (refreshToken == null) {
+      onSessionExpired?.call();
+      return false;
+    }
 
     try {
       final response = await _dio.post(
@@ -54,6 +75,7 @@ class ApiClient {
       return true;
     } catch (_) {
       await tokenStorage.clear();
+      onSessionExpired?.call();
       return false;
     }
   }

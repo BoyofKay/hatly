@@ -7,7 +7,7 @@ import axios from 'axios';
  * production, since localStorage is XSS-exposed; flagged for the
  * Phase 6 security review rather than blocking Phase 1 foundation work.
  */
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api/v1';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000/api/v1';
 
 export const apiClient = axios.create({ baseURL: API_BASE_URL });
 

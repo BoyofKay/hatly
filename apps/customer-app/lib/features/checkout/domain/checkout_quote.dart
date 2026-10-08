@@ -2,6 +2,8 @@
 /// the app displays these amounts and never recomputes a fee, a discount, an ETA or a payment split itself.
 library;
 
+import '../../addresses/domain/delivery_zone.dart';
+
 /// A reason the order cannot be placed right now (machine-readable [code], server-written [message]).
 class QuoteBlocker {
   const QuoteBlocker({required this.code, required this.message});
@@ -85,13 +87,15 @@ class QuoteAddress {
       );
 }
 
-/// The address as it would be frozen on the order (also the shape of an order's immutable address snapshot).
+/// The address as it would be frozen on the order (also the shape of an order's immutable address snapshot). PD-009: the pin
+/// is optional; [deliveryZone] is the zone exactly as frozen (an order keeps its zone name even if the zone is renamed later).
 class QuoteAddressSnapshot {
   const QuoteAddressSnapshot({
     this.label,
     required this.line1,
-    required this.latitude,
-    required this.longitude,
+    this.latitude,
+    this.longitude,
+    this.deliveryZone,
     this.instructions,
     this.governorate,
     this.city,
@@ -105,8 +109,9 @@ class QuoteAddressSnapshot {
 
   final String? label;
   final String line1;
-  final double latitude;
-  final double longitude;
+  final double? latitude;
+  final double? longitude;
+  final DeliveryZone? deliveryZone;
   final String? instructions;
   final String? governorate;
   final String? city;
@@ -117,7 +122,27 @@ class QuoteAddressSnapshot {
   final String? landmark;
   final String? formattedAddress;
 
+  /// "بلبيس — أبو نصيب" when the address has a zone, else null (an order placed before zones existed).
+  String? areaLabel(bool arabic) => deliveryZone?.areaLabel(arabic);
+
   /// The structured, human-readable lines a customer expects to see (street/building/floor/apartment, city, governorate).
+  /// With a zone the area line ("بلبيس — أبو نصيب") comes first and replaces the plain city/governorate line.
+  List<String> detailLinesFor(bool arabic) {
+    final area = areaLabel(arabic);
+    if (area == null) return detailLines;
+    final unit = [
+      if (buildingNumber?.isNotEmpty == true) buildingNumber!,
+      if (floor?.isNotEmpty == true) floor!,
+      if (apartment?.isNotEmpty == true) apartment!,
+    ];
+    return [
+      area,
+      line1,
+      if (unit.isNotEmpty) unit.join(' · '),
+      if (landmark?.isNotEmpty == true) landmark!,
+    ].where((l) => l.isNotEmpty).toList();
+  }
+
   List<String> get detailLines {
     final unit = [
       if (buildingNumber?.isNotEmpty == true) buildingNumber!,
@@ -139,8 +164,11 @@ class QuoteAddressSnapshot {
       QuoteAddressSnapshot(
         label: json['label'] as String?,
         line1: json['line1'] as String,
-        latitude: (json['latitude'] as num).toDouble(),
-        longitude: (json['longitude'] as num).toDouble(),
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
+        deliveryZone: json['deliveryZone'] is Map<String, dynamic>
+            ? DeliveryZone.fromJson(json['deliveryZone'] as Map<String, dynamic>)
+            : null,
         instructions: json['instructions'] as String?,
         governorate: json['governorate'] as String?,
         city: json['city'] as String?,
@@ -158,17 +186,22 @@ class QuoteEligibility {
     required this.serviceable,
     this.code,
     this.message,
+    this.pricingSource,
   });
 
   final bool serviceable;
   final String? code;
   final String? message;
 
+  /// `DISTANCE` (map pin) · `DELIVERY_ZONE` (no pin — the selected zone) · null.
+  final String? pricingSource;
+
   factory QuoteEligibility.fromJson(Map<String, dynamic> json) =>
       QuoteEligibility(
         serviceable: json['serviceable'] as bool? ?? false,
         code: json['code'] as String?,
         message: json['message'] as String?,
+        pricingSource: json['pricingSource'] as String?,
       );
 }
 
@@ -235,19 +268,21 @@ class QuoteDeliveryVendor {
   const QuoteDeliveryVendor({
     required this.vendorBranchId,
     this.name,
-    required this.distanceToCustomerMeters,
+    this.distanceToCustomerMeters,
   });
 
   final String vendorBranchId;
   final String? name;
-  final int distanceToCustomerMeters;
+
+  /// Null when the fee came from a Delivery Zone (no distance was measured).
+  final int? distanceToCustomerMeters;
 
   factory QuoteDeliveryVendor.fromJson(Map<String, dynamic> json) =>
       QuoteDeliveryVendor(
         vendorBranchId: json['vendorBranchId'] as String,
         name: json['name'] as String?,
         distanceToCustomerMeters:
-            (json['distanceToCustomerMeters'] as num?)?.toInt() ?? 0,
+            (json['distanceToCustomerMeters'] as num?)?.toInt(),
       );
 }
 
@@ -265,7 +300,21 @@ class QuoteDelivery {
     this.distanceMeters,
     required this.vendors,
     required this.eta,
+    this.pricingSource,
+    this.deliveryZone,
+    this.hatlyService,
   });
+
+  /// `DISTANCE` · `DELIVERY_ZONE` · null (not priced yet).
+  final String? pricingSource;
+
+  /// The zone the fee was priced for (frozen into the order when placed).
+  final DeliveryZone? deliveryZone;
+
+  /// Hatly Service only: the fee is [QuoteHatlyServiceFee.zoneDeliveryFeeMinor] × [QuoteHatlyServiceFee.multiplier].
+  final QuoteHatlyServiceFee? hatlyService;
+
+  bool get pricedByZone => pricingSource == 'DELIVERY_ZONE';
 
   final bool applicable;
   final String source;
@@ -295,6 +344,33 @@ class QuoteDelivery {
             .map((e) => QuoteDeliveryVendor.fromJson(e as Map<String, dynamic>))
             .toList(),
         eta: QuoteEta.fromJson(json['eta'] as Map<String, dynamic>),
+        pricingSource: json['pricingSource'] as String?,
+        deliveryZone: json['deliveryZone'] is Map<String, dynamic>
+            ? DeliveryZone.fromJson(json['deliveryZone'] as Map<String, dynamic>)
+            : null,
+        hatlyService: json['hatlyService'] is Map<String, dynamic>
+            ? QuoteHatlyServiceFee.fromJson(json['hatlyService'] as Map<String, dynamic>)
+            : null,
+      );
+}
+
+/// The two server-computed parts of a Hatly Service delivery fee (PD-009 amended: the selected area's delivery fee × the
+/// multiplier, pin or not) — shown, never recomputed by the app.
+class QuoteHatlyServiceFee {
+  const QuoteHatlyServiceFee({required this.zoneDeliveryFeeMinor, required this.multiplier});
+
+  final int zoneDeliveryFeeMinor;
+  final double multiplier;
+
+  /// "1.5" — never "1.50000".
+  String get multiplierText {
+    final fixed = multiplier.toStringAsFixed(4);
+    return fixed.replaceFirst(RegExp(r'\.?0+$'), '');
+  }
+
+  factory QuoteHatlyServiceFee.fromJson(Map<String, dynamic> json) => QuoteHatlyServiceFee(
+        zoneDeliveryFeeMinor: (json['zoneDeliveryFeeMinor'] as num).toInt(),
+        multiplier: (json['multiplier'] as num).toDouble(),
       );
 }
 
@@ -445,6 +521,7 @@ class QuotePayment {
 class CheckoutQuote {
   const CheckoutQuote({
     required this.canPlaceOrder,
+    this.hasPendingPricing = false,
     required this.blockers,
     this.fulfillment,
     this.address,
@@ -459,6 +536,10 @@ class CheckoutQuote {
   });
 
   final bool canPlaceOrder;
+
+  /// Explicit server flag: a Hatly Service request has no confirmed price yet. The total / amount due are then unknown (never 0),
+  /// the order is cash-on-delivery only, and the price is confirmed while the order is being prepared.
+  final bool hasPendingPricing;
   final List<QuoteBlocker> blockers;
   final QuoteFulfillment? fulfillment;
   final QuoteAddress? address;
@@ -484,6 +565,7 @@ class CheckoutQuote {
         : null;
     return CheckoutQuote(
       canPlaceOrder: json['canPlaceOrder'] as bool? ?? false,
+      hasPendingPricing: json['hasPendingPricing'] as bool? ?? false,
       blockers: (json['blockers'] as List? ?? [])
           .map((e) => QuoteBlocker.fromJson(e as Map<String, dynamic>))
           .toList(),

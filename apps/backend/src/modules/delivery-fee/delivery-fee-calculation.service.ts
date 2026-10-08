@@ -6,7 +6,8 @@ import { roundPricingDistanceMeters } from './pricing-distance-rounding';
 
 export interface PricingRouteStop {
   vendorBranchId: string;
-  distanceToCustomerMeters: number;
+  /** Null for a DELIVERY_ZONE breakdown — no distance was measured (the address has no map pin). */
+  distanceToCustomerMeters: number | null;
 }
 
 /**
@@ -18,12 +19,20 @@ export interface PricingRouteStop {
  * elsewhere in this project.
  */
 export interface DeliveryFeeBreakdown {
-  vendorSequence: PricingRouteStop[]; // farthest-from-customer first
-  legDistancesMeters: number[]; // vendor[0]->vendor[1], ..., last vendor->customer, in that order
-  rawTotalDistanceMeters: number;
-  roundedTotalDistanceMeters: number;
-  pricePer100mMinorUsed: number;
-  minimumDeliveryFeeMinorUsed: number;
+  /**
+   * PD-009. Where the BASE fee came from: `DISTANCE` (absent on breakdowns frozen before zones existed — they are all
+   * distance-based) = max(minimum, distance fee); `DELIVERY_ZONE` = the selected zone's fee, frozen below.
+   */
+  pricingSource?: 'DISTANCE' | 'DELIVERY_ZONE';
+  /** DELIVERY_ZONE only: the zone and the exact fee it had when this breakdown was frozen. */
+  deliveryZoneId?: string;
+  zoneDeliveryFeeMinorUsed?: number;
+  vendorSequence: PricingRouteStop[]; // DISTANCE: farthest-from-customer first; DELIVERY_ZONE: by vendorBranchId
+  legDistancesMeters: number[]; // vendor[0]->vendor[1], ..., last vendor->customer, in that order (empty for DELIVERY_ZONE)
+  rawTotalDistanceMeters: number | null; // null for DELIVERY_ZONE
+  roundedTotalDistanceMeters: number | null; // null for DELIVERY_ZONE
+  pricePer100mMinorUsed: number | null; // null for DELIVERY_ZONE (not an input of its price)
+  minimumDeliveryFeeMinorUsed: number | null; // null for DELIVERY_ZONE (not an input of its price)
   additionalVendorFeeMinorUsed: number;
   additionalVendorChargeMinor: number;
   deliveryFeeMinor: number;
@@ -139,21 +148,10 @@ export class DeliveryFeeCalculationService {
     const rawTotalDistanceMeters = legDistancesMeters.reduce((sum, d) => sum + d, 0);
     const roundedTotalDistanceMeters = roundPricingDistanceMeters(rawTotalDistanceMeters);
 
-    const pricePer100mMinor = await this.businessConfigService.getRequired<number>(
-      BusinessConfigKey.REGISTERED_VENDOR_PRICE_PER_100M_MINOR,
-    );
-    const minimumDeliveryFeeMinor = await this.businessConfigService.getRequired<number>(
-      BusinessConfigKey.REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR,
-    );
+    const { pricePer100mMinor, minimumDeliveryFeeMinor, baseFeeMinor } = await this.distanceBaseFee(roundedTotalDistanceMeters);
     const additionalVendorFeeMinor = await this.businessConfigService.getRequired<number>(
       BusinessConfigKey.REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR,
     );
-
-    // roundedTotalDistanceMeters is always an exact multiple of 100 by
-    // construction (see roundPricingDistanceMeters), so this division
-    // is exact integer arithmetic — never floating point money.
-    const distanceFeeMinor = (roundedTotalDistanceMeters / 100) * pricePer100mMinor;
-    const baseFeeMinor = Math.max(minimumDeliveryFeeMinor, distanceFeeMinor);
     const { additionalVendorChargeMinor, deliveryFeeMinor } = composeDeliveryFee({
       baseFeeMinor,
       additionalVendorFeeMinor,
@@ -161,6 +159,7 @@ export class DeliveryFeeCalculationService {
     });
 
     return {
+      pricingSource: 'DISTANCE',
       vendorSequence,
       legDistancesMeters,
       rawTotalDistanceMeters,
@@ -172,6 +171,70 @@ export class DeliveryFeeCalculationService {
       deliveryFeeMinor,
       ...(etaKnown ? { legEtaSeconds, totalEtaSeconds: legEtaSeconds.reduce((sum, e) => sum + e, 0) } : {}),
     };
+  }
+
+  /**
+   * PD-009 — the base fee of an address WITHOUT a map pin is its Delivery Zone's fee (the caller has already established the zone
+   * is active and is the address's pricing source). It goes through the SAME `composeDeliveryFee`, so the additional-vendor fee
+   * applies exactly as for distance pricing, and partial cancellation (`recalculateForRemainingVendors`) works unchanged off the
+   * frozen breakdown. No map call, no distance, no ETA is invented: those fields are null/empty. Fails closed if the
+   * additional-vendor fee has never been configured, like `calculate()`.
+   */
+  async calculateForZone(
+    vendorBranches: Array<{ id: string }>,
+    zone: { id: string; deliveryFeeMinor: number },
+  ): Promise<DeliveryFeeBreakdown> {
+    if (vendorBranches.length === 0) {
+      throw new BadRequestException({
+        message: 'At least one vendor branch is required to calculate a delivery fee.',
+        details: { code: 'NO_VENDOR_BRANCHES_FOR_PRICING' },
+      });
+    }
+    if (!Number.isInteger(zone.deliveryFeeMinor) || zone.deliveryFeeMinor < 0) {
+      throw new BadRequestException({
+        message: 'Delivery fee could not be calculated right now. Please try again shortly.',
+        details: { code: 'DELIVERY_FEE_UNAVAILABLE' },
+      });
+    }
+    const additionalVendorFeeMinor = await this.businessConfigService.getRequired<number>(
+      BusinessConfigKey.REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR,
+    );
+    const { additionalVendorChargeMinor, deliveryFeeMinor } = composeDeliveryFee({
+      baseFeeMinor: zone.deliveryFeeMinor,
+      additionalVendorFeeMinor,
+      vendorCount: vendorBranches.length,
+    });
+    return {
+      pricingSource: 'DELIVERY_ZONE',
+      deliveryZoneId: zone.id,
+      zoneDeliveryFeeMinorUsed: zone.deliveryFeeMinor,
+      // No customer point → no "farthest first" route; a deterministic order (dispatch falls back to the first segment anyway).
+      vendorSequence: [...vendorBranches]
+        .sort((a, b) => a.id.localeCompare(b.id))
+        .map((b) => ({ vendorBranchId: b.id, distanceToCustomerMeters: null })),
+      legDistancesMeters: [],
+      rawTotalDistanceMeters: null,
+      roundedTotalDistanceMeters: null,
+      pricePer100mMinorUsed: null,
+      minimumDeliveryFeeMinorUsed: null,
+      additionalVendorFeeMinorUsed: additionalVendorFeeMinor,
+      additionalVendorChargeMinor,
+      deliveryFeeMinor,
+    };
+  }
+
+  /** `baseFee = max(minimumFee, distanceBasedFee)` — the one definition of the distance base fee. */
+  private async distanceBaseFee(roundedDistanceMeters: number) {
+    const pricePer100mMinor = await this.businessConfigService.getRequired<number>(
+      BusinessConfigKey.REGISTERED_VENDOR_PRICE_PER_100M_MINOR,
+    );
+    const minimumDeliveryFeeMinor = await this.businessConfigService.getRequired<number>(
+      BusinessConfigKey.REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR,
+    );
+    // roundedDistanceMeters is always an exact multiple of 100 by construction (see roundPricingDistanceMeters), so this
+    // division is exact integer arithmetic — never floating point money.
+    const distanceFeeMinor = (roundedDistanceMeters / 100) * pricePer100mMinor;
+    return { pricePer100mMinor, minimumDeliveryFeeMinor, baseFeeMinor: Math.max(minimumDeliveryFeeMinor, distanceFeeMinor) };
   }
 
   /**

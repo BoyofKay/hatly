@@ -128,22 +128,61 @@ class DeliverySegment {
   }
 }
 
+/// The order's frozen delivery address. PD-009: the map pin is OPTIONAL — an address without one is located by its Delivery
+/// Zone (e.g. "بلبيس — أبو نصيب", frozen with the order) plus the customer's written details. Coordinates are never invented.
 class DeliveryAddress {
-  const DeliveryAddress({this.label, required this.line1, required this.latitude, required this.longitude, this.instructions});
+  const DeliveryAddress({
+    this.label,
+    required this.line1,
+    this.latitude,
+    this.longitude,
+    this.instructions,
+    this.zoneNameAr,
+    this.zoneCityAr,
+    this.buildingNumber,
+    this.floor,
+    this.apartment,
+    this.landmark,
+  });
 
   final String? label;
   final String line1;
-  final double latitude;
-  final double longitude;
+  final double? latitude;
+  final double? longitude;
   final String? instructions;
+  final String? zoneNameAr;
+  final String? zoneCityAr;
+  final String? buildingNumber;
+  final String? floor;
+  final String? apartment;
+  final String? landmark;
+
+  bool get hasPin => latitude != null && longitude != null;
+
+  /// "بلبيس — أبو نصيب", or null for an order placed before zones existed.
+  String? get areaLabel {
+    if (zoneNameAr == null) return null;
+    return zoneCityAr == null ? zoneNameAr : '$zoneCityAr — $zoneNameAr';
+  }
 
   factory DeliveryAddress.fromJson(Map<String, dynamic> json) {
+    final zone = json['deliveryZone'];
+    double? number(Object? v) => v is num ? v.toDouble() : null;
+    final lat = number(json['latitude']);
+    final lng = number(json['longitude']);
     return DeliveryAddress(
       label: json['label'] as String?,
       line1: json['line1'] as String,
-      latitude: (json['latitude'] as num).toDouble(),
-      longitude: (json['longitude'] as num).toDouble(),
+      // A half pin is treated as no pin.
+      latitude: lat != null && lng != null ? lat : null,
+      longitude: lat != null && lng != null ? lng : null,
       instructions: json['instructions'] as String?,
+      zoneNameAr: zone is Map ? zone['nameAr'] as String? : null,
+      zoneCityAr: zone is Map ? zone['cityAr'] as String? : null,
+      buildingNumber: json['buildingNumber'] as String?,
+      floor: json['floor'] as String?,
+      apartment: json['apartment'] as String?,
+      landmark: json['landmark'] as String?,
     );
   }
 }
@@ -202,7 +241,10 @@ class Delivery {
   final String? orderNote;
   final String paymentMethod;
   final String? electronicPaymentMethod;
-  final int totalMinor;
+
+  /// Null while the order's final price is not known yet — a Hatly Service order whose item price is still to be confirmed.
+  /// Never shown as 0.
+  final int? totalMinor;
 
   /// Driver Core + Dispatch Foundation milestone. What must actually be collected on delivery —
   /// NEVER `totalMinor` (which can overstate it once a wallet credit already covered part of the
@@ -230,7 +272,7 @@ class Delivery {
       orderNote: json['orderNote'] as String?,
       paymentMethod: json['paymentMethod'] as String,
       electronicPaymentMethod: json['electronicPaymentMethod'] as String?,
-      totalMinor: json['totalMinor'] as int,
+      totalMinor: (json['totalMinor'] as num?)?.toInt(),
       amountDueMinor: json['amountDueMinor'] as int?,
       customerName: json['customerName'] as String,
       customerPhone: json['customerPhone'] as String,

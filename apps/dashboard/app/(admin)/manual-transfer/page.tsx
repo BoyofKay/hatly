@@ -5,8 +5,10 @@ import {
   ManualTransferPayment,
   approvePayment,
   listUnderReviewPayments,
+  recordManualTransferRefund,
   rejectPayment,
 } from '../../../lib/api/admin-manual-transfer';
+import { apiErrorMessage } from '../../../lib/api/errors';
 
 /**
  * Real Admin Manual Transfer verification — consumes the existing
@@ -24,13 +26,20 @@ export default function ManualTransferPage() {
   const [rejectReasonById, setRejectReasonById] = useState<Record<string, string>>({});
   const [actionErrorById, setActionErrorById] = useState<Record<string, string>>({});
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  // M3a (Launch-Readiness Gap Audit, G-25) — manual refund form.
+  const [refundPaymentId, setRefundPaymentId] = useState('');
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundReason, setRefundReason] = useState('');
+  const [isRefunding, setIsRefunding] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
+  const [refundSuccess, setRefundSuccess] = useState<string | null>(null);
 
   async function refresh() {
     setError(null);
     try {
       setPayments(await listUnderReviewPayments());
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load pending transfers.');
+      setError(apiErrorMessage(err, 'Failed to load pending transfers.'));
     }
   }
 
@@ -39,6 +48,12 @@ export default function ManualTransferPage() {
   }, []);
 
   async function handleApprove(paymentId: string) {
+    if (submittingId) return;
+    // M3a (Launch-Readiness Gap Audit, G-12) — this releases the customer's order for real money
+    // already claimed as sent; previously had no confirmation step at all.
+    if (!window.confirm('Approve this Manual Transfer as paid? This confirms Hatly received the money and cannot be undone.')) {
+      return;
+    }
     setSubmittingId(paymentId);
     setActionErrorById((prev) => ({ ...prev, [paymentId]: '' }));
     try {
@@ -47,7 +62,7 @@ export default function ManualTransferPage() {
     } catch (err: any) {
       // Covers the "already PAID/REJECTED by another Admin" conflict —
       // the backend's own terminal-state guard, surfaced plainly.
-      setActionErrorById((prev) => ({ ...prev, [paymentId]: err?.response?.data?.message ?? 'Failed to approve.' }));
+      setActionErrorById((prev) => ({ ...prev, [paymentId]: apiErrorMessage(err, 'Failed to approve.' )}));
       await refresh();
     } finally {
       setSubmittingId(null);
@@ -55,16 +70,50 @@ export default function ManualTransferPage() {
   }
 
   async function handleReject(paymentId: string) {
+    if (submittingId) return;
+    if (!window.confirm('Reject this Manual Transfer claim? This cannot be undone.')) return;
     setSubmittingId(paymentId);
     setActionErrorById((prev) => ({ ...prev, [paymentId]: '' }));
     try {
       await rejectPayment(paymentId, rejectReasonById[paymentId] || undefined);
       await refresh();
     } catch (err: any) {
-      setActionErrorById((prev) => ({ ...prev, [paymentId]: err?.response?.data?.message ?? 'Failed to reject.' }));
+      setActionErrorById((prev) => ({ ...prev, [paymentId]: apiErrorMessage(err, 'Failed to reject.' )}));
       await refresh();
     } finally {
       setSubmittingId(null);
+    }
+  }
+
+  /** M3a (Launch-Readiness Gap Audit, G-25). */
+  async function handleRecordRefund(e: React.FormEvent) {
+    e.preventDefault();
+    if (isRefunding) return;
+    setRefundError(null);
+    setRefundSuccess(null);
+    const amount = Number(refundAmount);
+    if (!refundPaymentId.trim()) {
+      setRefundError('Payment id is required.');
+      return;
+    }
+    if (!refundAmount || !Number.isInteger(amount) || amount <= 0) {
+      setRefundError('Amount is required and must be a positive integer (minor units).');
+      return;
+    }
+    if (!window.confirm(`Record a refund of ${(amount / 100).toFixed(2)} against this payment? This cannot be undone.`)) {
+      return;
+    }
+    setIsRefunding(true);
+    try {
+      await recordManualTransferRefund(refundPaymentId.trim(), amount, refundReason || undefined);
+      setRefundSuccess('Refund recorded.');
+      setRefundPaymentId('');
+      setRefundAmount('');
+      setRefundReason('');
+    } catch (err: any) {
+      setRefundError(apiErrorMessage(err, 'Failed to record refund.'));
+    } finally {
+      setIsRefunding(false);
     }
   }
 
@@ -137,6 +186,49 @@ export default function ManualTransferPage() {
             )}
           </div>
         ))}
+      </div>
+
+      {/* M3a (Launch-Readiness Gap Audit, G-25). A separate payment id field, not a per-row button
+          above: refund applies to an already-PAID payment, which by definition has already left the
+          under-review list this page renders — no picker/search endpoint exists on the backend for
+          PAID payments (building one would be a backend change, out of scope for M3a). */}
+      <div className="mt-8 rounded border bg-white p-4">
+        <h2 className="font-semibold">Record a Manual Transfer Refund</h2>
+        <p className="mt-1 text-xs text-gray-500">
+          For an already-approved (PAID) transfer that needs money sent back to the customer externally.
+        </p>
+        <form onSubmit={handleRecordRefund} className="mt-3 space-y-2">
+          <input
+            value={refundPaymentId}
+            onChange={(e) => setRefundPaymentId(e.target.value)}
+            placeholder="Payment id"
+            className="w-full rounded border px-2 py-1.5 text-sm"
+          />
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={refundAmount}
+            onChange={(e) => setRefundAmount(e.target.value)}
+            placeholder="Amount (minor units)"
+            className="w-full rounded border px-2 py-1.5 text-sm"
+          />
+          <input
+            value={refundReason}
+            onChange={(e) => setRefundReason(e.target.value)}
+            placeholder="Reason (optional)"
+            className="w-full rounded border px-2 py-1.5 text-sm"
+          />
+          {refundError && <p className="text-sm text-red-600">{refundError}</p>}
+          {refundSuccess && <p className="text-sm text-green-700">{refundSuccess}</p>}
+          <button
+            type="submit"
+            disabled={isRefunding}
+            className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {isRefunding ? 'Recording...' : 'Record Refund'}
+          </button>
+        </form>
       </div>
     </div>
   );

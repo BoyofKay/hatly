@@ -34,6 +34,7 @@ class ProductListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final p = context.palette;
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final displayName =
         isArabic && product.nameAr != null ? product.nameAr! : product.name;
@@ -79,27 +80,41 @@ class ProductListTile extends StatelessWidget {
                     // as returned, never a client-calculated value.
                     // Branching preserved unchanged — see class doc.
                     if (product.activeOffer?.isFlashSale == true) ...[
+                      // Polish pass: no Flexible/overflow handling — a long
+                      // formatted price (e.g. wide-locale digits, a 4+ digit
+                      // amount) plus the struck-through original price plus
+                      // "/kg" could overflow this Row on a narrow screen.
                       Row(
                         children: [
-                          Text(
-                            formatMinorUnits(product.priceMinor, context),
-                            style:
-                                Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                      decoration: TextDecoration.lineThrough,
-                                    ),
+                          Flexible(
+                            child: Text(
+                              formatMinorUnits(product.priceMinor, context),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                    decoration: TextDecoration.lineThrough,
+                                  ),
+                            ),
                           ),
                           const SizedBox(width: HatlySpacing.sm),
-                          LtrText(
-                            formatMinorUnits(
-                                product.activeOffer!.specialPriceMinor ??
-                                    product.priceMinor,
-                                context),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: HatlyColors.success),
+                          Flexible(
+                            child: LtrText(
+                              formatMinorUnits(
+                                  product.activeOffer!.specialPriceMinor ??
+                                      product.priceMinor,
+                                  context),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: p.success),
+                            ),
                           ),
                           if (product.isWeighted)
                             Text('/kg',
@@ -111,7 +126,11 @@ class ProductListTile extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: HatlySpacing.sm, vertical: 1),
                         decoration: BoxDecoration(
-                          color: HatlyColors.flashSale.withOpacity(0.15),
+                          // Dark Mode fix: fixed `HatlyColors.success`/
+                          // `flashSale` — identical to the old constants in
+                          // Light Mode, theme-tuned (brighter/more legible)
+                          // on a dark surface in Dark Mode.
+                          color: p.urgent.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(HatlyRadius.chip),
                         ),
                         child: Text(
@@ -119,20 +138,24 @@ class ProductListTile extends StatelessWidget {
                           style: Theme.of(context)
                               .textTheme
                               .labelLarge
-                              ?.copyWith(color: HatlyColors.flashSale),
+                              ?.copyWith(color: p.urgent),
                         ),
                       ),
                     ] else ...[
                       Row(
                         children: [
-                          LtrText(
-                            formatMinorUnits(product.priceMinor, context),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: HatlyColors.primaryOrangeDark),
+                          Flexible(
+                            child: LtrText(
+                              formatMinorUnits(product.priceMinor, context),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: p.link),
+                            ),
                           ),
                           if (product.isWeighted)
                             Text('/kg',
@@ -147,7 +170,7 @@ class ProductListTile extends StatelessWidget {
                           style: Theme.of(context)
                               .textTheme
                               .labelLarge
-                              ?.copyWith(color: HatlyColors.success),
+                              ?.copyWith(color: p.success),
                         ),
                       ],
                     ],

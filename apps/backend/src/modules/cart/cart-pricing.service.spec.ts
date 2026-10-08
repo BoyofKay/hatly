@@ -95,7 +95,7 @@ describe('CartPricingService', () => {
     expect(view.hasUnpricedItems).toBe(true);
   });
 
-  it('a cart with only an unpriced ad-hoc group is never readyForCheckout', () => {
+  it('a cart with only a Hatly Service request whose price is pending IS readyForCheckout (pending is an explicit state, not a blocker); hasUnpricedItems stays true as information', () => {
     const group = {
       id: 'group-2',
       groupType: CartGroupType.AD_HOC_SERVICE,
@@ -106,7 +106,14 @@ describe('CartPricingService', () => {
     } as unknown as CartVendorGroup;
 
     const view = service.buildCartView(buildCart([group]), new Map());
-    expect(view.readyForCheckout).toBe(false);
+    expect(view.hasUnpricedItems).toBe(true);
+    expect(view.readyForCheckout).toBe(true);
+    expect(view.groups[0].subtotalMinor).toBeNull(); // still never a fabricated 0
+  });
+
+  it('an EMPTY Hatly Service group is not ready — there is nothing to order', () => {
+    const group = { id: 'group-2', groupType: CartGroupType.AD_HOC_SERVICE, vendorBranchId: null, adHocPlaceName: 'Corner Pharmacy', vendorNote: null, items: [] } as unknown as CartVendorGroup;
+    expect(service.buildCartView(buildCart([group]), new Map()).readyForCheckout).toBe(false);
   });
 
   it("multi-vendor: computes each CATALOG group's subtotal independently and sums them at the cart level (Multi-Vendor preserved — no minimum-order gate of any kind)", () => {

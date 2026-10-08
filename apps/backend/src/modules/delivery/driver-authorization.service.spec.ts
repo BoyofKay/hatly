@@ -6,7 +6,11 @@ function buildHarness(drivers: any[], deliveries: any[]) {
     findOne: jest.fn(async ({ where }: any) => drivers.find((d) => d.userId === where.userId) ?? null),
   };
   const deliveriesRepository = {
-    findOne: jest.fn(async ({ where }: any) => deliveries.find((d) => d.id === where.id) ?? null),
+    findOne: jest.fn(async ({ where }: any) => {
+      if (where.id) return deliveries.find((d) => d.id === where.id) ?? null;
+      if (where.orderId) return deliveries.find((d) => d.orderId === where.orderId) ?? null;
+      return null;
+    }),
   };
   const service = new DriverAuthorizationService(driversRepository as any, deliveriesRepository as any);
   return { service };
@@ -38,5 +42,21 @@ describe('DriverAuthorizationService', () => {
   it('rejects a non-existent delivery with the same NotFoundException as an unowned one — does not leak which case it is', async () => {
     const { service } = buildHarness([], []);
     await expect(service.assertOwnsDelivery('driver-1', 'missing')).rejects.toThrow(NotFoundException);
+  });
+
+  it('M4: getOwnedDeliveryForOrder returns the Delivery when it belongs to the driver, resolved by orderId', async () => {
+    const { service } = buildHarness([], [{ id: 'delivery-1', orderId: 'order-1', driverId: 'driver-1' }]);
+    const delivery = await service.getOwnedDeliveryForOrder('driver-1', 'order-1');
+    expect(delivery.id).toBe('delivery-1');
+  });
+
+  it("M4: getOwnedDeliveryForOrder rejects another driver's order — same cross-driver isolation as assertOwnsDelivery", async () => {
+    const { service } = buildHarness([], [{ id: 'delivery-1', orderId: 'order-1', driverId: 'driver-2' }]);
+    await expect(service.getOwnedDeliveryForOrder('driver-1', 'order-1')).rejects.toThrow(NotFoundException);
+  });
+
+  it('M4: getOwnedDeliveryForOrder rejects a non-existent order the same way', async () => {
+    const { service } = buildHarness([], []);
+    await expect(service.getOwnedDeliveryForOrder('driver-1', 'missing-order')).rejects.toThrow(NotFoundException);
   });
 });

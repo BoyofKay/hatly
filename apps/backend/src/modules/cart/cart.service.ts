@@ -94,7 +94,7 @@ export class CartService {
    * -> option validation (unchanged from Phase 2D).
    */
   async addItem(customerId: string, dto: AddCartItemDto): Promise<CartView> {
-    return this.dataSource.transaction(async (manager) => {
+    const fullCart = await this.dataSource.transaction(async (manager) => {
       const cart = await this.getOrCreateActiveCartLocked(manager, customerId);
 
       const product = await manager.findOne(Product, {
@@ -178,8 +178,11 @@ export class CartService {
       }
 
       const fullCart = await this.loadCartWithRelations(manager, cart.id);
-      return this.buildView(fullCart);
+      return fullCart;
     });
+    // Rendered AFTER the transaction has committed and released its connection: buildView reads other tables through the
+    // pool, and doing that while still holding a pooled connection starves the pool under concurrent load (M5 Batch 3).
+    return this.buildView(fullCart);
   }
 
   /**
@@ -191,7 +194,7 @@ export class CartService {
    * external URL is rejected, never silently accepted.
    */
   async addAdHocItem(customerId: string, dto: AddAdHocCartItemDto): Promise<CartView> {
-    return this.dataSource.transaction(async (manager) => {
+    const fullCart = await this.dataSource.transaction(async (manager) => {
       const cart = await this.getOrCreateActiveCartLocked(manager, customerId);
       const groups = await manager.find(CartVendorGroup, { where: { cartId: cart.id } });
 
@@ -298,8 +301,11 @@ export class CartService {
       );
 
       const fullCart = await this.loadCartWithRelations(manager, cart.id);
-      return this.buildView(fullCart);
+      return fullCart;
     });
+    // Rendered AFTER the transaction has committed and released its connection: buildView reads other tables through the
+    // pool, and doing that while still holding a pooled connection starves the pool under concurrent load (M5 Batch 3).
+    return this.buildView(fullCart);
   }
 
   /**
@@ -328,7 +334,7 @@ export class CartService {
    * subtotal) — no change needed there, reused as-is.
    */
   async addVendorCustomItem(customerId: string, dto: AddVendorCustomItemDto): Promise<CartView> {
-    return this.dataSource.transaction(async (manager) => {
+    const fullCart = await this.dataSource.transaction(async (manager) => {
       const cart = await this.getOrCreateActiveCartLocked(manager, customerId);
       const groups = await manager.find(CartVendorGroup, { where: { cartId: cart.id } });
 
@@ -419,8 +425,11 @@ export class CartService {
       );
 
       const fullCart = await this.loadCartWithRelations(manager, cart.id);
-      return this.buildView(fullCart);
+      return fullCart;
     });
+    // Rendered AFTER the transaction has committed and released its connection: buildView reads other tables through the
+    // pool, and doing that while still holding a pooled connection starves the pool under concurrent load (M5 Batch 3).
+    return this.buildView(fullCart);
   }
 
   async setFulfillmentType(customerId: string, fulfillmentType: FulfillmentType): Promise<CartView> {

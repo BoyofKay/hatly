@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/localization/l10n/app_localizations.dart';
+import '../../../core/media/media_url.dart';
 import '../../../core/theme/hatly_theme.dart';
 import '../../../core/utils/money_formatter.dart';
 import '../../../shared_widgets/hatly_loading_view.dart';
@@ -190,7 +191,7 @@ class OrderSummaryCard extends StatelessWidget {
           const SizedBox(height: HatlySpacing.sm),
           Align(
             alignment: AlignmentDirectional.centerStart,
-            child: OrderStatusBadge(status: order.status, themeAware: true),
+            child: OrderStatusBadge(status: order.status),
           ),
           const SizedBox(height: HatlySpacing.sm),
           if (eta != null)
@@ -241,9 +242,12 @@ class OrderSummaryCard extends StatelessWidget {
 }
 
 class _Thumbnails extends StatelessWidget {
-  const _Thumbnails({required this.urls});
+  const _Thumbnails({required List<String> urls}) : _rawUrls = urls;
 
-  final List<String> urls;
+  final List<String> _rawUrls;
+
+  List<String> get urls =>
+      _rawUrls.map(resolveMediaUrl).whereType<String>().toList();
 
   @override
   Widget build(BuildContext context) {

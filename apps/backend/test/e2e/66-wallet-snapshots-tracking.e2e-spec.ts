@@ -242,7 +242,7 @@ describe('E2E — wallet, snapshots, ETA, tracking, order list (PD-006)', () => 
       const pv = await s.product(v, { name: 'Snap Burger', priceMinor: 12000, inventoryMode: 'OPEN' });
       const c = await s.customer();
       await s.addToCart(c, pv.id, 2);
-      const saved = expectData<any>(await world.api('post', '/addresses', { token: c.accessToken, body: { line1: 'Original Street 9', latitude: home.lat, longitude: home.lng, governorate: 'الشرقية', landmark: 'near the mosque' } }), 201);
+      const saved = expectData<any>(await world.api('post', '/addresses', { token: c.accessToken, body: { deliveryZoneId: await s.defaultDeliveryZoneId(), line1: 'Original Street 9', latitude: home.lat, longitude: home.lng, governorate: 'الشرقية', landmark: 'near the mosque' } }), 201);
       const order = expectData<any>(await place(c, { addressId: saved.id, deliveryAddress: undefined, paymentMethod: 'COD' }), 201);
       const before = await details(c, order.id);
 

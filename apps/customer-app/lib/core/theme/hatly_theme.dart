@@ -238,7 +238,11 @@ class HatlyTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: p.surface,
+        // Dark Mode: a filled input needs to read as distinct from a card,
+        // not the identical surface colour — `surfaceSoft` is a step lighter
+        // than `surface` in the dark palette. Left as `p.surface` (unchanged)
+        // in Light Mode so this does not alter the approved Light appearance.
+        fillColor: isDark ? p.surfaceSoft : p.surface,
         contentPadding: const EdgeInsets.symmetric(
             horizontal: HatlySpacing.md, vertical: HatlySpacing.ms),
         border: outline(p.border),

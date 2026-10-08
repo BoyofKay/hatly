@@ -41,9 +41,9 @@ describe('Request context — end-to-end', () => {
     });
 
     middleware.use(req, res, next);
-    // middleware.use runs the async next() synchronously-invoked chain;
-    // allow its internal awaits to settle.
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    // middleware.use starts the async next() chain and returns; wait for THAT chain to finish (not a wall-clock delay,
+    // which a loaded machine can outrun — the assertion then saw the not-yet-written value).
+    await next.mock.results[0].value;
 
     expect(res.setHeader).toHaveBeenCalledWith('x-correlation-id', 'e2e-success');
     expect(observedByDeepService).toBe('e2e-success');
@@ -91,7 +91,7 @@ describe('Request context — end-to-end', () => {
         observed = await deepService.createOrder();
       });
       middleware.use(req, res, next);
-      await new Promise((resolve) => setTimeout(resolve, 5));
+      await next.mock.results[0].value; // this request's own chain, however long the machine takes
       return observed;
     }
 

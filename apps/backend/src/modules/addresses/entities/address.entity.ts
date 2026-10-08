@@ -1,6 +1,7 @@
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../database/base.entity';
 import { User } from '../../users/entities/user.entity';
+import { DeliveryZone } from '../../delivery-zones/entities/delivery-zone.entity';
 
 /**
  * CONFIRMED business decision (Checkout / Address chunk): a genuinely
@@ -34,11 +35,27 @@ export class Address extends BaseEntity {
   @Column({ type: 'varchar', length: 255 })
   line1: string;
 
-  @Column({ type: 'double precision' })
-  latitude: number;
+  /**
+   * PD-009: the map pin is OPTIONAL (a pair — both or neither). When present it stays the authoritative location for the
+   * existing coordinate serviceability + distance pricing; when absent, the selected Delivery Zone decides both.
+   */
+  @Column({ type: 'double precision', nullable: true })
+  latitude: number | null;
 
-  @Column({ type: 'double precision' })
-  longitude: number;
+  @Column({ type: 'double precision', nullable: true })
+  longitude: number | null;
+
+  /**
+   * PD-009: the Delivery Zone the CUSTOMER selected. Required for every new/edited address; legacy rows keep NULL and are never
+   * guessed into a zone.
+   */
+  @ManyToOne(() => DeliveryZone, { nullable: true })
+  @JoinColumn({ name: 'delivery_zone_id' })
+  deliveryZone?: DeliveryZone | null;
+
+  @Index()
+  @Column({ name: 'delivery_zone_id', type: 'uuid', nullable: true })
+  deliveryZoneId: string | null;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   instructions?: string | null;

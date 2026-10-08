@@ -1,11 +1,40 @@
+import { buildDatabaseSslOptions } from './database-ssl';
+import { parseAllowedOrigins, parseTrustProxy, resolveRuntimeEnvironment, isStrictEnvironment } from './env.validation';
+
+const runtimeEnvironment = () => resolveRuntimeEnvironment(process.env.NODE_ENV) ?? 'development';
+
 export default () => ({
   env: process.env.NODE_ENV ?? 'development',
+
+  /**
+   * M5 Batch 1 — HTTP hardening. `strict` = production/staging (validated at boot by env.validation.ts, which has already
+   * rejected an invalid/empty CORS list or an unsafe TRUST_PROXY there). In development/test an empty CORS list keeps the open
+   * local-workflow behaviour; `trustProxy` is false unless explicitly configured; the Swagger UI is on outside strict
+   * environments and opt-in (ENABLE_API_DOCS=true) inside them.
+   */
+  http: {
+    strict: isStrictEnvironment(runtimeEnvironment()),
+    corsAllowedOrigins: parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS).origins,
+    trustProxy: parseTrustProxy(process.env.TRUST_PROXY).value,
+    enableApiDocs: process.env.ENABLE_API_DOCS === 'true' || (process.env.ENABLE_API_DOCS !== 'false' && !isStrictEnvironment(runtimeEnvironment())),
+  },
   port: parseInt(process.env.PORT ?? '3000', 10),
   apiPrefix: process.env.API_PREFIX ?? 'api/v1',
 
   database: {
     url: process.env.DATABASE_URL,
     ssl: process.env.DB_SSL === 'true',
+    sslOptions: buildDatabaseSslOptions(process.env),
+    // Connection pool (M5 Batch 3). `max` defaults to node-postgres' own 10. The acquire timeout is bounded (node-postgres' default is
+    // "wait forever"), so pool exhaustion surfaces as a fast, loggable error instead of every request hanging until a restart.
+    poolMax: Number(process.env.DB_POOL_MAX) || 10,
+    connectionTimeoutMs: Number(process.env.DB_CONNECTION_TIMEOUT_MS) || 10_000,
+  },
+
+  // Rate limiting (see common/throttling/rate-limit-policies.ts and docs/security/rate-limiting.md).
+  rateLimits: {
+    routePerMinute: Number(process.env.RATE_LIMIT_ROUTE_PER_MINUTE) || 100,
+    clientPerMinute: Number(process.env.RATE_LIMIT_CLIENT_PER_MINUTE) || 600,
   },
 
   redis: {
@@ -47,6 +76,15 @@ export default () => ({
   },
 
   storage: {
+    /** `local` (default — development; files under uploads-storage) or `s3` (S3-compatible object storage). */
+    driver: process.env.STORAGE_DRIVER ?? 'local',
+    /** Path-style addressing (`host/bucket/key`) — needed by MinIO and many S3-compatible stores. */
+    forcePathStyle: process.env.STORAGE_FORCE_PATH_STYLE === 'true',
+    /** `private` (default): bucket not public, reads via short-lived signed URLs. `public`: bucket/CDN is public by policy. */
+    access: process.env.STORAGE_ACCESS ?? 'private',
+    publicBaseUrl: process.env.STORAGE_PUBLIC_BASE_URL,
+    signedUrlTtlSeconds: parseInt(process.env.STORAGE_SIGNED_URL_TTL_SECONDS ?? '300', 10),
+    keyPrefix: process.env.STORAGE_KEY_PREFIX ?? '',
     endpoint: process.env.STORAGE_ENDPOINT,
     region: process.env.STORAGE_REGION,
     bucket: process.env.STORAGE_BUCKET,
@@ -66,6 +104,8 @@ export default () => ({
   uploads: {
     localDir: process.env.UPLOADS_LOCAL_DIR,
     publicUrlPrefix: process.env.UPLOADS_PUBLIC_URL_PREFIX ?? '/uploads/files',
+    // Image uploads allowed in flight at once (memory protection; see common/middleware/upload-concurrency.middleware.ts).
+    maxConcurrent: Number(process.env.UPLOAD_MAX_CONCURRENT) || 6,
   },
 
   /**

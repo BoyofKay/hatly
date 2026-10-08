@@ -6,6 +6,7 @@ import { Role } from '../../../common/enums/role.enum';
 import { CurrentUser, AuthenticatedUser } from '../../../common/decorators/current-user.decorator';
 import { CheckoutQuoteService } from './checkout-quote.service';
 import { CheckoutQuoteDto } from './dto/checkout-quote.dto';
+import { RateLimitPolicies, Throttled } from '../../../common/throttling/rate-limit-policies';
 
 @ApiTags('checkout')
 @Controller('checkout')
@@ -19,6 +20,7 @@ export class CheckoutController {
    * amount due, ETA, payment options and address eligibility — plus a signed `quoteToken` that freezes the delivery fee.
    * Read-only: it creates nothing and holds no locks.
    */
+  @Throttled(RateLimitPolicies.checkoutQuote)
   @Post('quote')
   async quote(@CurrentUser() user: AuthenticatedUser, @Body() dto: CheckoutQuoteDto) {
     return this.quoteService.quote(user.id, dto);

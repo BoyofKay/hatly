@@ -213,6 +213,65 @@ describe('CustomerOrdersService.getForCustomer', () => {
     expect(details.segments[0].items[0].productImageUrlSnapshot).toBe('https://cdn/burger.png');
   });
 
+  it(
+    'Standalone Hatly Service milestone: an AD_HOC_SERVICE segment exposes its frozen place name, service type, ' +
+      'and pickup/destination coordinates — real backend columns that existed but were never returned before this fix',
+    async () => {
+      const { service } = buildHarness({
+        orders: [
+          makeOrder({
+            segments: [
+              {
+                id: 'seg-1',
+                groupType: 'AD_HOC_SERVICE',
+                vendorBranchId: null,
+                status: 'PICKED_UP',
+                subtotalMinor: null,
+                adHocPlaceNameSnapshot: 'كارفور بلبيس',
+                adHocServiceTypeSnapshot: 'BUY_FROM_PLACE',
+                adHocPickupLatitudeSnapshot: 30.42,
+                adHocPickupLongitudeSnapshot: 31.56,
+                adHocDestinationLatitudeSnapshot: null,
+                adHocDestinationLongitudeSnapshot: null,
+                items: [
+                  {
+                    id: 'item-1',
+                    productId: null,
+                    productNameSnapshot: null,
+                    productImageUrlSnapshot: null,
+                    quantity: 1,
+                    unitPriceMinor: null,
+                    optionsSnapshot: [],
+                    notes: null,
+                    pricingUnitSnapshot: null,
+                    requestedWeightGrams: null,
+                    actualWeightGrams: null,
+                    estimatedAmountMinor: null,
+                    finalAmountMinor: null,
+                    freeTextDescriptionSnapshot: 'عايز 2 كيلو رز بسمتي',
+                    imageUrlsSnapshot: ['https://cdn/rice.jpg'],
+                  },
+                ],
+              },
+            ],
+          }),
+        ],
+      });
+
+      const details = await service.getForCustomer('customer-1', 'order-1');
+      const segment = details.segments[0];
+
+      expect(segment.adHocPlaceNameSnapshot).toBe('كارفور بلبيس');
+      expect(segment.adHocServiceTypeSnapshot).toBe('BUY_FROM_PLACE');
+      expect(segment.adHocPickupLatitudeSnapshot).toBe(30.42);
+      expect(segment.adHocPickupLongitudeSnapshot).toBe(31.56);
+      expect(segment.adHocDestinationLatitudeSnapshot).toBeNull();
+      expect(segment.adHocDestinationLongitudeSnapshot).toBeNull();
+      expect(segment.items[0].freeTextDescriptionSnapshot).toBe('عايز 2 كيلو رز بسمتي');
+      expect(segment.items[0].imageUrlsSnapshot).toEqual(['https://cdn/rice.jpg']);
+    },
+  );
+
   it('Customer Order Details exposure fix: a normal catalog item exposes actualAmountMinor as null (unchanged unitPriceMinor path)', async () => {
     const { service } = buildHarness({
       orders: [
@@ -465,7 +524,7 @@ describe('CustomerOrdersService — PD-006 views', () => {
 
   it.each([
     ['active', [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP, OrderStatus.ASSIGNED_TO_DRIVER, OrderStatus.PICKED_UP, OrderStatus.ON_THE_WAY]],
-    ['completed', [OrderStatus.DELIVERED]],
+    ['completed', [OrderStatus.DELIVERED, OrderStatus.COLLECTED]], // U2: a collected pickup order is completed
     ['cancelled', [OrderStatus.CANCELLED, OrderStatus.FAILED_DELIVERY]],
   ] as const)('the "%s" tab lists exactly its own statuses', async (tab, statuses) => {
     const everyStatus = Object.values(OrderStatus);
@@ -548,6 +607,7 @@ describe('CustomerOrdersService — PD-006 views', () => {
       additionalVendorFeeMinor: 500,
       additionalVendorChargeMinor: 500,
       vendorCount: 2,
+      pricingSource: 'DISTANCE',
       distanceMeters: 3500,
       frozenTotalFeeMinor: 2500,
       vendors: [{ vendorBranchId: 'b1', distanceToCustomerMeters: 3000 }, { vendorBranchId: 'b2', distanceToCustomerMeters: 1000 }],
@@ -597,4 +657,28 @@ describe('CustomerOrdersService — PD-006 views', () => {
     const { service } = buildHarness({ orders: [makeOrder({ customerId: 'someone-else', segments: [seg()] })] });
     await expect(service.trackForCustomer('customer-1', 'order-1')).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it(
+    'Standalone Hatly Service milestone: tracking falls back to the frozen place name for an AD_HOC_SERVICE ' +
+      "segment (no vendorNameSnapshot/vendorBranchId exist for it) — never a blank vendor name",
+    async () => {
+      const { service } = buildHarness({
+        orders: [
+          makeOrder({
+            segments: [
+              seg({
+                groupType: 'AD_HOC_SERVICE',
+                vendorBranchId: null,
+                subtotalMinor: null,
+                adHocPlaceNameSnapshot: 'صيدلية النور',
+              }),
+            ],
+          }),
+        ],
+      });
+
+      const t = await service.trackForCustomer('customer-1', 'order-1');
+      expect(t.segments[0].vendorName).toBe('صيدلية النور');
+    },
+  );
 });

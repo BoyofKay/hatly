@@ -1,6 +1,8 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../shared_widgets/hatly_state_view.dart';
+import '../localization/l10n/app_localizations.dart';
 import '../../features/auth/presentation/session_controller.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/phone_entry_screen.dart';
@@ -10,7 +12,6 @@ import '../../features/search/presentation/search_screen.dart';
 import '../../features/vendors/presentation/vendor_list_screen.dart';
 import '../../features/vendors/presentation/vendor_details_screen.dart';
 import '../../features/products/presentation/product_details_screen.dart';
-import '../../features/catalog/presentation/category_products_screen.dart';
 import '../../features/catalog/presentation/catalog_product_details_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
 import '../../features/orders/presentation/order_details_screen.dart';
@@ -20,7 +21,11 @@ import '../../features/checkout/presentation/checkout_screen.dart';
 import '../../features/checkout/presentation/transfer_instructions_screen.dart';
 import '../../features/addresses/presentation/address_selection_screen.dart';
 import '../../features/addresses/presentation/add_address_screen.dart';
+import '../../features/addresses/presentation/my_addresses_screen.dart';
 import '../../features/addresses/domain/saved_address.dart';
+import '../../features/hatly_service/presentation/hatly_service_screen.dart';
+import '../../features/wallet/presentation/wallet_screen.dart';
+import '../../features/loyalty/presentation/loyalty_screen.dart';
 
 /// Route table for the customer app.
 ///
@@ -57,6 +62,20 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           path == '/splash' || path == '/phone' || path == '/otp';
       return onAuthFlow ? '/' : null;
     },
+    // Polish pass: go_router's own default error page is unstyled and
+    // English-only. A deep link (e.g. from a push notification) can carry
+    // a server-supplied route that no longer matches any route here, so
+    // this needs to be a real, on-brand, localized fallback rather than
+    // relying on go_router's default.
+    errorBuilder: (context, state) => Scaffold(
+      appBar: AppBar(),
+      body: HatlyStateView(
+        icon: Icons.error_outline,
+        title: AppLocalizations.of(context).routeNotFoundTitle,
+        retryLabel: AppLocalizations.of(context).checkoutSuccessBackHome,
+        onRetry: () => context.go('/'),
+      ),
+    ),
     routes: [
       GoRoute(
           path: '/splash', builder: (context, state) => const SplashScreen()),
@@ -69,6 +88,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
           path: '/search', builder: (context, state) => const SearchScreen()),
       GoRoute(path: '/cart', builder: (context, state) => const CartScreen()),
+      // Standalone Hatly Service — NOT attached to any vendor catalog
+      // (see hatly_service_screen.dart's own doc comment for how this
+      // differs from the Vendor/Pharmacy Custom Request, which has no
+      // route of its own — it is a bottom sheet reached from a vendor
+      // branch screen instead).
+      GoRoute(
+        path: '/hatly-service',
+        builder: (context, state) => const HatlyServiceScreen(),
+      ),
       GoRoute(
         path: '/vendors',
         builder: (context, state) {
@@ -84,14 +112,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return VendorDetailsScreen(vendorId: vendorId);
         },
       ),
-      // Category tap (Home / Explore) → product-first listing of the sector.
-      GoRoute(
-        path: '/category-products',
-        builder: (context, state) => CategoryProductsScreen(
-          sectorId: state.uri.queryParameters['sectorId'] ?? '',
-          sectorName: state.uri.queryParameters['sectorName'],
-        ),
-      ),
+      // Category tap (Home / Explore / search) is vendor-first — see `categoryListingRoute()` — and
+      // resolves to `/vendors` above, not a dedicated category route. No product-first category
+      // entry point exists anywhere in this router, deliberately (universal marketplace rule).
       // A marketplace (catalog) product and the stores that sell it.
       GoRoute(
         path: '/catalog-products/:id',
@@ -134,6 +157,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/checkout/address',
         builder: (context, state) => const AddressSelectionScreen(),
+      ),
+      // Profile — My Addresses. A separate screen/route from
+      // `/checkout/address` (Checkout's own select-and-pop flow) —
+      // see MyAddressesScreen's own doc comment for why.
+      GoRoute(
+        path: '/profile/addresses',
+        builder: (context, state) => const MyAddressesScreen(),
+      ),
+      // Profile — Wallet.
+      GoRoute(
+        path: '/profile/wallet',
+        builder: (context, state) => const WalletScreen(),
+      ),
+      // Profile — Loyalty (consolidated customer-commerce milestone, Parts C/D).
+      GoRoute(
+        path: '/profile/loyalty',
+        builder: (context, state) => const LoyaltyScreen(),
       ),
       GoRoute(
         path: '/addresses/add',

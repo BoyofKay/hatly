@@ -26,6 +26,9 @@ String orderStatusLabel(BuildContext context, String status) {
       return l10n.orderStatusOnTheWay;
     case 'DELIVERED':
       return l10n.orderStatusDelivered;
+    // U2: a pickup order the customer collected at the branch — completed, like a delivered order.
+    case 'COLLECTED':
+      return l10n.orderStatusCollected;
     case 'CANCELLED':
       return l10n.orderStatusCancelled;
     case 'FAILED_DELIVERY':
@@ -35,24 +38,14 @@ String orderStatusLabel(BuildContext context, String status) {
   }
 }
 
-Color _orderStatusColor(String status) {
-  switch (status) {
-    case 'DELIVERED':
-      return HatlyColors.success;
-    case 'CANCELLED':
-    case 'FAILED_DELIVERY':
-      return HatlyColors.error;
-    default:
-      return HatlyColors.primaryOrange;
-  }
-}
-
-/// Same mapping from the theme palette (`success` / `urgent` / `accent` — identical to the fixed colours above in
-/// Light Mode, but readable on a dark surface).
-Color _orderStatusPaletteColor(BuildContext context, String status) {
+/// Maps a status to its palette colour (`success` / `urgent` / `accent`) —
+/// identical to the app's legacy fixed colours in Light Mode, but readable
+/// on a dark surface in Dark Mode too.
+Color _orderStatusColor(BuildContext context, String status) {
   final p = context.palette;
   switch (status) {
     case 'DELIVERED':
+    case 'COLLECTED':
       return p.success;
     case 'CANCELLED':
     case 'FAILED_DELIVERY':
@@ -63,25 +56,28 @@ Color _orderStatusPaletteColor(BuildContext context, String status) {
 }
 
 class OrderStatusBadge extends StatelessWidget {
-  const OrderStatusBadge(
-      {super.key, required this.status, this.themeAware = false});
+  const OrderStatusBadge({super.key, required this.status});
 
   final String status;
 
-  /// Off by default: screens still on legacy light-only surfaces (the Orders list) keep the fixed colours. Order
-  /// Details sits on palette surfaces, so it opts in to theme-aware colours.
-  final bool themeAware;
-
   @override
   Widget build(BuildContext context) {
-    final color = themeAware
-        ? _orderStatusPaletteColor(context, status)
-        : _orderStatusColor(status);
+    // Dark Mode cleanup: every call site (Orders list, Order Details,
+    // Tracking) already opted in to the theme-aware colour via the old
+    // `themeAware: true` parameter, so the parameter and the legacy fixed-
+    // colour branch it gated are now dead code — removed rather than kept
+    // as an unused second code path.
+    final color = _orderStatusColor(context, status);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+          horizontal: HatlySpacing.sm, vertical: HatlySpacing.xs),
+      // Polish pass: radius was a literal `12`, diverging from
+      // `HatlyRadius.badge` (8) — the shared `HatlyBadge` widget already
+      // uses the correct token. `withOpacity` (deprecated) -> `withValues`,
+      // matching the rest of this feature (checkout_screen.dart etc).
       decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(12)),
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(HatlyRadius.badge)),
       child: Text(
         orderStatusLabel(context, status),
         style:

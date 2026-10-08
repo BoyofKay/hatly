@@ -9,6 +9,7 @@ import {
   listServiceAreas,
   updateServiceArea,
 } from '../../../lib/api/admin-service-areas';
+import { apiErrorMessage } from '../../../lib/api/errors';
 
 /**
  * Real Admin ServiceArea management — consumes the Phase I-B backend
@@ -33,7 +34,7 @@ export default function ServiceAreasPage() {
     try {
       setAreas(await listServiceAreas());
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to load service areas.');
+      setError(apiErrorMessage(err, 'Failed to load service areas.'));
     }
   }
 
@@ -62,7 +63,7 @@ export default function ServiceAreasPage() {
       setShowCreateForm(false);
       await refresh();
     } catch (err: any) {
-      setCreateError(err?.response?.data?.message ?? 'Failed to create service area.');
+      setCreateError(apiErrorMessage(err, 'Failed to create service area.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -74,7 +75,7 @@ export default function ServiceAreasPage() {
       area.isActive ? await deactivateServiceArea(area.id) : await activateServiceArea(area.id);
       await refresh();
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to update service area.');
+      setError(apiErrorMessage(err, 'Failed to update service area.'));
     }
   }
 
@@ -85,7 +86,7 @@ export default function ServiceAreasPage() {
       await updateServiceArea(area.id, { name: newName });
       await refresh();
     } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Failed to rename service area.');
+      setError(apiErrorMessage(err, 'Failed to rename service area.'));
     }
   }
 

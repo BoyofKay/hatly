@@ -73,7 +73,8 @@ class _Content extends StatelessWidget {
         ),
         const SizedBox(height: HatlySpacing.sm),
         Text(orderNumberTag(tracking.orderNumber),
-            key: const Key('tracking-order-number'), style: context.type.caption),
+            key: const Key('tracking-order-number'),
+            style: context.type.caption),
         if (tracking.status == 'CANCELLED' &&
             tracking.cancellationReason != null) ...[
           const SizedBox(height: HatlySpacing.md),
@@ -119,8 +120,7 @@ class _Content extends StatelessWidget {
                           HatlyTrailingRow(
                             leading: Text(segment.vendorName ?? '',
                                 style: context.type.title),
-                            trailing: OrderStatusBadge(
-                                status: segment.status, themeAware: true),
+                            trailing: OrderStatusBadge(status: segment.status),
                           ),
                           if (_showPrep(tracking, segment)) ...[
                             const SizedBox(height: HatlySpacing.xs),

@@ -18,4 +18,10 @@ export enum OrderStatus {
    * FailedDeliveryService), never inferred from the status alone.
    */
   FAILED_DELIVERY = 'FAILED_DELIVERY',
+  /**
+   * U2 (approved): a PICKUP order the customer collected at the branch — the pickup counterpart of DELIVERED, which stays
+   * delivery-only (it carries driver commission, proof of delivery and the driver's cash). Terminal. Reached only from
+   * READY_FOR_PICKUP, only for a PICKUP order, confirmed by the branch's vendor staff (Admin as support fallback).
+   */
+  COLLECTED = 'COLLECTED',
 }

@@ -390,6 +390,145 @@ question for a future milestone: should Hatly periodically retry ANY orphaned `R
 freshly-ready or freshly-timed-out ones? Not decided here — no new retry-business-rule was invented to fill this
 gap.
 
+### PD-009 — Delivery Zones (V1 serviceability + pricing without geocoding) and zone-based Hatly Service pricing
+
+Status: **APPROVED — IMPLEMENTED** (backend, Admin Dashboard, customer app, driver app). Migrations
+`1700005000000-DeliveryZones` and `1700005100000-HatlyServiceDeliveryFeeMultiplier` (additive, reversible).
+**Amends PD-006.A** (the map pin is no longer mandatory) and **supersedes the Phase F Hatly Service formula**.
+
+**A. Delivery Zone.** A named local delivery area (e.g. "بلبيس — أبو نصيب") inside an existing **Service Area**: governorate,
+city, name (EN + AR), active flag, **delivery fee in integer minor units** (`bigint`, ≥ 0), display order, and an OPTIONAL
+representative point that is **metadata only** — never used for pricing or containment, and never invented (both NULL or both
+set). Zones are deactivated, never deleted. Admin: `admin/delivery-zones` — `MANAGE_SERVICE_AREAS` for list/edit/order/point/
+activate/deactivate; creating a zone or changing its fee **also** needs `MANAGE_DELIVERY_FEE_MULTIPLIER` (the existing delivery-
+pricing permission). Customers: read-only `GET /delivery-zones` (active zones of active service areas).
+
+**B. Saved address.** Every new/edited address carries the `deliveryZoneId` the customer **selected** (must be active); a detailed
+free-form address (`line1`) is required; building / floor / apartment / landmark / label are optional; **the map pin is optional**
+(latitude + longitude as a pair). Governorate and city are **derived from the zone** by the server. Addresses saved before zones
+keep `delivery_zone_id = NULL` and are **never guessed into a zone** — the app asks the customer to choose one
+(`zoneStatus: MISSING`); an address whose zone was deactivated reports `UNAVAILABLE`. Geocoding stays assistive only.
+
+**C. Serviceability and the delivery fee (server-authoritative).**
+| Address | Serviceability | Base delivery fee |
+|---|---|---|
+| has a map pin | the existing service-area radius check (unchanged) | the existing `max(minimum, distance fee)` (unchanged) |
+| no pin, **active** zone | the zone (its service area restricts branches exactly like a pin's area) | **the zone's fee** |
+| no pin, no zone | `ADDRESS_ZONE_REQUIRED` | — |
+| zone inactive / deleted / its service area inactive | `DELIVERY_ZONE_UNAVAILABLE` (also when a pin exists — no fallback zone) | — |
+
+`total = baseFee + additionalVendorFee × (vendorCount − 1)` — the ONE existing `composeDeliveryFee` formula for both sources, so
+partial vendor cancellation (PD-002/PD-003) works unchanged off the frozen breakdown. The quote fingerprint includes the zone,
+its **current fee** and the pricing source: changing the zone, or an admin changing the zone's fee, makes an earlier quote stale
+(`QUOTE_STALE`) — a fee is never silently kept. A zone price has no distance and no travel ETA (none is invented).
+
+**D. Hatly Service — ZONE-BASED (amended).** **Hatly Service fee = the address's ACTIVE Delivery Zone fee ×
+`HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER`.** The active zone is the ONLY serviceability and pricing source for Hatly Service:
+coordinates are optional and never take part in the price (a pinned and a pin-less address in the same zone pay the same; a pin
+outside every service-area radius changes nothing). No zone → `ADDRESS_ZONE_REQUIRED` (also for a pinned legacy address — there
+is no fallback to distance pricing); inactive zone → `DELIVERY_ZONE_UNAVAILABLE`. The customer's own place stays required by type
+(BUY_FROM_PLACE pickup / DELIVER_TO_PLACE destination — never a Hatly default). The multiplier is a Business Config value
+(positive, ≤ 10, ≤ 4 decimals, validated on write); its approved default **1.5** is seeded as data by migration — never a
+constant in code; unset fails closed. `HATLY_SERVICE_DISTANCE_MULTIPLIER` is retired and read by nothing. The quote shows both
+parts (`delivery.hatlyService = { zoneDeliveryFeeMinor, multiplier }`); a quote becomes stale when the zone fee changes
+(`INPUTS_CHANGED`) or the multiplier changes (`AMOUNTS_CHANGED`). COD-only / unpriced-order payment rules are unchanged.
+Dispatch: no location is invented — a BUY_FROM_PLACE order is ranked from the customer's chosen place; a DELIVER_TO_PLACE order
+from a pin-less address has no point to rank from and is left to manual dispatch.
+
+**E. Snapshots.** The order's `delivery_address_snapshot` freezes the zone (`deliveryZoneId` + `deliveryZone` names, city,
+governorate) and the written address / coordinates when present; the delivery breakdown freezes `pricingSource`,
+`zoneDeliveryFeeMinorUsed` (and, for Hatly Service, `multiplierUsed` + `chargeMinor`). Renaming, re-pricing or
+deactivating a zone, or changing the multiplier, never changes a placed order. Customer / admin / driver views show
+"المدينة — المنطقة" before the written address; the driver app shows no Maps button when there is no pin.
+
+**F. Dev seed.** `npm run seed:dev-delivery-zones` — `hatly_dev` only, idempotent, additive. Seeds **Abu Naseeb / أبو نصيب**
+(the only Belbeis area name verified for this project); further areas are added by an admin (or a `DEV_DELIVERY_ZONES_FILE`).
+No coordinates are seeded; the fee defaults to the configured minimum delivery fee.
+
+### PD-010 — Pickup completion (U2) and redispatch after a driver hand-back (U3)
+
+Status: **APPROVED — IMPLEMENTED** (backend + dashboard + customer app). Migration `1700005300000-OrderStatusCollected`
+(adds `COLLECTED` to `orders_status_enum`; `down` is a no-op, same convention as `OrderStatusFailedDelivery`).
+
+**A. Pickup completion (U2)**
+1. **State.** `READY_FOR_PICKUP → COLLECTED`, terminal (no transition out of it). Only a `PICKUP` order can be collected
+   (`409 NOT_A_PICKUP_ORDER`); `DELIVERED` stays delivery-only. A pickup order can never reach `ASSIGNED_TO_DRIVER` through
+   any endpoint (`409 PICKUP_ORDER_NOT_DISPATCHABLE`, enforced in the state machine under the order lock).
+2. **Actor.** The branch's vendor staff (`VENDOR` / `VENDOR_MANAGER`, ownership checked by branch — another branch gets the
+   same 404 as a non-existent order); an `ADMIN` holding `MANAGE_ORDER_ISSUES` as the support fallback (the existing rule
+   for an admin moving an order); `SUPER_ADMIN`. Customers and drivers cannot. Immediate — no OTP, QR or proof.
+3. **At COLLECTED** (same mechanisms as a delivery order, nothing parallel): `VENDOR_COMMISSION_RECOGNIZED` per segment —
+   same rate rule and idempotency key (`vendor-commission:{segmentId}`) as at a delivery's `PICKED_UP`, so it is booked at
+   most once; loyalty earning (inside the transition's transaction, like `DELIVERED`); best-selling counts; customer push
+   `ORDER_COLLECTED`. Nothing driver-side: no driver commission, no reimbursement, no proof of delivery, no cash remainder.
+4. **Weighed items.** The existing "weight recorded before it is finally picked up" gate applies to `COLLECTED` too.
+5. **Payment.** A **new** pickup order is cash at the counter only (`COD`): Wallet, Manual Transfer and Pay at Delivery are
+   not offered by the quote and refused by the server (`400 PICKUP_CASH_ONLY`). Existing pickup orders keep their method.
+6. **Never collected.** Unchanged: the vendor (or an admin) cancels it at `READY_FOR_PICKUP`.
+7. **Derived (no new rule):** `COLLECTED` is listed with `DELIVERED` wherever the meaning is "the customer received the
+   order": the customer's "completed" tab, the ETA (no countdown), vendor/product ratings (driver rating stays
+   delivery-only — there is no driver), segment locking and weight-recording closure.
+
+**B. Redispatch after a driver hand-back (U3)**
+1. When a **driver** hands an assigned order back (`ASSIGNED_TO_DRIVER → READY_FOR_PICKUP`, driver app or the generic
+   endpoint), automatic dispatch makes **one immediate attempt** — only while `AUTOMATIC_DISPATCH_ENABLED` — through the
+   existing `attemptAutomaticDispatch` (same ranking, atomic assignment, locks, push, alerts).
+2. The releasing driver is **excluded from that attempt only** (no blacklist, no cooldown); the ranking itself is unchanged.
+3. Nobody else eligible → the existing `NO_ELIGIBLE_DRIVER` alert; the order waits for an admin. No delay, no retry loop.
+4. `reassignmentCount` is not incremented (same as a timeout re-assignment); it counts admin reassignments.
+5. An admin who assigns it first wins (the attempt stops on `ORDER_NOT_ASSIGNABLE`); a failure of the attempt never fails
+   the driver's request (logged; the order stays visible as "released" in the Control Tower).
+6. Not changed: an admin-initiated release, and the timeout sweep (PD-008, which may legitimately re-pick the same driver).
+
+**C. Technical note.** A driver's status change re-checks delivery ownership under the order lock (Operational Completion
+milestone), so a driver who was just reassigned away can never advance the order.
+
+### Control Tower milestone — operational hardening (technical; no new business rule)
+
+Status: **IMPLEMENTED**. Migration `1700005200000-DriverAvailabilityReflectsActiveDelivery` (data correction).
+
+- **Admin Control Tower** (`/control-tower`; read-only `admin/control-tower/summary|deliveries` need `VIEW_ORDERS`, the dispatcher
+  driver picker `admin/control-tower/drivers` needs `ASSIGN_REASSIGN_ORDERS`). Every figure is a query over existing data — no new
+  state, no polling, no retry rule. "Waiting without a dispatch alert" is reported as a fact (it includes the PD-008 orphan
+  case); no automatic retry interval was introduced. `/dispatch` now forwards to it.
+- **Assignment is atomic.** Order status check, driver lock-out, delivery row, alert resolution and the
+  `READY_FOR_PICKUP → ASSIGNED_TO_DRIVER` transition are one transaction (previously a refused assignment could leave a driver
+  locked out and the delivery pointing at an un-notified driver). **Reassignment** validates everything first and releases +
+  re-assigns in one transaction; refusals change nothing (`ORDER_NOT_REASSIGNABLE`, `DRIVER_UNAVAILABLE`,
+  `DRIVER_ALREADY_ASSIGNED`, and `ASSIGNMENT_CHANGED` when the caller's `expectedCurrentDriverId` is stale).
+- **DispatchAlert** is now resolved by the assignment that fixes it (its documented contract; nothing set `resolvedAt` before).
+- **A released order** (back to `READY_FOR_PICKUP`) no longer reports the driver it was released from.
+- **`OVERRIDE_DISPATCH` for SUPER_ADMIN**: in-handler permission checks now apply the guard's rule (SUPER_ADMIN holds all).
+- **Driver availability** = "has no active delivery": a new driver is available (previously defaulted false, so admin-created
+  drivers could never be dispatched); existing rows realigned by migration.
+- **PICKUP orders are never assigned a driver** (PD-006.C: the customer collects them; no address) — neither automatically nor
+  manually. **Open product question (not decided here):** the state machine has no "customer collected" step, so a PICKUP order
+  has no defined completion after `READY_FOR_PICKUP` (see U2). **Resolved by PD-010.**
+
+### Operational Completion milestone (technical; no new business rule)
+
+Status: **IMPLEMENTED**. No migration.
+
+- **Driver-row writes are column-targeted.** The location heartbeat, online toggle, verification, commission rate and vehicle
+  type used to `save()` the whole driver row read moments earlier — a concurrent assignment's `is_available = false` was then
+  written back to `true` (a busy driver offered new orders). Each writer now updates only its own column(s).
+- **A driver's status change re-checks ownership under the order lock** (`OrderTransitionParams.actingDriverId`, Order → Delivery
+  lock order). Before, a driver whose order an admin reassigned at that instant could still move it (reproduced: `PICKED_UP`
+  by the old driver while the delivery named the new one).
+- **Released orders are visible, not retried.** An order back at `READY_FOR_PICKUP` because its driver was released (driver
+  hand-back, or the timeout sweep) is flagged on its Control Tower row (`released: { at, byRole }`, from its status history),
+  filterable (`?releasedOnly=true`), and counted under "needs attention" when no open alert carries it
+  (`releasedAwaitingManualAssignment`). No retry was added in this milestone (U3). **Superseded by PD-010 B:** a driver
+  hand-back now gets one immediate redispatch without that driver; the flag/count still show what is left waiting.
+- **Driver vehicle type** is managed by an admin with `MANAGE_DRIVERS` (`PATCH admin/drivers/:id/vehicle-type`, `null` clears;
+  the active catalog for the picker: `GET admin/drivers/vehicle-types`). Only an existing, **active** `vehicle_types` row can be
+  given; no category is invented. It stays **optional for dispatch** (only an `isBicycle` type is distance-limited, at ranking
+  time); a change applies from the next ranking and never revisits an assignment already made.
+- **Pickup orders are findable**: admin order search filters by `fulfillmentType`; the Control Tower's "pickup orders ready"
+  count opens that list. They are still never assigned a driver (completion: PD-010 A).
+- **Error messages**: Vendor pages and the login page read the backend error envelope. Login keeps "Invalid phone number or
+  password." for a 401 only; a 429 (rate limit / account lock) now says so instead of claiming the password was wrong.
+
 ---
 
 ## Derived rules to CONFIRM before implementation (not part of the locked text above)
@@ -414,6 +553,8 @@ none of them changes what is locked above.
 | ID | Edge case | Why it is open |
 |---|---|---|
 | U1 | A vendor cancellation leaves **zero** active Vendor Segments (the last active segment is cancelled). | PD-002 says the Order is not automatically cancelled because *one* vendor cancelled, but with nothing left to fulfil, whether the Order is cancelled, how the Delivery Fee and any payment are refunded, and what the customer is told are **undecided**. Current behaviour (Group 8, unchanged): the Order simply stays in its status with no active segment, and nothing advances it. |
+| U2 | ~~Completion of a PICKUP order~~ | **RESOLVED — PD-010 A.** |
+| U3 | ~~Automatic retry of a released order~~ | **RESOLVED — PD-010 B** (driver hand-back). A timeout release keeps PD-008's own behaviour. |
 
 ---
 

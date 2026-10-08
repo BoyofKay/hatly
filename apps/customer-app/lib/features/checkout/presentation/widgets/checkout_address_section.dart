@@ -22,6 +22,11 @@ class CheckoutAddressSection extends StatelessWidget {
         return l10n.checkoutAddressVendorDoesNotDeliver;
       case 'VENDOR_OUTSIDE_DELIVERY_AREA':
         return l10n.checkoutAddressVendorOutsideArea;
+      // PD-009: a pin-less address needs its delivery zone; a deactivated zone is never silently replaced.
+      case 'ADDRESS_ZONE_REQUIRED':
+        return l10n.checkoutAddressZoneRequired;
+      case 'DELIVERY_ZONE_UNAVAILABLE':
+        return l10n.checkoutAddressZoneUnavailable;
       default:
         return l10n.checkoutAddressOutOfServiceArea;
     }
@@ -119,7 +124,8 @@ class CheckoutAddressSection extends StatelessWidget {
                                 ],
                               ],
                             ),
-                            for (final line in snapshot.detailLines)
+                            for (final line in snapshot.detailLinesFor(
+                                Localizations.localeOf(context).languageCode == 'ar'))
                               Text(line, style: context.type.small),
                             if (snapshot.instructions?.isNotEmpty == true)
                               Text(snapshot.instructions!,

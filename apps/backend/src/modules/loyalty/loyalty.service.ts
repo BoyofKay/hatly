@@ -17,6 +17,13 @@ import { RequestContextService } from '../../common/request-context/request-cont
 import { logBusinessEvent } from '../../common/logging/log-business-event';
 import { BusinessEvent } from '../../common/logging/business-events';
 
+// Loyalty Balance/History (consolidated customer-commerce milestone). Same contract as
+// WalletService.listTransactionsForCustomer/CustomerOrdersService.listForCustomer — no new
+// pagination shape invented.
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 50;
+
 /**
  * Loyalty Ledger Foundation (Chunk A). CONFIRMED scope: this service
  * only creates ledger rows and derives a balance from them — it
@@ -113,6 +120,32 @@ export class LoyaltyService {
   async getBalance(customerId: string): Promise<number> {
     const transactions = await this.loyaltyTransactionsRepository.find({ where: { customerId } });
     return transactions.reduce((sum, t) => sum + t.pointsDelta, 0);
+  }
+
+  /**
+   * Loyalty Balance/History (consolidated customer-commerce
+   * milestone) — paginated ledger history for the customer's own
+   * `LoyaltyController`. Mirrors `WalletService.
+   * listTransactionsForCustomer` exactly (same DEFAULT_PAGE/
+   * DEFAULT_LIMIT/MAX_LIMIT, same `findAndCount` + newest-first
+   * ordering, same `{data, page, limit, total}` shape) — no second
+   * pagination convention invented.
+   */
+  async listTransactionsForCustomer(
+    customerId: string,
+    params: { page?: number; limit?: number },
+  ): Promise<{ data: LoyaltyPointsTransaction[]; page: number; limit: number; total: number }> {
+    const page = params.page && params.page > 0 ? params.page : DEFAULT_PAGE;
+    const limit = params.limit && params.limit > 0 ? Math.min(params.limit, MAX_LIMIT) : DEFAULT_LIMIT;
+
+    const [data, total] = await this.loyaltyTransactionsRepository.findAndCount({
+      where: { customerId },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { data, page, limit, total };
   }
 
   /**
@@ -276,17 +309,26 @@ export class LoyaltyService {
    * the injected repository) so two concurrent requests can never both
    * observe the same pre-lock balance and both succeed.
    *
-   * MINIMUM CONVERSION: derived from the SAME configured rate used for
-   * the amount calculation (`pointsPerEgp`) — CONFIRMED, not a second,
-   * independently-hardcoded "100" that could drift out of sync if the
-   * rate ever changes. "Convert at least enough points to produce 1
-   * EGP" is definitionally `pointsPerEgp` points.
+   * MINIMUM CONVERSION (consolidated customer-commerce milestone,
+   * approved V1 rule): 5 EGP worth of points — `5 * pointsPerEgp`, not
+   * a bare hardcoded "500" independent of the rate, so this stays
+   * correct even if `pointsPerEgp` is ever reconfigured (at the
+   * approved default of 100 points/EGP this is exactly 500 points, the
+   * literal approved number). Distinct from, and now stricter than,
+   * the earlier "at least enough to produce 1 EGP" (`pointsPerEgp`)
+   * rule this replaces.
    *
-   * AMOUNT: `walletCreditMinor = floor(requestedPoints / pointsPerEgp)
-   * * 100` — CONFIRMED, deducts the FULL requested points but credits
-   * only the EGP-clean portion; any leftover fractional-EGP points
-   * value is intentionally forfeited, never rounded up, never
-   * returned.
+   * MULTIPLE-OF-RATE REQUIREMENT (same milestone, approved V1 rule):
+   * `requestedPoints` must be an EXACT multiple of `pointsPerEgp` (100
+   * at the approved default) — REJECTED otherwise, replacing the
+   * earlier behavior of silently accepting any amount above the
+   * minimum and forfeiting its fractional-EGP remainder. A customer
+   * converting a non-multiple now gets a clear, actionable error
+   * instead of unknowingly losing points.
+   *
+   * AMOUNT: `walletCreditMinor = (requestedPoints / pointsPerEgp) *
+   * 100` — always exact now that non-multiples are rejected upfront
+   * (no floor/forfeiture is reachable).
    *
    * RATE SNAPSHOT: recorded as a plain, human-readable `reason` string
    * on both rows (e.g. "Converted 250 points to 200 minor units at
@@ -322,21 +364,57 @@ export class LoyaltyService {
     }
 
     const pointsPerEgp = await this.businessConfigService.getLoyaltyWalletConversionPointsPerEgp();
-    if (requestedPoints < pointsPerEgp) {
+    const minimumPoints = 5 * pointsPerEgp; // approved V1 rule: 5 EGP worth of points (500 at the default 100 pts/EGP)
+    if (requestedPoints < minimumPoints) {
       throw new BadRequestException({
-        message: `A minimum of ${pointsPerEgp} points is required to convert.`,
-        details: { code: 'BELOW_MINIMUM_CONVERSION', minimum: pointsPerEgp },
+        message: `A minimum of ${minimumPoints} points is required to convert.`,
+        details: { code: 'BELOW_MINIMUM_CONVERSION', minimum: minimumPoints },
+      });
+    }
+    if (requestedPoints % pointsPerEgp !== 0) {
+      throw new BadRequestException({
+        message: `The conversion amount must be a multiple of ${pointsPerEgp} points.`,
+        details: { code: 'INVALID_CONVERSION_MULTIPLE', multipleOf: pointsPerEgp },
       });
     }
 
-    const walletCreditMinor = Math.floor(requestedPoints / pointsPerEgp) * 100;
+    const walletCreditMinor = (requestedPoints / pointsPerEgp) * 100;
     const reason = `Converted ${requestedPoints} points to ${walletCreditMinor} minor units at rate ${pointsPerEgp} points = 100 minor units.`;
 
+    // Robustness fix (found while extending this milestone's own tests): a genuine RETRY of the
+    // exact same idempotencyKey, arriving AFTER the first attempt already committed and reduced the
+    // customer's balance, could otherwise see an insufficient CURRENT balance and be wrongly refused
+    // — even though the conversion itself already succeeded. Checking for the existing row FIRST,
+    // before the balance check, mirrors FinancialEventService.record's own "pre-check, then a
+    // race-fallback re-check on 23505" shape (see this class's own top comment) exactly — this is
+    // just the missing "pre-check" half of that same pattern for THIS method.
+    const precheckExisting = await this.loyaltyTransactionsRepository.findOne({ where: { idempotencyKey, customerId } });
+    if (precheckExisting) {
+      logBusinessEvent(this.logger, 'warn', BusinessEvent.LOYALTY_REDEMPTION_DUPLICATE, () => this.requestContextService.getCorrelationId(), {
+        customerId,
+        idempotencyKey,
+      });
+      const pointsBalance = await this.getBalance(customerId);
+      const walletBalance = await this.walletService.getBalance(customerId);
+      return {
+        convertedPoints: Math.abs(precheckExisting.pointsDelta),
+        walletCreditMinor: (Math.abs(precheckExisting.pointsDelta) / pointsPerEgp) * 100,
+        pointsBalance,
+        walletBalance,
+      };
+    }
+
+    let wasNewlyCommitted = false;
     try {
       await this.dataSource.transaction(async (manager) => {
         // Serializes concurrent conversions for THIS customer — see
         // this method's own top comment.
         await manager.findOne(User, { where: { id: customerId }, lock: { mode: 'pessimistic_write' } });
+
+        // Re-checked INSIDE the lock — a concurrent request for the SAME key could have committed
+        // between the pre-check above and acquiring this lock.
+        const existingInsideLock = await manager.findOne(LoyaltyPointsTransaction, { where: { idempotencyKey, customerId } });
+        if (existingInsideLock) return;
 
         const transactions = await manager.find(LoyaltyPointsTransaction, { where: { customerId } });
         const availablePoints = transactions.reduce((sum, t) => sum + t.pointsDelta, 0);
@@ -368,6 +446,7 @@ export class LoyaltyService {
           },
           manager,
         );
+        wasNewlyCommitted = true;
       });
 
       // Business-event log (Group 4). Post-commit only — this method
@@ -379,17 +458,26 @@ export class LoyaltyService {
       // method's own comment for why the transaction owner logs a
       // `wallet.credit`/`wallet.debit` post-commit rather than the
       // thin ledger-write helper it calls mid-transaction.
-      logBusinessEvent(this.logger, 'log', BusinessEvent.LOYALTY_REDEMPTION, () => this.requestContextService.getCorrelationId(), {
-        customerId,
-        pointsRedeemed: requestedPoints,
-        walletCreditMinor,
-        idempotencyKey,
-      });
-      logBusinessEvent(this.logger, 'log', BusinessEvent.WALLET_CREDIT, () => this.requestContextService.getCorrelationId(), {
-        customerId,
-        amountDeltaMinor: walletCreditMinor,
-        type: WalletTransactionType.LOYALTY_REDEMPTION,
-      });
+      if (wasNewlyCommitted) {
+        logBusinessEvent(this.logger, 'log', BusinessEvent.LOYALTY_REDEMPTION, () => this.requestContextService.getCorrelationId(), {
+          customerId,
+          pointsRedeemed: requestedPoints,
+          walletCreditMinor,
+          idempotencyKey,
+        });
+        logBusinessEvent(this.logger, 'log', BusinessEvent.WALLET_CREDIT, () => this.requestContextService.getCorrelationId(), {
+          customerId,
+          amountDeltaMinor: walletCreditMinor,
+          type: WalletTransactionType.LOYALTY_REDEMPTION,
+        });
+      } else {
+        // The in-lock re-check found it already committed (a genuine concurrent race with another
+        // request for this exact key) — same benign, idempotent outcome as the pre-check above.
+        logBusinessEvent(this.logger, 'warn', BusinessEvent.LOYALTY_REDEMPTION_DUPLICATE, () => this.requestContextService.getCorrelationId(), {
+          customerId,
+          idempotencyKey,
+        });
+      }
     } catch (error: any) {
       if (error?.code === '23505') {
         // A genuine retry of an already-successful conversion —
@@ -426,5 +514,92 @@ export class LoyaltyService {
     const pointsBalance = await this.getBalance(customerId);
     const walletBalance = await this.walletService.getBalance(customerId);
     return { convertedPoints: requestedPoints, walletCreditMinor, pointsBalance, walletBalance };
+  }
+
+  /**
+   * Loyalty Reversal on Post-DELIVERED Refund (consolidated customer-
+   * commerce milestone, approved rule: "If a delivered order is
+   * subsequently refunded/partially refunded, the corresponding
+   * loyalty entitlement must be reversed according to the refunded
+   * eligible merchandise amount").
+   *
+   * CALLED FROM `ManualTransferRefundService.recordRefund` — the ONE
+   * place in this codebase that can record a refund against a payment
+   * with NO order-status gate at all (unlike the automatic partial-
+   * cancellation refund path, or the Failed-Delivery refund path,
+   * both of which only ever apply to an order that never reached
+   * DELIVERED and therefore never earned anything to reverse in the
+   * first place). Always joins the CALLER's own transaction (never
+   * opens its own) — same shape as `awardOrderEarning`.
+   *
+   * PROPORTIONAL, DISCLOSED SIMPLIFICATION: this codebase's data model
+   * does not cleanly separate "refunded eligible merchandise" from
+   * "refunded delivery fee/other charges" within one raw refund
+   * amount (the admin-recorded `amountMinor` is a single number — see
+   * `RecordRefundDto`). Rather than inventing a new breakdown model
+   * (explicitly out of scope — "do not invent a new location model"
+   * applies by the same spirit here: do not invent a new financial
+   * breakdown model), the reversal is proportional to the refund's
+   * share of the order's own frozen `totalMinor`:
+   *   pointsToReverse = floor(originallyEarnedPoints * min(1, refundedAmountMinor / order.totalMinor))
+   * This can never OVER-reverse (the fraction is capped at 1, and the
+   * result is additionally capped at whatever remains un-reversed —
+   * see below), and a full-order refund correctly reverses the FULL
+   * amount originally earned.
+   *
+   * IDEMPOTENT: no-op if this order never earned anything (most
+   * refunds — pre-DELIVERED cancellations — hit exactly this, safely).
+   * No-op if this exact `idempotencyKey` was already used for a
+   * reversal (the SAME unique index REDEMPTION rows already rely on —
+   * see the entity's own doc comment — covers EARNING_REVERSED too,
+   * since it isn't scoped by `type`). Never reverses more than remains
+   * of the original award, even under a hypothetical multiple-partial-
+   * refund sequence (each call sums every prior EARNING_REVERSED row
+   * for this order first).
+   */
+  async reverseEarningForRefund(
+    manager: EntityManager,
+    params: { orderId: string; refundedAmountMinor: number; idempotencyKey: string },
+  ): Promise<void> {
+    if (params.refundedAmountMinor <= 0) return;
+
+    const order = await manager.findOne(Order, { where: { id: params.orderId } });
+    if (!order || order.totalMinor == null || Number(order.totalMinor) <= 0) return;
+
+    const earningTx = await manager.findOne(LoyaltyPointsTransaction, {
+      where: { orderId: params.orderId, type: LoyaltyTransactionType.EARNING },
+    });
+    if (!earningTx) return; // this order never earned anything (e.g. refunded before DELIVERED) — nothing to reverse
+
+    const priorReversals = await manager.find(LoyaltyPointsTransaction, {
+      where: { orderId: params.orderId, type: LoyaltyTransactionType.EARNING_REVERSED },
+    });
+    const alreadyReversedPoints = priorReversals.reduce((sum, t) => sum + Math.abs(t.pointsDelta), 0);
+    const remainingReversiblePoints = earningTx.pointsDelta - alreadyReversedPoints;
+    if (remainingReversiblePoints <= 0) return;
+
+    const fraction = Math.min(1, params.refundedAmountMinor / Number(order.totalMinor));
+    const pointsToReverse = Math.min(remainingReversiblePoints, Math.floor(earningTx.pointsDelta * fraction));
+    if (pointsToReverse <= 0) return;
+
+    try {
+      await this.recordTransaction(
+        {
+          customerId: earningTx.customerId,
+          pointsDelta: -pointsToReverse,
+          type: LoyaltyTransactionType.EARNING_REVERSED,
+          orderId: params.orderId,
+          reason: `Reversed ${pointsToReverse} of ${earningTx.pointsDelta} points earned, for a refund of ${params.refundedAmountMinor} minor units against an order total of ${order.totalMinor}.`,
+          idempotencyKey: params.idempotencyKey,
+        },
+        manager,
+      );
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        // Already reversed for this exact refund (retried call) — benign, idempotent no-op.
+        return;
+      }
+      throw error;
+    }
   }
 }

@@ -22,14 +22,31 @@ import { ElectronicPaymentMethod } from '../../payments/electronic-payment-metho
  * `fulfillmentType`/`orderNote` mirror the same new Cart fields.
  */
 /**
- * The immutable delivery address of an order: coordinates are authoritative; the structured details are what the customer
- * typed; `formattedAddress` is only the map provider's suggestion. Never edited after the order exists.
+ * The Delivery Zone exactly as it was when the order was placed (PD-009). Frozen: renaming / re-pricing / deactivating the zone
+ * later never changes it. The fee that zone contributed is frozen separately in the delivery breakdown.
+ */
+export interface DeliveryZoneSnapshot {
+  id: string;
+  name: string;
+  nameAr: string;
+  city: string;
+  cityAr: string;
+  governorate: string;
+  governorateAr: string;
+}
+
+/**
+ * The immutable delivery address of an order: the map pin (when there is one) is authoritative; the structured details are
+ * what the customer typed; `formattedAddress` is only the map provider's suggestion. PD-009: the pin is optional — an address
+ * without one is located by its Delivery Zone (`deliveryZone`, frozen). Never edited after the order exists.
  */
 export interface DeliveryAddressSnapshot {
   label?: string;
   line1: string;
-  latitude: number;
-  longitude: number;
+  latitude?: number;
+  longitude?: number;
+  deliveryZoneId?: string;
+  deliveryZone?: DeliveryZoneSnapshot;
   instructions?: string;
   governorate?: string;
   city?: string;

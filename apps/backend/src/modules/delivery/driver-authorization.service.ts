@@ -45,4 +45,21 @@ export class DriverAuthorizationService {
     }
     return delivery;
   }
+
+  /**
+   * M4 — same ownership check as `assertOwnsDelivery`, keyed by `orderId` instead of
+   * `deliveryId`. Needed by the generic `PATCH /orders/:id/status` endpoint
+   * (OrdersController), which — unlike DriverController's own
+   * `/driver/deliveries/:id/status` — only ever has the orderId on hand. Used to close
+   * the exact bypass this milestone's Proof-of-Delivery requirement would otherwise
+   * have: a driver could reach DELIVERED via this endpoint without ever going through
+   * DriverOrderActionsService/ProofOfDeliveryService at all.
+   */
+  async getOwnedDeliveryForOrder(driverId: string, orderId: string): Promise<Delivery> {
+    const delivery = await this.deliveriesRepository.findOne({ where: { orderId } });
+    if (!delivery || delivery.driverId !== driverId) {
+      throw new NotFoundException('Delivery not found.');
+    }
+    return delivery;
+  }
 }

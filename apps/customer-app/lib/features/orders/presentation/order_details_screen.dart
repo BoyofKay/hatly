@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/localization/l10n/app_localizations.dart';
+import '../../../core/media/media_url.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/hatly_theme.dart';
 import '../../../core/utils/money_formatter.dart';
@@ -48,12 +49,8 @@ class OrderDetailsScreen extends ConsumerWidget {
     final detailsAsync = ref.watch(orderDetailsProvider(orderId));
 
     return detailsAsync.when(
-      loading: () => Scaffold(
-        appBar: AppBar(title: Text(l10n.orderDetailsTitle)),
-        body: const HatlyLoadingView(),
-      ),
-      error: (error, _) => Scaffold(
-        appBar: AppBar(title: Text(l10n.orderDetailsTitle)),
+      loading: () => const _OrderDetailsScaffold(body: HatlyLoadingView()),
+      error: (error, _) => _OrderDetailsScaffold(
         body: HatlyStateView(
           icon: Icons.error_outline,
           title: l10n.somethingWentWrong,
@@ -61,9 +58,48 @@ class OrderDetailsScreen extends ConsumerWidget {
           onRetry: () => ref.invalidate(orderDetailsProvider(orderId)),
         ),
       ),
-      data: (order) => Scaffold(
-        appBar: AppBar(title: Text(l10n.orderDetailsTitle)),
-        body: _OrderDetailsContent(order: order),
+      data: (order) =>
+          _OrderDetailsScaffold(body: _OrderDetailsContent(order: order)),
+    );
+  }
+}
+
+/// The ONE scaffold of every Order Details state (loading, error, loaded), so Back behaves the same in all of them.
+///
+/// Order Details can be opened as the first route of the stack (a push-notification deep link, a cold start) as well as pushed
+/// from the Orders list or the order-success screen. When there is a route beneath, the framework's own Back arrow (and the
+/// iOS swipe / Android system Back) pops it. When there is NOT, there is nothing to pop: the AppBar shows an explicit Back
+/// arrow that goes Home, and the system Back goes Home too instead of closing the app.
+class _OrderDetailsScaffold extends StatelessWidget {
+  const _OrderDetailsScaffold({required this.body});
+
+  final Widget body;
+
+  void _goHome(BuildContext context) => GoRouter.of(context).go('/');
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final canPop = Navigator.of(context).canPop();
+    return PopScope(
+      canPop: canPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goHome(context);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(l10n.orderDetailsTitle),
+          // With a route beneath, the framework supplies the (RTL-aware) back arrow itself.
+          leading: canPop
+              ? null
+              : IconButton(
+                  key: const Key('order-details-back'),
+                  icon: const BackButtonIcon(),
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  onPressed: () => _goHome(context),
+                ),
+        ),
+        body: body,
       ),
     );
   }
@@ -321,12 +357,21 @@ class _SegmentCard extends ConsumerWidget {
           children: [
             HatlyTrailingRow(
               leading: Text(
-                segment.vendorBranchName ?? l10n.orderItemsTitle,
+                // AD_HOC_SERVICE segments have no vendorBranchName — mirrors
+                // the cart's own `vendorName ?? adHocPlaceName` fallback (see
+                // cart_vendor_section.dart) so the same request "title"
+                // appears throughout cart, checkout and order history.
+                segment.vendorBranchName ??
+                    segment.adHocPlaceNameSnapshot ??
+                    l10n.orderItemsTitle,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              trailing:
-                  OrderStatusBadge(status: segment.status, themeAware: true),
+              trailing: OrderStatusBadge(status: segment.status),
             ),
+            if (segment.isAdHocService) ...[
+              const SizedBox(height: HatlySpacing.xs),
+              _AdHocServiceInfo(segment: segment),
+            ],
             if (segment.hadSubtotalDiscount) ...[
               const SizedBox(height: HatlySpacing.xs),
               Text(
@@ -360,6 +405,7 @@ class _SegmentCard extends ConsumerWidget {
               _OrderItemRow(
                 item: item,
                 orderId: orderId,
+                isHatlyService: segment.isAdHocService,
                 ratingState:
                     _findProductItemRating(productRatingStates, item.id),
               ),
@@ -370,12 +416,68 @@ class _SegmentCard extends ConsumerWidget {
   }
 }
 
+/// Service type + real, set-by-the-customer location for a standalone
+/// Hatly Service segment — reads only the frozen snapshot fields (see
+/// `OrderSegmentDetails`'s own doc comment); shows nothing for a
+/// coordinate pair that was never captured, never a placeholder.
+class _AdHocServiceInfo extends StatelessWidget {
+  const _AdHocServiceInfo({required this.segment});
+
+  final OrderSegmentDetails segment;
+
+  String? _typeLabel(AppLocalizations l10n) {
+    switch (segment.adHocServiceTypeSnapshot) {
+      case 'BUY_FROM_PLACE':
+        return l10n.hatlyServiceTypeBuyFromPlace;
+      case 'DELIVER_TO_PLACE':
+        return l10n.hatlyServiceTypeDeliverToPlace;
+      default:
+        return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final p = context.palette;
+    final typeLabel = _typeLabel(l10n);
+    final hasPickup = segment.adHocPickupLatitudeSnapshot != null &&
+        segment.adHocPickupLongitudeSnapshot != null;
+    final hasDestination = segment.adHocDestinationLatitudeSnapshot != null &&
+        segment.adHocDestinationLongitudeSnapshot != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (typeLabel != null)
+          Text('${l10n.orderHatlyServiceTypeLabel}: $typeLabel',
+              style: context.type.caption.copyWith(color: p.textMuted)),
+        if (hasPickup)
+          Text(
+              '${l10n.orderHatlyServicePickupLocationLabel}: ${l10n.orderHatlyServiceLocationCoordinates}',
+              style: context.type.caption.copyWith(color: p.textMuted)),
+        if (hasDestination)
+          Text(
+              '${l10n.orderHatlyServiceDestinationLocationLabel}: ${l10n.orderHatlyServiceLocationCoordinates}',
+              style: context.type.caption.copyWith(color: p.textMuted)),
+      ],
+    );
+  }
+}
+
 class _OrderItemRow extends ConsumerWidget {
   const _OrderItemRow(
-      {required this.item, required this.orderId, this.ratingState});
+      {required this.item,
+      required this.orderId,
+      this.isHatlyService = false,
+      this.ratingState});
 
   final OrderItemDetails item;
   final String orderId;
+
+  /// The item belongs to a Hatly Service request (not a vendor's own custom request) — only changes the wording of its
+  /// pending-price text.
+  final bool isHatlyService;
   final ProductItemRatingState? ratingState;
 
   @override
@@ -383,6 +485,7 @@ class _OrderItemRow extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final name =
         item.productNameSnapshot ?? item.freeTextDescriptionSnapshot ?? '';
+    final productImageUrl = resolveMediaUrl(item.productImageUrlSnapshot);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: HatlySpacing.sm),
@@ -394,9 +497,9 @@ class _OrderItemRow extends ConsumerWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(HatlyRadius.imageContainer),
-                child: item.productImageUrlSnapshot != null
+                child: productImageUrl != null
                     ? CachedNetworkImage(
-                        imageUrl: item.productImageUrlSnapshot!,
+                        imageUrl: productImageUrl,
                         width: 48,
                         height: 48,
                         fit: BoxFit.cover,
@@ -461,6 +564,8 @@ class _OrderItemRow extends ConsumerWidget {
                         height: 36,
                         child: Row(
                           children: item.imageUrlsSnapshot!
+                              .map(resolveMediaUrl)
+                              .whereType<String>()
                               .map(
                                 (url) => Padding(
                                   padding: const EdgeInsets.only(
@@ -525,15 +630,22 @@ class _OrderItemRow extends ConsumerWidget {
                 // amount, never derived from unitPriceMinor/Order
                 // totals/anything else.
                 LtrText(formatMinorUnits(item.actualAmountMinor!, context))
-              else if (item.productId == null)
-                // Vendor/Pharmacy Custom Request whose final price
-                // isn't known yet — NEVER shown as "0 EGP" or blank.
-                Text(
-                  l10n.cartCustomRequestPricePending,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelLarge
-                      ?.copyWith(color: context.palette.textMuted),
+              else if (item.isPricePending)
+                // A custom request (vendor Custom Request or Hatly Service) whose final price isn't known yet — an explicit
+                // pending state (`priceStatus == 'PENDING'`), NEVER shown as "0 EGP" or blank. A Hatly Service request says
+                // exactly when it will be confirmed.
+                Flexible(
+                  child: Text(
+                    isHatlyService
+                        ? l10n.hatlyServicePricePending
+                        : l10n.cartCustomRequestPricePending,
+                    key: const Key('order-item-price-pending'),
+                    textAlign: TextAlign.end,
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelLarge
+                        ?.copyWith(color: context.palette.textMuted),
+                  ),
                 ),
             ],
           ),
@@ -597,7 +709,14 @@ class _PricingCard extends StatelessWidget {
       child: _OrderSurface(
         child: Column(
           children: [
-            if (order.subtotalMinor != null)
+            // While a Hatly Service price is still pending the server's subtotal is only what is confirmed so far (0 when nothing is):
+            // showing "0" would read as free, so the pending state is shown instead of a number.
+            if (order.hasPendingPricing)
+              OrderInfoRow(
+                  key: const Key('order-subtotal-pending'),
+                  label: l10n.cartSubtotal,
+                  value: l10n.hatlyServicePricePending)
+            else if (order.subtotalMinor != null)
               OrderInfoRow(
                   label: l10n.cartSubtotal,
                   value: formatMinorUnits(order.subtotalMinor!, context),
@@ -632,6 +751,12 @@ class _PricingCard extends StatelessWidget {
                   label: l10n.orderTotalLabel,
                   value: formatMinorUnits(order.totalMinor!, context),
                   ltrValue: true,
+                  bold: true)
+            else if (order.hasPendingPricing)
+              OrderInfoRow(
+                  key: const Key('order-total-pending'),
+                  label: l10n.orderTotalLabel,
+                  value: l10n.hatlyServicePricePending,
                   bold: true),
           ],
         ),
@@ -667,11 +792,12 @@ class _DeliveryBreakdownCard extends StatelessWidget {
                   value:
                       formatMinorUnits(b.additionalVendorChargeMinor, context),
                   ltrValue: true),
-            OrderInfoRow(
-                label: l10n.checkoutBreakdownDistance,
-                value: l10n.checkoutDistanceKm(
-                    (b.distanceMeters / 1000).toStringAsFixed(1)),
-                ltrValue: true),
+            if (b.distanceMeters != null)
+              OrderInfoRow(
+                  label: l10n.checkoutBreakdownDistance,
+                  value: l10n.checkoutDistanceKm(
+                      (b.distanceMeters! / 1000).toStringAsFixed(1)),
+                  ltrValue: true),
           ],
         ),
       ),
@@ -772,7 +898,9 @@ class _AddressCard extends StatelessWidget {
                 children: [
                   if (address.label?.isNotEmpty == true)
                     Text(address.label!, style: context.type.title),
-                  for (final line in address.detailLines)
+                  // The zone as frozen with the order ("بلبيس — أبو نصيب"), then the written address — never an internal id.
+                  for (final line in address.detailLinesFor(
+                      Localizations.localeOf(context).languageCode == 'ar'))
                     Text(line, style: context.type.body),
                   if (address.instructions?.isNotEmpty == true)
                     Text(address.instructions!, style: context.type.small),

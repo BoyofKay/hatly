@@ -6,6 +6,7 @@ import { DriverSettlementPeriod } from './entities/driver-settlement-period.enti
 import { FinancialEvent } from './entities/financial-event.entity';
 import { FinancialEventType } from './financial-event-type.enum';
 import { OrderVendorSegment } from '../orders/entities/order-vendor-segment.entity';
+import { OrderVendorSegmentStatus } from '../orders/order-vendor-segment-status.enum';
 import { CartGroupType } from '../cart/cart-group-type.enum';
 import { BusinessConfigService } from '../business-config/business-config.service';
 
@@ -27,6 +28,39 @@ import { BusinessConfigService } from '../business-config/business-config.servic
  * Dispatch-phase review) — periods are opened and closed on demand by
  * an Admin action, not on an automatic timer. This is the same honest,
  * buildable pattern already used for automatic-dispatch retry.
+ *
+ * M2 (Launch-Readiness Gap Audit, G-13). Two fixes, both additive to
+ * the architecture above:
+ *
+ *  1. The vendor gross-sales query below now excludes CANCELLED
+ *     segments — a cancelled segment was never fulfilled and already
+ *     earns no `VENDOR_COMMISSION_RECOGNIZED` event (see
+ *     `OrderFinancialEventsService.handlePickedUp`'s own identical
+ *     `status !== CANCELLED` filter), so `totalCommissionOwedMinor`
+ *     here was already correct; only the raw-segment `grossSalesMinor`
+ *     query lacked the same filter, silently overstating a vendor's
+ *     gross sales (and, since payable = gross sales - commission,
+ *     overstating the payable too) whenever a segment was cancelled
+ *     within a period.
+ *
+ *  2. `closeVendorPeriod`/`closeDriverPeriod` are now idempotent under
+ *     a genuine concurrent race, using this codebase's own established
+ *     "pre-check, then race-fallback on a unique-constraint violation"
+ *     shape (see `FinancialEventService.record`'s own doc comment,
+ *     which this mirrors exactly). Two concurrent closes for the SAME
+ *     vendor branch / driver read the SAME `previous` row before
+ *     either commits, so both compute the SAME `periodStart` — the
+ *     overlap the audit flagged. A real database-level guarantee (a
+ *     UNIQUE index on `(vendorBranchId, periodStart)` /
+ *     `(driverId, periodStart)` — see the
+ *     `SettlementPeriodConcurrencyIndex` migration) makes the second
+ *     INSERT impossible rather than merely unlikely; its failure
+ *     (Postgres `23505`) is caught here and the already-closed period
+ *     is returned instead of a raw DB error or a duplicate/overlapping
+ *     row — exactly `DriverCashRemainderService.submit`'s own pattern.
+ *     A legitimate sequential close is unaffected: its `periodStart`
+ *     is always the previous period's `periodEnd`, a value no earlier
+ *     period for that vendor branch / driver already used.
  */
 @Injectable()
 export class SettlementService {
@@ -67,23 +101,47 @@ export class SettlementService {
       .createQueryBuilder('s')
       .where('s.vendor_branch_id = :vendorBranchId', { vendorBranchId })
       .andWhere('s.group_type = :groupType', { groupType: CartGroupType.CATALOG })
+      // M2 (audit G-13): a cancelled segment was never fulfilled and
+      // already earns no commission (see this file's own top comment)
+      // — excluded here too, so it can never inflate gross sales.
+      .andWhere('s.status != :cancelledStatus', { cancelledStatus: OrderVendorSegmentStatus.CANCELLED })
       .andWhere('s.created_at >= :start AND s.created_at < :end', { start: periodStart, end: periodEnd })
       .getMany();
     const grossSalesMinor = segments.reduce((sum, s) => sum + (s.subtotalMinor ?? 0), 0);
 
-    return this.vendorPeriodsRepository.save(
-      this.vendorPeriodsRepository.create({
-        vendorBranchId,
-        frequency,
-        periodStart,
-        periodEnd,
-        status: 'CLOSED',
-        grossSalesMinor,
-        totalCommissionOwedMinor,
-        closedAt: periodEnd,
-        closedByUserId,
-      }),
-    );
+    // M2 (audit G-13): pre-check, mirroring FinancialEventService.record — a
+    // period for this exact (vendorBranchId, periodStart) may already exist
+    // if an earlier concurrent call already won the race below.
+    const alreadyClosed = await this.vendorPeriodsRepository.findOne({ where: { vendorBranchId, periodStart } });
+    if (alreadyClosed) {
+      return alreadyClosed;
+    }
+
+    try {
+      return await this.vendorPeriodsRepository.save(
+        this.vendorPeriodsRepository.create({
+          vendorBranchId,
+          frequency,
+          periodStart,
+          periodEnd,
+          status: 'CLOSED',
+          grossSalesMinor,
+          totalCommissionOwedMinor,
+          closedAt: periodEnd,
+          closedByUserId,
+        }),
+      );
+    } catch (error: any) {
+      // Race-fallback: a concurrent call for this same vendor branch committed
+      // first and won the `idx_vendor_settlement_periods_branch_start_unique`
+      // constraint — return ITS period rather than a raw DB error or a
+      // duplicate/overlapping row (see this file's own top comment).
+      if (error?.code === '23505') {
+        const winner = await this.vendorPeriodsRepository.findOne({ where: { vendorBranchId, periodStart } });
+        if (winner) return winner;
+      }
+      throw error;
+    }
   }
 
   async closeDriverPeriod(driverId: string, closedByUserId: string): Promise<DriverSettlementPeriod> {
@@ -123,21 +181,35 @@ export class SettlementService {
 
     const netPayableMinor = totalEarningsMinor - totalCommissionOwedMinor + totalReimbursementsOwedMinor;
 
-    return this.driverPeriodsRepository.save(
-      this.driverPeriodsRepository.create({
-        driverId,
-        frequency,
-        periodStart,
-        periodEnd,
-        status: 'CLOSED',
-        totalEarningsMinor,
-        totalCommissionOwedMinor,
-        totalReimbursementsOwedMinor,
-        netPayableMinor,
-        closedAt: periodEnd,
-        closedByUserId,
-      }),
-    );
+    // M2 (audit G-13): same pre-check/race-fallback shape as closeVendorPeriod above.
+    const alreadyClosed = await this.driverPeriodsRepository.findOne({ where: { driverId, periodStart } });
+    if (alreadyClosed) {
+      return alreadyClosed;
+    }
+
+    try {
+      return await this.driverPeriodsRepository.save(
+        this.driverPeriodsRepository.create({
+          driverId,
+          frequency,
+          periodStart,
+          periodEnd,
+          status: 'CLOSED',
+          totalEarningsMinor,
+          totalCommissionOwedMinor,
+          totalReimbursementsOwedMinor,
+          netPayableMinor,
+          closedAt: periodEnd,
+          closedByUserId,
+        }),
+      );
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        const winner = await this.driverPeriodsRepository.findOne({ where: { driverId, periodStart } });
+        if (winner) return winner;
+      }
+      throw error;
+    }
   }
 
   private async earliestVendorEventDate(vendorBranchId: string): Promise<Date | null> {

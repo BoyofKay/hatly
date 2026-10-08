@@ -10,6 +10,7 @@ import { UsersModule } from '../users/users.module';
 import { BusinessConfigModule } from '../business-config/business-config.module';
 import { SMS_PROVIDER } from './sms-provider.interface';
 import { UnifonicSmsProvider } from './providers/unifonic-sms.provider';
+import { LoginAttemptLimiter } from './login-attempt-limiter';
 
 @Module({
   imports: [UsersModule, PassportModule, JwtModule.register({}), BusinessConfigModule],
@@ -18,6 +19,7 @@ import { UnifonicSmsProvider } from './providers/unifonic-sms.provider';
     AuthService,
     OtpService,
     RefreshTokenStore,
+    LoginAttemptLimiter,
     JwtStrategy,
     UnifonicSmsProvider,
     { provide: SMS_PROVIDER, useClass: UnifonicSmsProvider },

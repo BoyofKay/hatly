@@ -28,6 +28,7 @@ class CartItemRow extends StatelessWidget {
     this.onEdit,
     this.busy = false,
     this.isCustomRequest = false,
+    this.isHatlyService = false,
   });
 
   final CartItem item;
@@ -39,6 +40,9 @@ class CartItemRow extends StatelessWidget {
   final VoidCallback? onEdit;
   final bool busy;
   final bool isCustomRequest;
+
+  /// The line belongs to a Hatly Service request: its pending price says when it will be confirmed.
+  final bool isHatlyService;
 
   @override
   Widget build(BuildContext context) {
@@ -130,7 +134,10 @@ class CartItemRow extends StatelessWidget {
                           ),
                         ),
                       const SizedBox(height: HatlySpacing.xs),
-                      _Price(item: item, unit: unit),
+                      _Price(
+                          item: item,
+                          unit: unit,
+                          isHatlyService: isHatlyService),
                     ],
                   ),
                 ),
@@ -239,10 +246,12 @@ class CartItemRow extends StatelessWidget {
 }
 
 class _Price extends StatelessWidget {
-  const _Price({required this.item, required this.unit});
+  const _Price(
+      {required this.item, required this.unit, this.isHatlyService = false});
 
   final CartItem item;
   final String unit;
+  final bool isHatlyService;
 
   @override
   Widget build(BuildContext context) {
@@ -252,7 +261,11 @@ class _Price extends StatelessWidget {
 
     if (line == null) {
       // The backend uses null for "not priced yet" — never shown as 0 or blank.
-      return Text(l10n.cartCustomRequestPricePending,
+      return Text(
+          isHatlyService
+              ? l10n.hatlyServicePricePending
+              : l10n.cartCustomRequestPricePending,
+          key: const Key('cart-item-price-pending'),
           style: context.type.small);
     }
     if (item.hasOfferPreview) {

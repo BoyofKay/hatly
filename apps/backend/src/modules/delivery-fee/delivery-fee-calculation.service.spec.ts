@@ -247,3 +247,59 @@ describe('DeliveryFeeCalculationService — travel-time estimate frozen with the
     expect(withEta.deliveryFeeMinor).toBe(withoutEta.deliveryFeeMinor);
   });
 });
+
+describe('DeliveryFeeCalculationService.calculateForZone (PD-009)', () => {
+  const cfg = () => buildBusinessConfigService({ REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR: 500 });
+  const zone = { id: 'zone-1', deliveryFeeMinor: 1800 };
+
+  it('single vendor: the zone fee IS the delivery fee — no map call, no distance, no invented ETA', async () => {
+    const mapProvider = { distanceAndEta: jest.fn() };
+    const result = await new DeliveryFeeCalculationService(mapProvider as any, cfg() as any).calculateForZone([{ id: 'b1' }], zone);
+    expect(mapProvider.distanceAndEta).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      pricingSource: 'DELIVERY_ZONE',
+      deliveryZoneId: 'zone-1',
+      zoneDeliveryFeeMinorUsed: 1800,
+      deliveryFeeMinor: 1800,
+      additionalVendorChargeMinor: 0,
+      rawTotalDistanceMeters: null,
+      roundedTotalDistanceMeters: null,
+      pricePer100mMinorUsed: null,
+      minimumDeliveryFeeMinorUsed: null,
+      legDistancesMeters: [],
+    });
+    expect(result.totalEtaSeconds).toBeUndefined();
+  });
+
+  it('multi-vendor: zone fee + additionalVendorFee × (vendorCount − 1) — the same composeDeliveryFee formula', async () => {
+    const service = new DeliveryFeeCalculationService({} as any, cfg() as any);
+    const result = await service.calculateForZone([{ id: 'z' }, { id: 'a' }, { id: 'm' }], zone);
+    expect(result).toMatchObject({ deliveryFeeMinor: 1800 + 2 * 500, additionalVendorChargeMinor: 1000, additionalVendorFeeMinorUsed: 500 });
+    expect(result.vendorSequence.map((s) => s.vendorBranchId)).toEqual(['a', 'm', 'z']); // deterministic, no fake distances
+  });
+
+  it('partial cancellation re-derives from a ZONE breakdown exactly like a distance one (base stays the frozen zone fee)', async () => {
+    const service = new DeliveryFeeCalculationService({} as any, cfg() as any);
+    const frozen = await service.calculateForZone([{ id: 'a' }, { id: 'b' }, { id: 'c' }], zone);
+    expect(service.recalculateForRemainingVendors(frozen, 2)).toBe(2300);
+    expect(service.recalculateForRemainingVendors(frozen, 1)).toBe(1800);
+  });
+
+  it('a zero-fee zone is a real, allowed price (0), not an error', async () => {
+    const result = await new DeliveryFeeCalculationService({} as any, cfg() as any).calculateForZone([{ id: 'b1' }], { id: 'z', deliveryFeeMinor: 0 });
+    expect(result.deliveryFeeMinor).toBe(0);
+  });
+
+  it('fails closed when the additional-vendor fee is not configured, or the zone fee is malformed', async () => {
+    await expect(new DeliveryFeeCalculationService({} as any, buildBusinessConfigService({}) as any).calculateForZone([{ id: 'b1' }], zone)).rejects.toThrow(NotFoundException);
+    await expect(new DeliveryFeeCalculationService({} as any, cfg() as any).calculateForZone([{ id: 'b1' }], { id: 'z', deliveryFeeMinor: 12.5 })).rejects.toThrow(BadRequestException);
+    await expect(new DeliveryFeeCalculationService({} as any, cfg() as any).calculateForZone([], zone)).rejects.toThrow(BadRequestException);
+  });
+
+  it('the distance path is unchanged and now labels itself DISTANCE', async () => {
+    const mapProvider = buildMapProvider({ '1,1->0,0': 840 });
+    const businessConfig = buildBusinessConfigService({ REGISTERED_VENDOR_PRICE_PER_100M_MINOR: 100, REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR: 500, REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR: 300 });
+    const result = await new DeliveryFeeCalculationService(mapProvider as any, businessConfig as any).calculate([{ id: 'a', latitude: 1, longitude: 1 }], customer);
+    expect(result).toMatchObject({ pricingSource: 'DISTANCE', deliveryFeeMinor: 900 });
+  });
+});

@@ -291,7 +291,7 @@ void main() {
     });
 
     testWidgets(
-        'tapping a category opens the product-first listing with the sector id + name',
+        'tapping a category opens vendor-first discovery (/vendors) with the sector id + name — never a product listing',
         (tester) async {
       String? opened;
       final router = GoRouter(routes: [
@@ -300,7 +300,7 @@ void main() {
             builder: (context, state) =>
                 Scaffold(body: CategoryGrid(categories: make(3)))),
         GoRoute(
-            path: '/category-products',
+            path: '/vendors',
             builder: (context, state) {
               opened = state.uri.toString();
               return const Scaffold(body: Text('vendors'));
@@ -322,7 +322,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('فئة 1'));
       await tester.pumpAndSettle();
-      expect(opened, startsWith('/category-products?sectorId=id1&sectorName='));
+      expect(opened, startsWith('/vendors?sectorId=id1&sectorName='));
       expect(Uri.parse(opened!).queryParameters['sectorName'], 'فئة 1');
     });
 

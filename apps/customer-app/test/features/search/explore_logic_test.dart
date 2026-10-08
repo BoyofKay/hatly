@@ -39,7 +39,11 @@ class _Repo implements VendorRepository {
       int page = 1,
       int limit = 20,
       double? latitude,
-      double? longitude}) async {
+      double? longitude,
+      String? subcategoryId,
+      bool? openNow,
+      bool? hasOffers,
+      double? minRating}) async {
     calls.add((sectorId: sectorId, sort: sort, limit: limit, lat: latitude));
     if (failing.contains(sectorId)) throw Exception('boom');
     final data = bySector[sectorId] ?? const <Vendor>[];

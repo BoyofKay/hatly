@@ -12,10 +12,11 @@ import { TestData } from './support/test-data';
  * (bypassing `OrderCreationService`/`nextOrderNumber`, exactly like a real pre-migration order would have been), and
  * migrating forward again re-applies the SAME `up()` the production deploy runs.
  *
- * Dispatch Hardening milestone: `DeliveryAcceptDeadlineIndex` (purely a `deliveries` index, unrelated to `order_number`)
- * landed AFTER `OrderNumber` and is now the actual last-applied migration, so getting back to the pre-`OrderNumber`
- * schema takes two `undoLastMigration()` calls, not one — undoing it first (harmless: just drops an index) then
- * undoing `OrderNumber` itself. Migrating forward again re-applies both, in the same order production would.
+ * Every migration that landed AFTER `OrderNumber` (indexes, marketplace subcategories, proof of delivery, ...) is unrelated to
+ * `order_number`, so it sits on top of it and must be undone first, then re-applied in the same order production would. The set
+ * is derived from the registered migrations (ordered by their timestamp) rather than hardcoded, so adding a migration never
+ * silently breaks this test: it undoes exactly "everything after OrderNumber, then OrderNumber", and asserts the re-apply list
+ * is exactly that, in order.
  */
 describe('OrderNumber migration — backfill on real PostgreSQL', () => {
   let dataSource: DataSource;
@@ -28,18 +29,28 @@ describe('OrderNumber migration — backfill on real PostgreSQL', () => {
   });
 
   afterAll(async () => {
-    if (dataSource?.isInitialized) await dataSource.destroy();
+    // This spec undoes real migrations. Whatever happened (including a failure midway), leave the shared integration
+    // database fully migrated so the specs that run after it never inherit a half-reverted schema.
+    try {
+      if (dataSource?.isInitialized) await resetAndMigrate(dataSource);
+    } finally {
+      if (dataSource?.isInitialized) await dataSource.destroy();
+    }
   });
 
   it('backfills legacy orders deterministically (created_at, id), then enforces NOT NULL + UNIQUE, and the sequence continues past them', async () => {
     await resetAndMigrate(dataSource);
     data = new TestData(dataSource);
 
-    // Revert to the pre-OrderNumber schema: no order_number column, no sequence. `DeliveryAcceptDeadlineIndex` now sits
-    // on top of `OrderNumber`, so it must be undone first (an unrelated `deliveries` index — harmless to drop/reapply
-    // here) before `OrderNumber` itself is the "last" migration to undo.
-    await dataSource.undoLastMigration();
-    await dataSource.undoLastMigration();
+    // Revert to the pre-OrderNumber schema: no order_number column, no sequence. Everything registered after `OrderNumber`
+    // is undone first (unrelated migrations — harmless to drop/reapply here), then `OrderNumber` itself.
+    const ordered = dataSource.migrations
+      .map((m) => m.name as string)
+      .sort((x, y) => Number(/(\d+)$/.exec(x)![1]) - Number(/(\d+)$/.exec(y)![1]));
+    const from = ordered.indexOf('OrderNumber1700004300000');
+    expect(from).toBeGreaterThanOrEqual(0);
+    const expectedReapply = ordered.slice(from);
+    for (let i = 0; i < expectedReapply.length; i++) await dataSource.undoLastMigration();
     const columnsBefore = await dataSource.query(
       "SELECT column_name FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'order_number'",
     );
@@ -63,10 +74,9 @@ describe('OrderNumber migration — backfill on real PostgreSQL', () => {
       legacyIds.push(id);
     }
 
-    // Re-apply — this runs the OrderNumber migration's up() against the legacy rows above (and, since it was undone
-    // too, the unrelated DeliveryAcceptDeadlineIndex migration immediately after it — same as a real deploy).
+    // Re-apply — this runs the OrderNumber migration's up() against the legacy rows above .
     const applied = await dataSource.runMigrations({ transaction: 'each' });
-    expect(applied.map((m) => m.name)).toEqual(['OrderNumber1700004300000', 'DeliveryAcceptDeadlineIndex1700004400000']);
+    expect(applied.map((m) => m.name)).toEqual(expectedReapply);
 
     const rows: Array<{ id: string; order_number: string; created_at: Date }> = await dataSource.query(
       `SELECT id, order_number, created_at FROM orders WHERE id = ANY($1::uuid[]) ORDER BY created_at ASC`,

@@ -45,18 +45,18 @@ export class CartVendorGroup extends BaseEntity {
 
   /**
    * AD_HOC_SERVICE only — which of the two Hatly Service flows this
-   * group represents. Determines which default-location BusinessConfig
-   * key applies when the customer hasn't supplied their own
-   * coordinate — see ad-hoc-service-type.enum.ts.
+   * group represents. Determines which customer-chosen place is
+   * required at checkout (pickup for BUY_FROM_PLACE, destination for
+   * DELIVER_TO_PLACE) — see ad-hoc-service-type.enum.ts.
    */
   @Column({ name: 'ad_hoc_service_type', type: 'varchar', length: 20, nullable: true })
   adHocServiceType?: AdHocServiceType | null;
 
   /**
-   * BUY_FROM_PLACE only — set only if the customer explicitly
-   * supplied/overrode a pickup location; null means "use the
-   * configured default pickup location" (resolved at order-creation
-   * time, never guessed here).
+   * BUY_FROM_PLACE only — the pickup location the customer chose for
+   * the place to buy from. Required at checkout: null is rejected
+   * (`BUY_FROM_PLACE_PICKUP_REQUIRED`), never replaced by a Hatly
+   * default.
    */
   @Column({ name: 'ad_hoc_pickup_latitude', type: 'double precision', nullable: true })
   adHocPickupLatitude?: number | null;
@@ -65,9 +65,10 @@ export class CartVendorGroup extends BaseEntity {
   adHocPickupLongitude?: number | null;
 
   /**
-   * DELIVER_TO_PLACE only — set only if the customer explicitly
-   * supplied a destination; null means "use the configured default
-   * destination location." Not used for BUY_FROM_PLACE, whose
+   * DELIVER_TO_PLACE only — the destination the customer chose.
+   * Required at checkout: null is rejected
+   * (`DELIVER_TO_PLACE_DESTINATION_REQUIRED`), never replaced by a
+   * Hatly default. Not used for BUY_FROM_PLACE, whose
    * "destination" is simply the customer's own delivery address,
    * already captured normally at checkout.
    */

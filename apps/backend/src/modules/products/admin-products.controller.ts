@@ -7,6 +7,8 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductExcelImportService, EXCEL_IMPORT_MAX_FILE_SIZE_BYTES } from './product-excel-import.service';
+import { requireUploadedFile, singleFileMultipartLimits } from './multipart-limits';
+import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
 
 /**
  * CONFIRMED (Phase I-A, Chunk 2): Admin-only management surface —
@@ -60,18 +62,20 @@ export class AdminProductsController {
   }
 
   @Post('import/validate')
+  @Throttled(RateLimitPolicies.fileImport)
   @RequiresPermission(Permission.MANAGE_CATALOG)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: EXCEL_IMPORT_MAX_FILE_SIZE_BYTES } }))
+  @UseInterceptors(FileInterceptor('file', { limits: singleFileMultipartLimits(EXCEL_IMPORT_MAX_FILE_SIZE_BYTES) }))
   async validateImport(@UploadedFile() file: Express.Multer.File) {
-    const { summary } = await this.productExcelImportService.validate(file.buffer, async () => true);
+    const { summary } = await this.productExcelImportService.validate(requireUploadedFile(file, 'file').buffer, async () => true);
     return { data: summary };
   }
 
   @Post('import/apply')
+  @Throttled(RateLimitPolicies.fileImport)
   @RequiresPermission(Permission.MANAGE_CATALOG)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: EXCEL_IMPORT_MAX_FILE_SIZE_BYTES } }))
+  @UseInterceptors(FileInterceptor('file', { limits: singleFileMultipartLimits(EXCEL_IMPORT_MAX_FILE_SIZE_BYTES) }))
   async applyImport(@UploadedFile() file: Express.Multer.File) {
-    const result = await this.productExcelImportService.apply(file.buffer, async () => true);
+    const result = await this.productExcelImportService.apply(requireUploadedFile(file, 'file').buffer, async () => true);
     return { data: result };
   }
 

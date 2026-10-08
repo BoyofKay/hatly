@@ -2,12 +2,12 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Order } from '../orders/entities/order.entity';
-import { OrderStatus } from '../orders/order-status.enum';
 import { OrderVendorSegmentStatus } from '../orders/order-vendor-segment-status.enum';
 import { Delivery } from '../delivery/entities/delivery.entity';
 import { VendorRating } from './entities/vendor-rating.entity';
 import { DriverRating } from './entities/driver-rating.entity';
 import { ProductRating } from './entities/product-rating.entity';
+import { RATEABLE_ORDER_STATUSES } from './rateable-order-statuses';
 
 export interface OrderRatingState {
   orderId: string;
@@ -37,7 +37,7 @@ export interface OrderRatingState {
  * what have they already rated," for the customer app's Order Details
  * screen (never a forced popup — see the requirements' own framing).
  * Same ownership/eligibility rule as the three create() services:
- * order must belong to this customer and be DELIVERED. Excludes
+ * order must belong to this customer and be DELIVERED (or COLLECTED — a pickup order). Excludes
  * CANCELLED segments/their items from the eligible list, and excludes
  * AD_HOC_SERVICE segments/items (nothing to rate as a "Vendor"/
  * "Product" there) — mirrors each create() service's own guard
@@ -59,7 +59,7 @@ export class RatingStateService {
       where: { id: orderId },
       relations: { segments: { items: true } },
     });
-    if (!order || order.customerId !== customerId || order.status !== OrderStatus.DELIVERED) {
+    if (!order || order.customerId !== customerId || !RATEABLE_ORDER_STATUSES.includes(order.status)) {
       throw new NotFoundException('Order not found.');
     }
 

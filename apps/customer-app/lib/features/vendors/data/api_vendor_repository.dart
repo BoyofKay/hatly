@@ -121,6 +121,10 @@ class ApiVendorRepository implements VendorRepository {
     int limit = 20,
     double? latitude,
     double? longitude,
+    String? subcategoryId,
+    bool? openNow,
+    bool? hasOffers,
+    double? minRating,
   }) async {
     // LAUNCH TRACK L1-A CORRECTION: coordinates are sent as an atomic
     // pair — never independently. If either is null, neither is sent;
@@ -141,6 +145,11 @@ class ApiVendorRepository implements VendorRepository {
           'limit': limit,
           if (hasCoordinates) 'latitude': latitude,
           if (hasCoordinates) 'longitude': longitude,
+          if (subcategoryId != null) 'subcategoryId': subcategoryId,
+          // Filters V1.
+          if (openNow == true) 'openNow': 'true',
+          if (hasOffers == true) 'hasOffers': 'true',
+          if (minRating != null) 'minRating': minRating,
         },
       ),
       (data) {
@@ -180,7 +189,10 @@ class ApiVendorRepository implements VendorRepository {
       etaMaxMinutes: 0,
       deliveryFeeMinor: 0,
       isOpen: json['isOpen'] as bool,
-      hasPromotion: false, // Offers integration is out of this chunk's scope
+      // Filters V1: real data now (`MarketplaceVendorView.hasOffer`) — a currently-active Offer for
+      // this branch, batch-resolved server-side. Read defensively (`?? false`) so an older cached
+      // response shape (before this field existed) still degrades safely.
+      hasPromotion: json['hasOffer'] as bool? ?? false,
     );
   }
 }

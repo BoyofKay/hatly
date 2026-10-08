@@ -136,6 +136,10 @@ class FixtureVendorRepository implements VendorRepository {
     int limit = 20,
     double? latitude,
     double? longitude,
+    String? subcategoryId,
+    bool? openNow,
+    bool? hasOffers,
+    double? minRating,
   }) async {
     await Future.delayed(const Duration(milliseconds: 700));
     final matching = _all.where((v) => v.category == sectorId).toList();

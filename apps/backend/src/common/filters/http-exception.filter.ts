@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { httpErrorClientStatus, isDependencyUnavailable, resolveHttpStatus } from '../utils/http-status.util';
 import { NO_REQUEST_CONTEXT, RequestContextService } from '../request-context/request-context.service';
 import { normalizeCorrelationId } from '../request-context/correlation-id';
+import { ThrottlerException } from '@nestjs/throttler';
 
 interface ErrorBody {
   error: {
@@ -32,7 +33,16 @@ interface ErrorBody {
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
-  constructor(private readonly requestContextService: RequestContextService) {}
+  /**
+   * @param exposeServerErrorMessages when false (production/staging) the message of a 5xx HttpException is replaced by a
+   *   generic one — an HttpException message is developer-authored text and a 5xx is an internal failure, so it must not
+   *   reach a client; the full detail is logged server-side with the correlation id. 4xx messages are unchanged (they are
+   *   the actionable validation/business errors the apps display).
+   */
+  constructor(
+    private readonly requestContextService: RequestContextService,
+    private readonly exposeServerErrorMessages: boolean = true,
+  ) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -48,6 +58,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     const status = resolveHttpStatus(exception);
+    // Path only (no query string — it can carry phone numbers/coordinates/search terms) in every server-side log line.
+    const safePath = String(request.originalUrl ?? request.url ?? '').split('?')[0];
     let code = 'INTERNAL_ERROR';
     let message = 'Something went wrong. Please try again.';
     let details: unknown;
@@ -55,8 +67,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       code = HttpStatus[status] ?? 'HTTP_ERROR';
       const response_ = exception.getResponse();
-      if (status === HttpStatus.TOO_MANY_REQUESTS) {
-        // @nestjs/throttler's own message is the class name ("ThrottlerException: Too Many Requests").
+      if (exception instanceof ThrottlerException || (status === HttpStatus.TOO_MANY_REQUESTS && typeof response_ === 'string' && response_.startsWith('ThrottlerException'))) {
+        // @nestjs/throttler's own message is the class name ("ThrottlerException: Too Many Requests"). Other 429s (e.g. the
+        // per-account failed-login lock) carry their own message and details.
         message = 'Too many requests. Please try again later.';
       } else if (typeof response_ === 'string') {
         message = response_;
@@ -65,11 +78,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = (body.message as string) ?? message;
         details = body.details ?? undefined;
       }
+      if (status >= 500) {
+        // An HttpException that is a server error used to leave NO server-side trace at all (only unknown errors were logged).
+        this.logger.error(
+          `Server error response [correlationId=${correlationId}] ${request.method} ${safePath} (status ${status}, code ${code}): ${exception.message}`,
+          exception.stack,
+        );
+        if (!this.exposeServerErrorMessages) {
+          message = 'Something went wrong. Please try again.';
+          details = undefined;
+        }
+      }
     } else if (isDependencyUnavailable(exception)) {
       code = HttpStatus[status] ?? 'SERVICE_UNAVAILABLE';
       message = 'A required service is temporarily unavailable. Please try again shortly.';
       this.logger.error(
-        `Dependency unavailable [correlationId=${correlationId}] on ${request.method} ${request.url}: ${(exception as Error).message}`,
+        `Dependency unavailable [correlationId=${correlationId}] on ${request.method} ${safePath}: ${(exception as Error).message}`,
       );
     } else if (httpErrorClientStatus(exception) !== undefined) {
       code = HttpStatus[status] ?? 'HTTP_ERROR';
@@ -79,7 +103,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // correlation id, so this line can be found from a client/support
       // report), expose nothing beyond the correlation id to the client.
       this.logger.error(
-        `Unhandled exception [correlationId=${correlationId}] on ${request.method} ${request.url} (status ${status}): ${exception.message}`,
+        `Unhandled exception [correlationId=${correlationId}] on ${request.method} ${safePath} (status ${status}): ${exception.message}`,
         exception.stack,
       );
     }

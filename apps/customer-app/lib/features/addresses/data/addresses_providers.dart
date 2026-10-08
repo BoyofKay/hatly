@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/providers.dart';
 import '../../../core/location/device_location_service.dart';
 import 'addresses_api.dart';
+import '../domain/delivery_zone.dart';
 import '../domain/saved_address.dart';
 
 final addressesApiProvider =
@@ -17,4 +18,10 @@ final deviceLocationServiceProvider =
 final savedAddressesProvider =
     FutureProvider.autoDispose<List<SavedAddress>>((ref) {
   return ref.watch(addressesApiProvider).getAddresses();
+});
+
+/// The active Delivery Zones from the backend (PD-009) — the only source of the zone dropdown.
+final deliveryZonesProvider =
+    FutureProvider.autoDispose<List<DeliveryZone>>((ref) {
+  return ref.watch(addressesApiProvider).getDeliveryZones();
 });

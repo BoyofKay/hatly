@@ -49,9 +49,9 @@ export class AdminCommissionConfigController {
     if (!driver) {
       throw new NotFoundException('Driver not found.');
     }
-    driver.commissionRateBasisPoints = dto.commissionRateBasisPoints;
-    await this.driversRepository.save(driver);
-    return { data: driver };
+    // Column-targeted (Operational Completion milestone): a whole-row save() could write back a stale is_available.
+    await this.driversRepository.update({ id: driverId }, { commissionRateBasisPoints: dto.commissionRateBasisPoints });
+    return { data: await this.driversRepository.findOneOrFail({ where: { id: driverId } }) };
   }
 
   /**

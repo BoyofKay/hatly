@@ -126,6 +126,6 @@ export interface CartView {
   subtotalMinor: number;
   /** True if any group is AD_HOC_SERVICE (i.e. the cart contains at least one not-yet-priced item). */
   hasUnpricedItems: boolean;
-  /** True only when the cart has ≥1 item, every catalog item is available, every catalog group meets its minimum, and nothing is unpriced. Does NOT create an order — see the Phase 2D report. Whether an unpriced cart may eventually check out at all is left to Step 4. */
+  /** True when the cart has ≥1 item and every catalog item is available. A pending (unconfirmed) Hatly Service price does NOT block it — see `hasUnpricedItems` (information only). Does NOT create an order; the checkout quote is the authority on whether the order can actually be placed. */
   readyForCheckout: boolean;
 }

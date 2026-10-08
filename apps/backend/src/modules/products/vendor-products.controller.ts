@@ -9,6 +9,8 @@ import { VendorProductsService } from './vendor-products.service';
 import { VendorUpdateProductDto } from './dto/vendor-update-product.dto';
 import { VendorCreateProductDto } from './dto/vendor-create-product.dto';
 import { EXCEL_IMPORT_MAX_FILE_SIZE_BYTES } from './product-excel-import.service';
+import { requireUploadedFile, singleFileMultipartLimits } from './multipart-limits';
+import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
 
 /**
  * CHUNK 12B-1. Every endpoint is scoped to the caller's own
@@ -93,9 +95,10 @@ export class VendorProductsController {
    * for clarity and consistency).
    */
   @Post('import/validate')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: EXCEL_IMPORT_MAX_FILE_SIZE_BYTES } }))
+  @Throttled(RateLimitPolicies.fileImport)
+  @UseInterceptors(FileInterceptor('file', { limits: singleFileMultipartLimits(EXCEL_IMPORT_MAX_FILE_SIZE_BYTES) }))
   async validateImport(@CurrentUser() user: AuthenticatedUser, @UploadedFile() file: Express.Multer.File) {
-    const summary = await this.vendorProductsService.validateImport(user.id, file.buffer);
+    const summary = await this.vendorProductsService.validateImport(user.id, requireUploadedFile(file, 'file').buffer);
     return { data: summary };
   }
 
@@ -105,9 +108,10 @@ export class VendorProductsController {
    * before anything is written, inside one all-or-nothing transaction.
    */
   @Post('import/apply')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: EXCEL_IMPORT_MAX_FILE_SIZE_BYTES } }))
+  @Throttled(RateLimitPolicies.fileImport)
+  @UseInterceptors(FileInterceptor('file', { limits: singleFileMultipartLimits(EXCEL_IMPORT_MAX_FILE_SIZE_BYTES) }))
   async applyImport(@CurrentUser() user: AuthenticatedUser, @UploadedFile() file: Express.Multer.File) {
-    const result = await this.vendorProductsService.applyImport(user.id, file.buffer);
+    const result = await this.vendorProductsService.applyImport(user.id, requireUploadedFile(file, 'file').buffer);
     return { data: result };
   }
 
@@ -134,13 +138,14 @@ export class VendorProductsController {
    * reconfigured without updating the service).
    */
   @Post(':id/image')
-  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @Throttled(RateLimitPolicies.productImageUpload)
+  @UseInterceptors(FileInterceptor('image', { limits: singleFileMultipartLimits(5 * 1024 * 1024) }))
   async uploadImage(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const product = await this.vendorProductsService.uploadImageForUser(user.id, id, file);
+    const product = await this.vendorProductsService.uploadImageForUser(user.id, id, requireUploadedFile(file, 'image'));
     return { data: product };
   }
 

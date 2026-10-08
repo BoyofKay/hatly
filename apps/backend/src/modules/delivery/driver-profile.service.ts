@@ -25,17 +25,21 @@ export class DriverProfileService {
     private readonly driverAuthorizationService: DriverAuthorizationService,
   ) {}
 
+  /**
+   * Operational Completion milestone fix: every driver-row write is a column-targeted UPDATE. These used to load the whole
+   * row and `save()` it — TypeORM then writes back every column that differs from the database, so a location heartbeat
+   * (sent on a timer by the driver app) or an online toggle that read the row just before an assignment committed wrote the
+   * stale `is_available = true` back: the driver looked free while carrying an order, and could be double-booked.
+   */
   async setOnlineStatus(userId: string, isOnline: boolean): Promise<Driver> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
-    driver.isOnline = isOnline;
-    return this.driversRepository.save(driver);
+    await this.driversRepository.update({ id: driver.id }, { isOnline });
+    return this.driversRepository.findOneOrFail({ where: { id: driver.id } });
   }
 
   async updateLocation(userId: string, latitude: number, longitude: number): Promise<Driver> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
-    driver.lastLatitude = latitude;
-    driver.lastLongitude = longitude;
-    driver.lastLocationAt = new Date();
-    return this.driversRepository.save(driver);
+    await this.driversRepository.update({ id: driver.id }, { lastLatitude: latitude, lastLongitude: longitude, lastLocationAt: new Date() });
+    return this.driversRepository.findOneOrFail({ where: { id: driver.id } });
   }
 }

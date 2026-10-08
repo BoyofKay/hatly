@@ -34,6 +34,11 @@ typedef ProductListParams = ({
   String? search,
   int? page,
   int? limit,
+  // Filters V1.
+  bool availableOnly,
+  bool hasOffers,
+  int? minPriceMinor,
+  int? maxPriceMinor,
 });
 
 final productListProvider = FutureProvider.autoDispose
@@ -45,6 +50,10 @@ final productListProvider = FutureProvider.autoDispose
         search: params.search,
         page: params.page,
         limit: params.limit,
+        availableOnly: params.availableOnly,
+        hasOffers: params.hasOffers,
+        minPriceMinor: params.minPriceMinor,
+        maxPriceMinor: params.maxPriceMinor,
       );
 });
 
