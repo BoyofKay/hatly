@@ -64,3 +64,6 @@ Next steps #1–#5 are complete and gated; details in `docs/launch/LAUNCH_PROGRE
 
 ## 13. Update (2026-11-01, latest) — visual redesign from the reference, NOT deployed, NOT committed
 Owner supplied the reference image (saved `docs/transformation/reference/admin-vendor-reference.jpg`) and chose the flat menu. Done and gated: 10-section Admin sidebar + section tabs, Admin Home `/home` (landing), Vendor 7-section sidebar + Vendor Home per reference, backend `newCustomers`/`ordersByStatus` (executive KPIs) and `yesterday`/`productCount`/`rating`/`vendorName` (vendor overview). Details + gates: `docs/launch/LAUNCH_PROGRESS.md` §3ae. **Pending owner:** vendor Offers rule; R3 gross-sales rule; the "notification system" requirements; explicit go-ahead to commit/deploy (the owner said not to deploy a partial implementation).
+
+## 14. DEPLOYED (2026-11-01 evening) — task complete
+Release `20261101T191813Z-084657feb275` LIVE (commit `d629943`, branch `release/admin-vendor-20261101`, pushed); rollback target `20261101T102911Z-6abe9a04c7d9` kept. Includes the reference redesign (§3ae) and the staff notification system (§3af). Record + verification: `docs/launch/LAUNCH_PROGRESS.md` §3ag. Still owner decisions: vendor Offers rule, R3 gross-sales rule; FCM/SMS/e-mail providers not configured; `master` not yet updated (merge the release branch when the owner wants).
