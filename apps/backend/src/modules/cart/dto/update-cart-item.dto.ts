@@ -18,5 +18,6 @@ export class UpdateCartItemDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(100_000) // see AddCartItemDto
   requestedWeightGrams?: number;
 }

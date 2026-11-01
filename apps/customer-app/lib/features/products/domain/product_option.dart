@@ -33,6 +33,8 @@ class ProductOption {
     required this.isRequired,
     required this.allowsMultiple,
     required this.values,
+    this.minSelections = 0,
+    this.maxSelections,
   });
 
   final String id;
@@ -42,4 +44,17 @@ class ProductOption {
   final bool
       allowsMultiple; // false = single-select (radio), true = multi-select (checkboxes)
   final List<ProductOptionValue> values;
+
+  /// Explicit limits (server: `min_selections` / `max_selections`). The EFFECTIVE rule below also honours the original flags, exactly
+  /// like the backend's `effectiveSelectionLimits`, so a group that never set them behaves as before.
+  final int minSelections;
+  final int? maxSelections;
+
+  /// At least this many values must be chosen (`isRequired` means ≥ 1).
+  int get effectiveMin => minSelections > (isRequired ? 1 : 0)
+      ? minSelections
+      : (isRequired ? 1 : 0);
+
+  /// At most this many (null = no cap). A single-choice group holds exactly one.
+  int? get effectiveMax => allowsMultiple ? maxSelections : 1;
 }

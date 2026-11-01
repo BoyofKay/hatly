@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RequiresPermission } from '../permissions/decorators/requires-permission.decorator';
 import { Permission } from '../permissions/permission.enum';
@@ -7,6 +7,7 @@ import { AdminManualTransferService } from './admin-manual-transfer.service';
 import { RejectManualTransferDto } from './dto/reject-manual-transfer.dto';
 import { ManualTransferRefundService } from './manual-transfer-refund.service';
 import { RecordRefundDto } from './dto/record-refund.dto';
+import { MarkRefundSentDto } from './dto/mark-refund-sent.dto';
 
 /**
  * No @UseGuards here — PermissionsGuard is global, same pattern as
@@ -25,6 +26,21 @@ export class AdminManualTransferController {
   async list() {
     const payments = await this.adminManualTransferService.listUnderReview();
     return { data: payments };
+  }
+
+  /** Recorded refund obligations; `?sent=false` = still to be sent, `?sent=true` = already sent. */
+  @Get('refunds')
+  @RequiresPermission(Permission.VERIFY_MANUAL_PAYMENTS)
+  async listRefunds(@Query('sent') sent?: string) {
+    const filter = sent === 'true' ? { sent: true } : sent === 'false' ? { sent: false } : {};
+    return { data: await this.adminManualTransferService.listRefunds(filter) };
+  }
+
+  /** Operations confirm the refund money was really sent to the customer (the ledger entry alone never says so). Audited as an admin mutation. */
+  @Post('refunds/:eventId/mark-sent')
+  @RequiresPermission(Permission.VERIFY_MANUAL_PAYMENTS)
+  async markRefundSent(@CurrentUser() user: AuthenticatedUser, @Param('eventId') eventId: string, @Body() dto: MarkRefundSentDto) {
+    return { data: await this.adminManualTransferService.markRefundSent(eventId, user.id, dto.note) };
   }
 
   @Post(':paymentId/approve')

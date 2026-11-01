@@ -44,6 +44,14 @@ export class TestData {
 
   async dispose(): Promise<void> {
     for (const { table, id } of [...this.created].reverse()) {
+      // rows the application itself writes next to a tracked row (segment history, dispatch attempts) go first
+      if (table === 'order_vendor_segments') await this.dataSource.query('DELETE FROM order_vendor_segment_events WHERE segment_id = $1', [id]);
+      // the stock ledger is written by a trigger whenever a tracked product's quantity changes; it is append-only in production (products are only ever soft-deleted)
+      if (table === 'products') await this.dataSource.query('DELETE FROM stock_movements WHERE product_id = $1', [id]);
+      if (table === 'orders') {
+        await this.dataSource.query('DELETE FROM order_vendor_segment_events WHERE order_id = $1', [id]);
+        await this.dataSource.query('DELETE FROM dispatch_attempts WHERE order_id = $1', [id]);
+      }
       await this.dataSource.query(`DELETE FROM "${table}" WHERE id = $1`, [id]);
     }
     this.created.length = 0;

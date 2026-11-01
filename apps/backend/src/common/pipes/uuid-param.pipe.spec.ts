@@ -20,10 +20,19 @@ describe('UuidParamPipe', () => {
     }
   });
 
-  it('leaves non-identifier params, query and body untouched', () => {
+  it('leaves non-identifier params, non-identifier query values, whole-query DTOs and body untouched', () => {
     expect(pipe.transform('MANAGE_VENDORS', param('permission'))).toBe('MANAGE_VENDORS');
     expect(pipe.transform('REGISTERED_VENDOR_PRICE_PER_100M_MINOR', param('key'))).toBe('REGISTERED_VENDOR_PRICE_PER_100M_MINOR');
-    expect(pipe.transform('x', { type: 'query', data: 'id' })).toBe('x');
+    expect(pipe.transform('false', { type: 'query', data: 'prefilled' })).toBe('false');
+    expect(pipe.transform({ vendorBranchId: 'x' }, { type: 'query' })).toEqual({ vendorBranchId: 'x' });
     expect(pipe.transform({ id: 'x' }, { type: 'body' })).toEqual({ id: 'x' });
+  });
+
+  it('named identifier QUERY values (@Query(\'vendorBranchId\')) are validated too; absent/empty means "no filter"', () => {
+    expect(pipe.transform(VALID, { type: 'query', data: 'vendorBranchId' })).toBe(VALID);
+    expect(pipe.transform(undefined, { type: 'query', data: 'vendorBranchId' })).toBeUndefined();
+    expect(pipe.transform('', { type: 'query', data: 'vendorBranchId' })).toBe('');
+    expect(() => pipe.transform('not-a-uuid', { type: 'query', data: 'vendorBranchId' })).toThrow(BadRequestException);
+    expect(() => pipe.transform("1' OR '1'='1", { type: 'query', data: 'categoryId' })).toThrow(BadRequestException);
   });
 });

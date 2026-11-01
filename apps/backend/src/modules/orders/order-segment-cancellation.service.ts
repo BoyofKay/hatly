@@ -96,12 +96,14 @@ export class OrderSegmentCancellationService {
     }
     await manager.save(Order, order);
 
-    // Give back only THIS segment's flash-sale allocation; the other vendors' allocations stay consumed. (Subtotal
-    // discounts are deliberately never returned — the approved "SUBTOTAL_DISCOUNT rows are never reversed" rule.)
+    // Give back only THIS segment's flash-sale allocation and subtotal-discount / coupon entitlement; the other vendors' allocations
+    // stay consumed. (PD-014 supersedes the earlier "SUBTOTAL_DISCOUNT rows are never reversed" rule; the money side is unchanged — the
+    // discount already left the order total above, so the refund is computed from the reduced total exactly as before.)
     const cancelledItemIds = (
       cancelledSegment.items ?? (await manager.find(OrderItem, { where: { orderVendorSegmentId: cancelledSegment.id } }))
     ).map((i: OrderItem) => i.id);
     await this.offerConsumptionService.reverseFlashSaleConsumptionForOrder(manager, order.id, cancelledItemIds);
+    await this.offerConsumptionService.reverseSubtotalDiscountConsumptionForOrder(manager, order.id, [cancelledSegment.id]);
 
     let refundMinor = 0;
     let pendingRefundMinor = 0;

@@ -55,8 +55,8 @@ class SubcategoryChipRow extends ConsumerWidget {
   }
 }
 
-const double _kImageSize = 56;
-const double _kItemWidth = 84;
+const double _kChipHeight = 44;
+const double _kChipImage = 28;
 
 class _SubcategoryStrip extends StatelessWidget {
   const _SubcategoryStrip({
@@ -73,52 +73,51 @@ class _SubcategoryStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    // Two label lines at the user's text size (clamped like the other rows)
-    // so the strip never clips a larger font.
+    // One line of label at the user's text size (clamped like the other rows) so the strip never clips a larger font.
     final textScale =
-        MediaQuery.textScalerOf(context).scale(12).clamp(12.0, 24.0) / 12;
-    final height = _kImageSize +
-        HatlySpacing.sm * 3 + // card padding top/bottom + image→label gap
-        2 * 12 * 1.35 * textScale +
-        4; // selected border allowance
+        MediaQuery.textScalerOf(context).scale(14).clamp(14.0, 28.0) / 14;
+    final height = (_kChipHeight * textScale).clamp(_kChipHeight, 72.0) + 8;
 
     return SizedBox(
       height: height,
-      child: ListView.separated(
+      // A short row of light pills: a plain scrolling Row (not a lazy list) so every pill is always in the tree — none goes missing just
+      // because it is scrolled out of view (tests, accessibility traversal).
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(
-            horizontal: HatlySpacing.md, vertical: 2),
-        itemCount: subcategories.length + 1,
-        separatorBuilder: (context, index) =>
-            const SizedBox(width: HatlySpacing.sm),
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return _SubcategoryItem(
+            horizontal: HatlySpacing.md, vertical: 4),
+        child: Row(
+          children: [
+            _SubcategoryItem(
               key: const Key('subcategory-chip-all'),
               label: l10n.allProducts,
               imageUrl: null,
               placeholderIcon: Icons.apps_rounded,
               selected: selectedSubcategoryId == null,
               onTap: () => onChanged(null),
-            );
-          }
-          final subcategory = subcategories[index - 1];
-          return _SubcategoryItem(
-            key: Key('subcategory-chip-${subcategory.id}'),
-            label: isArabic && subcategory.nameAr != null
-                ? subcategory.nameAr!
-                : subcategory.name,
-            imageUrl: subcategory.imageUrl,
-            placeholderIcon: Icons.category_outlined,
-            selected: selectedSubcategoryId == subcategory.id,
-            onTap: () => onChanged(subcategory.id),
-          );
-        },
+            ),
+            for (final subcategory in subcategories) ...[
+              const SizedBox(width: HatlySpacing.sm),
+              _SubcategoryItem(
+                key: Key('subcategory-chip-${subcategory.id}'),
+                label: isArabic && subcategory.nameAr != null
+                    ? subcategory.nameAr!
+                    : subcategory.name,
+                imageUrl: subcategory.imageUrl,
+                placeholderIcon: Icons.category_outlined,
+                selected: selectedSubcategoryId == subcategory.id,
+                onTap: () => onChanged(subcategory.id),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 }
 
+/// A compact pill: the selected one is filled orange, the others are white with a hairline border. A small round image (or the soft orange
+/// glyph) leads the label.
 class _SubcategoryItem extends StatelessWidget {
   const _SubcategoryItem({
     super.key,
@@ -138,7 +137,7 @@ class _SubcategoryItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final radius = BorderRadius.circular(HatlyRadius.card);
+    final radius = BorderRadius.circular(HatlyRadius.circular);
 
     return Semantics(
       button: true,
@@ -146,55 +145,42 @@ class _SubcategoryItem extends StatelessWidget {
       label: label,
       onTap: onTap,
       excludeSemantics: true,
-      child: SizedBox(
-        width: _kItemWidth,
-        child: Material(
-          color: p.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: radius,
-            side: BorderSide(
-              color: selected ? p.accent : p.border,
-              width: selected ? 2 : 1,
-            ),
-          ),
-          child: InkWell(
-            borderRadius: radius,
-            onTap: onTap,
-            child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(minHeight: HatlyTouch.minTarget),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(HatlySpacing.xs,
-                    HatlySpacing.sm, HatlySpacing.xs, HatlySpacing.sm),
-                child: Column(
-                  children: [
-                    HatlySoftImage(
-                      url: imageUrl,
-                      width: _kImageSize,
-                      height: _kImageSize,
-                      radius: HatlyRadius.imageContainer - 4,
-                      placeholderIcon: placeholderIcon,
-                      placeholderIconSize: 26,
+      child: Material(
+        color: selected ? p.accent : p.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: selected ? p.accent : p.border),
+        ),
+        child: InkWell(
+          borderRadius: radius,
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: _kChipHeight),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(HatlySpacing.sm,
+                  HatlySpacing.xs, HatlySpacing.md, HatlySpacing.xs),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  HatlySoftImage(
+                    url: imageUrl,
+                    width: _kChipImage,
+                    height: _kChipImage,
+                    circular: true,
+                    placeholderIcon: placeholderIcon,
+                    placeholderIconSize: 16,
+                  ),
+                  const SizedBox(width: HatlySpacing.sm),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: context.type.small.copyWith(
+                      color: selected ? p.accentOn : p.textPrimary,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                     ),
-                    const SizedBox(height: HatlySpacing.xs),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          label,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: context.type.small.copyWith(
-                            height: 1.35,
-                            color: p.textPrimary,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

@@ -138,6 +138,20 @@ export class OrderItem extends BaseEntity {
   finalAmountMinor?: number | null;
 
   /**
+   * PD-016 — set when the item was taken off the order because the product turned out to be unavailable (order exception). The row,
+   * its snapshots and its amounts are never changed or deleted; readers stop counting an item with `removedAt` set, and the amount that
+   * left the order is kept in `removedAmountMinor`.
+   */
+  @Column({ name: 'removed_at', type: 'timestamptz', nullable: true })
+  removedAt?: Date | null;
+
+  @Column({ name: 'removed_amount_minor', type: 'bigint', nullable: true })
+  removedAmountMinor?: number | null;
+
+  @Column({ name: 'removal_exception_id', type: 'uuid', nullable: true })
+  removalExceptionId?: string | null;
+
+  /**
    * PHASE G addition (Offers & Promotions). CONFIRMED: WEIGHT items are
    * never eligible — these five columns are only ever populated for a
    * PIECE catalog item. `appliedOfferId` deliberately has NO FK

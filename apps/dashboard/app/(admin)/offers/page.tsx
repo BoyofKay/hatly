@@ -14,6 +14,8 @@ import {
   listOffers,
 } from '../../../lib/api/admin-offers';
 import { apiErrorMessage } from '../../../lib/api/errors';
+import { OfferTools } from '../../../components/marketing/OfferTools';
+import { useLang } from '../../../lib/ui/lang';
 
 /**
  * Admin Offers Management UI. Reuses the existing Admin catalog/branch
@@ -25,6 +27,8 @@ import { apiErrorMessage } from '../../../lib/api/errors';
  * existing offer's fields — that limitation is real, not an oversight.
  */
 export default function AdminOffersPage() {
+  const { t: tl } = useLang();
+  const [offerFilter, setOfferFilter] = useState<'ALL' | 'LIVE' | 'SCHEDULED' | 'ENDED' | 'INACTIVE'>('ALL');
   const [branches, setBranches] = useState<VendorBranch[] | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [offers, setOffers] = useState<Offer[] | null>(null);
@@ -173,16 +177,25 @@ export default function AdminOffersPage() {
     return `Special Price ${formatMinor(offer.specialPriceMinor)}`;
   }
 
+  /** Derived only from the offer's own fields: inactive, not started yet, running now, or ended. */
+  const offerState = (o: { isActive: boolean; startAt: string; endAt: string }): 'LIVE' | 'SCHEDULED' | 'ENDED' | 'INACTIVE' => {
+    const now = Date.now();
+    return !o.isActive ? 'INACTIVE' : new Date(o.endAt).getTime() <= now ? 'ENDED' : new Date(o.startAt).getTime() > now ? 'SCHEDULED' : 'LIVE';
+  };
+  const stateTone = { LIVE: 'bg-green-100 text-green-700', SCHEDULED: 'bg-blue-100 text-blue-700', ENDED: 'bg-amber-100 text-amber-800', INACTIVE: 'bg-gray-200 text-gray-600' } as const;
+  const stateLabel = { LIVE: tl('Live now', 'يعمل الآن'), SCHEDULED: tl('Scheduled', 'مجدول'), ENDED: tl('Ended', 'منتهٍ'), INACTIVE: tl('Inactive', 'غير نشط') } as const;
+  const shownOffers = (offers ?? []).filter((o) => offerFilter === 'ALL' || offerState(o) === offerFilter);
+
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold">Offers</h1>
+    <div className="max-w-6xl">
+      <div className="mb-2 min-w-0"><h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{tl('Offers', 'العروض')}</h1><p className="mt-1 max-w-3xl text-sm text-gray-500">{tl('Discounts and flash sales a vendor branch offers, with their dates and targeting.', 'الخصومات والعروض السريعة التي يقدمها فرع المتجر، بتواريخها واستهدافها.')}</p></div>
 
       <div className="mt-4">
         <label className="text-sm font-medium">Vendor Branch</label>
         <select
           value={selectedBranchId}
           onChange={(e) => setSelectedBranchId(e.target.value)}
-          className="ml-2 rounded border px-2 py-1 text-sm"
+          className="mt-1 block w-full min-h-[44px] rounded-lg sm:ml-2 sm:mt-0 sm:inline-block sm:w-auto rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
         >
           <option value="">Select a branch…</option>
           {branches?.map((b) => (
@@ -200,20 +213,20 @@ export default function AdminOffersPage() {
           <div className="mt-4 flex justify-end">
             <button
               onClick={() => setShowCreateForm((v) => !v)}
-              className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white"
+              className="min-h-[44px] rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
             >
               {showCreateForm ? 'Cancel' : 'New Offer'}
             </button>
           </div>
 
           {showCreateForm && (
-            <form onSubmit={handleCreate} className="mt-3 space-y-3 rounded border bg-white p-4">
+            <form onSubmit={handleCreate} className="mt-3 space-y-3 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
               <div>
                 <label className="block text-sm font-medium">Mechanism</label>
                 <select
                   value={mechanism}
                   onChange={(e) => setMechanism(e.target.value as OfferMechanism)}
-                  className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                  className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                 >
                   <option value="SUBTOTAL_DISCOUNT">Subtotal Discount</option>
                   <option value="FLASH_SALE">Flash Sale</option>
@@ -222,7 +235,7 @@ export default function AdminOffersPage() {
 
               <div>
                 <label className="block text-sm font-medium">Name</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} required className="mt-1 w-full rounded border px-2 py-1 text-sm" />
+                <input value={name} onChange={(e) => setName(e.target.value)} required className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
               </div>
 
               <div>
@@ -230,7 +243,7 @@ export default function AdminOffersPage() {
                 <select
                   value={targetingMode}
                   onChange={(e) => setTargetingMode(e.target.value as any)}
-                  className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                  className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                 >
                   <option value="BRANCH_WIDE">Branch-wide (applies to every product)</option>
                   <option value="PRODUCT">Specific Product</option>
@@ -241,7 +254,7 @@ export default function AdminOffersPage() {
                     value={targetProductId}
                     onChange={(e) => setTargetProductId(e.target.value)}
                     required
-                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                   >
                     <option value="">Select a product…</option>
                     {products?.map((p) => (
@@ -256,7 +269,7 @@ export default function AdminOffersPage() {
                     value={targetCategoryId}
                     onChange={(e) => setTargetCategoryId(e.target.value)}
                     required
-                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                   >
                     <option value="">Select a category…</option>
                     {categories?.map((c) => (
@@ -270,13 +283,13 @@ export default function AdminOffersPage() {
 
               {mechanism === 'SUBTOTAL_DISCOUNT' ? (
                 <>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium">Discount Type</label>
                       <select
                         value={discountType}
                         onChange={(e) => setDiscountType(e.target.value as DiscountType)}
-                        className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                       >
                         <option value="PERCENTAGE">Percentage</option>
                         <option value="FIXED">Fixed Amount</option>
@@ -292,11 +305,11 @@ export default function AdminOffersPage() {
                         onChange={(e) => setDiscountValue(e.target.value)}
                         required
                         min="0"
-                        className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium">Minimum Eligible Subtotal (EGP)</label>
                       <input
@@ -304,7 +317,7 @@ export default function AdminOffersPage() {
                         value={minimumEligibleSubtotal}
                         onChange={(e) => setMinimumEligibleSubtotal(e.target.value)}
                         min="0"
-                        className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                       />
                     </div>
                     <div>
@@ -314,7 +327,7 @@ export default function AdminOffersPage() {
                         value={maximumDiscount}
                         onChange={(e) => setMaximumDiscount(e.target.value)}
                         min="0"
-                        className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                       />
                     </div>
                   </div>
@@ -329,10 +342,10 @@ export default function AdminOffersPage() {
                       onChange={(e) => setSpecialPrice(e.target.value)}
                       required
                       min="0"
-                      className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                      className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium">Per-Customer Cumulative Limit (units/grams)</label>
                       <input
@@ -340,7 +353,7 @@ export default function AdminOffersPage() {
                         value={perCustomerLifetimeLimit}
                         onChange={(e) => setPerCustomerLifetimeLimit(e.target.value)}
                         min="0"
-                        className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                       />
                     </div>
                     <div>
@@ -350,14 +363,14 @@ export default function AdminOffersPage() {
                         value={totalAllocationLimit}
                         onChange={(e) => setTotalAllocationLimit(e.target.value)}
                         min="0"
-                        className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                        className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                       />
                     </div>
                   </div>
                 </>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium">Start</label>
                   <input
@@ -365,7 +378,7 @@ export default function AdminOffersPage() {
                     value={startAt}
                     onChange={(e) => setStartAt(e.target.value)}
                     required
-                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                   />
                 </div>
                 <div>
@@ -375,7 +388,7 @@ export default function AdminOffersPage() {
                     value={endAt}
                     onChange={(e) => setEndAt(e.target.value)}
                     required
-                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                   />
                 </div>
               </div>
@@ -388,7 +401,7 @@ export default function AdminOffersPage() {
                     value={budgetCapMinor}
                     onChange={(e) => setBudgetCapMinor(e.target.value)}
                     min="0"
-                    className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                    className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                   />
                 </div>
               )}
@@ -398,30 +411,38 @@ export default function AdminOffersPage() {
               <button
                 type="submit"
                 disabled={isCreating}
-                className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="min-h-[44px] rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
               >
                 {isCreating ? 'Creating…' : 'Create Offer'}
               </button>
             </form>
           )}
 
-          <div className="mt-4 space-y-2">
-            {offers?.map((offer) => (
-              <div key={offer.id} className="rounded border bg-white p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span
-                      className={`mr-2 rounded px-2 py-0.5 text-xs font-semibold ${
-                        offer.mechanism === 'FLASH_SALE' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                      }`}
-                    >
+          {offers && offers.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2" data-testid="offers-filters">
+              {(['ALL', 'LIVE', 'SCHEDULED', 'ENDED', 'INACTIVE'] as const).map((f) => {
+                const n = f === 'ALL' ? offers.length : offers.filter((o) => offerState(o) === f).length;
+                return (
+                  <button key={f} onClick={() => setOfferFilter(f)} aria-pressed={offerFilter === f} className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-full border px-3 text-sm font-medium ${offerFilter === f ? 'border-hatly-orange bg-hatly-orange text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
+                    {f === 'ALL' ? tl('All', 'الكل') : stateLabel[f]} <span className={`rounded-full px-1.5 text-xs ${offerFilter === f ? 'bg-white/25' : 'bg-gray-100 text-gray-600'}`}>{n}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div className="mt-3 space-y-2">
+            {shownOffers.map((offer) => (
+              <div key={offer.id} className="rounded-xl border bg-white p-3 border-gray-200 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className={`rounded px-2 py-0.5 text-xs font-semibold ${offer.mechanism === 'FLASH_SALE' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
                       {offer.mechanism === 'FLASH_SALE' ? 'FLASH SALE' : 'SUBTOTAL DISCOUNT'}
                     </span>
                     <span className="font-semibold">{offer.name}</span>
-                    <span className="ml-2 text-xs text-gray-500">{offer.isActive ? 'Active' : 'Inactive'}</span>
+                    <span className={`rounded px-2 py-0.5 text-xs ${stateTone[offerState(offer)]}`}>{stateLabel[offerState(offer)]}</span>
                   </div>
-                  <button onClick={() => handleToggleActive(offer)} className="text-xs text-gray-500 underline">
-                    {offer.isActive ? 'Deactivate' : 'Activate'}
+                  <button onClick={() => handleToggleActive(offer)} className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-hatly-orangeDark hover:bg-gray-50">
+                    {offer.isActive ? tl('Deactivate', 'إيقاف') : tl('Activate', 'تفعيل')}
                   </button>
                 </div>
                 <p className="mt-1 text-sm">{mechanismSummary(offer)}</p>
@@ -429,9 +450,11 @@ export default function AdminOffersPage() {
                   {targetingSummary(offer)} · {new Date(offer.startAt).toLocaleDateString()} –{' '}
                   {new Date(offer.endAt).toLocaleDateString()}
                 </p>
+                <div className="mt-1"><OfferTools offer={offer} onChanged={() => refresh(selectedBranchId)} /></div>
                 {actionErrorById[offer.id] && <p className="text-xs text-red-600">{actionErrorById[offer.id]}</p>}
               </div>
             ))}
+            {offers && offers.length > 0 && shownOffers.length === 0 && <p className="text-sm text-gray-500">{tl('No offer in this state.', 'لا يوجد عرض بهذه الحالة.')}</p>}
             {offers?.length === 0 && <p className="text-sm text-gray-500">No offers for this branch yet.</p>}
           </div>
         </>

@@ -35,7 +35,7 @@ describe('E2E — multi-vendor partial cancellation (fee, totals, refund)', () =
   const segmentOf = async (orderId: string, v: VendorFixture): Promise<string> =>
     (await world.ds.query('SELECT id FROM order_vendor_segments WHERE order_id = $1 AND vendor_branch_id = $2', [orderId, v.branchId]))[0].id;
   const cancelSegment = async (v: VendorFixture, segmentId: string) =>
-    world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status: 'CANCELLED' } });
+    world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } });
   const refundEvents = (orderId: string) =>
     world.ds.query(
       "SELECT amount_minor, idempotency_key, order_vendor_segment_id FROM financial_events WHERE order_id = $1 AND type = 'MANUAL_TRANSFER_REFUND_RECORDED' ORDER BY created_at",
@@ -272,7 +272,7 @@ describe('E2E — multi-vendor partial cancellation (fee, totals, refund)', () =
       await payTransfer(customer, o.id);
       const res = await world.api('patch', `/vendor/orders/segments/${await segmentOf(o.id, v2)}/status`, {
         token: v2.manager.accessToken,
-        body: { status: 'CANCELLED', refundAmountMinor: 1, totalMinor: 1, deliveryFeeMinor: 0 },
+        body: { status: 'CANCELLED', reason: 'Out of stock', refundAmountMinor: 1, totalMinor: 1, deliveryFeeMinor: 0 },
       });
       expect(res.status).toBe(400);
       expect(await refundEvents(o.id)).toEqual([]);
@@ -318,8 +318,8 @@ describe('E2E — multi-vendor partial cancellation (fee, totals, refund)', () =
 
     it('a customer cannot cancel a segment or the order through the vendor/order endpoints', async () => {
       const { customer, order: o } = await order([p1, p2]);
-      expect((await world.api('patch', `/vendor/orders/segments/${await segmentOf(o.id, v2)}/status`, { token: customer.accessToken, body: { status: 'CANCELLED' } })).status).toBe(403);
-      expect((await world.api('patch', `/orders/${o.id}/status`, { token: customer.accessToken, body: { status: 'CANCELLED' } })).status).toBe(400);
+      expect((await world.api('patch', `/vendor/orders/segments/${await segmentOf(o.id, v2)}/status`, { token: customer.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } })).status).toBe(403);
+      expect((await world.api('patch', `/orders/${o.id}/status`, { token: customer.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } })).status).toBe(400);
       expect((await orderRow(o.id)).status).toBe('PENDING');
     });
   });

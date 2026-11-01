@@ -64,8 +64,11 @@ class HomeOffer {
   final bool isDemo;
 }
 
-/// Why a product appears in "Popular & New".
-enum HomeProductTag { popular, newItem }
+/// Why a product appears in a Home product section.
+enum HomeProductTag { popular, newItem, offer }
+
+/// The three Home product sections and their "See all" lists: "Most ordered", "New" and "Offers".
+enum HomeSectionKind { mostOrdered, newest, offers }
 
 class HomeProductEntry {
   const HomeProductEntry(

@@ -1,8 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { getBusinessConfigValue, setBusinessConfigValue } from '../../../lib/api/admin-business-config';
+import { clearBusinessConfigValue, getBusinessConfigValue, setBusinessConfigValue } from '../../../lib/api/admin-business-config';
+import {
+  EMPTY_ROUTE_DEFAULT_FORM,
+  ROUTE_DEFAULT_DEFS,
+  buildRouteDefault,
+  formFromValue,
+  statusOf,
+  type RouteDefaultDef,
+  type RouteDefaultForm,
+  type RouteDefaultStatus,
+} from '../../../lib/service-routes/route-defaults';
 import { apiErrorMessage } from '../../../lib/api/errors';
+import { useLang } from '../../../lib/ui/lang';
 
 const CUSTOMER_OTP_ENABLED_KEY = 'CUSTOMER_OTP_ENABLED';
 
@@ -11,8 +22,8 @@ const CUSTOMER_OTP_ENABLED_KEY = 'CUSTOMER_OTP_ENABLED';
  * of `BusinessConfigKey` (business-config-key.enum.ts) — NOT every key
  * the backend's generic `PUT admin/business-config/:key` would accept.
  * Deliberately excluded (documented in the M3a report, not silently
- * dropped): `HATLY_SERVICE_DEFAULT_PICKUP_LOCATION` /
- * `..._DESTINATION_LOCATION` (lat/lng/label objects) and
+ * dropped): the Hatly / Wasally default route locations (lat/lng/label objects — they have
+ * their own card, `RouteDefaultsCard`, below; PD-012) and
  * `CHECKOUT_ENABLED_ELECTRONIC_METHODS` (an array of a payment-method
  * enum needing a multi-select, not a single scalar control) — both real
  * capabilities, just outside this generic editor's single-scalar shape.
@@ -33,19 +44,18 @@ interface ConfigFieldDef {
 const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'AUTOMATIC_DISPATCH_ENABLED', label: 'Automatic Dispatch', type: 'boolean', help: 'OFF: orders wait for manual assignment on the Dispatch page instead of auto-assigning.' },
   { key: 'MULTI_VENDOR_ORDERS_ENABLED', label: 'Multi-Vendor Orders', type: 'boolean', help: 'OFF: checkout rejects a cart with more than one vendor group.' },
-  { key: 'VENDOR_SEGMENT_AUTO_ACCEPT_ENABLED', label: 'Vendor Segment Auto-Accept', type: 'boolean', help: 'ON: new vendor segments start CONFIRMED automatically instead of waiting for vendor acceptance.' },
   { key: 'VENDOR_SETTLEMENT_FREQUENCY', label: 'Vendor Settlement Frequency', type: 'enum', options: ['WEEKLY', 'MONTHLY'] },
   { key: 'DRIVER_SETTLEMENT_FREQUENCY', label: 'Driver Settlement Frequency', type: 'enum', options: ['WEEKLY', 'MONTHLY'] },
   { key: 'REGISTERED_VENDOR_PRICE_PER_100M_MINOR', label: 'Registered-Vendor Price per 100m', type: 'integer', unit: 'minor units' },
   { key: 'REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR', label: 'Registered-Vendor Minimum Delivery Fee', type: 'integer', unit: 'minor units' },
   { key: 'REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR', label: 'Registered-Vendor Additional-Vendor Fee', type: 'integer', unit: 'minor units' },
-  // PD-009 (amended): Hatly Service pricing is zone-based. Replaces the retired HATLY_SERVICE_DISTANCE_MULTIPLIER (never read).
+  // Hatly AND Wasally: base fee by the customer's address method, then this multiplier once. Replaces the retired HATLY_SERVICE_DISTANCE_MULTIPLIER (never read).
   {
     key: 'HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER',
-    label: 'Hatly Service Delivery Fee Multiplier',
+    label: 'Hatly & Wasally Delivery Fee Multiplier',
     type: 'decimal',
-    unit: '× zone fee',
-    help: "Hatly Service fee = Delivery Zone fee × Hatly Service multiplier. The customer's selected delivery zone is always used — a map pin or distance never changes the price. Approved default 1.5. Positive, up to 10. New quotes/orders only — placed orders keep their fee.",
+    unit: '× base fee',
+    help: "Applies to BOTH Hatly and Wasally, once, after the ordinary base delivery fee: Hatly / Wasally fee = base fee × this multiplier. The base fee is the selected delivery area's fixed fee (manual address) or the road-distance fee from the price per 100 m and minimum above (GPS address). It is never applied to the per-100 m price itself. Approved default 1.5. Positive, up to 10. New quotes/orders only — placed orders keep the fee they were frozen with.",
   },
   { key: 'MAX_BICYCLE_PICKUP_DISTANCE_METERS', label: 'Max Bicycle Pickup Distance', type: 'integer', unit: 'meters' },
   { key: 'DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES', label: 'Dispatch Assignment Lead Time', type: 'integer', unit: 'minutes' },
@@ -129,7 +139,7 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
           <select
             value={value || 'false'}
             onChange={(e) => { edited.current = true; setValue(e.target.value); setSaved(false); }}
-            className="rounded border px-2 py-1 text-sm"
+            className="min-h-[40px] rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
           >
             <option value="true">ON</option>
             <option value="false">OFF</option>
@@ -138,7 +148,7 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
           <select
             value={value}
             onChange={(e) => { edited.current = true; setValue(e.target.value); setSaved(false); }}
-            className="rounded border px-2 py-1 text-sm"
+            className="min-h-[40px] rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
           >
             <option value="">Unset</option>
             {field.options.map((o) => (
@@ -154,19 +164,186 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
             data-testid={`config-input-${field.key}`}
             value={value}
             onChange={(e) => { edited.current = true; setValue(e.target.value); setSaved(false); }}
-            className="w-40 rounded border px-2 py-1 text-sm"
+            className="min-h-[40px] w-40 rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
           />
         )}
         {field.unit && <span className="text-xs text-gray-400">{field.unit}</span>}
         <button
           onClick={handleSave}
           disabled={isSaving || !loaded}
-          className="rounded bg-hatly-orange px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+          className="min-h-[40px] rounded-lg bg-hatly-orange px-4 py-1 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
         >
           {isSaving ? 'Saving...' : 'Save'}
         </button>
         {saved && <span className="text-xs text-green-700">Saved</span>}
         {error && <span className="text-xs text-red-600">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+
+const STATUS_TEXT: Record<RouteDefaultStatus, { text: string; className: string }> = {
+  NOT_CONFIGURED: { text: 'Not configured — customers must choose this point themselves', className: 'text-amber-700' },
+  CONFIGURED: { text: 'Configured', className: 'text-green-700' },
+  INVALID: { text: 'Stored value is invalid — it is ignored until you save a valid one', className: 'text-red-700' },
+};
+
+/** One default route location: status, the three fields, Save (validated here and again by the backend) and Clear. */
+function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: (key: string, raw: unknown) => void }) {
+  const [form, setForm] = useState<RouteDefaultForm>({ ...EMPTY_ROUTE_DEFAULT_FORM });
+  const [status, setStatus] = useState<RouteDefaultStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await getBusinessConfigValue<unknown>(def.key);
+        if (cancelled) return;
+        setStatus(statusOf(raw));
+        setForm(formFromValue(raw));
+        onChanged(def.key, raw);
+      } catch (err: any) {
+        if (!cancelled) setError(apiErrorMessage(err, 'Failed to load.'));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [def.key]);
+
+  function edit(patch: Partial<RouteDefaultForm>) {
+    setForm((f) => ({ ...f, ...patch }));
+    setNote(null);
+  }
+
+  async function save() {
+    if (busy) return;
+    setError(null);
+    setNote(null);
+    const built = buildRouteDefault(form);
+    if (!built.ok) {
+      setError(built.error);
+      return;
+    }
+    setBusy(true);
+    try {
+      await setBusinessConfigValue(def.key, built.value);
+      setStatus('CONFIGURED');
+      setForm(formFromValue(built.value));
+      onChanged(def.key, built.value);
+      setNote('Saved. New quotes use it immediately; placed orders keep the route they were frozen with.');
+    } catch (err: any) {
+      setError(apiErrorMessage(err, 'Failed to save.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clear() {
+    if (busy) return;
+    if (!window.confirm(`Clear "${def.title}"? Customers will then have to choose this point themselves.`)) return;
+    setError(null);
+    setNote(null);
+    setBusy(true);
+    try {
+      await clearBusinessConfigValue(def.key);
+      setStatus('NOT_CONFIGURED');
+      setForm({ ...EMPTY_ROUTE_DEFAULT_FORM });
+      onChanged(def.key, null);
+      setNote('Cleared.');
+    } catch (err: any) {
+      setError(apiErrorMessage(err, 'Failed to clear.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const s = status ? STATUS_TEXT[status] : null;
+  return (
+    <div className="border-b py-3 last:border-0" data-testid={`route-default-${def.key}`}>
+      <p className="text-sm font-medium">{def.title}</p>
+      <p className="text-xs text-gray-500">{def.help}</p>
+      <p className={`mt-1 text-xs ${s?.className ?? 'text-gray-400'}`} data-testid={`route-default-status-${def.key}`}>
+        {s ? s.text : 'Loading...'}
+      </p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-[8rem_8rem_1fr]">
+        <input
+          aria-label={`${def.title} latitude`}
+          data-testid={`route-default-lat-${def.key}`}
+          inputMode="decimal"
+          placeholder="Latitude"
+          value={form.latitude}
+          onChange={(e) => edit({ latitude: e.target.value })}
+          className="rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
+        />
+        <input
+          aria-label={`${def.title} longitude`}
+          data-testid={`route-default-lng-${def.key}`}
+          inputMode="decimal"
+          placeholder="Longitude"
+          value={form.longitude}
+          onChange={(e) => edit({ longitude: e.target.value })}
+          className="rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
+        />
+        <input
+          aria-label={`${def.title} label`}
+          data-testid={`route-default-label-${def.key}`}
+          maxLength={120}
+          placeholder="Label customers see (e.g. the place name)"
+          value={form.label}
+          onChange={(e) => edit({ label: e.target.value })}
+          className="rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
+        />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button onClick={save} disabled={busy || status === null} className="rounded-lg bg-hatly-orange px-3 py-1 text-xs font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
+          {busy ? 'Working...' : 'Save'}
+        </button>
+        <button onClick={clear} disabled={busy || status === null || status === 'NOT_CONFIGURED'} className="rounded-lg border px-3 py-1 text-xs disabled:opacity-50 border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
+          Clear
+        </button>
+        {note && <span className="text-xs text-green-700">{note}</span>}
+        {error && <span className="text-xs text-red-600" role="alert">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * PD-012. Where Hatly and Wasally routes start and end when the customer does not choose. Hatly has an origin and a destination
+ * default; Wasally only a destination default (a Wasally pick-up is always the customer's choice). Nothing is pre-filled or invented:
+ * until a default is saved the customer app asks the customer to choose that point.
+ */
+function RouteDefaultsCard() {
+  const [values, setValues] = useState<Record<string, unknown>>({});
+  const [loadedKeys, setLoadedKeys] = useState<Set<string>>(new Set());
+  const onChanged = (key: string, raw: unknown) => {
+    setValues((v) => ({ ...v, [key]: raw }));
+    setLoadedKeys((k) => new Set(k).add(key));
+  };
+  const missing = ROUTE_DEFAULT_DEFS.filter((d) => loadedKeys.has(d.key) && statusOf(values[d.key]) !== 'CONFIGURED');
+  return (
+    <div className="mt-6 rounded-xl border bg-white p-4 border-gray-200 shadow-sm" data-testid="route-defaults-card">
+      <h2 className="font-semibold">Hatly &amp; Wasally default route points</h2>
+      <p className="mt-1 text-xs text-gray-500">
+        Every Hatly / Wasally request goes from an origin to a destination. Each end is the customer&apos;s own choice; when they do not
+        choose one, the default below is used. Hatly and Wasally keep separate defaults. A default is never taken from the customer&apos;s
+        address, and nothing is filled in for you: enter the real coordinates and the name customers will see.
+      </p>
+      {missing.length > 0 && (
+        <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800" data-testid="route-defaults-missing">
+          Still to enter: {missing.map((d) => d.title).join(' · ')}.
+        </p>
+      )}
+      <div className="mt-2">
+        {ROUTE_DEFAULT_DEFS.map((def) => (
+          <RouteDefaultRow key={def.key} def={def} onChanged={onChanged} />
+        ))}
       </div>
     </div>
   );
@@ -225,12 +402,12 @@ function ManualTransferDestinationForm() {
 
   return (
     <form onSubmit={handleSave} className="space-y-2">
-      <input value={label} onChange={(e) => { setLabel(e.target.value); setSaved(false); }} placeholder="Label (e.g. InstaPay)" className="w-full rounded border px-2 py-1.5 text-sm" />
-      <input value={phoneOrAccountNumber} onChange={(e) => { setPhoneOrAccountNumber(e.target.value); setSaved(false); }} placeholder="Phone or account number" className="w-full rounded border px-2 py-1.5 text-sm" />
-      <input value={accountName} onChange={(e) => { setAccountName(e.target.value); setSaved(false); }} placeholder="Account name (optional)" className="w-full rounded border px-2 py-1.5 text-sm" />
+      <input value={label} onChange={(e) => { setLabel(e.target.value); setSaved(false); }} placeholder="Label (e.g. InstaPay)" className="w-full rounded-lg border px-2 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+      <input value={phoneOrAccountNumber} onChange={(e) => { setPhoneOrAccountNumber(e.target.value); setSaved(false); }} placeholder="Phone or account number" className="w-full rounded-lg border px-2 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+      <input value={accountName} onChange={(e) => { setAccountName(e.target.value); setSaved(false); }} placeholder="Account name (optional)" className="w-full rounded-lg border px-2 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
       {error && <p className="text-sm text-red-600">{error}</p>}
       {saved && <p className="text-sm text-green-700">Saved.</p>}
-      <button type="submit" disabled={isSaving} className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+      <button type="submit" disabled={isSaving} className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
         {isSaving ? 'Saving...' : 'Save'}
       </button>
     </form>
@@ -245,6 +422,7 @@ function ManualTransferDestinationForm() {
  * server-side; a 403 here shows as a plain error, never bypassed).
  */
 export default function SettingsPage() {
+  const { t: tl } = useLang();
   const [otpEnabled, setOtpEnabled] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -272,14 +450,14 @@ export default function SettingsPage() {
       // matching this Dashboard's existing convention (no new
       // confirmation-dialog infrastructure introduced).
       const confirmed = window.confirm(
-        'Switch Customer authentication to Password mode? Customers will use Phone + Password instead of OTP until this is turned back on.',
+        'Turn OFF phone verification by OTP? New customers will still register and sign in with Phone + Password, but they will not be asked to verify their phone number with a code until this is turned back on. Existing accounts and sessions are not affected.',
       );
       if (!confirmed) return;
     }
     setIsSaving(true);
     setError(null);
     try {
-      await setBusinessConfigValue(CUSTOMER_OTP_ENABLED_KEY, next, 'Controls whether Customers authenticate via OTP or Password.');
+      await setBusinessConfigValue(CUSTOMER_OTP_ENABLED_KEY, next, 'Controls first-time phone verification by OTP during customer registration. It never changes sign-in: customers always sign in with phone + password.');
       setOtpEnabled(next);
     } catch (err: any) {
       setError(apiErrorMessage(err, 'Failed to update setting.'));
@@ -289,23 +467,38 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <h1 className="text-xl font-semibold">Settings</h1>
+    <div className="max-w-6xl">
+      <div className="min-w-0"><h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{tl('Settings', 'الإعدادات')}</h1><p className="mt-1 max-w-3xl text-sm text-gray-500">{tl('Platform-wide settings. A change applies immediately to every customer and vendor.', 'إعدادات على مستوى المنصة. يسري أي تغيير فورًا على كل العملاء والمتاجر.')}</p></div>
 
-      <div className="mt-6 rounded border bg-white p-4">
-        <div className="flex items-center justify-between">
+      <nav aria-label={tl('Settings sections', 'أقسام الإعدادات')} className="sticky top-0 z-10 -mx-1 mt-4 flex gap-2 overflow-x-auto bg-gray-50/95 px-1 py-2 backdrop-blur" data-testid="settings-nav">
+        {([['sec-auth', tl('Authentication', 'تسجيل الدخول')], ['sec-config', tl('Operational configuration', 'الإعدادات التشغيلية')], ['sec-routes', tl('Hatly & Wasally routes', 'مسارات هاتلي ووصّلي')], ['sec-payments', tl('Manual transfer', 'التحويل اليدوي')]] as const).map(([id, label]) => (
+          <a key={id} href={`#${id}`} className="inline-flex min-h-[40px] shrink-0 items-center rounded-full border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{label}</a>
+        ))}
+      </nav>
+
+      <div id="sec-auth" className="mt-4 scroll-mt-16 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="font-medium">Customer Authentication — OTP</p>
-            {otpEnabled === true && <p className="mt-1 text-sm text-gray-500">ON: Customers authenticate with OTP.</p>}
+            <p className="mt-1 text-sm text-gray-500">
+              OTP is used only to verify a customer&apos;s phone number the first time, during registration. It is not used to
+              sign in: customers always sign in with phone + password, and every account has a password.
+            </p>
+            {otpEnabled === true && (
+              <p className="mt-1 text-sm text-gray-500">ON: new customers are asked to verify their phone number with a code.</p>
+            )}
             {otpEnabled === false && (
-              <p className="mt-1 text-sm text-gray-500">OFF: Customers authenticate with Password instead of OTP.</p>
+              <p className="mt-1 text-sm text-gray-500">
+                OFF: new customers register with phone + password and are not asked for a code; their phone stays unverified until
+                verification is turned back on and they complete it.
+              </p>
             )}
           </div>
           {otpEnabled !== null && (
             <button
               onClick={handleToggle}
               disabled={isSaving}
-              className={`rounded px-4 py-2 text-sm font-medium text-white disabled:opacity-50 ${
+              className={`min-h-[44px] rounded-lg px-5 py-2 text-sm font-medium text-white disabled:opacity-50 ${
                 otpEnabled ? 'bg-hatly-orange' : 'bg-gray-500'
               }`}
             >
@@ -314,7 +507,7 @@ export default function SettingsPage() {
           )}
         </div>
         {error && (
-          <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {error}{' '}
             <button onClick={load} className="underline">
               Retry
@@ -324,7 +517,7 @@ export default function SettingsPage() {
         {otpEnabled === null && !error && <p className="mt-3 text-sm text-gray-500">Loading...</p>}
       </div>
 
-      <div className="mt-6 rounded border bg-white p-4">
+      <div id="sec-config" className="mt-6 scroll-mt-16 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
         <h2 className="font-semibold">Operational Configuration</h2>
         <p className="mt-1 text-xs text-gray-500">
           Each value is saved independently. An unset value shown blank means the backend has no value yet — the
@@ -337,7 +530,9 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      <div className="mt-6 rounded border bg-white p-4">
+      <div id="sec-routes" className="scroll-mt-16"><RouteDefaultsCard /></div>
+
+      <div id="sec-payments" className="mt-6 scroll-mt-16 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
         <h2 className="font-semibold">Manual Transfer Destination</h2>
         <p className="mt-1 text-xs text-gray-500">Until set, Manual Transfer payments fail closed.</p>
         <div className="mt-2">

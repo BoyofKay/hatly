@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { notificationTypeForStatus, recordOrderNotification } from '../notifications/customer-notification-events';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
@@ -13,14 +14,17 @@ import { Product } from '../products/entities/product.entity';
 import { InventoryMode } from '../products/inventory-mode.enum';
 import { BestSellingCacheService } from '../discovery/best-selling-cache.service';
 import { Payment } from '../payments/entities/payment.entity';
+import { DispatchAlert } from '../delivery/entities/dispatch-alert.entity';
 import { Delivery } from '../delivery/entities/delivery.entity';
 import { Driver } from '../delivery/entities/driver.entity';
 import { restoreTrackedInventoryForSegments } from './tracked-inventory.util';
 import { PaymentStatus } from '../payments/payment-status.enum';
 import { ManualTransferRefundService } from '../payments/manual-transfer-refund.service';
 import { PushNotificationService } from '../notifications/push-notification.service';
+import { StaffAlertsService } from '../notifications/staff-alerts.service';
+import { Permission } from '../permissions/permission.enum';
 import { OrderPaymentGateService } from './order-payment-gate.service';
-import { CUSTOMER_CANCELLABLE_ORDER_STATUSES } from './customer-cancellation-rule';
+import { CUSTOMER_CANCELLABLE_ORDER_STATUSES, customerCancellationBlock } from './customer-cancellation-rule';
 import { OrderStatusHistoryService } from './order-status-history.service';
 import { OrderWalletRefundService } from './order-wallet-refund.service';
 import { OfferConsumptionService } from '../offers/offer-consumption.service';
@@ -193,6 +197,8 @@ export class OrderStateMachineService {
     private readonly orderPaymentGateService: OrderPaymentGateService,
     private readonly orderStatusHistoryService: OrderStatusHistoryService,
     private readonly orderWalletRefundService: OrderWalletRefundService,
+    // Staff inbox (Admin/Vendor notification centre). Optional so unit tests that build this service by hand keep working unchanged.
+    @Optional() private readonly staffAlerts?: StaffAlertsService,
   ) {}
 
   /**
@@ -255,11 +261,18 @@ export class OrderStateMachineService {
       );
     }
 
-    const customerMayCancel =
-      params.customerCancellation === true &&
-      params.actorRole === Role.CUSTOMER &&
-      params.to === OrderStatus.CANCELLED &&
-      CUSTOMER_CANCELLABLE_STATUSES.includes(order.status);
+    // The customer's own cancellation, decided HERE under the order lock (never trusted from the caller): PENDING / CONFIRMED as before, and —
+    // PD-014 — READY_FOR_PICKUP for an order made only of Hatly / Wasally service segments (no vendor, no driver yet). If a driver was
+    // assigned first the status is already ASSIGNED_TO_DRIVER and this is refused; if this wins, assignment sees CANCELLED and is refused.
+    let customerMayCancel = false;
+    if (params.customerCancellation === true && params.actorRole === Role.CUSTOMER && params.to === OrderStatus.CANCELLED) {
+      if (CUSTOMER_CANCELLABLE_STATUSES.includes(order.status)) {
+        customerMayCancel = true;
+      } else if (order.status === OrderStatus.READY_FOR_PICKUP) {
+        const orderSegments = await manager.find(OrderVendorSegment, { where: { orderId: order.id } });
+        customerMayCancel = customerCancellationBlock(order.status, orderSegments) === null;
+      }
+    }
 
     if (!roleMayUseRule(rule, params.actorRole) && !customerMayCancel) {
       throw new BadRequestException(
@@ -309,7 +322,7 @@ export class OrderStateMachineService {
           .getMany();
 
         const missingWeight = items.some(
-          (i) => i.pricingUnitSnapshot === PricingUnit.WEIGHT && i.actualWeightGrams == null,
+          (i) => !i.removedAt && i.pricingUnitSnapshot === PricingUnit.WEIGHT && i.actualWeightGrams == null,
         );
         if (missingWeight) {
           throw new BadRequestException({
@@ -429,6 +442,18 @@ export class OrderStateMachineService {
       // CANCELLED transition as the trigger, per the explicit
       // instruction not to invent a new cancellation state.
       await this.offerConsumptionService.reverseFlashSaleConsumptionForOrder(manager, order.id);
+      // PD-014: the discount/coupon entitlement of every still-unreversed segment discount goes back with the order (once — see
+      // OfferConsumptionService.reverseSubtotalDiscountConsumptionForOrder).
+      await this.offerConsumptionService.reverseSubtotalDiscountConsumptionForOrder(manager, order.id);
+
+      // A cancelled order no longer waits for a driver: its open dispatch alerts are resolved (they would otherwise keep the operations
+      // banner lit and be retried for an order nobody will deliver).
+      await manager
+        .createQueryBuilder()
+        .update(DispatchAlert)
+        .set({ resolvedAt: () => 'now()' })
+        .where('order_id = :orderId AND resolved_at IS NULL', { orderId: order.id })
+        .execute();
     }
 
     // Loyalty Earning (Chunk C). Inside this SAME locked transaction
@@ -463,10 +488,13 @@ export class OrderStateMachineService {
     // second order of the day sat at READY_FOR_PICKUP forever (found by the Group 8 journeys).
     // A driver is single-delivery today (vehicle_types.max_active_deliveries is not read anywhere),
     // so they are free again as soon as their delivery ends or is handed back.
+    // (Cancelling from READY_FOR_PICKUP frees nobody: no driver holds the order then — a delivery row left behind by an earlier
+    // release names a driver who may be on another order by now, and must not be marked available again.)
+    const driverHoldsOrder = fromStatus !== OrderStatus.READY_FOR_PICKUP;
     const releasesDriver =
       params.to === OrderStatus.DELIVERED ||
       params.to === OrderStatus.FAILED_DELIVERY ||
-      params.to === OrderStatus.CANCELLED ||
+      (params.to === OrderStatus.CANCELLED && driverHoldsOrder) ||
       (fromStatus === OrderStatus.ASSIGNED_TO_DRIVER && params.to === OrderStatus.READY_FOR_PICKUP);
     if (releasesDriver) {
       await manager
@@ -486,7 +514,42 @@ export class OrderStateMachineService {
       actorRole: params.actorRole,
       actorUserId: params.actorUserId ?? null,
     });
+    // The customer's in-app notification is written in this same transaction (so it can never disagree with the status), but in
+    // a savepoint and idempotently: a failure here is logged and never blocks the transition (see recordOrderNotification).
+    const notificationType = notificationTypeForStatus(params.to, saved.fulfillmentType);
+    if (notificationType) await recordOrderNotification(manager, saved, notificationType);
+    await this.notifyStaff(manager, saved, params);
     return { order: saved, fromStatus: fromStatus! };
+  }
+
+  /**
+   * Staff notifications of this transition, in the same transaction (a row exists iff the change committed; StaffAlertsService never throws):
+   * a cancelled order tells the staff of every vendor branch whose part was still active — or cancelled in this very transaction — to stop
+   * preparing; a failed delivery tells Operations staff who resolve order issues. The person who made the change is not told about it.
+   */
+  private async notifyStaff(manager: EntityManager, order: Order, params: OrderTransitionParams): Promise<void> {
+    if (!this.staffAlerts) return;
+    if (params.to === OrderStatus.CANCELLED) {
+      const branches: Array<{ vendor_branch_id: string }> = await manager.query(
+        `SELECT DISTINCT vendor_branch_id FROM order_vendor_segments
+          WHERE order_id = $1 AND group_type = 'CATALOG' AND vendor_branch_id IS NOT NULL AND (status <> 'CANCELLED' OR updated_at >= now())`,
+        [order.id],
+      );
+      for (const b of branches) {
+        await this.staffAlerts.alert(manager, {
+          eventKey: `order:${order.id}:cancelled:${b.vendor_branch_id}`, category: 'VENDOR_PART_CANCELLED', requiredAction: 'STOP_PREPARING',
+          recipients: await this.staffAlerts.vendorRecipients(manager, b.vendor_branch_id), excludeUserId: params.actorUserId ?? null,
+          orderId: order.id, orderNumber: order.orderNumber, vendorBranchId: b.vendor_branch_id,
+        });
+      }
+    }
+    if (params.to === OrderStatus.FAILED_DELIVERY) {
+      await this.staffAlerts.alert(manager, {
+        eventKey: `order:${order.id}:failed-delivery`, category: 'OPS_FAILED_DELIVERY', requiredAction: 'RESOLVE_FAILED_DELIVERY',
+        recipients: await this.staffAlerts.recipientsHolding(manager, [Permission.MANAGE_ORDER_ISSUES]), excludeUserId: params.actorUserId ?? null,
+        orderId: order.id, orderNumber: order.orderNumber,
+      });
+    }
   }
 
   private async runAfterCommit(updatedOrder: Order, fromStatus: OrderStatus, params: OrderTransitionParams): Promise<void> {

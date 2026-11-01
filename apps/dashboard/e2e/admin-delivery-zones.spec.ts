@@ -46,7 +46,7 @@ test.describe('Admin — Delivery Zones', () => {
 
   test('lists zones (Abu Naseeb is seeded) with city, fee and status', async ({ page }) => {
     await openPage(page);
-    await expect(page.getByTestId('zones-hatly-rule')).toHaveText('Hatly Service: fee = Delivery Zone fee × Hatly Service multiplier (Settings), with or without a map pin.');
+    await expect(page.getByTestId('zones-hatly-rule')).toHaveText("Hatly & Wasally: fee = base fee × the Hatly & Wasally multiplier (Settings). For a manually chosen area the base fee is this zone's fee; a GPS address uses road distance instead.");
     const table = page.getByTestId('zones-table');
     await expect(table).toBeVisible();
     await expect(table).toContainText('أبو نصيب');
@@ -155,12 +155,12 @@ test.describe('Admin — Delivery Zones', () => {
     await deactivate(page, zone.id);
   });
 
-  test('Settings: the Hatly Service multiplier explains the formula and refuses an invalid value', async ({ page }) => {
+  test('Settings: the Hatly & Wasally multiplier explains the formula and refuses an invalid value', async ({ page }) => {
     await page.goto('/settings');
-    await expect(page.getByText('Hatly Service fee = Delivery Zone fee × Hatly Service multiplier', { exact: false })).toBeVisible();
-    // PD-009 (amended): nothing on the setting implies distance-based Hatly Service pricing any more.
-    const help = page.locator('p', { hasText: 'Hatly Service fee = Delivery Zone fee' });
-    await expect(help).toContainText('a map pin or distance never changes the price');
+    await expect(page.getByText('Hatly / Wasally fee = base fee × this multiplier', { exact: false })).toBeVisible();
+    // The multiplier applies once to the base fee (zone fee or GPS road-distance fee) — never to the per-100 m price itself.
+    const help = page.locator('p', { hasText: 'Hatly / Wasally fee = base fee' });
+    await expect(help).toContainText('never applied to the per-100 m price itself');
     await expect(page.getByText('Normal Delivery Fee', { exact: false })).toHaveCount(0);
     const input = page.getByTestId('config-input-HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER');
     await expect(input).toHaveValue('1.5');

@@ -8,6 +8,12 @@ import { logBusinessEvent } from '../../../common/logging/log-business-event';
 import { BusinessEvent } from '../../../common/logging/business-events';
 
 const CACHE_TTL_SECONDS = 600; // 10 minutes — confirmed business decision
+/**
+ * Upper bound on one provider call. `fetch` has no timeout of its own: a hung connection to the provider used to hold the API request
+ * (and checkout, which needs the road distance) open indefinitely. Past this the call fails like an unreachable provider — the
+ * callers already treat that as "no suggestion" (address picker) or the documented distance fallback (checkout).
+ */
+export const MAPS_REQUEST_TIMEOUT_MS = 5_000;
 // Rounds to ~1.1m precision at the equator — normalizes trivial GPS/float
 // differences so repeated calls against "the same real-world spot" reliably
 // hit the cache, without materially changing which spot is meant.
@@ -66,6 +72,20 @@ export class GoogleMapsProvider implements MapProvider {
     });
   }
 
+  /**
+   * One provider HTTP call, bounded by MAPS_REQUEST_TIMEOUT_MS. Never logs the raw error object/message — a network-level fetch failure
+   * can in principle include request internals (the URL carries the API key); a fixed category is enough.
+   */
+  private async fetchBounded(url: URL): Promise<Response> {
+    try {
+      return await fetch(url.toString(), { signal: AbortSignal.timeout(MAPS_REQUEST_TIMEOUT_MS) });
+    } catch (error) {
+      const timedOut = (error as { name?: string })?.name === 'TimeoutError';
+      this.logFailure('error', timedOut ? 'timeout' : 'unreachable');
+      throw new Error(timedOut ? 'The maps provider did not answer in time.' : 'Could not reach the maps provider.');
+    }
+  }
+
   /** Address text → a point (Egypt only). Null when the provider knows no such place. */
   async geocode(address: string): Promise<GeoPoint | null> {
     const query = address.trim().toLowerCase();
@@ -106,13 +126,7 @@ export class GoogleMapsProvider implements MapProvider {
     url.searchParams.set('region', 'eg');
     url.searchParams.set('key', this.apiKey);
 
-    let response: Response;
-    try {
-      response = await fetch(url.toString());
-    } catch {
-      this.logFailure('error', 'unreachable');
-      throw new Error('Could not reach the maps provider.');
-    }
+    const response = await this.fetchBounded(url);
     if (!response.ok) {
       this.logFailure('error', `http_${response.status}`);
       throw new Error(`Maps provider returned HTTP ${response.status}.`);
@@ -162,17 +176,7 @@ export class GoogleMapsProvider implements MapProvider {
     url.searchParams.set('mode', 'driving');
     url.searchParams.set('key', this.apiKey);
 
-    let response: Response;
-    try {
-      response = await fetch(url.toString());
-    } catch {
-      // Never log the raw error object/message here — a network-level
-      // fetch failure can in principle include request internals; a
-      // safe, fixed category is enough to know "the dependency was
-      // unreachable" without risking exposure.
-      this.logFailure('error', 'unreachable');
-      throw new Error('Could not reach the maps provider.');
-    }
+    const response = await this.fetchBounded(url);
 
     if (!response.ok) {
       this.logFailure('error', `http_${response.status}`);

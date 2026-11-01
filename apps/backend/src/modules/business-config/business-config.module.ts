@@ -10,10 +10,11 @@ import { BusinessConfigController } from './business-config.controller';
 import { VehicleTypesController } from './vehicle-types.controller';
 import { HatlyServicePricingController } from './hatly-service-pricing.controller';
 import { SupportContactController } from './support-contact.controller';
+import { ServiceRouteDefaultsController } from './service-route-defaults.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([BusinessConfig, VehicleType, HatlyServicePricingConfig])],
-  controllers: [BusinessConfigController, VehicleTypesController, HatlyServicePricingController, SupportContactController],
+  controllers: [BusinessConfigController, VehicleTypesController, HatlyServicePricingController, SupportContactController, ServiceRouteDefaultsController],
   providers: [BusinessConfigService, VehicleTypesService, HatlyServicePricingService],
   // Exported so the future Dispatch module can inject
   // BusinessConfigService (for isAutomaticDispatchEnabled()) and

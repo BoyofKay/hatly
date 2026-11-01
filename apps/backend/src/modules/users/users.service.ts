@@ -34,6 +34,14 @@ export class UsersService {
     });
   }
 
+  /** The same narrow select as `findByPhoneWithPasswordHash`, by id — used to check a customer's CURRENT password. */
+  findByIdWithPasswordHash(id: string): Promise<User | null> {
+    return this.usersRepository.findOne({
+      where: { id },
+      select: ['id', 'phone', 'fullName', 'role', 'passwordHash', 'isActive', 'isPhoneVerified'],
+    });
+  }
+
   findById(id: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { id } });
   }
@@ -52,27 +60,32 @@ export class UsersService {
     return this.usersRepository.find({ where: { role: In([Role.ADMIN, Role.SUPER_ADMIN]) }, order: { createdAt: 'ASC' } });
   }
 
-  async createCustomer(params: {
-    phone: string;
-    fullName: string;
-    passwordHash?: string;
-  }): Promise<User> {
+  /**
+   * The ONLY way a customer account is created. A persistent customer account ALWAYS has a password: `passwordHash` is
+   * required, and an empty value is refused here as a last line of defence (callers validate and hash the password first), so
+   * no code path can create a passwordless customer. Guests who only browse have no account at all. The phone starts
+   * UNVERIFIED unless `phoneVerified` is passed — which only AuthService does, right after it has consumed a valid one-time
+   * code for this exact phone (never from request data). `id` lets the caller store the session before this irreversible write
+   * (see AuthService.registerCustomerWithPassword).
+   */
+  async createCustomer(params: { phone: string; fullName: string; passwordHash: string; id?: string; phoneVerified?: boolean }): Promise<User> {
+    if (!params.passwordHash) {
+      throw new Error('A customer account cannot be created without a password hash.');
+    }
     const user = this.usersRepository.create({
+      ...(params.id ? { id: params.id } : {}),
       phone: params.phone,
       fullName: params.fullName,
       passwordHash: params.passwordHash,
       role: Role.CUSTOMER,
+      isPhoneVerified: params.phoneVerified === true,
     });
     return this.usersRepository.save(user);
   }
 
   /**
-   * Customer Authentication Modes addition. Generic — sets/overwrites
-   * `passwordHash` for a given user id. Used by both the passwordless-
-   * attach flow and the authenticated password setup/change flow
-   * (AuthService). Does NOT touch `isPhoneVerified` or any other
-   * field — a plain, minimal, single-column update, matching this
-   * class's existing convention of small, purpose-specific methods.
+   * Sets `passwordHash` for a given user id (the authenticated password CHANGE flow in AuthService, which has already
+   * verified the current password). Does NOT touch `isPhoneVerified` or any other field.
    */
   async setPasswordHash(userId: string, passwordHash: string): Promise<void> {
     await this.usersRepository.update({ id: userId }, { passwordHash });

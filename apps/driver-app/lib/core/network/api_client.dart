@@ -36,7 +36,7 @@ class ApiClient {
           // (a real, pre-existing hang, not merely a theoretical one —
           // caught by this milestone's own session-expiry test).
           if (error.response?.statusCode == 401 && error.requestOptions.path != '/auth/refresh') {
-            final refreshed = await _tryRefresh();
+            final refreshed = await _refreshOnce();
             if (refreshed) {
               final retryResponse = await _dio.fetch(error.requestOptions);
               return handler.resolve(retryResponse);
@@ -55,13 +55,32 @@ class ApiClient {
 
   Dio get dio => _dio;
 
+  // Single-use refresh tokens with reuse detection on the backend (AuthService.refresh → RefreshTokenStore.rotate): presenting
+  // an already-rotated refresh token revokes EVERY session of the user. The GPS ping, the deliveries poll and screen refreshes run
+  // concurrently, so several 401s arrive together after the access token expires — each must await the SAME refresh, never start
+  // its own with the same token (that second refresh logged the driver out). Same in-flight-Future pattern as the customer app.
+  Future<bool>? _inFlightRefresh;
+
+  Future<bool> _refreshOnce() {
+    return _inFlightRefresh ??= _tryRefresh().whenComplete(() => _inFlightRefresh = null);
+  }
+
+  // Concurrent callers of a failed shared refresh are told about the expiry once, not once per request.
+  Future<void>? _inFlightSessionExpiry;
+
+  Future<void> _notifySessionExpiredOnce() {
+    return _inFlightSessionExpiry ??= (() async {
+      await tokenStorage.clear();
+      onSessionExpired?.call();
+    })().whenComplete(() => _inFlightSessionExpiry = null);
+  }
+
   Future<bool> _tryRefresh() async {
     final refreshToken = await tokenStorage.refreshToken;
     if (refreshToken == null) {
-      onSessionExpired?.call();
+      await _notifySessionExpiredOnce();
       return false;
     }
-
     try {
       final response = await _dio.post(
         '/auth/refresh',
@@ -74,8 +93,7 @@ class ApiClient {
       );
       return true;
     } catch (_) {
-      await tokenStorage.clear();
-      onSessionExpired?.call();
+      await _notifySessionExpiredOnce();
       return false;
     }
   }

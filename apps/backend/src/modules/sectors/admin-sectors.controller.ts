@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Optional, Param, Patch, Post } from '@nestjs/common';
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AdminAuditAction, AdminAuditService } from '../audit/admin-audit.service';
 import { ApiTags } from '@nestjs/swagger';
 import { RequiresPermission } from '../permissions/decorators/requires-permission.decorator';
 import { Permission } from '../permissions/permission.enum';
@@ -20,7 +22,10 @@ import { UpdateSectorDto } from './dto/update-sector.dto';
 @ApiTags('admin-sectors')
 @Controller('admin/sectors')
 export class AdminSectorsController {
-  constructor(private readonly sectorsService: SectorsService) {}
+  constructor(
+    private readonly sectorsService: SectorsService,
+    @Optional() private readonly audit?: AdminAuditService,
+  ) {}
 
   @Post()
   @RequiresPermission(Permission.MANAGE_MARKETPLACE_SECTORS)
@@ -45,8 +50,11 @@ export class AdminSectorsController {
 
   @Patch(':id')
   @RequiresPermission(Permission.MANAGE_MARKETPLACE_SECTORS)
-  async update(@Param('id') id: string, @Body() dto: UpdateSectorDto) {
+  async update(@Param('id') id: string, @Body() dto: UpdateSectorDto, @CurrentUser() actor: AuthenticatedUser) {
     const sector = await this.sectorsService.update(id, dto);
+    if (dto.customRequestsEnabled !== undefined) {
+      await this.audit?.record({ actorUserId: actor.id, actorRole: actor.role, action: AdminAuditAction.SECTOR_CUSTOM_REQUESTS_CHANGED, targetType: 'sector', targetId: id, metadata: { enabled: dto.customRequestsEnabled } });
+    }
     return { data: sector };
   }
 

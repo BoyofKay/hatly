@@ -12,6 +12,10 @@ import { VENDOR_A_PHONE, VENDOR_A_PASSWORD, VENDOR_A_STORAGE_STATE } from './env
  * `storageState` instead of spending more of that same budget on a redundant UI login.
  */
 test.describe('Vendor authentication — real login form', () => {
+  // The Vendor area is Arabic-first; these tests assert the English wording, so the browser starts in English (the Arabic default has its own test in vendor-hub.spec.ts).
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => { try { if (!window.localStorage.getItem('hatly_dashboard_locale')) window.localStorage.setItem('hatly_dashboard_locale', 'en'); } catch { /* storage unavailable */ } });
+  });
   test('an unauthenticated visitor to a vendor route is redirected to /login', async ({ page }) => {
     await page.goto('/orders');
     await expect(page).toHaveURL(/\/login$/);
@@ -58,28 +62,21 @@ test.describe('Vendor authentication — session lifecycle', () => {
   });
 
   test(
-    'REGRESSION (Sales Release Candidate hardening — session-expiry fix): an invalid/expired session is not left ' +
-      'stuck on a broken page — the first API call redirects cleanly to /login',
-    async ({ page }) => {
+    'REGRESSION (session-expiry fix): an invalid/expired session is not left stuck on a broken page — the first API call ' +
+      'ends the session cleanly and redirects to /login',
+    async ({ page, context }) => {
       await page.goto('/orders');
       await expect(page.getByRole('heading', { name: 'Incoming Orders' })).toBeVisible();
 
-      // Swap in a WELL-FORMED-but-invalid token: it decodes successfully client-side (so
-      // VendorLayout's own mount-time local decode still lets the vendor "in" — this must NOT be
-      // caught by that pre-existing, purely-local guard, or the test would prove the wrong thing),
-      // but its signature is garbage, so the backend genuinely rejects it with 401 on the first
-      // real API call — exactly what a genuinely expired/invalidated token looks like from the
-      // client's perspective.
-      await page.evaluate(() => {
-        const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-        const payload = btoa(JSON.stringify({ sub: 'x', role: 'VENDOR_MANAGER', phone: '+201098765432' }));
-        window.localStorage.setItem('hatly_dashboard_token', `${header}.${payload}.not-a-real-signature`);
-      });
+      // The session now lives in HttpOnly cookies: replace BOTH with garbage, as a revoked / tampered session looks from the browser.
+      // The page still has its locally-kept profile (so its own mount-time guard lets it render), but the API rejects the cookie (401),
+      // the transparent refresh is refused too, and the only sensible outcome is the login screen.
+      const cookies = await context.cookies();
+      await context.addCookies(cookies.filter((c) => c.name === 'hatly_at' || c.name === 'hatly_rt').map((c) => ({ ...c, value: 'not-a-real-token' })));
 
       await page.reload();
-      // Before the fix: stuck on /orders showing "Failed to load orders." forever.
       await expect(page).toHaveURL(/\/login$/, { timeout: 10_000 });
-      expect(await page.evaluate(() => window.localStorage.getItem('hatly_dashboard_token'))).toBeNull();
+      expect(await page.evaluate(() => window.localStorage.getItem('hatly_dashboard_user'))).toBeNull();
     },
   );
 });

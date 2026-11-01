@@ -4,6 +4,7 @@ import { EntityManager, Repository } from 'typeorm';
 import { BusinessConfig } from './entities/business-config.entity';
 import { BusinessConfigKey } from './business-config-key.enum';
 import { SettlementFrequency } from '../finance/settlement-frequency.enum';
+import { isPointInEgypt } from '../addresses/address-mode';
 import { ELECTRONIC_PAYMENT_METHODS, ElectronicPaymentMethod } from '../payments/electronic-payment-method.enum';
 
 /** A positive decimal factor no larger than 10 (a typo guard, not a business limit), with at most 4 decimal places. */
@@ -11,11 +12,58 @@ export function isValidHatlyServiceMultiplier(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 10 && Math.round(value * 10000) === value * 10000;
 }
 
+export interface ServiceLocation {
+  latitude: number;
+  longitude: number;
+  label: string;
+}
+
+/** Roughly Egypt (the same box the address service uses): a typo guard for a default route location, not a business rule. */
+export function isValidServiceLocation(value: unknown): value is ServiceLocation {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.latitude === 'number' &&
+    typeof v.longitude === 'number' &&
+    Number.isFinite(v.latitude) &&
+    Number.isFinite(v.longitude) &&
+    isPointInEgypt(v.latitude, v.longitude) &&
+    typeof v.label === 'string' &&
+    v.label.trim().length > 0 &&
+    v.label.trim().length <= 120
+  );
+}
+
+/** Settings an Admin may CLEAR (back to "not configured") — the route defaults, which must never be invented, only unset. */
+const CLEARABLE_KEYS: ReadonlySet<string> = new Set([
+  BusinessConfigKey.HATLY_SERVICE_DEFAULT_PICKUP_LOCATION,
+  BusinessConfigKey.HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION,
+  BusinessConfigKey.WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION,
+]);
+
 /** Keys whose value has a known shape: a write that does not match is refused (400) instead of breaking pricing later. */
 const VALUE_VALIDATORS: Partial<Record<string, { valid: (v: unknown) => boolean; message: string }>> = {
   [BusinessConfigKey.HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER]: {
     valid: isValidHatlyServiceMultiplier,
     message: 'The Hatly Service delivery fee multiplier must be a positive number up to 10 (e.g. 1.5).',
+  },
+  [BusinessConfigKey.HATLY_SERVICE_DEFAULT_PICKUP_LOCATION]: {
+    valid: isValidServiceLocation,
+    message: 'HATLY_SERVICE_DEFAULT_PICKUP_LOCATION must be { latitude, longitude, label } inside Egypt with a label of 1-120 characters (use DELETE to clear it).',
+  },
+  [BusinessConfigKey.HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION]: {
+    valid: isValidServiceLocation,
+    message: 'HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION must be { latitude, longitude, label } inside Egypt with a label of 1-120 characters (use DELETE to clear it).',
+  },
+  [BusinessConfigKey.WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION]: {
+    valid: isValidServiceLocation,
+    message: 'WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION must be { latitude, longitude, label } inside Egypt with a label of 1-120 characters (use DELETE to clear it).',
+  },
+  // Customer phone verification switch: a real boolean only — `0`, `""`, `"false"` or `null` must never be stored and later read
+  // by truthiness (which would silently turn OTP off, or fail to).
+  [BusinessConfigKey.CUSTOMER_OTP_ENABLED]: {
+    valid: (v) => typeof v === 'boolean',
+    message: 'CUSTOMER_OTP_ENABLED must be true or false.',
   },
 };
 
@@ -101,6 +149,18 @@ export class BusinessConfigService {
   }
 
   /**
+   * Clears a clearable setting (a Hatly / Wasally default route location) so it is "not configured" again. Idempotent. Any other key is
+   * refused: pricing and operational settings are changed, never removed.
+   */
+  async unset(key: string): Promise<{ key: string; cleared: boolean }> {
+    if (!CLEARABLE_KEYS.has(key)) {
+      throw new BadRequestException({ message: `"${key}" cannot be cleared.`, details: { code: 'BUSINESS_CONFIG_NOT_CLEARABLE', key } });
+    }
+    const result = await this.repo.delete({ key });
+    return { key, cleared: (result.affected ?? 0) > 0 };
+  }
+
+  /**
    * The confirmed Automatic Dispatch master switch (approved this
    * phase). Defaults to `true` (dispatch operates normally) when
    * unset — an operational bootstrap default, not a business-rule
@@ -125,15 +185,6 @@ export class BusinessConfigService {
    */
   async isMultiVendorOrdersEnabled(): Promise<boolean> {
     return this.get<boolean>(BusinessConfigKey.MULTI_VENDOR_ORDERS_ENABLED, true);
-  }
-
-  /**
-   * PHASE 4 addition. Default `false` when unset, matching the seeded
-   * default — preserves Phase B's manual-acceptance behavior unless
-   * an Admin deliberately turns this on.
-   */
-  async isVendorSegmentAutoAcceptEnabled(): Promise<boolean> {
-    return this.get<boolean>(BusinessConfigKey.VENDOR_SEGMENT_AUTO_ACCEPT_ENABLED, false);
   }
 
   /**
@@ -206,6 +257,29 @@ export class BusinessConfigService {
     return value;
   }
 
+  /**
+   * PD-012. One configured route default, or null when it is unset OR holds an invalid value (an invalid stored value is never used
+   * to route a courier; the Dashboard shows it as invalid). Never invents or substitutes a location.
+   */
+  async getServiceLocation(key: BusinessConfigKey, manager?: EntityManager): Promise<ServiceLocation | null> {
+    const value = await this.get<unknown>(key, null, manager);
+    if (!isValidServiceLocation(value)) return null;
+    return { latitude: value.latitude, longitude: value.longitude, label: value.label.trim() };
+  }
+
+  /** The three configured defaults, for the customer app: Hatly origin + destination, Wasally destination (Wasally has no origin default). */
+  async getServiceRouteDefaults(manager?: EntityManager): Promise<{
+    hatly: { origin: ServiceLocation | null; destination: ServiceLocation | null };
+    wasally: { destination: ServiceLocation | null };
+  }> {
+    const [hatlyOrigin, hatlyDestination, wasallyDestination] = await Promise.all([
+      this.getServiceLocation(BusinessConfigKey.HATLY_SERVICE_DEFAULT_PICKUP_LOCATION, manager),
+      this.getServiceLocation(BusinessConfigKey.HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION, manager),
+      this.getServiceLocation(BusinessConfigKey.WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION, manager),
+    ]);
+    return { hatly: { origin: hatlyOrigin, destination: hatlyDestination }, wasally: { destination: wasallyDestination } };
+  }
+
   async getVendorSettlementFrequency(): Promise<SettlementFrequency> {
     return this.getRequired(BusinessConfigKey.VENDOR_SETTLEMENT_FREQUENCY);
   }
@@ -217,13 +291,15 @@ export class BusinessConfigService {
   /**
    * Customer Authentication Modes (master implementation). Default
    * `true` (OTP mode) when unset, following the exact same pattern as
-   * `isAutomaticDispatchEnabled()`/`isVendorSegmentAutoAcceptEnabled()`
+   * `isAutomaticDispatchEnabled()`
    * above — read fresh from Postgres on every call, no caching, so a
    * Dashboard change takes effect on the very next authentication
    * request with no restart required.
    */
   async isCustomerOtpEnabled(): Promise<boolean> {
-    return this.get<boolean>(BusinessConfigKey.CUSTOMER_OTP_ENABLED, true);
+    // FAIL SAFE: only an explicit boolean `false` (set by an authorized admin) turns phone verification off. Unset, or any malformed
+    // value stored before validation existed, keeps OTP ON.
+    return (await this.get<unknown>(BusinessConfigKey.CUSTOMER_OTP_ENABLED, true)) !== false;
   }
 
   /**

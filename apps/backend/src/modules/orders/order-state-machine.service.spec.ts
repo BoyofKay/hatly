@@ -96,7 +96,7 @@ function buildHarness(order: any, segmentItems: any[] = [], delivery?: { driverI
   const ordersRepository = { findOne: async (_opts: any) => ({ ...store }) };
   const orderFinancialEventsService = { handleTransition: jest.fn(async () => undefined) };
   const bestSellingCacheService = { recordDeliveredSales: jest.fn(async () => undefined) };
-  const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+  const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
   const loyaltyService = { awardOrderEarning: jest.fn(async () => undefined) };
   const manualTransferRefundService = { recordRefund: jest.fn(async () => undefined) };
   const pushNotificationService = {
@@ -144,6 +144,8 @@ function buildInventoryHarness(params: {
   const paymentStore = params.payment ? { ...params.payment } : null;
 
   const manager = {
+    // The order id of a segment and the stock-ledger context (a no-op for this fake store).
+    query: async (sql: string) => (sql.includes('order_vendor_segments') ? [{ order_id: 'order-1' }] : [{ set_config: '' }]),
     findOne: async (_EntityClass: any, _opts: any) => ({ ...store }),
     save: async (entity: any) => {
       Object.assign(store, entity);
@@ -217,7 +219,7 @@ function buildInventoryHarness(params: {
   const ordersRepository = { findOne: async (_opts: any) => ({ ...store }) };
   const orderFinancialEventsService = { handleTransition: jest.fn(async () => undefined) };
   const bestSellingCacheService = { recordDeliveredSales: jest.fn(async () => undefined) };
-  const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+  const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
   const loyaltyService = { awardOrderEarning: jest.fn(async () => undefined) };
   const manualTransferRefundService = {
     recordRefund: jest.fn(
@@ -300,6 +302,12 @@ describe('OrderStateMachineService — delivery timestamps (Group 8 regression)'
   ])('keeps the driver busy on %s -> %s', async (from, to, role) => {
     const service = buildHarness({ id: 'order-1', status: from });
     await service.transition({ orderId: 'order-1', to, actorRole: role });
+    expect(driverReleases).toEqual([]);
+  });
+
+  it('cancelling from READY_FOR_PICKUP frees NO driver (PD-014: the delivery row may name a driver released earlier who is on another order now)', async () => {
+    const service = buildHarness({ id: 'order-1', status: OrderStatus.READY_FOR_PICKUP });
+    await service.transition({ orderId: 'order-1', to: OrderStatus.CANCELLED, actorRole: Role.ADMIN });
     expect(driverReleases).toEqual([]);
   });
 
@@ -486,7 +494,7 @@ describe('OrderStateMachineService — post-commit financial hook never blocks a
       }),
     };
     const bestSellingCacheService = { recordDeliveredSales: jest.fn(async () => undefined) };
-    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
   const loyaltyService = { awardOrderEarning: jest.fn(async () => undefined) };
   const manualTransferRefundService = { recordRefund: jest.fn(async () => undefined) };
   const pushNotificationService = {
@@ -532,6 +540,8 @@ describe('OrderStateMachineService — Weighted Products PICKED_UP gate (Phase G
     const items = params.items;
 
     const manager = {
+      // The order id of a segment and the stock-ledger context (a no-op for this fake store).
+  query: async (sql: string) => (sql.includes('order_vendor_segments') ? [{ order_id: 'order-1' }] : [{ set_config: '' }]),
       findOne: async (EntityClass: any, _opts: any) => {
         if (EntityClass === Order) return { ...orderStore };
         throw new Error(`unhandled findOne ${EntityClass.name}`);
@@ -564,7 +574,7 @@ describe('OrderStateMachineService — Weighted Products PICKED_UP gate (Phase G
     const ordersRepository = { findOne: async () => ({ ...orderStore }) };
     const orderFinancialEventsService = { handleTransition: jest.fn(async () => undefined) };
     const bestSellingCacheService = { recordDeliveredSales: jest.fn(async () => undefined) };
-    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
   const loyaltyService = { awardOrderEarning: jest.fn(async () => undefined) };
   const manualTransferRefundService = { recordRefund: jest.fn(async () => undefined) };
   const pushNotificationService = {
@@ -689,7 +699,7 @@ describe('OrderStateMachineService — Best Selling cache hook (Discovery & Rank
     const ordersRepository = { findOne: async () => ({ ...store }) };
     const orderFinancialEventsService = { handleTransition: jest.fn(async () => undefined) };
     const bestSellingCacheService = { recordDeliveredSales: jest.fn(async () => undefined) };
-    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
   const loyaltyService = { awardOrderEarning: jest.fn(async () => undefined) };
   const manualTransferRefundService = { recordRefund: jest.fn(async () => undefined) };
   const pushNotificationService = {
@@ -761,7 +771,7 @@ describe('OrderStateMachineService — Best Selling cache hook (Discovery & Rank
         throw new Error('transient DB error while incrementing Product counters');
       }),
     };
-    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
   const loyaltyService = { awardOrderEarning: jest.fn(async () => undefined) };
   const manualTransferRefundService = { recordRefund: jest.fn(async () => undefined) };
   const pushNotificationService = {
@@ -815,6 +825,7 @@ describe('OrderStateMachineService — Offers Final System: Flash Sale cancellat
     const bestSellingCacheService = { recordDeliveredSales: jest.fn(async () => undefined) };
     const offerConsumptionService = {
       reverseFlashSaleConsumptionForOrder: jest.fn(async (_manager: unknown, _orderId: string) => undefined),
+      reverseSubtotalDiscountConsumptionForOrder: jest.fn(async (_manager: unknown, _orderId: string) => undefined),
     };
   const loyaltyService = { awardOrderEarning: jest.fn(async () => undefined) };
   const manualTransferRefundService = { recordRefund: jest.fn(async () => undefined) };
@@ -876,7 +887,7 @@ describe('OrderStateMachineService — Loyalty Earning (Chunk C) wiring', () => 
     const ordersRepository = { findOne: async (_opts: any) => ({ ...store }) };
     const orderFinancialEventsService = { handleTransition: jest.fn(async () => undefined) };
     const bestSellingCacheService = { recordDeliveredSales: jest.fn(async () => undefined) };
-    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
     const loyaltyService = {
       awardOrderEarning: jest.fn(async (_manager: unknown, _orderId: string) => undefined),
     };
@@ -1359,7 +1370,7 @@ describe('OrderStateMachineService — Failed Delivery Metadata (Chunk 1)', () =
     };
     const dataSource = { transaction: async (cb: any) => cb(manager) };
     const ordersRepository = { findOne: async () => ({ ...store }) };
-    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
     const manualTransferRefundService = { recordRefund: jest.fn(async () => undefined) };
   const pushNotificationService = {
     sendOrderConfirmedNotification: jest.fn(async () => undefined),
@@ -1407,7 +1418,7 @@ describe('OrderStateMachineService — Failed Delivery Metadata (Chunk 1)', () =
     };
     const dataSource = { transaction: async (cb: any) => cb(manager) };
     const ordersRepository = { findOne: async () => ({ ...store }) };
-    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
     const service = new OrderStateMachineService(
       ordersRepository as any,
       dataSource as any,
@@ -1466,7 +1477,7 @@ describe('OrderStateMachineService — Customer Push Notifications (Chunk A)', (
     const ordersRepository = { findOne: async () => ({ ...store }) };
     const orderFinancialEventsService = { handleTransition: jest.fn(async () => undefined) };
     const bestSellingCacheService = { recordDeliveredSales: jest.fn(async () => undefined) };
-    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
     const loyaltyService = { awardOrderEarning: jest.fn(async () => undefined) };
     const manualTransferRefundService = { recordRefund: jest.fn(async () => undefined) };
     const pushNotificationService = {
@@ -1588,7 +1599,7 @@ describe('OrderStateMachineService — structured business-event logging (Group 
     const ordersRepository = { findOne: async () => ({ ...store }) };
     const orderFinancialEventsService = { handleTransition: jest.fn(async () => undefined) };
     const bestSellingCacheService = { recordDeliveredSales: jest.fn(async () => undefined) };
-    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+    const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
     const loyaltyService = { awardOrderEarning: jest.fn(async () => undefined) };
     const manualTransferRefundService = { recordRefund: jest.fn(async () => undefined) };
     const pushNotificationService = {
@@ -1773,6 +1784,49 @@ describe('OrderStateMachineService — customer cancellation door (PD-005)', () 
     OrderStatus.CANCELLED,
   ])('a customer can NEVER cancel a %s order — even through the customer path', async (status) => {
     const h = buildInventoryHarness({ orderStatus: status, segments: [], items: [], products: [] });
+    await expect(cancelAsCustomer(h)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('PD-014: a customer CAN cancel a READY_FOR_PICKUP order made only of Hatly / Wasally service segments (no vendor, no driver yet)', async () => {
+    const h = buildInventoryHarness({
+      orderStatus: OrderStatus.READY_FOR_PICKUP,
+      segments: [{ id: 'seg-1', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'AD_HOC_SERVICE' }],
+      items: [],
+      products: [],
+    });
+    const order = await cancelAsCustomer(h, { cancellationReason: 'no longer needed' });
+    expect(order).toMatchObject({ status: OrderStatus.CANCELLED, cancelledByRole: Role.CUSTOMER });
+    // the same whole-order money handling + entitlement restoration as every other cancellation
+    expect(h.offerConsumptionService.reverseSubtotalDiscountConsumptionForOrder).toHaveBeenCalledWith(expect.anything(), 'order-1');
+  });
+
+  it('PD-014: a customer still cannot cancel a READY_FOR_PICKUP order that has a vendor part (the vendor prepared it), nor one with no active segment', async () => {
+    const vendor = buildInventoryHarness({
+      orderStatus: OrderStatus.READY_FOR_PICKUP,
+      segments: [{ id: 'seg-1', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'CATALOG' }],
+      items: [],
+      products: [],
+    });
+    await expect(cancelAsCustomer(vendor)).rejects.toBeInstanceOf(BadRequestException);
+    const mixed = buildInventoryHarness({
+      orderStatus: OrderStatus.READY_FOR_PICKUP,
+      segments: [
+        { id: 'seg-1', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'CATALOG' },
+        { id: 'seg-2', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'AD_HOC_SERVICE' },
+      ],
+      items: [],
+      products: [],
+    });
+    await expect(cancelAsCustomer(mixed)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('PD-014: once the driver is assigned the customer is refused, however the order is made up', async () => {
+    const h = buildInventoryHarness({
+      orderStatus: OrderStatus.ASSIGNED_TO_DRIVER,
+      segments: [{ id: 'seg-1', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'AD_HOC_SERVICE' }],
+      items: [],
+      products: [],
+    });
     await expect(cancelAsCustomer(h)).rejects.toBeInstanceOf(BadRequestException);
   });
 

@@ -19,6 +19,13 @@ export const DASHBOARD_PORT = process.env.PLAYWRIGHT_DASHBOARD_PORT ?? '3002';
 export const SUPER_ADMIN_PHONE = process.env.PLAYWRIGHT_SUPER_ADMIN_PHONE ?? '+201099999999';
 export const SUPER_ADMIN_PASSWORD = process.env.PLAYWRIGHT_SUPER_ADMIN_PASSWORD ?? 'Playwright-Dev-1!';
 
+/**
+ * A dedicated dev ADMIN used only by the two-factor browser spec (it enrols an authenticator, signs in with it, and removes it again).
+ * Created once in `hatly_dev` (see e2e/README.md); the spec skips itself when the account does not exist.
+ */
+export const MFA_ADMIN_PHONE = process.env.PLAYWRIGHT_MFA_ADMIN_PHONE ?? '+201099999998';
+export const MFA_ADMIN_PASSWORD = process.env.PLAYWRIGHT_MFA_ADMIN_PASSWORD ?? 'Playwright-Dev-1!';
+
 /** Vendor Manager fixture — "Beit El Sharkia Restaurant" (seeded by seed-dev-marketplace.ts). */
 export const VENDOR_A_PHONE = process.env.PLAYWRIGHT_VENDOR_A_PHONE ?? '+201098765432';
 export const VENDOR_A_PASSWORD = process.env.PLAYWRIGHT_VENDOR_A_PASSWORD ?? 'Playwright-Dev-1!';
@@ -41,6 +48,8 @@ export const STORAGE_STATE_DIR = 'e2e/.auth';
 export const VENDOR_A_STORAGE_STATE = `${STORAGE_STATE_DIR}/vendor-a.json`;
 export const VENDOR_B_STORAGE_STATE = `${STORAGE_STATE_DIR}/vendor-b.json`;
 export const FIXTURE_FILE = `${STORAGE_STATE_DIR}/fixtures.json`;
+/** Bearer tokens for the Node-side fixture/API helpers ONLY (never loaded into a browser: the dashboard itself uses HttpOnly cookies). */
+export const TOKENS_FILE = `${STORAGE_STATE_DIR}/tokens.json`;
 /**
  * M3a (Launch-Readiness Gap Audit) — the smallest possible extension of
  * this existing fixture mechanism to cover the new Admin pages. The

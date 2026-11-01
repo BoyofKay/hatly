@@ -19,6 +19,11 @@ String localizedCartErrorMessage(BuildContext context, ApiException error) {
       return l10n.cartErrorOptionRequired;
     case 'INVALID_OPTION_SELECTION':
       return l10n.cartErrorInvalidOption;
+    case 'OPTION_MIN_SELECTIONS':
+    case 'OPTION_MAX_SELECTIONS':
+      return l10n.cartErrorOptionLimit;
+    case 'CUSTOM_REQUESTS_NOT_AVAILABLE':
+      return l10n.cartErrorCustomRequestsUnavailable;
     case 'CART_BRANCH_CONFLICT':
       return l10n.cartBranchConflictMessage;
     // Real cart rules of the multi-vendor cart (cart.service.ts assertCanAddNewGroup).
@@ -57,6 +62,8 @@ String localizedCartErrorMessage(BuildContext context, ApiException error) {
       return l10n.cartErrorAdHocDestinationRequired;
     case 'BUY_FROM_PLACE_PICKUP_REQUIRED':
       return l10n.cartErrorAdHocPickupRequired;
+    case 'DELIVER_TO_PLACE_ORIGIN_REQUIRED':
+      return l10n.cartErrorAdHocOriginRequired;
     // Photos / content of a custom request (Hatly Service and the vendor Custom Request share these backend rules).
     case 'TOO_MANY_IMAGES':
       return l10n.cartErrorTooManyImages;

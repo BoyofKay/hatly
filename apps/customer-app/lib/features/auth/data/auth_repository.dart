@@ -1,7 +1,7 @@
 import '../../../core/storage/token_storage.dart';
 import 'auth_api.dart';
 
-/// Sits between the UI (OtpFlowController) and the raw API/storage
+/// Sits between the UI (the auth flow controller) and the raw API/storage
 /// layers: the only place that knows both "how to call the backend"
 /// and "how to persist the result".
 class AuthRepository {
@@ -12,28 +12,8 @@ class AuthRepository {
   final AuthApi _authApi;
   final TokenStorage _tokenStorage;
 
-  Future<void> requestOtp({required String phone, required String fullName}) {
-    return _authApi.requestOtp(phone: phone, fullName: fullName);
-  }
-
-  Future<void> verifyOtpAndPersistSession({
-    required String phone,
-    required String code,
-    String? fullName,
-  }) async {
-    final tokens = await _authApi.verifyOtp(phone: phone, code: code);
-    await _tokenStorage.saveTokens(
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    );
-    // Local-only convenience cache for Home's greeting — see
-    // TokenStorage.saveDisplayName for why this isn't a backend call.
-    await _tokenStorage.saveDisplayName(fullName);
-  }
-
-  /// Customer Authentication Modes (master implementation) — MODE B.
-  /// Same token-persistence shape as the OTP path above; the only
-  /// difference is which AuthApi call produced the tokens.
+  /// Phone + password sign-in: persists the tokens. It does NOT mark the session authenticated — the caller (the flow
+  /// controller) does that, so a registration can finish its phone-verification step first.
   Future<void> passwordLoginAndPersistSession(
       {required String phone, required String password}) async {
     final tokens =
@@ -42,24 +22,27 @@ class AuthRepository {
         accessToken: tokens.accessToken, refreshToken: tokens.refreshToken);
   }
 
-  /// Covers both "genuinely new Customer" and the passwordless-
-  /// existing-row attachment case — the backend alone decides which
-  /// applies (see AuthApi.passwordRegister's own comment); this
-  /// repository method doesn't need to know or care.
+  Future<void> requestRegistrationCode({required String phone}) =>
+      _authApi.requestRegistrationCode(phone: phone);
+
+  /// Registration for a phone that has no account (see AuthApi.passwordRegister).
   Future<void> passwordRegisterAndPersistSession({
     required String phone,
     required String fullName,
     required String password,
+    String? code,
   }) async {
     final tokens = await _authApi.passwordRegister(
-        phone: phone, fullName: fullName, password: password);
+        phone: phone, fullName: fullName, password: password, code: code);
     await _tokenStorage.saveTokens(
         accessToken: tokens.accessToken, refreshToken: tokens.refreshToken);
     await _tokenStorage.saveDisplayName(fullName);
   }
 
-  Future<void> setPassword({required String password}) =>
-      _authApi.setPassword(password: password);
+  Future<void> setPassword(
+          {required String password, String? currentPassword}) =>
+      _authApi.setPassword(
+          password: password, currentPassword: currentPassword);
 
   Future<void> requestPhoneVerification() =>
       _authApi.requestPhoneVerification();
@@ -67,7 +50,15 @@ class AuthRepository {
   Future<void> confirmPhoneVerification({required String code}) =>
       _authApi.confirmPhoneVerification(code: code);
 
-  Future<bool> getIsPhoneVerified() => _authApi.getIsPhoneVerified();
+  Future<PhoneVerificationStatus> getPhoneVerificationStatus() =>
+      _authApi.getPhoneVerificationStatus();
+
+  /// Account deletion already ended the server-side session, so — unlike [logout] — nothing is sent afterwards: only the local
+  /// tokens are cleared. A failed deletion throws and leaves the session untouched.
+  Future<void> deleteAccount({required String password}) async {
+    await _authApi.deleteAccount(password: password);
+    await _tokenStorage.clear();
+  }
 
   Future<void> logout() async {
     try {

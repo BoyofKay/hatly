@@ -36,7 +36,16 @@ String localizedCheckoutErrorMessage(BuildContext context, ApiException error) {
     case 'BUY_FROM_PLACE_PICKUP_REQUIRED':
       return l10n.checkoutBlockerAdHocPickupRequired;
     case 'DELIVER_TO_PLACE_DESTINATION_REQUIRED':
+    case 'SERVICE_DESTINATION_REQUIRED':
       return l10n.checkoutBlockerAdHocDestinationRequired;
+    case 'DELIVER_TO_PLACE_ORIGIN_REQUIRED':
+      return l10n.checkoutBlockerAdHocOriginRequired;
+    case 'HATLY_DEFAULT_PICKUP_NOT_CONFIGURED':
+      return l10n.checkoutBlockerHatlyDefaultPickupMissing;
+    case 'HATLY_DEFAULT_DESTINATION_NOT_CONFIGURED':
+      return l10n.checkoutBlockerHatlyDefaultDestinationMissing;
+    case 'WASALLY_DEFAULT_DESTINATION_NOT_CONFIGURED':
+      return l10n.checkoutBlockerWasallyDefaultDestinationMissing;
     // Order-creation rejections the backend raises with a specific code (checkout-planner / order-creation services).
     case 'ADDRESS_NOT_SERVICEABLE':
       return l10n.checkoutAddressOutOfServiceArea;
@@ -121,6 +130,9 @@ String? checkoutBlockerMessage(BuildContext context, String code) {
       return l10n.checkoutBlockerMultiVendorDisabled;
     case 'DELIVERY_FEE_UNAVAILABLE':
       return l10n.checkoutBlockerFeeUnavailable;
+    // A saved GPS address while road-distance pricing is off (Maps disabled): say what to do instead of a generic blocker.
+    case 'DISTANCE_PRICING_UNAVAILABLE':
+      return l10n.checkoutBlockerGpsUnavailable;
     case 'INVALID_DELIVERY_LOCATION':
     case 'INVALID_DELIVERY_ADDRESS':
       return l10n.checkoutBlockerInvalidAddress;
@@ -141,7 +153,16 @@ String? checkoutBlockerMessage(BuildContext context, String code) {
     case 'BUY_FROM_PLACE_PICKUP_REQUIRED':
       return l10n.checkoutBlockerAdHocPickupRequired;
     case 'DELIVER_TO_PLACE_DESTINATION_REQUIRED':
+    case 'SERVICE_DESTINATION_REQUIRED':
       return l10n.checkoutBlockerAdHocDestinationRequired;
+    case 'DELIVER_TO_PLACE_ORIGIN_REQUIRED':
+      return l10n.checkoutBlockerAdHocOriginRequired;
+    case 'HATLY_DEFAULT_PICKUP_NOT_CONFIGURED':
+      return l10n.checkoutBlockerHatlyDefaultPickupMissing;
+    case 'HATLY_DEFAULT_DESTINATION_NOT_CONFIGURED':
+      return l10n.checkoutBlockerHatlyDefaultDestinationMissing;
+    case 'WASALLY_DEFAULT_DESTINATION_NOT_CONFIGURED':
+      return l10n.checkoutBlockerWasallyDefaultDestinationMissing;
     case 'ONLINE_PAYMENT_NOT_AVAILABLE':
       return l10n.checkoutErrorOnlinePaymentUnavailable;
     case 'PAYMENT_METHOD_REQUIRED':

@@ -37,6 +37,15 @@ export enum FinancialEventType {
    * is no later-known-amount concern here).
    */
   HATLY_FUNDED_OFFER_DISCOUNT_RECORDED = 'HATLY_FUNDED_OFFER_DISCOUNT_RECORDED',
+  /**
+   * PD-015 — the COMPENSATING event for HATLY_FUNDED_OFFER_DISCOUNT_RECORDED. When a vendor part is rejected (or the order is
+   * cancelled) its offer consumption is reversed (PD-014) and the discount Hatly would have funded is no longer a cost. The original
+   * event is never touched; this one is appended, once per reversed OfferConsumption row (key `hatly-funded-offer-discount-restored:<consumptionId>`),
+   * linked to the original (`relatedEventId`) and to the affected segment (`orderVendorSegmentId`). `amountMinor` is POSITIVE (the
+   * amount restored); the net Hatly-funded cost of an order = recorded - restored (see FinancialEventService.hatlyFundedDiscountSummary).
+   * Informational like the original: it never enters vendor/driver settlement and moves no money.
+   */
+  HATLY_FUNDED_OFFER_DISCOUNT_RESTORED = 'HATLY_FUNDED_OFFER_DISCOUNT_RESTORED',
 }
 
 /**

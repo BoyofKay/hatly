@@ -1,0 +1,117 @@
+# Hatly SALES STAGING — an isolated stack, separate from production.
+#
+#   project name : hatly-staging   (every container, network and volume is prefixed with it)
+#   network      : hatly-staging_internal (private); nothing is shared with any other compose project
+#   volumes      : hatly-staging_pgdata, hatly-staging_redisdata, hatly-staging_uploads  (all new, all staging-only)
+#   public ports : NONE. The API and Dashboard are bound to 127.0.0.1 only, for the HTTPS reverse proxy on the host.
+#                  PostgreSQL and Redis publish no ports at all.
+#
+# Run it ONLY through deploy/staging/staging.sh (it pins `-p hatly-staging` and the env file) or with the same flags:
+#   docker compose -p hatly-staging --env-file /opt/hatly-staging/.env.staging -f deploy/staging/docker-compose.staging.yml <cmd>
+name: hatly-staging
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${STAGING_DB_NAME:?set in .env.staging}
+      POSTGRES_USER: ${STAGING_DB_USER:?set in .env.staging}
+      POSTGRES_PASSWORD: ${STAGING_DB_PASSWORD:?set in .env.staging}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # The password is read from the environment at start; --appendonly keeps sessions/counters across restarts.
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes --save 60 1000"]
+    environment:
+      REDIS_PASSWORD: ${STAGING_REDIS_PASSWORD:?set in .env.staging}
+    volumes:
+      - redisdata:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: deploy/staging/backend.Dockerfile
+    image: hatly-staging-backend:local
+    restart: unless-stopped
+    env_file: ${STAGING_ENV_FILE:-/opt/hatly-staging/.env.staging}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - uploads:/data/uploads
+    ports:
+      - "127.0.0.1:${STAGING_API_HOST_PORT:-13000}:3000"
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/api/v1/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  dashboard:
+    build:
+      context: ../..
+      dockerfile: deploy/staging/dashboard.Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${STAGING_PUBLIC_API_URL:?set in .env.staging}
+    image: hatly-staging-dashboard:local
+    restart: unless-stopped
+    depends_on:
+      backend: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:${STAGING_DASHBOARD_HOST_PORT:-13001}:3001"
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3001/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # HTTPS edge for the two staging hostnames ONLY (certificates are issued automatically once their DNS records point here).
+  # Start it with `./staging.sh edge` AFTER the DNS records exist. It owns host ports 80/443 — see RUNBOOK 'Caddy / ports'.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [backend, dashboard]
+    networks: [internal]
+
+networks:
+  internal:
+    name: hatly-staging_internal
+
+volumes:
+  pgdata:
+    name: hatly-staging_pgdata
+  redisdata:
+    name: hatly-staging_redisdata
+  uploads:
+    name: hatly-staging_uploads
+  caddy_data:
+    name: hatly-staging_caddy_data
+  caddy_config:
+    name: hatly-staging_caddy_config

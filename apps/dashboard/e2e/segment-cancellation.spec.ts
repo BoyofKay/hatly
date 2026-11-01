@@ -3,15 +3,14 @@ import { VENDOR_A_STORAGE_STATE } from './env';
 import { readFixtures } from './read-fixtures';
 
 /**
- * M3a (Launch-Readiness Gap Audit, G-12) — the confirmation guard added
- * to the Vendor Order Detail page's own pre-existing "Cancel" segment
- * action. Uses its own dedicated fixture order (`vendorAOrders[3]`),
- * never touched by any other spec's PENDING-state assumptions.
+ * Rejecting (cancelling) a vendor segment needs a reason: the Vendor Order Detail page collects it in an inline form (no bare confirm),
+ * refuses to send an empty one, lets the vendor back out without sending anything, and shows the recorded reason in the segment history.
+ * Uses its own dedicated fixture order (`vendorAOrders[3]`), never touched by any other spec's PENDING-state assumptions.
  */
-test.describe('Vendor segment cancellation — confirmation guard', () => {
+test.describe('Vendor segment rejection — required reason', () => {
   test.use({ storageState: VENDOR_A_STORAGE_STATE });
 
-  test('dismissing the confirmation sends NO status-update request, and the segment stays PENDING', async ({ page }) => {
+  test('an empty reason sends NO status-update request; backing out keeps the segment PENDING', async ({ page }) => {
     const { vendorAOrders } = readFixtures();
     const order = vendorAOrders[3];
 
@@ -24,23 +23,30 @@ test.describe('Vendor segment cancellation — confirmation guard', () => {
     await page.goto(`/orders/${order.orderId}`);
     await expect(page.getByRole('heading', { name: 'Your items — status: PENDING' })).toBeVisible();
 
-    page.once('dialog', (dialog) => dialog.dismiss());
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByTestId('vendor-segment-action-CANCELLED').click();
+    await expect(page.getByTestId('vendor-reject-form')).toBeVisible();
+    await page.getByTestId('vendor-reject-confirm').click();
+    await expect(page.getByText('Enter the reason for rejecting this order.')).toBeVisible();
+    expect(statusRequestSent).toBe(false);
 
+    await page.getByRole('button', { name: 'Keep order' }).click();
+    await expect(page.getByTestId('vendor-reject-form')).toBeHidden();
     expect(statusRequestSent).toBe(false);
     await expect(page.getByRole('heading', { name: 'Your items — status: PENDING' })).toBeVisible();
   });
 
-  test('accepting the confirmation cancels the segment, re-fetched from the server', async ({ page }) => {
+  test('rejecting with a reason cancels the segment, re-fetched from the server, and the history shows the reason', async ({ page }) => {
     const { vendorAOrders } = readFixtures();
     const order = vendorAOrders[3];
 
     await page.goto(`/orders/${order.orderId}`);
     await expect(page.getByRole('heading', { name: 'Your items — status: PENDING' })).toBeVisible();
 
-    page.once('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByTestId('vendor-segment-action-CANCELLED').click();
+    await page.getByTestId('vendor-reject-reason').fill('Out of stock today');
+    await page.getByTestId('vendor-reject-confirm').click();
 
     await expect(page.getByRole('heading', { name: 'Your items — status: CANCELLED' })).toBeVisible();
+    await expect(page.getByTestId('vendor-segment-history')).toContainText('Out of stock today');
   });
 });

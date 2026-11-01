@@ -79,7 +79,7 @@
       },
       "usedBy": "Home \"Shop by category\" tile; Explore featured-category row",
       "priority": 1,
-      "generationBrief": "Category tile image for the \"Restaurants\" (مطاعم) marketplace sector, shown as a square tile on the Home \"Shop by category\" grid. One clear, instantly recognisable hero composition that represents the whole sector (a small, tidy arrangement of 2-3 typical items, not a crowded collage). Typical items sold here include: Grilled Chicken, Mixed Grill, Rice with Vermicelli, Green Salad, Soft Drink Can.",
+      "generationBrief": "Category tile image for the \"Restaurants\" (مطاعم) marketplace sector, shown as a square tile on the Home \"Shop by category\" grid. One clear, instantly recognisable hero composition that represents the whole sector (a small, tidy arrangement of 2-3 typical items, not a crowded collage). Typical items sold here include: Mixed Grill, Grilled Chicken, Rice with Vermicelli, Green Salad, Chicken Shawarma Sandwich.",
       "hasUrlInDb": true,
       "deliveredInMediaDir": true
     },
@@ -1045,7 +1045,7 @@
       },
       "usedBy": "Vendor cards, vendor details header, favorites, product-details vendor row, promo fallback",
       "priority": 1,
-      "generationBrief": "Original logo mark for the vendor \"Beit El Sharkia Restaurant\" (مطعم بيت الشرقية), a Restaurants business in Belbeis, Egypt. Simple, flat, memorable emblem centred on a plain background with ~10% padding; it is displayed inside a circle (64 dp in lists, 84 dp on the vendor page), so keep it legible when circle-cropped. Invent a clean emblem only; do not copy any real brand. Latin or Arabic wordmark is optional and must match the vendor name exactly. Typical items sold here include: Grilled Chicken, Mixed Grill, Rice with Vermicelli, Green Salad.",
+      "generationBrief": "Original logo mark for the vendor \"Beit El Sharkia Restaurant\" (مطعم بيت الشرقية), a Restaurants business in Belbeis, Egypt. Simple, flat, memorable emblem centred on a plain background with ~10% padding; it is displayed inside a circle (64 dp in lists, 84 dp on the vendor page), so keep it legible when circle-cropped. Invent a clean emblem only; do not copy any real brand. Latin or Arabic wordmark is optional and must match the vendor name exactly. Typical items sold here include: Mixed Grill, Grilled Chicken, Rice with Vermicelli, Green Salad.",
       "hasUrlInDb": true,
       "deliveredInMediaDir": true
     },
@@ -1183,7 +1183,7 @@
       },
       "usedBy": "Vendor cards, vendor details header, favorites, product-details vendor row, promo fallback",
       "priority": 1,
-      "generationBrief": "Original logo mark for the vendor \"Abu Aly Grills\" (مطعم أبو علي للمشويات), a Restaurants business in Belbeis, Egypt. Simple, flat, memorable emblem centred on a plain background with ~10% padding; it is displayed inside a circle (64 dp in lists, 84 dp on the vendor page), so keep it legible when circle-cropped. Invent a clean emblem only; do not copy any real brand. Latin or Arabic wordmark is optional and must match the vendor name exactly. Typical items sold here include: Kofta, Kebab, Chicken Shawarma Sandwich, Grilled Rice.",
+      "generationBrief": "Original logo mark for the vendor \"Abu Aly Grills\" (مطعم أبو علي للمشويات), a Restaurants business in Belbeis, Egypt. Simple, flat, memorable emblem centred on a plain background with ~10% padding; it is displayed inside a circle (64 dp in lists, 84 dp on the vendor page), so keep it legible when circle-cropped. Invent a clean emblem only; do not copy any real brand. Latin or Arabic wordmark is optional and must match the vendor name exactly. Typical items sold here include: Chicken Shawarma Sandwich, Tahini Salad, Kofta, Soft Drink Can.",
       "hasUrlInDb": true,
       "deliveredInMediaDir": true
     },
@@ -2016,52 +2016,6 @@
       "deliveredInMediaDir": true
     },
     {
-      "assetKey": "products/beit-el-sharkia-restaurant/grilled-chicken",
-      "assetType": "product",
-      "entityIds": [
-        "99b22132-2fc1-43db-9643-b87794ca721a"
-      ],
-      "sharedAcrossEntities": false,
-      "entities": [
-        {
-          "entityId": "99b22132-2fc1-43db-9643-b87794ca721a",
-          "table": "products",
-          "name": "Grilled Chicken",
-          "nameAr": "فراخ مشوية",
-          "sector": "Restaurants",
-          "sectorSlug": "restaurants",
-          "vendor": "Beit El Sharkia Restaurant",
-          "vendorId": "6ba8e75b-c79b-455d-a12f-23e43a0dbcae",
-          "branch": "الفرع الرئيسي",
-          "branchId": "80f1a42a-cea0-4c42-b69f-35f4b83f6ae4",
-          "category": "مشويات",
-          "categoryAr": "مشويات",
-          "pricingUnit": "PIECE"
-        }
-      ],
-      "expectedFilename": "grilled-chicken.webp",
-      "mediaPackPath": "products/beit-el-sharkia-restaurant/grilled-chicken.webp",
-      "acceptedExtensions": [
-        ".webp",
-        ".png",
-        ".jpg",
-        ".jpeg"
-      ],
-      "storedUrlPath": "/uploads/files/marketplace/products/beit-el-sharkia-restaurant/grilled-chicken.webp",
-      "targetField": "products.image_url",
-      "dimensions": {
-        "widthPx": 1200,
-        "heightPx": 1090,
-        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
-        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
-      },
-      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
-      "priority": 1,
-      "generationBrief": "Product photo of \"Grilled Chicken\" (فراخ مشوية), menu/shelf category \"مشويات\", sold by Beit El Sharkia Restaurant (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
-      "hasUrlInDb": true,
-      "deliveredInMediaDir": true
-    },
-    {
       "assetKey": "products/beit-el-sharkia-restaurant/mixed-grill",
       "assetType": "product",
       "entityIds": [
@@ -2104,6 +2058,52 @@
       "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
       "priority": 1,
       "generationBrief": "Product photo of \"Mixed Grill\" (مشاوي مشكلة), menu/shelf category \"مشويات\", sold by Beit El Sharkia Restaurant (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
+      "hasUrlInDb": true,
+      "deliveredInMediaDir": true
+    },
+    {
+      "assetKey": "products/beit-el-sharkia-restaurant/grilled-chicken",
+      "assetType": "product",
+      "entityIds": [
+        "99b22132-2fc1-43db-9643-b87794ca721a"
+      ],
+      "sharedAcrossEntities": false,
+      "entities": [
+        {
+          "entityId": "99b22132-2fc1-43db-9643-b87794ca721a",
+          "table": "products",
+          "name": "Grilled Chicken",
+          "nameAr": "فراخ مشوية",
+          "sector": "Restaurants",
+          "sectorSlug": "restaurants",
+          "vendor": "Beit El Sharkia Restaurant",
+          "vendorId": "6ba8e75b-c79b-455d-a12f-23e43a0dbcae",
+          "branch": "الفرع الرئيسي",
+          "branchId": "80f1a42a-cea0-4c42-b69f-35f4b83f6ae4",
+          "category": "مشويات",
+          "categoryAr": "مشويات",
+          "pricingUnit": "PIECE"
+        }
+      ],
+      "expectedFilename": "grilled-chicken.webp",
+      "mediaPackPath": "products/beit-el-sharkia-restaurant/grilled-chicken.webp",
+      "acceptedExtensions": [
+        ".webp",
+        ".png",
+        ".jpg",
+        ".jpeg"
+      ],
+      "storedUrlPath": "/uploads/files/marketplace/products/beit-el-sharkia-restaurant/grilled-chicken.webp",
+      "targetField": "products.image_url",
+      "dimensions": {
+        "widthPx": 1200,
+        "heightPx": 1090,
+        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
+        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
+      },
+      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
+      "priority": 1,
+      "generationBrief": "Product photo of \"Grilled Chicken\" (فراخ مشوية), menu/shelf category \"مشويات\", sold by Beit El Sharkia Restaurant (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
       "hasUrlInDb": true,
       "deliveredInMediaDir": true
     },
@@ -2660,52 +2660,6 @@
       "deliveredInMediaDir": true
     },
     {
-      "assetKey": "products/beit-el-sharkia-restaurant/soft-drink-can",
-      "assetType": "product",
-      "entityIds": [
-        "06a54b93-4787-4ca2-94e6-63ad88a687df"
-      ],
-      "sharedAcrossEntities": false,
-      "entities": [
-        {
-          "entityId": "06a54b93-4787-4ca2-94e6-63ad88a687df",
-          "table": "products",
-          "name": "Soft Drink Can",
-          "nameAr": "مشروب غازي",
-          "sector": "Restaurants",
-          "sectorSlug": "restaurants",
-          "vendor": "Beit El Sharkia Restaurant",
-          "vendorId": "6ba8e75b-c79b-455d-a12f-23e43a0dbcae",
-          "branch": "الفرع الرئيسي",
-          "branchId": "80f1a42a-cea0-4c42-b69f-35f4b83f6ae4",
-          "category": "مشروبات",
-          "categoryAr": "مشروبات",
-          "pricingUnit": "PIECE"
-        }
-      ],
-      "expectedFilename": "soft-drink-can.webp",
-      "mediaPackPath": "products/beit-el-sharkia-restaurant/soft-drink-can.webp",
-      "acceptedExtensions": [
-        ".webp",
-        ".png",
-        ".jpg",
-        ".jpeg"
-      ],
-      "storedUrlPath": "/uploads/files/marketplace/products/beit-el-sharkia-restaurant/soft-drink-can.webp",
-      "targetField": "products.image_url",
-      "dimensions": {
-        "widthPx": 1200,
-        "heightPx": 1090,
-        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
-        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
-      },
-      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
-      "priority": 1,
-      "generationBrief": "Product photo of \"Soft Drink Can\" (مشروب غازي), menu/shelf category \"مشروبات\", sold by Beit El Sharkia Restaurant (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
-      "hasUrlInDb": true,
-      "deliveredInMediaDir": true
-    },
-    {
       "assetKey": "products/al-ahl-al-dahabi-bakery/baladi-bread-kg",
       "assetType": "product",
       "entityIds": [
@@ -2748,98 +2702,6 @@
       "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
       "priority": 1,
       "generationBrief": "Product photo of \"Baladi Bread (kg)\" (عيش بلدي (كيلو)), menu/shelf category \"خبز\", sold by Al Ahl Al Dahabi Bakery (Bakery). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type. It is sold by weight, so show it loose or as a natural portion, not as a branded pack.",
-      "hasUrlInDb": true,
-      "deliveredInMediaDir": true
-    },
-    {
-      "assetKey": "products/abu-aly-grills/kofta",
-      "assetType": "product",
-      "entityIds": [
-        "e9100e69-975d-4c1f-96c5-8c43cee3ab68"
-      ],
-      "sharedAcrossEntities": false,
-      "entities": [
-        {
-          "entityId": "e9100e69-975d-4c1f-96c5-8c43cee3ab68",
-          "table": "products",
-          "name": "Kofta",
-          "nameAr": "كفتة",
-          "sector": "Restaurants",
-          "sectorSlug": "restaurants",
-          "vendor": "Abu Aly Grills",
-          "vendorId": "4a59c90e-5cc3-4f8b-8bc2-b6e1eaf1ee50",
-          "branch": "الفرع الرئيسي",
-          "branchId": "ae7a5f94-9d43-4b42-81ed-1f3d4eedaf6c",
-          "category": "المشويات",
-          "categoryAr": "المشويات",
-          "pricingUnit": "PIECE"
-        }
-      ],
-      "expectedFilename": "kofta.webp",
-      "mediaPackPath": "products/abu-aly-grills/kofta.webp",
-      "acceptedExtensions": [
-        ".webp",
-        ".png",
-        ".jpg",
-        ".jpeg"
-      ],
-      "storedUrlPath": "/uploads/files/marketplace/products/abu-aly-grills/kofta.webp",
-      "targetField": "products.image_url",
-      "dimensions": {
-        "widthPx": 1200,
-        "heightPx": 1090,
-        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
-        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
-      },
-      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
-      "priority": 1,
-      "generationBrief": "Product photo of \"Kofta\" (كفتة), menu/shelf category \"المشويات\", sold by Abu Aly Grills (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
-      "hasUrlInDb": true,
-      "deliveredInMediaDir": true
-    },
-    {
-      "assetKey": "products/abu-aly-grills/kebab",
-      "assetType": "product",
-      "entityIds": [
-        "e7da524d-6791-496b-8cb3-920c2850ba03"
-      ],
-      "sharedAcrossEntities": false,
-      "entities": [
-        {
-          "entityId": "e7da524d-6791-496b-8cb3-920c2850ba03",
-          "table": "products",
-          "name": "Kebab",
-          "nameAr": "كباب",
-          "sector": "Restaurants",
-          "sectorSlug": "restaurants",
-          "vendor": "Abu Aly Grills",
-          "vendorId": "4a59c90e-5cc3-4f8b-8bc2-b6e1eaf1ee50",
-          "branch": "الفرع الرئيسي",
-          "branchId": "ae7a5f94-9d43-4b42-81ed-1f3d4eedaf6c",
-          "category": "المشويات",
-          "categoryAr": "المشويات",
-          "pricingUnit": "PIECE"
-        }
-      ],
-      "expectedFilename": "kebab.webp",
-      "mediaPackPath": "products/abu-aly-grills/kebab.webp",
-      "acceptedExtensions": [
-        ".webp",
-        ".png",
-        ".jpg",
-        ".jpeg"
-      ],
-      "storedUrlPath": "/uploads/files/marketplace/products/abu-aly-grills/kebab.webp",
-      "targetField": "products.image_url",
-      "dimensions": {
-        "widthPx": 1200,
-        "heightPx": 1090,
-        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
-        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
-      },
-      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
-      "priority": 1,
-      "generationBrief": "Product photo of \"Kebab\" (كباب), menu/shelf category \"المشويات\", sold by Abu Aly Grills (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
       "hasUrlInDb": true,
       "deliveredInMediaDir": true
     },
@@ -2890,52 +2752,6 @@
       "deliveredInMediaDir": true
     },
     {
-      "assetKey": "products/abu-aly-grills/grilled-rice",
-      "assetType": "product",
-      "entityIds": [
-        "22cdd893-9c03-4c27-a2a0-f215779c880e"
-      ],
-      "sharedAcrossEntities": false,
-      "entities": [
-        {
-          "entityId": "22cdd893-9c03-4c27-a2a0-f215779c880e",
-          "table": "products",
-          "name": "Grilled Rice",
-          "nameAr": "أرز محمر",
-          "sector": "Restaurants",
-          "sectorSlug": "restaurants",
-          "vendor": "Abu Aly Grills",
-          "vendorId": "4a59c90e-5cc3-4f8b-8bc2-b6e1eaf1ee50",
-          "branch": "الفرع الرئيسي",
-          "branchId": "ae7a5f94-9d43-4b42-81ed-1f3d4eedaf6c",
-          "category": "أطباق جانبية",
-          "categoryAr": "أطباق جانبية",
-          "pricingUnit": "PIECE"
-        }
-      ],
-      "expectedFilename": "grilled-rice.webp",
-      "mediaPackPath": "products/abu-aly-grills/grilled-rice.webp",
-      "acceptedExtensions": [
-        ".webp",
-        ".png",
-        ".jpg",
-        ".jpeg"
-      ],
-      "storedUrlPath": "/uploads/files/marketplace/products/abu-aly-grills/grilled-rice.webp",
-      "targetField": "products.image_url",
-      "dimensions": {
-        "widthPx": 1200,
-        "heightPx": 1090,
-        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
-        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
-      },
-      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
-      "priority": 1,
-      "generationBrief": "Product photo of \"Grilled Rice\" (أرز محمر), menu/shelf category \"أطباق جانبية\", sold by Abu Aly Grills (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
-      "hasUrlInDb": true,
-      "deliveredInMediaDir": true
-    },
-    {
       "assetKey": "products/abu-aly-grills/tahini-salad",
       "assetType": "product",
       "entityIds": [
@@ -2978,52 +2794,6 @@
       "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
       "priority": 1,
       "generationBrief": "Product photo of \"Tahini Salad\" (سلطة طحينة), menu/shelf category \"أطباق جانبية\", sold by Abu Aly Grills (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
-      "hasUrlInDb": true,
-      "deliveredInMediaDir": true
-    },
-    {
-      "assetKey": "products/abu-aly-grills/soft-drink-can",
-      "assetType": "product",
-      "entityIds": [
-        "2f2e96c0-2d54-477b-894a-3c3e412198c1"
-      ],
-      "sharedAcrossEntities": false,
-      "entities": [
-        {
-          "entityId": "2f2e96c0-2d54-477b-894a-3c3e412198c1",
-          "table": "products",
-          "name": "Soft Drink Can",
-          "nameAr": "مشروب غازي",
-          "sector": "Restaurants",
-          "sectorSlug": "restaurants",
-          "vendor": "Abu Aly Grills",
-          "vendorId": "4a59c90e-5cc3-4f8b-8bc2-b6e1eaf1ee50",
-          "branch": "الفرع الرئيسي",
-          "branchId": "ae7a5f94-9d43-4b42-81ed-1f3d4eedaf6c",
-          "category": "أطباق جانبية",
-          "categoryAr": "أطباق جانبية",
-          "pricingUnit": "PIECE"
-        }
-      ],
-      "expectedFilename": "soft-drink-can.webp",
-      "mediaPackPath": "products/abu-aly-grills/soft-drink-can.webp",
-      "acceptedExtensions": [
-        ".webp",
-        ".png",
-        ".jpg",
-        ".jpeg"
-      ],
-      "storedUrlPath": "/uploads/files/marketplace/products/abu-aly-grills/soft-drink-can.webp",
-      "targetField": "products.image_url",
-      "dimensions": {
-        "widthPx": 1200,
-        "heightPx": 1090,
-        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
-        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
-      },
-      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
-      "priority": 1,
-      "generationBrief": "Product photo of \"Soft Drink Can\" (مشروب غازي), menu/shelf category \"أطباق جانبية\", sold by Abu Aly Grills (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
       "hasUrlInDb": true,
       "deliveredInMediaDir": true
     },
@@ -3256,6 +3026,236 @@
       "generationBrief": "Product photo of \"Iced Tea\" (شاي مثلج), menu/shelf category \"مشروبات\", sold by Flatini Pizza (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
       "hasUrlInDb": true,
       "deliveredInMediaDir": true
+    },
+    {
+      "assetKey": "products/abu-aly-grills/kofta",
+      "assetType": "product",
+      "entityIds": [
+        "e9100e69-975d-4c1f-96c5-8c43cee3ab68"
+      ],
+      "sharedAcrossEntities": false,
+      "entities": [
+        {
+          "entityId": "e9100e69-975d-4c1f-96c5-8c43cee3ab68",
+          "table": "products",
+          "name": "Kofta",
+          "nameAr": "كفتة",
+          "sector": "Restaurants",
+          "sectorSlug": "restaurants",
+          "vendor": "Abu Aly Grills",
+          "vendorId": "4a59c90e-5cc3-4f8b-8bc2-b6e1eaf1ee50",
+          "branch": "الفرع الرئيسي",
+          "branchId": "ae7a5f94-9d43-4b42-81ed-1f3d4eedaf6c",
+          "category": "المشويات",
+          "categoryAr": "المشويات",
+          "pricingUnit": "PIECE"
+        }
+      ],
+      "expectedFilename": "kofta.webp",
+      "mediaPackPath": "products/abu-aly-grills/kofta.webp",
+      "acceptedExtensions": [
+        ".webp",
+        ".png",
+        ".jpg",
+        ".jpeg"
+      ],
+      "storedUrlPath": "/uploads/files/marketplace/products/abu-aly-grills/kofta.webp",
+      "targetField": "products.image_url",
+      "dimensions": {
+        "widthPx": 1200,
+        "heightPx": 1090,
+        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
+        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
+      },
+      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
+      "priority": 1,
+      "generationBrief": "Product photo of \"Kofta\" (كفتة), menu/shelf category \"المشويات\", sold by Abu Aly Grills (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
+      "hasUrlInDb": true,
+      "deliveredInMediaDir": true
+    },
+    {
+      "assetKey": "products/abu-aly-grills/soft-drink-can",
+      "assetType": "product",
+      "entityIds": [
+        "2f2e96c0-2d54-477b-894a-3c3e412198c1"
+      ],
+      "sharedAcrossEntities": false,
+      "entities": [
+        {
+          "entityId": "2f2e96c0-2d54-477b-894a-3c3e412198c1",
+          "table": "products",
+          "name": "Soft Drink Can",
+          "nameAr": "مشروب غازي",
+          "sector": "Restaurants",
+          "sectorSlug": "restaurants",
+          "vendor": "Abu Aly Grills",
+          "vendorId": "4a59c90e-5cc3-4f8b-8bc2-b6e1eaf1ee50",
+          "branch": "الفرع الرئيسي",
+          "branchId": "ae7a5f94-9d43-4b42-81ed-1f3d4eedaf6c",
+          "category": "أطباق جانبية",
+          "categoryAr": "أطباق جانبية",
+          "pricingUnit": "PIECE"
+        }
+      ],
+      "expectedFilename": "soft-drink-can.webp",
+      "mediaPackPath": "products/abu-aly-grills/soft-drink-can.webp",
+      "acceptedExtensions": [
+        ".webp",
+        ".png",
+        ".jpg",
+        ".jpeg"
+      ],
+      "storedUrlPath": "/uploads/files/marketplace/products/abu-aly-grills/soft-drink-can.webp",
+      "targetField": "products.image_url",
+      "dimensions": {
+        "widthPx": 1200,
+        "heightPx": 1090,
+        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
+        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
+      },
+      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
+      "priority": 1,
+      "generationBrief": "Product photo of \"Soft Drink Can\" (مشروب غازي), menu/shelf category \"أطباق جانبية\", sold by Abu Aly Grills (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
+      "hasUrlInDb": true,
+      "deliveredInMediaDir": false
+    },
+    {
+      "assetKey": "products/abu-aly-grills/kebab",
+      "assetType": "product",
+      "entityIds": [
+        "e7da524d-6791-496b-8cb3-920c2850ba03"
+      ],
+      "sharedAcrossEntities": false,
+      "entities": [
+        {
+          "entityId": "e7da524d-6791-496b-8cb3-920c2850ba03",
+          "table": "products",
+          "name": "Kebab",
+          "nameAr": "كباب",
+          "sector": "Restaurants",
+          "sectorSlug": "restaurants",
+          "vendor": "Abu Aly Grills",
+          "vendorId": "4a59c90e-5cc3-4f8b-8bc2-b6e1eaf1ee50",
+          "branch": "الفرع الرئيسي",
+          "branchId": "ae7a5f94-9d43-4b42-81ed-1f3d4eedaf6c",
+          "category": "المشويات",
+          "categoryAr": "المشويات",
+          "pricingUnit": "PIECE"
+        }
+      ],
+      "expectedFilename": "kebab.webp",
+      "mediaPackPath": "products/abu-aly-grills/kebab.webp",
+      "acceptedExtensions": [
+        ".webp",
+        ".png",
+        ".jpg",
+        ".jpeg"
+      ],
+      "storedUrlPath": "/uploads/files/marketplace/products/abu-aly-grills/kebab.webp",
+      "targetField": "products.image_url",
+      "dimensions": {
+        "widthPx": 1200,
+        "heightPx": 1090,
+        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
+        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
+      },
+      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
+      "priority": 1,
+      "generationBrief": "Product photo of \"Kebab\" (كباب), menu/shelf category \"المشويات\", sold by Abu Aly Grills (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
+      "hasUrlInDb": true,
+      "deliveredInMediaDir": true
+    },
+    {
+      "assetKey": "products/abu-aly-grills/grilled-rice",
+      "assetType": "product",
+      "entityIds": [
+        "22cdd893-9c03-4c27-a2a0-f215779c880e"
+      ],
+      "sharedAcrossEntities": false,
+      "entities": [
+        {
+          "entityId": "22cdd893-9c03-4c27-a2a0-f215779c880e",
+          "table": "products",
+          "name": "Grilled Rice",
+          "nameAr": "أرز محمر",
+          "sector": "Restaurants",
+          "sectorSlug": "restaurants",
+          "vendor": "Abu Aly Grills",
+          "vendorId": "4a59c90e-5cc3-4f8b-8bc2-b6e1eaf1ee50",
+          "branch": "الفرع الرئيسي",
+          "branchId": "ae7a5f94-9d43-4b42-81ed-1f3d4eedaf6c",
+          "category": "أطباق جانبية",
+          "categoryAr": "أطباق جانبية",
+          "pricingUnit": "PIECE"
+        }
+      ],
+      "expectedFilename": "grilled-rice.webp",
+      "mediaPackPath": "products/abu-aly-grills/grilled-rice.webp",
+      "acceptedExtensions": [
+        ".webp",
+        ".png",
+        ".jpg",
+        ".jpeg"
+      ],
+      "storedUrlPath": "/uploads/files/marketplace/products/abu-aly-grills/grilled-rice.webp",
+      "targetField": "products.image_url",
+      "dimensions": {
+        "widthPx": 1200,
+        "heightPx": 1090,
+        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
+        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
+      },
+      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
+      "priority": 1,
+      "generationBrief": "Product photo of \"Grilled Rice\" (أرز محمر), menu/shelf category \"أطباق جانبية\", sold by Abu Aly Grills (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
+      "hasUrlInDb": true,
+      "deliveredInMediaDir": true
+    },
+    {
+      "assetKey": "products/beit-el-sharkia-restaurant/soft-drink-can",
+      "assetType": "product",
+      "entityIds": [
+        "06a54b93-4787-4ca2-94e6-63ad88a687df"
+      ],
+      "sharedAcrossEntities": false,
+      "entities": [
+        {
+          "entityId": "06a54b93-4787-4ca2-94e6-63ad88a687df",
+          "table": "products",
+          "name": "Soft Drink Can",
+          "nameAr": "مشروب غازي",
+          "sector": "Restaurants",
+          "sectorSlug": "restaurants",
+          "vendor": "Beit El Sharkia Restaurant",
+          "vendorId": "6ba8e75b-c79b-455d-a12f-23e43a0dbcae",
+          "branch": "الفرع الرئيسي",
+          "branchId": "80f1a42a-cea0-4c42-b69f-35f4b83f6ae4",
+          "category": "مشروبات",
+          "categoryAr": "مشروبات",
+          "pricingUnit": "PIECE"
+        }
+      ],
+      "expectedFilename": "soft-drink-can.webp",
+      "mediaPackPath": "products/beit-el-sharkia-restaurant/soft-drink-can.webp",
+      "acceptedExtensions": [
+        ".webp",
+        ".png",
+        ".jpg",
+        ".jpeg"
+      ],
+      "storedUrlPath": "/uploads/files/marketplace/products/beit-el-sharkia-restaurant/soft-drink-can.webp",
+      "targetField": "products.image_url",
+      "dimensions": {
+        "widthPx": 1200,
+        "heightPx": 1090,
+        "aspectRatio": "1.1:1 card; 1.85:1 details hero and 1:1 thumbnails are cover-cropped from it (subject must sit in the central 1:1 area)",
+        "displayedAs": "rounded rectangle (radius 16), BoxFit.cover"
+      },
+      "usedBy": "Product card, product list tile (72 dp), product details hero, offers/promos, search results, order item snapshot",
+      "priority": 1,
+      "generationBrief": "Product photo of \"Soft Drink Can\" (مشروب غازي), menu/shelf category \"مشروبات\", sold by Beit El Sharkia Restaurant (Restaurants). Show the item exactly as a customer would receive it, as the single hero subject, plated/presented naturally for its type.",
+      "hasUrlInDb": true,
+      "deliveredInMediaDir": false
     },
     {
       "assetKey": "products/al-amana-minimarket/pasta-1kg",
@@ -5101,26 +5101,11 @@
       "assetKey": "products/belbeis-supermarket/sunflower-oil-1l",
       "assetType": "product",
       "entityIds": [
-        "8be8683b-199c-4467-8acf-b83e125d051c",
-        "7515f7fc-916d-4c6d-a8bd-64d050334b02"
+        "7515f7fc-916d-4c6d-a8bd-64d050334b02",
+        "8be8683b-199c-4467-8acf-b83e125d051c"
       ],
       "sharedAcrossEntities": true,
       "entities": [
-        {
-          "entityId": "8be8683b-199c-4467-8acf-b83e125d051c",
-          "table": "products",
-          "name": "Sunflower Oil 1L",
-          "nameAr": "زيت عباد الشمس 1 لتر",
-          "sector": "Groceries",
-          "sectorSlug": "groceries",
-          "vendor": "Belbeis Supermarket",
-          "vendorId": "fdf71631-1299-424f-a83e-063ad538a220",
-          "branch": "الفرع الرئيسي",
-          "branchId": "50a0a6ab-3487-4472-9e03-3ba647217e08",
-          "category": "ألبان ومعلبات",
-          "categoryAr": "ألبان ومعلبات",
-          "pricingUnit": "PIECE"
-        },
         {
           "entityId": "7515f7fc-916d-4c6d-a8bd-64d050334b02",
           "table": "products",
@@ -5132,6 +5117,21 @@
           "vendorId": "fdf71631-1299-424f-a83e-063ad538a220",
           "branch": "فرع المحطة",
           "branchId": "4669f678-fba4-495b-a475-562b22e75cb7",
+          "category": "ألبان ومعلبات",
+          "categoryAr": "ألبان ومعلبات",
+          "pricingUnit": "PIECE"
+        },
+        {
+          "entityId": "8be8683b-199c-4467-8acf-b83e125d051c",
+          "table": "products",
+          "name": "Sunflower Oil 1L",
+          "nameAr": "زيت عباد الشمس 1 لتر",
+          "sector": "Groceries",
+          "sectorSlug": "groceries",
+          "vendor": "Belbeis Supermarket",
+          "vendorId": "fdf71631-1299-424f-a83e-063ad538a220",
+          "branch": "الفرع الرئيسي",
+          "branchId": "50a0a6ab-3487-4472-9e03-3ba647217e08",
           "category": "ألبان ومعلبات",
           "categoryAr": "ألبان ومعلبات",
           "pricingUnit": "PIECE"

@@ -60,7 +60,7 @@ test.describe('Vendor pages — backend errors are shown with the backend’s re
 
 test.describe('Login — auth errors say what actually happened', () => {
   test('REGRESSION: the login rate limit (429) says so — it used to claim the phone/password was wrong', async ({ page }) => {
-    await page.route(/\/auth\/password\/login$/, (route) => route.fulfill(envelope(429, 'TOO_MANY_REQUESTS', 'Too many requests. Please try again later.')));
+    await page.route(/\/auth\/dashboard\/login$/, (route) => route.fulfill(envelope(429, 'TOO_MANY_REQUESTS', 'Too many requests. Please try again later.')));
     await page.goto('/login');
     await page.getByLabel('Phone number').fill(VENDOR_A_PHONE);
     await page.getByLabel('Password').fill('any-password-1');
@@ -72,7 +72,7 @@ test.describe('Login — auth errors say what actually happened', () => {
 
   test('a rejected login (401) keeps the clear credentials message; an outage shows the server’s message', async ({ page }) => {
     let status = 401;
-    await page.route(/\/auth\/password\/login$/, (route) =>
+    await page.route(/\/auth\/dashboard\/login$/, (route) =>
       route.fulfill(status === 401 ? envelope(401, 'UNAUTHORIZED', 'Invalid credentials.') : envelope(500, 'INTERNAL_ERROR', 'Something went wrong. Please try again.')),
     );
     await page.goto('/login');

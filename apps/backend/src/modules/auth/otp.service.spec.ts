@@ -123,4 +123,13 @@ describe('OtpService — Unifonic SMS provider integration', () => {
     await service.sendOtp('+201000000019');
     expect(smsProvider.sendSms).toHaveBeenCalled();
   });
+
+  it('SINGLE USE under concurrency: when another request already consumed the code, a second verification of the same correct code is refused', async () => {
+    const { service, redisStore, mockRedisInstance } = buildHarness();
+    const crypto = require('crypto');
+    redisStore.set('otp:+201000000020', JSON.stringify({ codeHash: crypto.createHash('sha256').update('424242').digest('hex'), attempts: 0 }));
+    // Both racers passed the hash comparison; Redis reports the key already deleted for the loser (DEL returned 0).
+    mockRedisInstance.del.mockImplementationOnce(async () => 0);
+    expect(await service.verifyOtp('+201000000020', '424242')).toBe(false);
+  });
 });

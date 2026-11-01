@@ -75,6 +75,18 @@ export const BusinessEvent = {
 
   /** A call to an external dependency (Unifonic SMS, Firebase Cloud Messaging, Google Maps Distance Matrix) did not succeed. Never includes credentials, tokens, or raw request/response payloads — see each provider's own call site. */
   EXTERNAL_PROVIDER_FAILED: 'external_provider.failed',
+
+  /**
+   * Security monitoring (security milestone) — emitted by HttpExceptionFilter for every refused request of these kinds, at WARN, with
+   * route TEMPLATE, status, error code, the caller's user id/role (when known) and IP. Never a body, a query string, a token or a phone.
+   * Alerting: a burst of `security.access_denied` from one user (BOLA probing), `security.auth_failed` across many accounts from one
+   * IP (credential stuffing), or `security.rate_limited` on auth routes.
+   */
+  SECURITY_AUTH_FAILED: 'security.auth_failed',
+  SECURITY_ACCESS_DENIED: 'security.access_denied',
+  SECURITY_RATE_LIMITED: 'security.rate_limited',
+  /** A refused money-moving request (400/409 on payment / wallet / refund / loyalty / settlement / cash-remainder routes): over-refund, replayed key, double claim. */
+  SECURITY_FINANCIAL_REJECTED: 'security.financial_rejected',
 } as const;
 
 export type BusinessEventName = (typeof BusinessEvent)[keyof typeof BusinessEvent];

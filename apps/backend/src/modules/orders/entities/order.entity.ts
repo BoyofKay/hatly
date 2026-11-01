@@ -1,3 +1,4 @@
+import { AddressMode } from '../../addresses/address-mode';
 import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../database/base.entity';
 import { OrderStatus } from '../order-status.enum';
@@ -41,6 +42,8 @@ export interface DeliveryZoneSnapshot {
  * without one is located by its Delivery Zone (`deliveryZone`, frozen). Never edited after the order exists.
  */
 export interface DeliveryAddressSnapshot {
+  /** How the address was identified (GPS or MANUAL); absent on legacy addresses and on orders placed before the two methods. */
+  mode?: AddressMode;
   label?: string;
   line1: string;
   latitude?: number;

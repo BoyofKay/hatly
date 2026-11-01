@@ -1,12 +1,14 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Upload } from './entities/upload.entity';
 import { UPLOAD_PROVIDER, UploadProvider } from './upload-provider.interface';
 import { decodeBase64Image, UploadRejectedError } from './image-validation';
 
 @Injectable()
 export class UploadsService {
+  private readonly logger = new Logger(UploadsService.name);
+
   constructor(
     @InjectRepository(Upload) private readonly repo: Repository<Upload>,
     @Inject(UPLOAD_PROVIDER) private readonly uploadProvider: UploadProvider,
@@ -50,5 +52,32 @@ export class UploadsService {
       .andWhere('upload.uploaded_by_user_id = :uploadedByUserId', { uploadedByUserId })
       .getMany();
     return new Set(rows.map((r) => r.url));
+  }
+
+  /**
+   * Account deletion, step 1 (inside the deletion transaction): forgets every upload this user made and returns the stored references so
+   * the files can be removed after the transaction commits. Hard delete — a soft-deleted row would still tie the photo to the user id.
+   */
+  async detachAllOwnedBy(uploadedByUserId: string, manager: EntityManager): Promise<string[]> {
+    // TypeORM's Postgres driver answers a DELETE … RETURNING with `[rows, affectedCount]` (a SELECT gives the rows directly).
+    const result: unknown = await manager.query('DELETE FROM uploads WHERE uploaded_by_user_id = $1 RETURNING url', [uploadedByUserId]);
+    const rows = (Array.isArray(result) && Array.isArray(result[0]) ? result[0] : result) as Array<{ url: string }>;
+    return rows.map((r) => r.url).filter((url): url is string => typeof url === 'string');
+  }
+
+  /**
+   * Account deletion, step 2 (after commit): removes the stored files. Best effort and never throws — the database no longer references
+   * them, so a file that could not be removed is an orphan, reported by count (never by URL: a URL is a capability) for an operator retry.
+   */
+  async removeStoredFiles(urls: string[]): Promise<{ removed: number; failed: number }> {
+    let removed = 0;
+    let failed = 0;
+    for (const url of urls) {
+      const ok = this.uploadProvider.remove ? await this.uploadProvider.remove(url).catch(() => false) : false;
+      if (ok) removed += 1;
+      else failed += 1;
+    }
+    if (failed > 0) this.logger.error(`account deletion: ${failed} of ${urls.length} uploaded file(s) could not be removed from storage (orphaned; database references already erased).`);
+    return { removed, failed };
   }
 }

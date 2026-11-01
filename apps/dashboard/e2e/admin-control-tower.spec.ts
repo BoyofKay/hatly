@@ -6,6 +6,7 @@ import {
   createOnlineDriver,
   ensureAssignedTo,
   orderDetail,
+  pinAutomaticDispatch,
   placeReadyOrder,
   reassignViaApi,
   releaseByDriver,
@@ -64,32 +65,39 @@ test.describe('Admin — Control Tower', () => {
     await expect(page.getByTestId('ct-awaiting')).toContainText(String(body.data.attention.awaitingAssignment));
   });
 
-  test('a status count opens the matching, pre-filtered order search', async ({ page }) => {
+  test('a status count opens the Orders workspace already filtered to that status (filtered by the backend)', async ({ page }) => {
     await openTower(page);
-    await page.getByTestId('ct-status-ASSIGNED_TO_DRIVER').click();
-    await expect(page).toHaveURL(/\/order-search\?status=ASSIGNED_TO_DRIVER/);
-    await expect(page.locator('select').filter({ has: page.locator('option[value="ASSIGNED_TO_DRIVER"]') }).first()).toHaveValue('ASSIGNED_TO_DRIVER');
-    // and the listed orders really are filtered by the backend
-    const rows = page.locator('tbody tr');
-    if ((await rows.count()) > 0) await expect(rows.first()).toContainText('ASSIGNED_TO_DRIVER');
+    const [request] = await Promise.all([
+      page.waitForRequest((r) => /\/admin\/orders\?/.test(r.url())),
+      page.getByTestId('ct-status-ASSIGNED_TO_DRIVER').click(),
+    ]);
+    // One status is narrower than any queue view (the "With a driver" view spans three), so the workspace shows it as its own removable status filter.
+    await expect(page).toHaveURL(/\/order-management\?status=ASSIGNED_TO_DRIVER/);
+    expect(new URL(request.url()).searchParams.get('statuses')).toBe('ASSIGNED_TO_DRIVER');
+    await expect(page.getByTestId('raw-status-chip')).toContainText('Assigned');
+    await expect(page.getByTestId('view-all')).toHaveAttribute('aria-selected', 'true');
+    const rows = page.locator('[data-testid^="order-row-"]');
+    const n = await rows.count();
+    for (let i = 0; i < Math.min(n, 5); i++) await expect(rows.nth(i)).toContainText(/Assigned|Picked up|On the way/);
   });
 
-  test('the "pickup orders ready" count opens the order search filtered to ready PICKUP orders (filtered by the backend)', async ({ page }) => {
+  test('the "pickup orders ready" count opens the Orders workspace on the ready-for-pickup view (filtered by the backend)', async ({ page }) => {
     await openTower(page);
     const [request] = await Promise.all([
       page.waitForRequest((r) => /\/admin\/orders\?/.test(r.url())),
       page.getByTestId('ct-pickup-ready').getByRole('link').click(),
     ]);
-    await expect(page).toHaveURL(/\/order-search\?status=READY_FOR_PICKUP&fulfillmentType=PICKUP/);
+    await expect(page).toHaveURL(/\/order-management\?view=readyPickup/);
     const params = new URL(request.url()).searchParams;
-    expect([params.get('status'), params.get('fulfillmentType')]).toEqual(['READY_FOR_PICKUP', 'PICKUP']);
-    await expect(page.getByTestId('list-fulfillment')).toHaveValue('PICKUP');
-    const rows = page.locator('tbody tr');
-    const n = await rows.count();
-    for (let i = 0; i < n; i++) await expect(rows.nth(i).getByTestId('pickup-badge')).toBeVisible();
+    expect([params.get('statuses'), params.get('fulfillmentType')]).toEqual(['READY_FOR_PICKUP', 'PICKUP']);
+    await expect(page.getByTestId('view-readyPickup')).toHaveAttribute('aria-selected', 'true');
+    const cards = page.locator('[data-testid^="order-row-"]');
+    const n = await cards.count();
+    for (let i = 0; i < Math.min(n, 5); i++) await expect(cards.nth(i)).toContainText('Pickup');
   });
 
   test('find an order, see its delivery state, reassign it (confirmed), the UI shows the backend’s new state; a dismissed confirmation sends nothing', async ({ page }) => {
+    const restoreDispatch = await pinAutomaticDispatch(false); // hand assignment: keep background dispatch from claiming the test drivers
     const order = await placeReadyOrder();
     try {
       await ensureAssignedTo(order.orderId, driverA);
@@ -119,11 +127,13 @@ test.describe('Admin — Control Tower', () => {
       await expect(row.getByTestId('ct-flag-reassigned')).toBeVisible();
       expect((await orderDetail(order.orderId)).driver.id).toBe(driverB.id);
     } finally {
+      await restoreDispatch();
       await cancelTestOrder(order);
     }
   });
 
   test('a double click sends exactly ONE reassignment', async ({ page }) => {
+    const restoreDispatch = await pinAutomaticDispatch(false); // hand assignment: keep background dispatch from claiming the test drivers
     const order = await placeReadyOrder();
     try {
       await ensureAssignedTo(order.orderId, driverA);
@@ -148,11 +158,13 @@ test.describe('Admin — Control Tower', () => {
       expect(posted).toBe(1);
     } finally {
       await page.unroute(REASSIGN_URL);
+      await restoreDispatch();
       await cancelTestOrder(order);
     }
   });
 
   test('stale view: another admin reassigned the order meanwhile → the backend refuses, the reason is shown, the row reloads to the truth', async ({ page }) => {
+    const restoreDispatch = await pinAutomaticDispatch(false); // hand assignment: keep background dispatch from claiming the test drivers
     const order = await placeReadyOrder();
     try {
       await ensureAssignedTo(order.orderId, driverA);
@@ -171,6 +183,7 @@ test.describe('Admin — Control Tower', () => {
       await expect(page.getByTestId(`ct-row-${order.orderNumber}`).getByTestId('ct-row-driver')).toContainText(driverB.fullName);
       expect((await orderDetail(order.orderId)).driver.id).toBe(driverB.id); // nothing was overridden
     } finally {
+      await restoreDispatch();
       await cancelTestOrder(order);
     }
   });
@@ -189,13 +202,13 @@ test.describe('Admin — Control Tower', () => {
 
       const ops = page.getByTestId('order-operations');
       await expect(ops).toBeVisible();
-      await expect(page.getByTestId('od-timeline')).toContainText('READY FOR PICKUP');
+      await expect(page.getByTestId('od-timeline')).toContainText('Ready for pickup');
       await ops.getByTestId('dispatch-driver-select').selectOption(driverB.id);
       const [res] = await Promise.all([page.waitForResponse((r) => ASSIGN_URL.test(r.url())), ops.getByTestId('dispatch-submit').click()]);
       expect(res.status()).toBe(201);
       await expect(page.getByTestId('od-flash')).toHaveText(`${order.orderNumber} assigned to ${driverB.fullName}.`);
       await expect(ops.getByTestId('dispatch-submit')).toHaveText('Reassign'); // the page re-read the order: now assigned
-      await expect(page.getByTestId('od-timeline').locator('li').last()).toContainText('ASSIGNED TO DRIVER');
+      await expect(page.getByTestId('od-timeline').locator('li').last()).toContainText('Assigned to driver');
     } finally {
       await cancelTestOrder(order);
     }
@@ -260,7 +273,7 @@ test.describe('Admin — Control Tower', () => {
     const order = await placeReadyOrder();
     try {
       await ensureAssignedTo(order.orderId, driverA);
-      await page.goto('/drivers');
+      await page.goto(`/drivers?search=${encodeURIComponent(driverA.fullName)}`);
       const row = page.getByTestId(`driver-row-${driverA.id}`);
       await expect(row.getByTestId('driver-active-delivery')).toContainText(order.orderNumber);
     } finally {
@@ -326,9 +339,9 @@ test.describe('Admin — Control Tower', () => {
 
   test('Arabic: the Control Tower renders right-to-left with Arabic labels', async ({ page }) => {
     await page.goto('/control-tower?lang=ar');
-    await expect(page.getByRole('heading', { name: 'برج التحكم' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'برج المراقبة' })).toBeVisible();
     await expect(page.locator('[dir="rtl"]').first()).toBeVisible();
-    await page.getByRole('button', { name: 'English' }).click(); // leave the remembered locale as English for other specs
+    await page.getByRole('button', { name: 'التبديل إلى الإنجليزية' }).click(); // the shell's single language control; leave the remembered locale as English for other specs
   });
 
   test('the old /dispatch address forwards to the Control Tower', async ({ page }) => {

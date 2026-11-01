@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import axios, { AxiosInstance } from 'axios';
-import { API_BASE_URL, SUPER_ADMIN_STORAGE_STATE, VENDOR_A_PRODUCT_ID, VENDOR_A_STORAGE_STATE } from './env';
+import { API_BASE_URL, TOKENS_FILE, VENDOR_A_PRODUCT_ID } from './env';
 import { registerCustomerApi } from './hatly-service-fixtures';
 
 /**
@@ -12,11 +12,10 @@ import { registerCustomerApi } from './hatly-service-fixtures';
  */
 const api = (token: string): AxiosInstance =>
   axios.create({ baseURL: API_BASE_URL, headers: { Authorization: `Bearer ${token}` }, validateStatus: () => true });
-const tokenFrom = (file: string) =>
-  JSON.parse(readFileSync(file, 'utf8')).origins[0].localStorage.find((e: any) => e.name === 'hatly_dashboard_token').value as string;
+const tokenFor = (who: 'superAdmin' | 'vendorA' | 'vendorB') => JSON.parse(readFileSync(TOKENS_FILE, 'utf8'))[who] as string;
 
-export const adminApi = () => api(tokenFrom(SUPER_ADMIN_STORAGE_STATE));
-export const vendorApi = () => api(tokenFrom(VENDOR_A_STORAGE_STATE));
+export const adminApi = () => api(tokenFor('superAdmin'));
+export const vendorApi = () => api(tokenFor('vendorA'));
 
 function must<T = any>(res: { status: number; data: any }, what: string, ok = [200, 201]): T {
   if (!ok.includes(res.status)) throw new Error(`${what}: HTTP ${res.status} ${JSON.stringify(res.data)}`);
@@ -92,15 +91,23 @@ export async function releaseByDriver(orderId: string, driver: TestDriver) {
 
 /**
  * Cleanup: an assigned order is handed back by the ADMIN (the existing ASSIGNED_TO_DRIVER → READY_FOR_PICKUP admin
- * transition — which, unlike a driver's hand-back, never triggers the U3 redispatch), then the vendor cancels it, so no test
+ * transition — which, unlike a driver's hand-back, never triggers the U3 redispatch), then the vendor cancels it (with the reason the API requires), so no test
  * order is left in operation and its driver is free again (the state machine frees whoever held it).
  */
 export async function cancelTestOrder(order: { orderId: string; segmentId: string }) {
   const detail = await orderDetail(order.orderId);
+  // Already over (the test itself cancelled / completed it): nothing to clean up.
+  if (['CANCELLED', 'DELIVERED', 'COLLECTED', 'FAILED_DELIVERY'].includes(detail.status)) return;
   if (detail.status === 'ASSIGNED_TO_DRIVER') {
     must(await adminApi().patch(`/orders/${order.orderId}/status`, { status: 'READY_FOR_PICKUP' }), 'admin hand-back for cleanup');
   }
-  await vendorApi().patch(`/vendor/orders/segments/${order.segmentId}/status`, { status: 'CANCELLED' });
+  // The API REQUIRES a reason for a vendor cancellation (400 without one). The first version of this helper sent none and ignored the
+  // answer, so no fixture order was ever cancelled: they piled up at READY_FOR_PICKUP and automatic dispatch later handed them to the
+  // next run's test drivers (intermittent DRIVER_UNAVAILABLE / NO_AVAILABLE_DRIVER). The answer is now checked.
+  const res = await vendorApi().patch(`/vendor/orders/segments/${order.segmentId}/status`, { status: 'CANCELLED', reason: 'Playwright fixture cleanup' });
+  const after = (await orderDetail(order.orderId)).status as string;
+  const cancellable = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'].includes(detail.status);
+  if (cancellable && after !== 'CANCELLED') throw new Error(`cleanup: the vendor could not cancel test order ${order.orderId} (was ${detail.status}, now ${after}): HTTP ${res.status} ${JSON.stringify(res.data)}`);
 }
 
 /**
@@ -118,4 +125,28 @@ export async function withAutomaticDispatch<T>(enabled: boolean, fn: () => Promi
       must(await adminApi().put('/admin/business-config/AUTOMATIC_DISPATCH_ENABLED', { value: previous }), 'restore dispatch switch');
     }
   }
+}
+
+/**
+ * Pins Automatic Dispatch for the length of a test that assigns drivers by hand and returns the function that puts the previous setting back.
+ * With it ON, the dev database's many ready orders keep claiming every online driver in the background, so a driver the test just picked can be
+ * "busy" a moment later — the backend then (correctly) refuses the manual assignment. The backend's availability rule is untouched.
+ */
+export async function pinAutomaticDispatch(enabled: boolean): Promise<() => Promise<void>> {
+  const previous = must<{ value: unknown }>(await adminApi().get('/admin/business-config/AUTOMATIC_DISPATCH_ENABLED'), 'read dispatch switch').value;
+  must(await adminApi().put('/admin/business-config/AUTOMATIC_DISPATCH_ENABLED', { value: enabled }), 'set dispatch switch');
+  return async () => {
+    if (previous !== null && previous !== undefined) must(await adminApi().put('/admin/business-config/AUTOMATIC_DISPATCH_ENABLED', { value: previous }), 'restore dispatch switch');
+  };
+}
+
+/** A placed COD order of Vendor A's product that nobody has accepted yet (vendor part PENDING) — what a vendor sees as a brand-new order. */
+export async function placeNewOrder(): Promise<{ orderId: string; orderNumber: string; segmentId: string }> {
+  const customer = await registerCustomerApi();
+  await customer.delete('/cart');
+  must(await customer.post('/cart/items', { productId: VENDOR_A_PRODUCT_ID, quantity: 1 }), 'add to cart');
+  const deliveryAddress = { line1: 'Playwright Operations Street 1', latitude: BELBEIS.latitude, longitude: BELBEIS.longitude };
+  const quote = must(await customer.post('/checkout/quote', { deliveryAddress, paymentMethod: 'COD' }), 'quote');
+  const order = must(await customer.post('/orders', { deliveryAddress, paymentMethod: 'COD', quoteToken: quote.quoteToken }), 'place order');
+  return { orderId: order.id, orderNumber: order.orderNumber, segmentId: order.segments[0].id };
 }

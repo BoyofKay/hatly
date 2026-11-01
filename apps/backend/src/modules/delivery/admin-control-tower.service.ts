@@ -52,8 +52,8 @@ export interface ControlTowerSummary {
      */
     awaitingWithoutAlert: number;
     /**
-     * DELIVERY orders back at READY_FOR_PICKUP after a driver was released (driver hand-back or timeout), with NO open alert:
-     * nothing will assign them again automatically — an admin must. (No automatic retry exists — PD-008 open question.)
+     * DELIVERY orders back at READY_FOR_PICKUP after a driver was released (driver hand-back or timeout) that the system is NOT retrying (no open NO_ELIGIBLE_DRIVER / ASSIGNMENT_ERROR
+     * alert — those are retried automatically): automatic assignment is off or the driver did not respond, so an admin must assign them.
      */
     releasedAwaitingManualAssignment: number;
     /** ASSIGNED_TO_DRIVER orders whose driver's accept window (acceptDeadlineAt) has passed — the timeout sweep's input. */
@@ -62,6 +62,26 @@ export interface ControlTowerSummary {
     failedDeliveriesUnresolved: number;
     /** PICKUP orders ready at the branch — the customer collects them; never a driver's job. */
     readyForCustomerPickup: number;
+  };
+  /**
+   * Operations follow-up facts (Order operations milestone). Everything an operator must act on, as counts the Dashboard turns into the
+   * navigation counter and the banner. Thresholds: a pending acceptance becomes an alert after PENDING_ACCEPTANCE_ALERT_MINUTES.
+   */
+  operations: {
+    pendingAcceptanceAlertMinutes: number;
+    /** Vendor segments still PENDING (all ages), and those older than the threshold. */
+    pendingAcceptance: number;
+    pendingAcceptanceOverdue: number;
+    /** Segments accepted/preparing past their expected-ready time (`expectedReadyAt`). */
+    preparationOverdue: number;
+    /** Open dispatch alerts by stable reason code. */
+    openDispatchAlerts: Record<'NO_ELIGIBLE_DRIVER' | 'AUTO_ASSIGN_DISABLED' | 'ASSIGNMENT_ERROR' | 'DRIVER_NOT_RESPONDING', number>;
+    /** Manual Transfer refunds recorded but not yet marked as sent. */
+    refundsToSend: number;
+    /** Active orders where some — not all — vendor parts were rejected. */
+    partiallyRejectedActiveOrders: number;
+    /** Everything above that needs a person (drives the navigation counter). */
+    actionRequired: number;
   };
   /** Driver aggregates — only for callers who may see drivers (MANAGE_DRIVERS or ASSIGN_REASSIGN_ORDERS), else null. */
   drivers: {
@@ -108,6 +128,50 @@ export class AdminControlTowerService {
     private readonly businessConfigService: BusinessConfigService,
   ) {}
 
+  /** A vendor segment waiting for acceptance longer than this raises an operations alert (approved initial value; centralized here). */
+  static readonly PENDING_ACCEPTANCE_ALERT_MINUTES = 5;
+
+  private async operationsFacts(): Promise<ControlTowerSummary['operations']> {
+    const minutes = AdminControlTowerService.PENDING_ACCEPTANCE_ALERT_MINUTES;
+    const [[segments], alertRows, [refunds], [partial]] = await Promise.all([
+      this.dataSource.query(
+        `SELECT
+           count(*) FILTER (WHERE s.status = 'PENDING')::int AS pending,
+           count(*) FILTER (WHERE s.status = 'PENDING' AND s.created_at < now() - ($1::int * interval '1 minute'))::int AS overdue,
+           count(*) FILTER (WHERE s.status IN ('CONFIRMED','PREPARING') AND s.expected_ready_at IS NOT NULL AND s.expected_ready_at < now())::int AS prep_overdue
+         FROM order_vendor_segments s JOIN orders o ON o.id = s.order_id
+        WHERE s.deleted_at IS NULL AND o.status IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP','ASSIGNED_TO_DRIVER')`,
+        [minutes],
+      ),
+      this.dataSource.query(`SELECT reason, count(*)::int AS n FROM dispatch_alerts WHERE resolved_at IS NULL AND deleted_at IS NULL GROUP BY reason`),
+      this.dataSource.query(
+        `SELECT count(*)::int AS n FROM financial_events e
+          WHERE e.type = 'MANUAL_TRANSFER_REFUND_RECORDED' AND NOT EXISTS (SELECT 1 FROM refund_payouts p WHERE p.financial_event_id = e.id)`,
+      ),
+      this.dataSource.query(
+        `SELECT count(*)::int AS n FROM orders o
+          WHERE o.deleted_at IS NULL AND o.status IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP','ASSIGNED_TO_DRIVER')
+            AND EXISTS (SELECT 1 FROM order_vendor_segments s WHERE s.order_id = o.id AND s.status = 'CANCELLED')
+            AND EXISTS (SELECT 1 FROM order_vendor_segments s WHERE s.order_id = o.id AND s.status <> 'CANCELLED')`,
+      ),
+    ]);
+    const openDispatchAlerts = { NO_ELIGIBLE_DRIVER: 0, AUTO_ASSIGN_DISABLED: 0, ASSIGNMENT_ERROR: 0, DRIVER_NOT_RESPONDING: 0 };
+    for (const row of alertRows as Array<{ reason: keyof typeof openDispatchAlerts; n: number }>) {
+      if (row.reason in openDispatchAlerts) openDispatchAlerts[row.reason] = Number(row.n);
+    }
+    const alertTotal = Object.values(openDispatchAlerts).reduce((a, b) => a + b, 0);
+    return {
+      pendingAcceptanceAlertMinutes: minutes,
+      pendingAcceptance: Number(segments.pending),
+      pendingAcceptanceOverdue: Number(segments.overdue),
+      preparationOverdue: Number(segments.prep_overdue),
+      openDispatchAlerts,
+      refundsToSend: Number(refunds.n),
+      partiallyRejectedActiveOrders: Number(partial.n),
+      actionRequired: alertTotal + Number(segments.overdue) + Number(segments.prep_overdue) + Number(refunds.n),
+    };
+  }
+
   async summary(options: { includeDrivers: boolean }): Promise<ControlTowerSummary> {
     const [byStatus, [attention], driverCounts, automaticDispatchEnabled] = await Promise.all([
       this.dataSource.query(
@@ -129,7 +193,8 @@ export class AdminControlTowerService {
            count(*) FILTER (WHERE o.status = 'READY_FOR_PICKUP' AND o.fulfillment_type = 'PICKUP')::int AS "readyForCustomerPickup",
            count(*) FILTER (WHERE o.status = 'READY_FOR_PICKUP' AND o.fulfillment_type = 'DELIVERY'
              AND (${LATEST_READY_EVENT_SQL}).from_status = 'ASSIGNED_TO_DRIVER'
-             AND NOT EXISTS (SELECT 1 FROM dispatch_alerts a WHERE a.order_id = o.id AND a.resolved_at IS NULL AND a.deleted_at IS NULL)
+             AND NOT EXISTS (SELECT 1 FROM dispatch_alerts a WHERE a.order_id = o.id AND a.resolved_at IS NULL AND a.deleted_at IS NULL
+               AND a.reason IN ('NO_ELIGIBLE_DRIVER', 'ASSIGNMENT_ERROR'))
            )::int AS "releasedAwaitingManualAssignment"
          FROM orders o
         WHERE o.deleted_at IS NULL AND o.status IN ('READY_FOR_PICKUP', 'ASSIGNED_TO_DRIVER', 'FAILED_DELIVERY')`,
@@ -164,6 +229,7 @@ export class AdminControlTowerService {
         failedDeliveriesUnresolved: attention.failedDeliveriesUnresolved,
         readyForCustomerPickup: attention.readyForCustomerPickup,
       },
+      operations: await this.operationsFacts(),
       drivers: driverCounts ? driverCounts[0] : null,
     };
   }

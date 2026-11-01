@@ -54,4 +54,18 @@ export class MarketplaceSector extends BaseEntity {
    */
   @Column({ name: 'image_url', type: 'varchar', length: 500, nullable: true })
   imageUrl?: string | null;
+
+  /**
+   * Admin-managed: may a customer send a free-text / photo "custom request" ("لا تجد ما تبحث عنه؟") to a vendor of this sector,
+   * to be priced by the vendor? OFF by default — it only makes sense where a vendor can source an item that is not on the menu
+   * (pharmacy, grocery…) and not for a restaurant menu. Enforced by the server on `POST /cart/vendor-custom-items`; the app only
+   * mirrors it (`allowsCustomRequests` on the branch details) and can never grant it.
+   */
+  @Column({ name: 'custom_requests_enabled', type: 'boolean', default: false })
+  customRequestsEnabled: boolean;
+}
+
+/** Whether a branch's sector lets customers send custom requests. A branch with no (or an inactive) sector cannot establish it. */
+export function sectorAllowsCustomRequests(sector: Pick<MarketplaceSector, 'customRequestsEnabled' | 'isActive'> | null | undefined): boolean {
+  return !!sector && sector.isActive === true && sector.customRequestsEnabled === true;
 }

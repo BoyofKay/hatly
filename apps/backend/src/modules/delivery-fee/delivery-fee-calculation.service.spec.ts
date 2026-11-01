@@ -1,3 +1,4 @@
+import { UnavailableMapProvider } from '../location/providers/unavailable-map.provider';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConflictException } from '@nestjs/common';
 import { composeDeliveryFee, DeliveryFeeCalculationService } from './delivery-fee-calculation.service';
@@ -301,5 +302,36 @@ describe('DeliveryFeeCalculationService.calculateForZone (PD-009)', () => {
     const businessConfig = buildBusinessConfigService({ REGISTERED_VENDOR_PRICE_PER_100M_MINOR: 100, REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR: 500, REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR: 300 });
     const result = await new DeliveryFeeCalculationService(mapProvider as any, businessConfig as any).calculate([{ id: 'a', latitude: 1, longitude: 1 }], customer);
     expect(result).toMatchObject({ pricingSource: 'DISTANCE', deliveryFeeMinor: 900 });
+  });
+});
+
+describe('DeliveryFeeCalculationService — Maps disabled (PD-009 G)', () => {
+  const config = { getRequired: jest.fn(async () => 500) };
+
+  it('reports road-distance pricing as unavailable only for the disabled provider', () => {
+    expect(new DeliveryFeeCalculationService(new UnavailableMapProvider(), config as any).roadDistancePricingAvailable).toBe(false);
+    expect(new DeliveryFeeCalculationService({ distanceAndEta: jest.fn() } as any, config as any).roadDistancePricingAvailable).toBe(true);
+  });
+
+  it('distance pricing fails closed (DELIVERY_FEE_UNAVAILABLE) — never a fabricated fee', async () => {
+    const service = new DeliveryFeeCalculationService(new UnavailableMapProvider(), config as any);
+    await expect(service.calculate([{ id: 'b1', latitude: 30.4, longitude: 31.5 }], { latitude: 30.41, longitude: 31.51 })).rejects.toMatchObject({
+      response: { details: { code: 'DELIVERY_FEE_UNAVAILABLE' } },
+    });
+  });
+
+  it('zone pricing needs no map: zone fee + additional-vendor fee, no distance, no ETA', async () => {
+    const service = new DeliveryFeeCalculationService(new UnavailableMapProvider(), config as any);
+    const b = await service.calculateForZone([{ id: 'b2' }, { id: 'b1' }], { id: 'zone-1', deliveryFeeMinor: 2000 });
+    expect(b).toMatchObject({
+      pricingSource: 'DELIVERY_ZONE',
+      deliveryZoneId: 'zone-1',
+      zoneDeliveryFeeMinorUsed: 2000,
+      additionalVendorChargeMinor: 500,
+      deliveryFeeMinor: 2500,
+      rawTotalDistanceMeters: null,
+      legDistancesMeters: [],
+    });
+    expect(b.totalEtaSeconds).toBeUndefined();
   });
 });

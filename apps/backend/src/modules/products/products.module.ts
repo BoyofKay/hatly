@@ -15,6 +15,8 @@ import { VendorProductsService } from './vendor-products.service';
 import { VendorProductsController, VendorCategoriesController } from './vendor-products.controller';
 import { ProductExcelImportService } from './product-excel-import.service';
 import { OffersModule } from '../offers/offers.module';
+import { ProductOptionsService } from './product-options.service';
+import { AdminProductOptionsController, VendorProductOptionsController } from './product-options.controllers';
 
 @Module({
   imports: [
@@ -23,8 +25,16 @@ import { OffersModule } from '../offers/offers.module';
     UploadsModule,
     OffersModule,
   ],
-  controllers: [ProductsController, AdminProductCategoriesController, AdminProductsController, VendorProductsController, VendorCategoriesController],
-  providers: [ProductsService, VendorProductsService, ProductExcelImportService],
+  controllers: [
+    ProductsController,
+    AdminProductCategoriesController,
+    AdminProductsController,
+    VendorProductsController,
+    VendorCategoriesController,
+    AdminProductOptionsController,
+    VendorProductOptionsController,
+  ],
+  providers: [ProductsService, VendorProductsService, ProductExcelImportService, ProductOptionsService],
   exports: [ProductsService, TypeOrmModule],
 })
 export class ProductsModule {}

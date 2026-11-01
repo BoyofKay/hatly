@@ -1,4 +1,5 @@
-import { IsBoolean, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { AddressMode } from '../address-mode';
 
 export class CreateAddressDto {
   @IsOptional()
@@ -6,15 +7,25 @@ export class CreateAddressDto {
   @MaxLength(100)
   label?: string;
 
-  /** The detailed, free-form address the driver reads. Required; it never needs to be geocodable. */
+  /**
+   * How this address is identified: MANUAL (zone + typed text, no coordinates) or GPS (coordinates only). Omitted by an old app
+   * build: the address is then a legacy one and the original rules apply (zone + text required, pin optional).
+   */
+  @IsOptional()
+  @IsEnum(AddressMode)
+  mode?: AddressMode;
+
+  /** The detailed, free-form address the driver reads. Required for MANUAL and legacy addresses; GPS does not need it. */
+  @ValidateIf((o: CreateAddressDto) => o.mode !== AddressMode.GPS)
   @IsString()
   @MaxLength(255)
   @Matches(/\S/)
-  line1: string;
+  line1?: string;
 
-  /** PD-009: the Delivery Zone the customer selected (GET /delivery-zones). Required; must be active. */
+  /** PD-009: the Delivery Zone the customer selected (GET /delivery-zones). Required for MANUAL and legacy; GPS has none. */
+  @ValidateIf((o: CreateAddressDto) => o.mode !== AddressMode.GPS)
   @IsUUID()
-  deliveryZoneId: string;
+  deliveryZoneId?: string;
 
   /** Optional map pin — both or neither. Never required to save an address. */
   @IsOptional()

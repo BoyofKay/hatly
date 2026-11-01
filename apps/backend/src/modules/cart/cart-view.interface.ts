@@ -95,12 +95,14 @@ export interface CartGroupView {
   adHocPlaceName: string | null;
   /** AD_HOC_SERVICE only — which of the two Hatly Service flows this group represents. */
   adHocServiceType: string | null;
-  /** BUY_FROM_PLACE only — the pickup coordinate actually in effect: the customer's own override if supplied, else the configured default (resolved at order-creation time; here it just reflects whatever the customer has set so far, which may still be null pre-checkout). */
+  /** The route ORIGIN the customer chose (null = the configured default is used; the resolved route is returned by the checkout quote). */
   adHocPickupLatitude: number | null;
   adHocPickupLongitude: number | null;
-  /** DELIVER_TO_PLACE only — same idea, for the destination. */
+  adHocPickupLabel: string | null;
+  /** The route DESTINATION the customer chose (null = the configured default is used). */
   adHocDestinationLatitude: number | null;
   adHocDestinationLongitude: number | null;
+  adHocDestinationLabel: string | null;
   vendorNote: string | null;
   items: CartItemView[];
   /** Null for an AD_HOC_SERVICE group — see the file's own top comment. */

@@ -1,3 +1,4 @@
+import { SettlementFrequency } from './settlement-frequency.enum';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -87,7 +88,12 @@ export class SettlementService {
       throw new BadRequestException('No new activity to settle since the last closed period.');
     }
 
-    const frequency = await this.businessConfigService.getVendorSettlementFrequency();
+    // The vendor's contractual term (set by Hatly per vendor) wins; without one the platform-wide setting is used exactly as before.
+    const [term] = await this.vendorPeriodsRepository.manager.query(
+      `SELECT t.frequency FROM vendor_settlement_terms t JOIN vendor_branches b ON b.vendor_id = t.vendor_id WHERE b.id = $1`,
+      [vendorBranchId],
+    );
+    const frequency = (term?.frequency as SettlementFrequency | undefined) ?? (await this.businessConfigService.getVendorSettlementFrequency());
 
     const commissionEvents = await this.financialEventsRepository
       .createQueryBuilder('e')

@@ -6,8 +6,15 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Firebase Cloud Messaging needs the Google Services plugin to turn android/app/google-services.json (git-ignored, supplied by the owner
+// from the Firebase console) into the app's Firebase options. Applied ONLY when that file exists, so a build without it — today's state,
+// and every developer build — is unchanged and push simply stays off (FcmService is wrapped defensively).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // The Google Maps SDK key (production-readiness slice — see docs/PRODUCT_DECISIONS.md "Google Maps key architecture").
-// A RESTRICTED MOBILE key (Android package name `com.hatly.customer` + the release keystore's SHA-1), never the
+// A RESTRICTED MOBILE key (Android package name `dev.hatly.customer` + the release keystore's SHA-1), never the
 // server's own GOOGLE_MAPS_API_KEY (that one stays server-side, in the backend's .env, and is never shipped here).
 // Read from `local.properties` (`MAPS_API_KEY=...`, already gitignored — never commit a real key there) or, for CI/CD, the
 // `MAPS_API_KEY` environment variable. Left blank in dev: the app's own `HATLY_MAPS_ENABLED` flag (see
@@ -30,6 +37,9 @@ val hasReleaseKeystore = listOf("storeFile", "storePassword", "keyAlias", "keyPa
     .all { !keystoreProperties.getProperty(it).isNullOrBlank() }
 
 android {
+    // `namespace` is the CODE package (the R class, BuildConfig, and what `.MainActivity` in the manifest resolves against — the Kotlin file lives
+    // in com/hatly/customer). It is deliberately NOT the installed identity and stays as it was; only `applicationId` below is what Google Play,
+    // Firebase and Google Maps key restrictions see. (They were identical until the 2026-10-19 change to dev.hatly.customer, see LAUNCH_PROGRESS §3o.)
     namespace = "com.hatly.customer"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
@@ -40,8 +50,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.hatly.customer"
+        // The Play / Firebase / Maps identity of the customer app (reverse of hatly.dev, a domain the project owns). Permanent once uploaded to Google Play.
+        // Android only: the iOS bundle id (com.hatly.customer) and the driver app id (com.hatly.driver) are unchanged.
+        applicationId = "dev.hatly.customer"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

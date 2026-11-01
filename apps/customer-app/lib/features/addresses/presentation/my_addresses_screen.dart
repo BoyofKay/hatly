@@ -80,9 +80,7 @@ class _MyAddressesScreenState extends ConsumerState<MyAddressesScreen> {
       // Reuses the existing PATCH /addresses/:id — every other field is
       // sent back unchanged (see SavedAddressToInput's own comment); the
       // backend's own `update()` clears the previous default atomically.
-      await ref
-          .read(addressesApiProvider)
-          .setDefaultAddress(address.id);
+      await ref.read(addressesApiProvider).setDefaultAddress(address.id);
       ref.invalidate(savedAddressesProvider);
     } catch (error) {
       if (mounted) {
@@ -116,10 +114,16 @@ class _MyAddressesScreenState extends ConsumerState<MyAddressesScreen> {
       appBar: AppBar(
         title: Text(l10n.profileMyAddresses),
         actions: [
-          TextButton(
-            key: const Key('my-addresses-add'),
-            onPressed: _addNew,
-            child: Text(l10n.addressAddNew),
+          // Capped (and ellipsised) so a very large system font on a narrow phone cannot push it off the bar.
+          ConstrainedBox(
+            constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * 0.42),
+            child: TextButton(
+              key: const Key('my-addresses-add'),
+              onPressed: _addNew,
+              child: Text(l10n.addressAddNew,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
           ),
         ],
       ),
@@ -210,18 +214,19 @@ class _AddressTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                // Wrap, not Row: with a large font on a narrow phone the "Default" badge moves under the name instead of overflowing.
+                Wrap(
+                  spacing: HatlySpacing.sm,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Flexible(
-                      child: Text(
-                        address.label?.isNotEmpty == true
-                            ? address.label!
-                            : address.line1,
-                        style: context.type.title,
-                      ),
+                    Text(
+                      address.label?.isNotEmpty == true
+                          ? address.label!
+                          : address.line1,
+                      style: context.type.title,
                     ),
                     if (address.isDefault) ...[
-                      const SizedBox(width: HatlySpacing.sm),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: HatlySpacing.sm, vertical: 2),

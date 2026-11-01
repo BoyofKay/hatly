@@ -6,6 +6,7 @@ import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../../shared_widgets/hatly_button.dart';
 import '../../../../shared_widgets/hatly_error_banner.dart';
+import '../../../auth/presentation/auth_gate.dart';
 import '../../../cart/data/cart_providers.dart';
 import '../../../uploads/data/uploads_providers.dart';
 import '../../../cart/presentation/cart_error_messages.dart';
@@ -20,7 +21,7 @@ const int _maxCustomRequestImages = 2;
 /// CartService.addVendorCustomItem) — never the External Hatly
 /// Service / AD_HOC_SERVICE flow, which lives entirely elsewhere in
 /// this app and is untouched by this widget.
-class CustomRequestAction extends StatelessWidget {
+class CustomRequestAction extends ConsumerWidget {
   const CustomRequestAction(
       {super.key, required this.vendorBranchId, this.pickImageOverride});
 
@@ -32,24 +33,46 @@ class CustomRequestAction extends StatelessWidget {
   final Future<XFile?> Function()? pickImageOverride;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final p = context.palette;
     // Polish pass: was a raw `OutlinedButton.icon` — `HatlyButton` exists
     // specifically to replace ad hoc button combinations like this one.
-    return HatlyButton(
-      variant: HatlyButtonVariant.secondary,
-      icon: Icons.help_outline,
-      label: l10n.customRequestEntryPoint,
-      // Not full-width — this is a compact entry-point button (was a
-      // content-sized `OutlinedButton.icon`), not a full-width CTA.
-      fullWidth: false,
-      onPressed: () => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        builder: (_) => _CustomRequestSheet(
-            vendorBranchId: vendorBranchId,
-            pickImageOverride: pickImageOverride),
-      ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        HatlyButton(
+          variant: HatlyButtonVariant.secondary,
+          icon: Icons.help_outline,
+          label: l10n.customRequestEntryPoint,
+          // Not full-width — this is a compact entry-point button (was a
+          // content-sized `OutlinedButton.icon`), not a full-width CTA.
+          fullWidth: false,
+          onPressed: () async {
+            // A custom request goes into the cart, which needs an account: a guest signs in first (and returns here).
+            if (!requireSignIn(context, ref)) return;
+            final messenger = ScaffoldMessenger.of(context);
+            final added = await showModalBottomSheet<bool>(
+              context: context,
+              isScrollControlled: true,
+              builder: (_) => _CustomRequestSheet(
+                  vendorBranchId: vendorBranchId,
+                  pickImageOverride: pickImageOverride),
+            );
+            // Say what happened: it is now in the cart, and the store (not the app) sets the price.
+            if (added == true) {
+              messenger.showSnackBar(
+                  SnackBar(content: Text(l10n.customRequestAdded)));
+            }
+          },
+        ),
+        const SizedBox(height: HatlySpacing.xs),
+        // What tapping it does, before tapping it.
+        Text(l10n.customRequestEntryHint,
+            key: const Key('custom-request-hint'),
+            textAlign: TextAlign.center,
+            style: context.type.caption.copyWith(color: p.textMuted)),
+      ],
     );
   }
 }
@@ -141,7 +164,7 @@ class _CustomRequestSheetState extends ConsumerState<_CustomRequestSheet> {
             () => _errorMessage = localizedCartErrorMessage(context, error));
         return;
       }
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     } catch (_) {
       if (mounted) {
         setState(() => _errorMessage = l10n.somethingWentWrong);

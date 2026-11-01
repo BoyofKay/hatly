@@ -1,3 +1,4 @@
+import { AddressMode } from '../address-mode';
 import { Column, Entity, Index, JoinColumn, ManyToOne } from 'typeorm';
 import { BaseEntity } from '../../../database/base.entity';
 import { User } from '../../users/entities/user.entity';
@@ -34,6 +35,13 @@ export class Address extends BaseEntity {
 
   @Column({ type: 'varchar', length: 255 })
   line1: string;
+
+  /**
+   * How this address is identified (see AddressMode): MANUAL = zone + typed text (no coordinates), GPS = coordinates only (no zone,
+   * text optional — `line1` is then ''). NULL = a legacy address, which keeps its original behaviour.
+   */
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  mode?: AddressMode | null;
 
   /**
    * PD-009: the map pin is OPTIONAL (a pair — both or neither). When present it stays the authoritative location for the

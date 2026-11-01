@@ -35,10 +35,12 @@ library;
 const approvedOrderNotificationTypes = {
   'ORDER_CONFIRMED',
   'ORDER_CANCELLED',
+  'ORDER_PART_CANCELLED',
   'ORDER_ON_THE_WAY',
   'ORDER_DELIVERED',
   'ORDER_FAILED_DELIVERY',
   'ORDER_COLLECTED',
+  'ORDER_ITEM_UNAVAILABLE',
 };
 
 /// Backend order ids are Postgres `uuid` primary keys (see

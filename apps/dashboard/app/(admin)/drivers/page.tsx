@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AdminDriver,
   DriverVehicleTypeOption,
@@ -11,19 +11,16 @@ import {
   setDriverVerification,
 } from '../../../lib/api/admin-dispatch';
 import { apiErrorMessage } from '../../../lib/api/errors';
+import { ORDER_STATUS, label } from '../../../lib/admin/labels';
 import { I18nProvider, useI18n } from '../../../lib/i18n/i18n';
-import { LocaleToggle } from '../../../components/orders/LocaleToggle';
+import { useLang } from '../../../lib/ui/lang';
+import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, inputCls, KpiCard, LabeledInput, Modal, PageHeader, Skeleton, StatusPill, useToast } from '../../../components/ui';
 
 /**
- * Real Admin Driver provisioning — consumes the real backend
- * `GET/POST admin/drivers` exactly (list added in Chunk 6, create
- * existing since Chunk 5). CONFIRMED (locked decisions): phone +
- * password only, no OTP field anywhere; no acceptance-configuration
- * field, since none exists on the backend DTO.
- *
- * Operational Completion milestone: the driver's vehicle type is set / changed / cleared here
- * (`PATCH admin/drivers/:id/vehicle-type`, MANAGE_DRIVERS) from the ACTIVE `vehicle_types` catalog; the page is
- * bilingual (EN/AR) like the other admin operational screens.
+ * Admin Drivers — the fleet at a glance (online / free / on a delivery / waiting for approval), a searchable, filterable list of driver cards, approval
+ * and vehicle-type management, and driver creation in a dialog. Consumes `GET/POST admin/drivers` exactly (phone + password only, no OTP; no
+ * acceptance configuration — none exists on the backend). A newly created driver is PENDING and can never be dispatched until APPROVED, so drivers
+ * waiting for approval are listed first. `?search=` pre-fills the search box.
  */
 export default function AdminDriversPage() {
   return (
@@ -33,20 +30,31 @@ export default function AdminDriversPage() {
   );
 }
 
+type Filter = 'all' | 'online' | 'free' | 'onDelivery' | 'pending' | 'rejected';
+const PAGE = 30;
+const VERIFICATION: Record<string, [string, string]> = { PENDING: ['Pending approval', 'بانتظار الموافقة'], APPROVED: ['Approved', 'معتمد'], REJECTED: ['Rejected', 'مرفوض'] };
+const rank = (d: AdminDriver) => (d.verificationStatus === 'PENDING' ? 0 : d.activeDelivery ? 1 : d.isOnline ? 2 : 3);
+
 function AdminDriversScreen() {
   const { t, locale } = useI18n();
+  const { t: tl, dateTime } = useLang();
+  const toast = useToast();
   const [drivers, setDrivers] = useState<AdminDriver[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
+  const [shown, setShown] = useState(PAGE);
 
+  const [createOpen, setCreateOpen] = useState(false);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  // M3a (Launch-Readiness Gap Audit, G-20).
-  const [verifyingDriverId, setVerifyingDriverId] = useState<string | null>(null);
-  const [verifyErrorById, setVerifyErrorById] = useState<Record<string, string>>({});
+
+  const [verifying, setVerifying] = useState<{ driver: AdminDriver; status: 'APPROVED' | 'REJECTED' } | null>(null);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
 
   const [vehicleTypes, setVehicleTypes] = useState<DriverVehicleTypeOption[] | null>(null);
   const [vehicleTypesError, setVehicleTypesError] = useState<string | null>(null);
@@ -74,23 +82,52 @@ function AdminDriversScreen() {
   }, [t]);
 
   useEffect(() => {
-    refresh();
-    loadVehicleTypes();
+    const q = new URLSearchParams(window.location.search).get('search');
+    if (q) setSearch(q);
+    void refresh();
+    void loadVehicleTypes();
   }, [refresh, loadVehicleTypes]);
+
+  const counts = useMemo(() => {
+    const l = drivers ?? [];
+    return {
+      all: l.length,
+      online: l.filter((d) => d.isOnline).length,
+      free: l.filter((d) => d.isOnline && d.isAvailable).length,
+      onDelivery: l.filter((d) => d.activeDelivery).length,
+      pending: l.filter((d) => d.verificationStatus === 'PENDING').length,
+      rejected: l.filter((d) => d.verificationStatus === 'REJECTED').length,
+    };
+  }, [drivers]);
+
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const match = (d: AdminDriver) =>
+      filter === 'all' ? true
+        : filter === 'online' ? d.isOnline
+        : filter === 'free' ? d.isOnline && d.isAvailable
+        : filter === 'onDelivery' ? !!d.activeDelivery
+        : filter === 'pending' ? d.verificationStatus === 'PENDING'
+        : d.verificationStatus === 'REJECTED';
+    return (drivers ?? [])
+      .filter((d) => match(d) && (!q || d.fullName.toLowerCase().includes(q) || d.phone.replace(/\s/g, '').includes(q.replace(/\s/g, ''))))
+      .sort((a, b) => rank(a) - rank(b) || a.fullName.localeCompare(b.fullName));
+  }, [drivers, search, filter]);
+
+  useEffect(() => setShown(PAGE), [search, filter]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (isSubmitting) return;
     setIsSubmitting(true);
     setCreateError(null);
-    setSuccessMessage(null);
     try {
       const driver = await createDriver({ fullName, phone, password });
       setFullName('');
       setPhone('');
-      // Password is never kept in state beyond this submission.
-      setPassword('');
-      setSuccessMessage(t('drvCreated', { name: driver.fullName }));
+      setPassword(''); // never kept in state beyond this submission
+      setCreateOpen(false);
+      toast.push('success', t('drvCreated', { name: driver.fullName }));
       await refresh();
     } catch (err: any) {
       setCreateError(apiErrorMessage(err, t('drvCreateFailed')));
@@ -99,35 +136,24 @@ function AdminDriversScreen() {
     }
   }
 
-  /**
-   * M3a (Launch-Readiness Gap Audit, G-20). Explicit confirmation — a
-   * newly Admin-created driver defaults to PENDING and can never receive
-   * a dispatch assignment until APPROVED (see
-   * DriverRankingService.rankCandidates), so this materially changes
-   * dispatch eligibility either way. Re-set from the server's own
-   * response, never assumed locally.
-   */
-  async function handleSetVerification(driver: AdminDriver, status: 'APPROVED' | 'REJECTED') {
-    if (verifyingDriverId) return;
-    const confirmed = window.confirm(
-      status === 'APPROVED' ? t('drvConfirmApprove', { name: driver.fullName }) : t('drvConfirmReject', { name: driver.fullName }),
-    );
-    if (!confirmed) return;
-
-    setVerifyingDriverId(driver.id);
-    setVerifyErrorById((prev) => ({ ...prev, [driver.id]: '' }));
+  /** Approving / rejecting changes dispatch eligibility, so it is confirmed first; the list is re-read from the server afterwards. */
+  async function confirmVerification() {
+    if (!verifying || verifyBusy) return;
+    setVerifyBusy(true);
+    setVerifyError(null);
     try {
-      await setDriverVerification(driver.id, status);
+      await setDriverVerification(verifying.driver.id, verifying.status);
+      setVerifying(null);
       await refresh();
     } catch (err: any) {
-      setVerifyErrorById((prev) => ({ ...prev, [driver.id]: apiErrorMessage(err, t('drvVerifyFailed')) }));
+      setVerifyError(apiErrorMessage(err, t('drvVerifyFailed')));
       await refresh();
     } finally {
-      setVerifyingDriverId(null);
+      setVerifyBusy(false);
     }
   }
 
-  /** Saves the picked vehicle type; the row then shows what the backend now holds (re-read), never a local assumption. */
+  /** Saves the picked vehicle type; the card then shows what the backend now holds (re-read), never a local assumption. */
   async function handleSaveVehicle(driver: AdminDriver) {
     if (savingVehicleId) return;
     const draft = vehicleDraftById[driver.id];
@@ -157,210 +183,170 @@ function AdminDriversScreen() {
     return v.isBicycle ? t('drvVehicleBicycle', { name }) : name;
   };
 
+  const chips: Array<[Filter, string, number]> = [
+    ['all', tl('All', 'الكل'), counts.all],
+    ['online', t('drvOnline'), counts.online],
+    ['free', t('drvFree'), counts.free],
+    ['onDelivery', t('drvOnDelivery'), counts.onDelivery],
+    ['pending', tl('Waiting for approval', 'بانتظار الموافقة'), counts.pending],
+    ['rejected', tl('Rejected', 'مرفوضون'), counts.rejected],
+  ];
+
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{t('drvTitle')}</h1>
-        <LocaleToggle />
-      </div>
+    <div className="max-w-6xl">
+      <PageHeader
+        title={t('drvTitle')}
+        subtitle={tl('Approve new drivers, see who is online and free, and set each driver’s vehicle.', 'اعتمد المندوبين الجدد، وتابع من هو متصل ومتاح، وحدّد مركبة كل مندوب.')}
+        actions={<><Button onClick={refresh}>{t('drvRefresh')}</Button><Button variant="primary" onClick={() => { setCreateError(null); setCreateOpen(true); }} data-testid="drv-add">{tl('Add driver', 'إضافة سائق')}</Button></>}
+      />
 
-      <div className="mt-4 rounded border bg-white p-4">
-        <h2 className="font-semibold">{t('drvCreateTitle')}</h2>
-        <form onSubmit={handleCreate} className="mt-3 space-y-3">
-          <div>
-            <label className="block text-sm font-medium">{t('drvFullName')}</label>
-            <input
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="mt-1 w-full rounded border px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">{t('drvPhone')}</label>
-            <input
-              required
-              type="tel"
-              dir="ltr"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+20..."
-              className="mt-1 w-full rounded border px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">{t('drvPassword')}</label>
-            <input
-              required
-              type="password"
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded border px-3 py-2"
-            />
-            <p className="mt-1 text-xs text-gray-500">{t('drvPasswordHelp')}</p>
-          </div>
-          {createError && <p className="text-sm text-red-600">{createError}</p>}
-          {successMessage && <p className="text-sm text-green-700">{successMessage}</p>}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {isSubmitting ? t('drvCreating') : t('drvCreate')}
-          </button>
-        </form>
-      </div>
-
-      <div className="mt-6">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">{t('drvAll')}</h2>
-          <button onClick={refresh} className="text-sm text-gray-500 underline">
-            {t('drvRefresh')}
-          </button>
+      {drivers && (
+        <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="drv-kpis">
+          <KpiCard label={tl('Drivers', 'السائقون')} value={counts.all} />
+          <KpiCard label={t('drvOnline')} value={counts.online} hint={tl(`${counts.free} free`, `${counts.free} متاح`)} />
+          <KpiCard label={t('drvOnDelivery')} value={counts.onDelivery} />
+          <KpiCard label={tl('Waiting for approval', 'بانتظار الموافقة')} value={counts.pending} tone={counts.pending > 0 ? 'bad' : 'neutral'} hint={counts.pending > 0 ? tl('Cannot receive orders yet', 'لا يستقبلون طلبات بعد') : undefined} />
         </div>
+      )}
 
-        {error && (
-          <div className="mt-2 rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}{' '}
-            <button onClick={refresh} className="underline">
-              {t('retry')}
+      <div className="mb-3 flex flex-col gap-2">
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tl('Search by name or phone', 'ابحث بالاسم أو الهاتف')} aria-label={tl('Search by name or phone', 'ابحث بالاسم أو الهاتف')} className={`${inputCls} min-h-[44px] sm:min-h-0 sm:max-w-sm`} data-testid="drv-search" />
+        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist" aria-label={tl('Filter drivers', 'تصفية السائقين')}>
+          {chips.map(([id, text, n]) => (
+            <button key={id} role="tab" aria-selected={filter === id} onClick={() => setFilter(id)} data-testid={`drv-filter-${id}`}
+              className={`inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition ${filter === id ? 'border-hatly-orange bg-hatly-orange text-white' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'}`}>
+              {text} <span className={`rounded-full px-1.5 text-xs tabular-nums ${filter === id ? 'bg-white/25' : 'bg-gray-100 text-gray-600'}`}>{n}</span>
             </button>
-          </div>
-        )}
-        {vehicleTypesError && (
-          <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" data-testid="driver-vehicle-types-error">
-            {vehicleTypesError}{' '}
-            <button onClick={loadVehicleTypes} className="underline">
-              {t('retry')}
-            </button>
-          </div>
-        )}
-        {!error && drivers === null && <p className="mt-2 text-gray-500">{t('loading')}</p>}
-        {!error && drivers !== null && drivers.length === 0 && <p className="mt-2 text-gray-500">{t('drvEmpty')}</p>}
-        {!error && drivers !== null && drivers.length > 0 && (
-          <ul className="mt-2 divide-y rounded border bg-white">
-            {drivers.map((d) => {
+          ))}
+        </div>
+      </div>
+
+      {vehicleTypesError && (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" data-testid="driver-vehicle-types-error">
+          {vehicleTypesError} <button onClick={loadVehicleTypes} className="underline">{t('retry')}</button>
+        </div>
+      )}
+
+      {error && !drivers ? (
+        <ErrorState message={error} onRetry={refresh} />
+      ) : !drivers ? (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" aria-busy="true">{[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-40" />)}</div>
+      ) : drivers.length === 0 ? (
+        <Card><EmptyState title={tl('No drivers yet', 'لا يوجد سائقون بعد')} hint={tl('Add the first driver to start delivering orders.', 'أضف أول سائق لبدء توصيل الطلبات.')} action={<Button variant="primary" onClick={() => setCreateOpen(true)}>{tl('Add driver', 'إضافة سائق')}</Button>} /></Card>
+      ) : visible.length === 0 ? (
+        <Card><EmptyState title={tl('No drivers match', 'لا يوجد سائقون مطابقون')} hint={tl('Try another search or filter.', 'جرّب بحثًا أو فلترًا آخر.')} action={<Button onClick={() => { setSearch(''); setFilter('all'); }}>{tl('Clear filters', 'مسح الفلاتر')}</Button>} /></Card>
+      ) : (
+        <>
+          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {visible.slice(0, shown).map((d) => {
               const saved = d.vehicleTypeId ?? '';
               const draft = vehicleDraftById[d.id];
               const picked = draft ?? saved;
               const savedIsInactive = d.vehicleTypeId !== null && vehicleTypes !== null && !vehicleTypes.some((v) => v.id === d.vehicleTypeId);
               const result = vehicleResultById[d.id];
+              const vTone = d.verificationStatus === 'APPROVED' ? 'green' : d.verificationStatus === 'REJECTED' ? 'red' : 'amber';
               return (
-                <li key={d.id} data-testid={`driver-row-${d.id}`} className="space-y-2 px-4 py-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="font-medium">{d.fullName}</p>
-                      <p className="text-xs text-gray-500">
-                        <span dir="ltr">{d.phone}</span>
-                        <span data-testid="driver-vehicle-name">{d.vehicleTypeName ? ` · ${d.vehicleTypeName}` : ` · ${t('drvNoVehicle')}`}</span>
-                        {d.lastLocationAt
-                          ? ` · ${t('drvLocationUpdated', { time: new Date(d.lastLocationAt).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-GB') })}`
-                          : ''}
-                      </p>
-                      {d.activeDelivery && (
-                        <p className="text-xs" data-testid="driver-active-delivery">
-                          {t('drvOnOrder')}{' '}
-                          <a href={`/order-search/${d.activeDelivery.orderId}`} className="font-medium text-hatly-orange underline" dir="ltr">
-                            {d.activeDelivery.orderNumber}
-                          </a>{' '}
-                          ({d.activeDelivery.status.replace(/_/g, ' ')})
-                        </p>
-                      )}
-                      {verifyErrorById[d.id] && <p className="mt-1 text-xs text-red-600">{verifyErrorById[d.id]}</p>}
+                <li key={d.id} data-testid={`driver-row-${d.id}`} className="flex min-w-0 flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-gray-900">{d.fullName}</p>
+                      <p className="text-xs text-gray-500" dir="ltr">{d.phone}</p>
                     </div>
-                    <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
-                      <span className={`rounded px-2 py-0.5 ${d.isOnline ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
-                        {d.isOnline ? t('drvOnline') : t('drvOffline')}
-                      </span>
-                      <span className={`rounded px-2 py-0.5 ${d.isAvailable ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-600'}`}>
-                        {d.isAvailable ? t('drvFree') : d.activeDelivery ? t('drvOnDelivery') : t('drvUnavailable')}
-                      </span>
-                      <span
-                        className={`rounded px-2 py-0.5 ${
-                          d.verificationStatus === 'APPROVED'
-                            ? 'bg-green-100 text-green-700'
-                            : d.verificationStatus === 'REJECTED'
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {d.verificationStatus}
-                      </span>
-                      {d.verificationStatus !== 'APPROVED' && (
-                        <button
-                          onClick={() => handleSetVerification(d, 'APPROVED')}
-                          disabled={verifyingDriverId === d.id}
-                          className="rounded bg-green-600 px-2 py-1 font-medium text-white disabled:opacity-50"
-                        >
-                          {t('drvApprove')}
-                        </button>
-                      )}
-                      {d.verificationStatus !== 'REJECTED' && (
-                        <button
-                          onClick={() => handleSetVerification(d, 'REJECTED')}
-                          disabled={verifyingDriverId === d.id}
-                          className="rounded bg-gray-200 px-2 py-1 font-medium text-gray-700 disabled:opacity-50"
-                        >
-                          {t('drvReject')}
-                        </button>
-                      )}
-                    </div>
+                    <span className="flex shrink-0 flex-wrap justify-end gap-1">
+                      <Badge tone={d.isOnline ? 'green' : 'gray'}>{d.isOnline ? t('drvOnline') : t('drvOffline')}</Badge>
+                      <Badge tone={vTone}>{label(VERIFICATION, d.verificationStatus, tl)}</Badge>
+                    </span>
                   </div>
 
+                  <div className="space-y-1 text-xs text-gray-600">
+                    <p>
+                      <Badge tone={d.isAvailable ? 'blue' : 'gray'}>{d.isAvailable ? t('drvFree') : d.activeDelivery ? t('drvOnDelivery') : t('drvUnavailable')}</Badge>{' '}
+                      <span data-testid="driver-vehicle-name">{d.vehicleTypeName ?? t('drvNoVehicle')}</span>
+                    </p>
+                    {d.lastLocationAt && <p>{t('drvLocationUpdated', { time: dateTime(d.lastLocationAt) })}</p>}
+                    {d.activeDelivery && (
+                      <p data-testid="driver-active-delivery">
+                        {t('drvOnOrder')}{' '}
+                        <a href={`/order-search/${d.activeDelivery.orderId}`} className="font-medium text-hatly-orangeDark hover:underline" dir="ltr">{d.activeDelivery.orderNumber}</a>{' '}
+                        <StatusPill status={d.activeDelivery.status} label={label(ORDER_STATUS, d.activeDelivery.status, tl)} />
+                      </p>
+                    )}
+                  </div>
+
+                  {(
+                    <div className="flex flex-wrap gap-2">
+                      {d.verificationStatus !== 'APPROVED' && <Button variant="primary" size="sm" className="min-h-[40px]" onClick={() => { setVerifyError(null); setVerifying({ driver: d, status: 'APPROVED' }); }}>{t('drvApprove')}</Button>}
+                      {d.verificationStatus !== 'REJECTED' && <Button size="sm" className="min-h-[40px]" onClick={() => { setVerifyError(null); setVerifying({ driver: d, status: 'REJECTED' }); }}>{t('drvReject')}</Button>}
+                    </div>
+                  )}
+
                   {vehicleTypes !== null && (
-                    <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="driver-vehicle">
-                      <label htmlFor={`vehicle-${d.id}`} className="font-medium">
-                        {t('drvVehicleLabel')}
-                      </label>
-                      <select
-                        id={`vehicle-${d.id}`}
-                        data-testid="driver-vehicle-select"
-                        value={picked}
-                        disabled={savingVehicleId === d.id}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setVehicleDraftById((prev) => {
-                            const { [d.id]: _, ...rest } = prev;
-                            return value === saved ? rest : { ...rest, [d.id]: value };
-                          });
-                        }}
-                        className="rounded border px-2 py-1"
-                      >
-                        <option value="">{t('drvVehicleNone')}</option>
-                        {savedIsInactive && (
-                          <option value={saved} disabled>
-                            {t('drvVehicleInactive', { name: d.vehicleTypeName ?? saved })}
-                          </option>
-                        )}
-                        {vehicleTypes.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {vehicleName(v)}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        data-testid="driver-vehicle-save"
-                        onClick={() => handleSaveVehicle(d)}
-                        disabled={draft === undefined || savingVehicleId !== null}
-                        className="rounded border px-2 py-1 font-medium disabled:opacity-40"
-                      >
-                        {savingVehicleId === d.id ? t('drvVehicleSaving') : t('drvVehicleSave')}
-                      </button>
-                      {result && (
-                        <span role="status" data-testid="driver-vehicle-result" className={result.ok ? 'text-green-700' : 'text-red-600'}>
-                          {result.message}
-                        </span>
-                      )}
+                    <div className="mt-auto border-t border-gray-100 pt-3" data-testid="driver-vehicle">
+                      <label htmlFor={`vehicle-${d.id}`} className="mb-1 block text-xs font-medium text-gray-700">{t('drvVehicleLabel')}</label>
+                      <div className="flex gap-2">
+                        <select
+                          id={`vehicle-${d.id}`}
+                          data-testid="driver-vehicle-select"
+                          value={picked}
+                          disabled={savingVehicleId === d.id}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setVehicleDraftById((prev) => {
+                              const { [d.id]: _, ...rest } = prev;
+                              return value === saved ? rest : { ...rest, [d.id]: value };
+                            });
+                          }}
+                          className={`${inputCls} min-w-0 flex-1`}
+                        >
+                          <option value="">{t('drvVehicleNone')}</option>
+                          {savedIsInactive && <option value={saved} disabled>{t('drvVehicleInactive', { name: d.vehicleTypeName ?? saved })}</option>}
+                          {vehicleTypes.map((v) => <option key={v.id} value={v.id}>{vehicleName(v)}</option>)}
+                        </select>
+                        <Button data-testid="driver-vehicle-save" onClick={() => handleSaveVehicle(d)} disabled={draft === undefined || savingVehicleId !== null} className="shrink-0">
+                          {savingVehicleId === d.id ? t('drvVehicleSaving') : t('drvVehicleSave')}
+                        </Button>
+                      </div>
+                      {result && <p role="status" data-testid="driver-vehicle-result" className={`mt-1 text-xs ${result.ok ? 'text-green-700' : 'text-red-600'}`}>{result.message}</p>}
                     </div>
                   )}
                 </li>
               );
             })}
           </ul>
-        )}
-        <p className="mt-2 text-xs text-gray-500">{t('drvVehicleHelp')}</p>
-      </div>
+          {visible.length > shown && (
+            <div className="mt-4 text-center">
+              <Button onClick={() => setShown((n) => n + PAGE)}>{tl(`Show more (${visible.length - shown} left)`, `عرض المزيد (${visible.length - shown} متبقٍ)`)}</Button>
+            </div>
+          )}
+          <p className="mt-3 text-xs text-gray-500">{t('drvVehicleHelp')}</p>
+        </>
+      )}
+
+      <Modal
+        open={createOpen}
+        title={t('drvCreateTitle')}
+        onClose={() => !isSubmitting && setCreateOpen(false)}
+        footer={<><Button onClick={() => setCreateOpen(false)} disabled={isSubmitting}>{tl('Cancel', 'إلغاء')}</Button><Button variant="primary" type="submit" form="drv-create" loading={isSubmitting}>{isSubmitting ? t('drvCreating') : t('drvCreate')}</Button></>}
+      >
+        <form id="drv-create" onSubmit={handleCreate} className="space-y-3">
+          <LabeledInput label={t('drvFullName')} required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <LabeledInput label={t('drvPhone')} required type="tel" dir="ltr" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+20..." />
+          <LabeledInput label={t('drvPassword')} required type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} hint={t('drvPasswordHelp')} autoComplete="new-password" />
+          {createError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</p>}
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!verifying}
+        title={verifying?.status === 'APPROVED' ? t('drvApprove') : t('drvReject')}
+        message={verifying ? (verifying.status === 'APPROVED' ? t('drvConfirmApprove', { name: verifying.driver.fullName }) : t('drvConfirmReject', { name: verifying.driver.fullName })) : ''}
+        confirmLabel={verifying?.status === 'APPROVED' ? t('drvApprove') : t('drvReject')}
+        danger={verifying?.status === 'REJECTED'}
+        busy={verifyBusy}
+        error={verifyError}
+        onConfirm={confirmVerification}
+        onClose={() => setVerifying(null)}
+      />
     </div>
   );
 }

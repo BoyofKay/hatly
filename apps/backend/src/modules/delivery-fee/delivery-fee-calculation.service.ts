@@ -1,8 +1,17 @@
 import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
-import { MAP_PROVIDER, MapProvider, GeoPoint } from '../location/map-provider.interface';
+import { MAP_PROVIDER, MapProvider, GeoPoint, isMapsDisabled } from '../location/map-provider.interface';
 import { BusinessConfigService } from '../business-config/business-config.service';
 import { BusinessConfigKey } from '../business-config/business-config-key.enum';
 import { roundPricingDistanceMeters } from './pricing-distance-rounding';
+
+/** The base fee of one road-distance route, with every input that produced it (frozen on the order by the caller). */
+export interface RouteBaseFee {
+  rawDistanceMeters: number;
+  roundedDistanceMeters: number;
+  pricePer100mMinorUsed: number;
+  minimumDeliveryFeeMinorUsed: number;
+  baseFeeMinor: number;
+}
 
 export interface PricingRouteStop {
   vendorBranchId: string;
@@ -76,6 +85,14 @@ export class DeliveryFeeCalculationService {
     @Inject(MAP_PROVIDER) private readonly mapProvider: MapProvider,
     private readonly businessConfigService: BusinessConfigService,
   ) {}
+
+  /**
+   * PD-009 G: `false` when Maps are deliberately disabled (`MAPS_PROVIDER=none`). Callers then price every delivery by its active
+   * Delivery Zone (`calculateForZone`) — `calculate()` would only fail closed, it never invents a distance.
+   */
+  get roadDistancePricingAvailable(): boolean {
+    return !isMapsDisabled(this.mapProvider);
+  }
 
   /**
    * `vendorBranches` must be non-empty CATALOG branches only (the
@@ -220,6 +237,31 @@ export class DeliveryFeeCalculationService {
       additionalVendorFeeMinorUsed: additionalVendorFeeMinor,
       additionalVendorChargeMinor,
       deliveryFeeMinor,
+    };
+  }
+
+  /**
+   * The base delivery fee of ONE route (origin → destination) by actual road distance: the same rounding, rate per 100 m and
+   * minimum fee as registered-vendor pricing — the shared definition, not a copy. Used by Hatly and Wasally for the GPS method (their
+   * multiplier is applied afterwards, once, to the base fee returned here). Never falls back to a zone fee: when the road-distance
+   * provider is disabled the caller gets `DISTANCE_PRICING_UNAVAILABLE`, and an unset rate or minimum fails closed like `calculate()`.
+   */
+  async calculateRouteBaseFee(from: GeoPoint, to: GeoPoint): Promise<RouteBaseFee> {
+    if (!this.roadDistancePricingAvailable) {
+      throw new BadRequestException({
+        message: 'Delivery by GPS location is not available right now. Please use a manually entered address.',
+        details: { code: 'DISTANCE_PRICING_UNAVAILABLE' },
+      });
+    }
+    const leg = await this.wrapMapProviderErrors(() => this.mapProvider.distanceAndEta(from, to));
+    const roundedDistanceMeters = roundPricingDistanceMeters(leg.distanceMeters);
+    const { pricePer100mMinor, minimumDeliveryFeeMinor, baseFeeMinor } = await this.distanceBaseFee(roundedDistanceMeters);
+    return {
+      rawDistanceMeters: leg.distanceMeters,
+      roundedDistanceMeters,
+      pricePer100mMinorUsed: pricePer100mMinor,
+      minimumDeliveryFeeMinorUsed: minimumDeliveryFeeMinor,
+      baseFeeMinor,
     };
   }
 

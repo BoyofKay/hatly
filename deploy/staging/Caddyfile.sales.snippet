@@ -1,0 +1,14 @@
+# Add to the EXISTING Caddy configuration as NEW site blocks (do not edit any production block).
+# Caddy obtains the certificates automatically once the two DNS records point at this server (see RUNBOOK.md "DNS").
+# If Caddy runs on the host, 127.0.0.1:<port> reaches the staging containers (they publish to loopback only).
+# If Caddy itself runs in a container, replace 127.0.0.1 with the host gateway address that container can reach.
+
+api-sales.hatly.dev {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:13000
+}
+
+sales.hatly.dev {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:13001
+}

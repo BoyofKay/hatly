@@ -1,3 +1,4 @@
+import { AdHocServiceType } from './ad-hoc-service-type.enum';
 import { Injectable } from '@nestjs/common';
 import { Cart } from './entities/cart.entity';
 import { CartVendorGroup } from './entities/cart-vendor-group.entity';
@@ -23,7 +24,11 @@ export class CartPricingService {
 
     const catalogGroups = groups.filter((g) => g.groupType === CartGroupType.CATALOG);
     const subtotalMinor = catalogGroups.reduce((sum, g) => sum + (g.subtotalMinor ?? 0), 0);
-    const hasUnpricedItems = groups.some((g) => g.groupType === CartGroupType.AD_HOC_SERVICE);
+    // Only a request whose price is unknown counts: "وصّلي لمكان" (DELIVER_TO_PLACE) has no product, so the delivery fee is its
+    // whole price and nothing is "unpriced".
+    const hasUnpricedItems = groups.some(
+      (g) => g.groupType === CartGroupType.AD_HOC_SERVICE && g.adHocServiceType !== AdHocServiceType.DELIVER_TO_PLACE,
+    );
 
     const totalItemCount = groups.reduce((sum, g) => sum + g.items.length, 0);
     const allCatalogItemsAvailable = groups
@@ -67,8 +72,10 @@ export class CartPricingService {
         adHocServiceType: group.adHocServiceType ?? null,
         adHocPickupLatitude: group.adHocPickupLatitude ?? null,
         adHocPickupLongitude: group.adHocPickupLongitude ?? null,
+        adHocPickupLabel: group.adHocPickupLabel ?? null,
         adHocDestinationLatitude: group.adHocDestinationLatitude ?? null,
         adHocDestinationLongitude: group.adHocDestinationLongitude ?? null,
+        adHocDestinationLabel: group.adHocDestinationLabel ?? null,
         vendorNote: group.vendorNote ?? null,
         items,
         subtotalMinor: null,
@@ -87,8 +94,10 @@ export class CartPricingService {
       adHocServiceType: null,
       adHocPickupLatitude: null,
       adHocPickupLongitude: null,
+      adHocPickupLabel: null,
       adHocDestinationLatitude: null,
       adHocDestinationLongitude: null,
+      adHocDestinationLabel: null,
       vendorNote: group.vendorNote ?? null,
       items,
       subtotalMinor,

@@ -35,3 +35,14 @@ const int kHomeProductsPerTagPerVendor = 3;
 const int kHomeMaxProductEntries = 10;
 const int kHomeMaxOffers = 8;
 const int kHomeMaxPromos = 5;
+
+/// How many of the best-rated vendors are queried for the "Most ordered", "New" and "Offers" rows (and their "See all" lists).
+const int kHomeSectionSourceVendors = 6;
+
+/// How many products one vendor contributes to a Home ROW, and to a "See all" list.
+const int kHomeRowProductsPerVendor = 3;
+const int kHomeSeeAllProductsPerVendor = 12;
+
+/// There is no configurable "new" flag in the backend, so "New" means: the listing was created in the last this-many days. A
+/// product older than that is never shown as new, however the "newest first" sort orders it.
+const int kHomeNewProductWindowDays = 30;

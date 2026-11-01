@@ -215,7 +215,7 @@ describe('E2E — Delivery Zones (PD-009)', () => {
   });
 
   describe('Hatly Service — zone fee × multiplier (PD-009 amended)', () => {
-    const buyItem = { adHocPlaceName: 'Corner Pharmacy', adHocServiceType: 'BUY_FROM_PLACE', pickupLatitude: 30.3, pickupLongitude: 31.45, freeTextDescription: 'Panadol', quantity: 1 };
+    const buyItem = { adHocPlaceName: 'Corner Pharmacy', adHocServiceType: 'BUY_FROM_PLACE', pickupLatitude: 30.3, pickupLongitude: 31.45, destinationLatitude: 30.31, destinationLongitude: 31.46, freeTextDescription: 'Panadol', quantity: 1 };
 
     it('a pin-less zone address is NOT rejected for a missing pin: fee = zone fee × multiplier; a later multiplier change only affects new quotes', async () => {
       await s.setConfig('HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER', 1.5);
@@ -229,7 +229,13 @@ describe('E2E — Delivery Zones (PD-009)', () => {
       const order = expectData<any>(await place(c, { addressId: saved.id, paymentMethod: 'COD', quoteToken: q.quoteToken }), 201);
       expect(order.deliveryFeeMinor).toBe(2700);
       const b = (await world.ds.query('SELECT delivery_fee_breakdown_snapshot AS b FROM orders WHERE id = $1', [order.id]))[0].b;
-      expect(b).toEqual({ pricingSource: 'DELIVERY_ZONE', zoneDeliveryFeeMinorUsed: 1800, multiplierUsed: 1.5, chargeMinor: 2700, deliveryZoneId: abuNaseeb.id });
+      // The frozen breakdown also records the BASE fee (before the multiplier), the address method (null: a legacy address), the service and
+      // the resolved route (PD-012).
+      expect(b).toEqual({
+        pricingSource: 'DELIVERY_ZONE', baseFeeMinor: 1800, addressMode: null, zoneDeliveryFeeMinorUsed: 1800, multiplierUsed: 1.5, chargeMinor: 2700, deliveryZoneId: abuNaseeb.id,
+        service: 'HATLY',
+        route: { origin: { latitude: 30.3, longitude: 31.45, label: null, source: 'CUSTOMER' }, destination: { latitude: 30.31, longitude: 31.46, label: null, source: 'CUSTOMER' } },
+      });
 
       await s.setConfig('HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER', 2);
       expect((await details(c, order.id)).deliveryFeeMinor).toBe(2700); // frozen

@@ -1,8 +1,10 @@
 import { NotFoundException } from '@nestjs/common';
-import { VendorOrdersService } from './vendor-orders.service';
+import { VENDOR_ORDERS_LIST_MAX_SEGMENTS, VendorOrdersService } from './vendor-orders.service';
 
 function buildHarness(allSegments: any[], ownedBranchIds: string[]) {
   const segmentsRepository = {
+    // Raw reads for the segment history / refund summary (no rows in these tests).
+    query: jest.fn(async () => []),
     find: jest.fn(async ({ where }: any) => {
       // `where` is an array of {vendorBranchId} or {orderId, vendorBranchId}
       // objects (OR semantics, matching TypeORM's array-where behavior)
@@ -15,7 +17,7 @@ function buildHarness(allSegments: any[], ownedBranchIds: string[]) {
     getOwnedBranchIds: jest.fn(async () => ownedBranchIds),
   };
   const service = new VendorOrdersService(segmentsRepository as any, vendorStaffAuthorizationService as any);
-  return { service };
+  return { service, segmentsRepository };
 }
 
 function makeSegment(overrides: Partial<any> = {}) {
@@ -31,6 +33,7 @@ function makeSegment(overrides: Partial<any> = {}) {
     items: [],
     order: {
       id: 'order-1',
+      orderNumber: 'HT-100001',
       status: 'PENDING',
       fulfillmentType: 'DELIVERY',
       orderNote: null,
@@ -43,6 +46,13 @@ function makeSegment(overrides: Partial<any> = {}) {
 }
 
 describe('VendorOrdersService', () => {
+  it('the list is bounded: newest first, at most VENDOR_ORDERS_LIST_MAX_SEGMENTS segments per call (it used to load the whole history)', async () => {
+    const { service, segmentsRepository } = buildHarness([makeSegment()], ['branch-1']);
+    await service.listForUser('user-1');
+    expect(segmentsRepository.find).toHaveBeenCalledWith(expect.objectContaining({ take: VENDOR_ORDERS_LIST_MAX_SEGMENTS, order: { createdAt: 'DESC' } }));
+    expect(VENDOR_ORDERS_LIST_MAX_SEGMENTS).toBeLessThanOrEqual(500);
+  });
+
   it("list only returns segments belonging to the caller's owned branches", async () => {
     const mine = makeSegment({ id: 'seg-mine', vendorBranchId: 'branch-1' });
     const { service } = buildHarness([mine], ['branch-1']);
@@ -68,8 +78,9 @@ describe('VendorOrdersService', () => {
     expect(orderView.deliveryAddressSnapshot).toBeUndefined();
     // Confirm the view only has the expected whitelisted keys.
     expect(Object.keys(orderView).sort()).toEqual(
-      ['fulfillmentType', 'id', 'orderNote', 'paymentMethod', 'segments', 'status'].sort(),
+      ['fulfillmentType', 'id', 'orderNote', 'orderNumber', 'paymentMethod', 'segments', 'status'].sort(),
     );
+    expect(orderView.orderNumber).toBe('HT-100001');
   });
 
   it("a multi-vendor order's sibling segment (another vendor's) never appears in this vendor's view", async () => {

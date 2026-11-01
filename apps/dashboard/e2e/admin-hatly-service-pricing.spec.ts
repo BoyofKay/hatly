@@ -93,7 +93,7 @@ test.describe('Admin Orders — Hatly Service pricing', () => {
     test('Arabic: the badge reads «سعر معلق», the page is RTL, and the choice survives a reload', async ({ page }) => {
       const order = await shared();
       await page.goto('/order-search');
-      await page.getByRole('button', { name: 'العربية' }).click();
+      await page.getByRole('button', { name: 'Switch to Arabic' }).click(); // the Admin shell's single language control
       await expect(page.locator('[dir="rtl"]').first()).toBeVisible();
       await expect(page.getByRole('heading', { name: 'البحث عن الطلبات' })).toBeVisible();
       await page.getByPlaceholder('رقم الطلب أو المعرّف أو هاتف العميل أو اسمه').fill(order.orderNumber);
@@ -101,7 +101,7 @@ test.describe('Admin Orders — Hatly Service pricing', () => {
       await expect(page.locator('tr', { hasText: order.orderNumber }).getByTestId('pending-price-badge')).toHaveText('سعر معلق');
       await page.reload();
       await expect(page.getByRole('heading', { name: 'البحث عن الطلبات' })).toBeVisible();
-      await page.getByRole('button', { name: 'English' }).click(); // leave the browser profile in English for the other specs
+      await page.getByRole('button', { name: 'التبديل إلى الإنجليزية' }).click(); // the shell's single language control; leave the browser profile in English for the other specs
     });
   });
 
@@ -117,9 +117,9 @@ test.describe('Admin Orders — Hatly Service pricing', () => {
       await expect(item.getByRole('button', { name: 'Confirm price' })).toBeEnabled();
       await expect(page.getByText('Hatly Service request', { exact: true })).toBeVisible();
       await expect(page.getByText('Buy from a place')).toBeVisible();
-      await expect(page.getByText('Playwright Corner Pharmacy (30.3, 31.45)')).toBeVisible(); // BUY: origin = the customer's place
-      // destination = the customer's address, led by its frozen delivery area ("City — Zone", PD-009) so ops can place it without a pin
-      await expect(page.getByText(/^Customer address: .+ — .+ · Playwright Hatly Service Street 1$/)).toBeVisible();
+      // PD-012: the frozen route, origin → destination, each with its label, coordinates and whether the customer chose it.
+      await expect(page.getByTestId('hatly-route-origin')).toHaveText("Playwright Corner Pharmacy (30.3, 31.45) — customer's choice");
+      await expect(page.getByTestId('hatly-route-destination')).toHaveText("Playwright drop-off (30.31, 31.46) — customer's choice");
 
       const totals = page.getByTestId('order-totals');
       await expect(totals).toHaveAttribute('data-total-pending', 'true');
@@ -298,7 +298,7 @@ test.describe('Admin Orders — Hatly Service pricing', () => {
     test('Arabic: «السعر لم يتم تحديده», «تأكيد السعر», the permission note and the confirmed state render right-to-left', async ({ page }) => {
       const order = await placePendingHatlyOrder(customer, ['Arabic detail request']);
       await openOrder(page, order.orderId);
-      await page.getByRole('button', { name: 'العربية' }).click();
+      await page.getByRole('button', { name: 'Switch to Arabic' }).click(); // the Admin shell's single language control
       await expect(page.locator('[dir="rtl"]').first()).toBeVisible();
       const item = page.getByTestId(`hatly-item-${order.itemIds[0]}`);
       await expect(item.getByTestId('price-pending')).toHaveText('السعر لم يتم تحديده');
@@ -315,7 +315,7 @@ test.describe('Admin Orders — Hatly Service pricing', () => {
       );
       await openOrder(page, noPermission.orderId);
       await expect(page.getByTestId('no-permission')).toHaveText('ليس لديك صلاحية تأكيد أسعار خدمة هاتلي.');
-      await page.getByRole('button', { name: 'English' }).click();
+      await page.getByRole('button', { name: 'التبديل إلى الإنجليزية' }).click();
     });
 
     test('a normal vendor order is unchanged: no Hatly Service section, a numeric total, no pricing controls', async ({ page }) => {

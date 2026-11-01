@@ -9,10 +9,12 @@ import 'package:hatly_customer/features/addresses/data/addresses_providers.dart'
 import 'package:hatly_customer/features/cart/data/cart_api.dart';
 import 'package:hatly_customer/features/cart/data/cart_providers.dart';
 import 'package:hatly_customer/features/cart/domain/cart.dart';
+import 'package:hatly_customer/features/hatly_service/data/hatly_service_api.dart';
+import 'package:hatly_customer/features/hatly_service/domain/route_endpoint.dart';
 import 'package:hatly_customer/features/hatly_service/presentation/hatly_service_screen.dart';
 import 'package:hatly_customer/features/uploads/data/uploads_api.dart';
 import 'package:hatly_customer/features/uploads/data/uploads_providers.dart';
-import 'package:hatly_customer/core/location/device_location_service.dart';
+import 'package:hatly_customer/features/addresses/domain/saved_address.dart';
 
 import '../../support/router_test_app.dart';
 
@@ -65,6 +67,8 @@ class _FakeCartApi implements CartApi {
     double? pickupLongitude,
     double? destinationLatitude,
     double? destinationLongitude,
+    String? pickupLabel,
+    String? destinationLabel,
     required String freeTextDescription,
     required int quantity,
     List<String>? imageUrls,
@@ -78,6 +82,8 @@ class _FakeCartApi implements CartApi {
       'pickupLongitude': pickupLongitude,
       'destinationLatitude': destinationLatitude,
       'destinationLongitude': destinationLongitude,
+      'pickupLabel': pickupLabel,
+      'destinationLabel': destinationLabel,
       'freeTextDescription': freeTextDescription,
       'quantity': quantity,
       'imageUrls': imageUrls,
@@ -108,6 +114,8 @@ class _FakeCartApi implements CartApi {
           adHocPickupLongitude: pickupLongitude,
           adHocDestinationLatitude: destinationLatitude,
           adHocDestinationLongitude: destinationLongitude,
+          adHocPickupLabel: pickupLabel,
+          adHocDestinationLabel: destinationLabel,
           items: [newItem],
         ),
       ];
@@ -124,12 +132,46 @@ class _FakeCartApi implements CartApi {
               adHocPickupLongitude: g.adHocPickupLongitude,
               adHocDestinationLatitude: g.adHocDestinationLatitude,
               adHocDestinationLongitude: g.adHocDestinationLongitude,
+              adHocPickupLabel: g.adHocPickupLabel,
+              adHocDestinationLabel: g.adHocDestinationLabel,
               items: [...g.items, newItem],
             )
           else
             g,
       ];
     }
+    return _cart();
+  }
+
+  final List<Map<String, dynamic>> routeCalls = [];
+
+  @override
+  Future<Cart> updateAdHocRoute({
+    RouteEndpoint? origin,
+    bool clearOrigin = false,
+    RouteEndpoint? destination,
+    bool clearDestination = false,
+  }) async {
+    routeCalls.add({'origin': origin, 'clearOrigin': clearOrigin, 'destination': destination, 'clearDestination': clearDestination});
+    groups = [
+      for (final g in groups)
+        if (g.isAdHocService)
+          CartGroup(
+            id: g.id,
+            groupType: g.groupType,
+            adHocPlaceName: g.adHocPlaceName,
+            adHocServiceType: g.adHocServiceType,
+            adHocPickupLatitude: clearOrigin ? null : (origin?.latitude ?? g.adHocPickupLatitude),
+            adHocPickupLongitude: clearOrigin ? null : (origin?.longitude ?? g.adHocPickupLongitude),
+            adHocPickupLabel: clearOrigin ? null : (origin?.label ?? g.adHocPickupLabel),
+            adHocDestinationLatitude: clearDestination ? null : (destination?.latitude ?? g.adHocDestinationLatitude),
+            adHocDestinationLongitude: clearDestination ? null : (destination?.longitude ?? g.adHocDestinationLongitude),
+            adHocDestinationLabel: clearDestination ? null : (destination?.label ?? g.adHocDestinationLabel),
+            items: g.items,
+          )
+        else
+          g,
+    ];
     return _cart();
   }
 }
@@ -231,46 +273,50 @@ XFile _fakeImage(String name) {
   return XFile(file.path);
 }
 
-/// Consolidated customer-commerce milestone (Part B — Hatly Service
-/// location semantics fix): fixed at a real point so a test can drive
-/// the DELIVER_TO_PLACE destination picker's "use current location"
-/// button — same mechanism `address_form_test.dart` already
-/// established for `AddressPinPicker`.
-class _FakeLocation implements DeviceLocationService {
-  const _FakeLocation();
+/// The customer's saved addresses as ordinary checkout lists them. `home` has a map pin (usable as a place); `zoneOnly` has a
+/// delivery zone but NO pin, so it cannot supply coordinates for a pickup / destination.
+const _home = SavedAddress(
+    id: 'addr-home',
+    label: 'المنزل',
+    line1: 'شارع الجمهورية',
+    latitude: 30.42,
+    longitude: 31.56);
+const _shop = SavedAddress(
+    id: 'addr-shop',
+    label: 'المحل',
+    line1: 'شارع النصر',
+    latitude: 30.5,
+    longitude: 31.7);
+const _zoneOnly = SavedAddress(
+    id: 'addr-zone',
+    label: 'بدون خريطة',
+    line1: 'حي الزهور',
+    deliveryZoneId: 'z1');
 
-  @override
-  Future<DeviceLocationResult> getCurrentLocation() async =>
-      const DeviceLocationResult(latitude: 30.42, longitude: 31.56);
-
-  @override
-  Future<bool> openAppSettings() async => true;
-}
-
-/// Taps the destination picker's "use current location" button — the
-/// one way this test suite sets a real destination for DELIVER_TO_PLACE
-/// without driving an actual (unavailable in tests) Google Map.
-Future<void> _setDestination(WidgetTester tester) async {
-  await tester.tap(find.byKey(const Key('address-use-current-location')));
+/// Opens the saved-address dropdown and picks [id].
+Future<void> _pickSaved(WidgetTester tester, String id) async {
+  await tester.tap(find.byKey(const Key('saved-address-dropdown')));
+  await _settle(tester);
+  await tester.tap(find.byKey(Key('saved-address-item-$id')).last);
   await _settle(tester);
 }
-
-/// Sets the customer's chosen place for whichever picker is showing (BUY_FROM_PLACE's pickup or DELIVER_TO_PLACE's destination —
-/// both are the same `AddressPinPicker`).
-Future<void> _setPlace(WidgetTester tester) => _setDestination(tester);
 
 Widget _app({
   required _FakeCartApi cartApi,
   required _FakeUploadsApi uploadsApi,
   List<XFile>? imagesToPick,
   List<String>? visited,
+  List<SavedAddress> saved = const [_home, _shop, _zoneOnly],
+  SavedAddress? addedByAddScreen,
+  RouteDefaults defaults = RouteDefaults.none,
 }) {
   var pickIndex = 0;
   return hatlyRouterApp(
     overrides: [
       cartApiProvider.overrideWithValue(cartApi),
       uploadsApiProvider.overrideWithValue(uploadsApi),
-      deviceLocationServiceProvider.overrideWithValue(const _FakeLocation()),
+      savedAddressesProvider.overrideWith((ref) async => saved),
+      routeDefaultsProvider.overrideWith((ref) async => defaults),
     ],
     initialLocation: '/hatly-service',
     routes: [
@@ -286,6 +332,19 @@ Widget _app({
         ),
       ),
       probeRoute('/cart', visited: visited),
+      // The normal Add Address screen, stood in for by a screen that "saves" an address and returns it, as the real one does.
+      GoRoute(
+        path: '/addresses/add',
+        builder: (context, state) => Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              key: const Key('fake-add-address-save'),
+              onPressed: () => context.pop(addedByAddScreen),
+              child: const Text('save'),
+            ),
+          ),
+        ),
+      ),
     ],
   );
 }
@@ -304,452 +363,302 @@ void _tallViewport(WidgetTester tester) {
   addTearDown(tester.view.reset);
 }
 
+const _hatlyStart = RouteEndpoint(latitude: 30.11, longitude: 31.11, label: 'نقطة بداية هاتلي', source: RouteEndpointSource.defaultLocation);
+const _hatlyEnd = RouteEndpoint(latitude: 30.22, longitude: 31.22, label: 'وجهة هاتلي', source: RouteEndpointSource.defaultLocation);
+const _wasallyEnd = RouteEndpoint(latitude: 30.33, longitude: 31.33, label: 'وجهة وصّلي', source: RouteEndpointSource.defaultLocation);
+const _allDefaults = RouteDefaults(hatlyOrigin: _hatlyStart, hatlyDestination: _hatlyEnd, wasallyDestination: _wasallyEnd);
+
+String _label(WidgetTester tester, String key) => (tester.widget(find.byKey(Key(key))) as Text).data!;
+bool _badge(String rowKey) => find.byKey(Key('$rowKey-badge')).evaluate().isNotEmpty;
+Finder _continueButton() => find.byType(ElevatedButton).first;
+bool _canContinue(WidgetTester tester) => tester.widget<ElevatedButton>(_continueButton()).onPressed != null;
+
+Future<void> _basics(WidgetTester tester, {required String typeKey}) async {
+  await tester.tap(find.byKey(Key(typeKey)));
+  await tester.enterText(find.byKey(const Key('hatly-service-place-name')), 'Carrefour');
+  await tester.enterText(find.byKey(const Key('hatly-service-description')), 'اشترى لي شاي');
+  await _settle(tester);
+}
+
+/// Opens the sheet of one end and picks a saved address that has a pin.
+Future<void> _chooseSaved(WidgetTester tester, {required bool origin, String id = 'addr-home'}) async {
+  await tester.ensureVisible(find.byKey(Key(origin ? 'route-origin-change' : 'route-destination-change')));
+  await tester.tap(find.byKey(Key(origin ? 'route-origin-change' : 'route-destination-change')));
+  await _settle(tester);
+  await _pickSaved(tester, id);
+}
+
 void main() {
-  group('HatlyServiceScreen — service type & field visibility', () {
-    testWidgets(
-        'BUY_FROM_PLACE shows a pickup-location picker, not a destination one',
-        (tester) async {
+  group('route ends: customer choice, else the service default, else nothing (PD-012)', () {
+    testWidgets('Hatly with both defaults configured: the resolved route is shown with Default badges and the customer can continue without choosing', (tester) async {
       _tallViewport(tester);
-      final cartApi = _FakeCartApi();
-      await tester
-          .pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi()));
+      await tester.pumpWidget(_app(cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi(), defaults: _allDefaults));
       await _settle(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-buy');
 
-      await tester.tap(find.byKey(const Key('hatly-service-type-buy')));
-      await _settle(tester);
-
-      expect(
-          find.byKey(const Key('hatly-service-pickup-picker')), findsOneWidget);
-      expect(find.byKey(const Key('hatly-service-destination-picker')),
-          findsNothing);
+      expect(_label(tester, 'route-origin-label'), 'نقطة بداية هاتلي');
+      expect(_label(tester, 'route-destination-label'), 'وجهة هاتلي');
+      expect(_badge('route-origin'), isTrue);
+      expect(_canContinue(tester), isTrue);
     });
 
-    testWidgets(
-        'DELIVER_TO_PLACE shows a destination-location picker, not a pickup one',
-        (tester) async {
+    testWidgets('Hatly with NO defaults configured: nothing is invented — both ends say so and Continue stays off until the customer chooses BOTH', (tester) async {
       _tallViewport(tester);
-      final cartApi = _FakeCartApi();
-      await tester
-          .pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi()));
+      await tester.pumpWidget(_app(cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi()));
       await _settle(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-buy');
 
+      expect(_badge('route-origin'), isFalse);
+      expect(_badge('route-destination'), isFalse);
+      expect(_canContinue(tester), isFalse);
+
+      await _chooseSaved(tester, origin: true);
+      expect(_label(tester, 'route-origin-label'), 'المنزل');
+      expect(_canContinue(tester), isFalse); // the destination is still missing
+
+      await _chooseSaved(tester, origin: false, id: 'addr-shop');
+      expect(_label(tester, 'route-destination-label'), 'المحل');
+      expect(_canContinue(tester), isTrue);
+    });
+
+    testWidgets('Wasally: the origin is NEVER defaulted (not even with every default configured) and is never assumed to be home; the destination uses Wasally\'s own default', (tester) async {
+      _tallViewport(tester);
+      await tester.pumpWidget(_app(cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi(), defaults: _allDefaults));
+      await _settle(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-deliver');
+
+      expect(_badge('route-origin'), isFalse);
+      expect(_label(tester, 'route-destination-label'), 'وجهة وصّلي'); // Wasally's default, not Hatly's
+      expect(_canContinue(tester), isFalse);
+
+      await _chooseSaved(tester, origin: true);
+      expect(_label(tester, 'route-origin-label'), 'المنزل'); // an explicit choice, never automatic
+      expect(_canContinue(tester), isTrue);
+    });
+
+    testWidgets('each end changes independently, and "use the default" returns a changed end to the default without touching the other', (tester) async {
+      _tallViewport(tester);
+      await tester.pumpWidget(_app(cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi(), defaults: _allDefaults));
+      await _settle(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-buy');
+
+      await _chooseSaved(tester, origin: false, id: 'addr-shop');
+      expect(_label(tester, 'route-destination-label'), 'المحل');
+      expect(_label(tester, 'route-origin-label'), 'نقطة بداية هاتلي'); // untouched
+
+      await tester.ensureVisible(find.byKey(const Key('route-destination-change')));
+      await tester.tap(find.byKey(const Key('route-destination-change')));
+      await _settle(tester);
+      await tester.ensureVisible(find.byKey(const Key('route-sheet-use-default')));
+      await tester.tap(find.byKey(const Key('route-sheet-use-default')));
+      await _settle(tester);
+      expect(_label(tester, 'route-destination-label'), 'وجهة هاتلي');
+    });
+
+    testWidgets('a saved address without a map pin cannot be an end (requires coordinates)', (tester) async {
+      _tallViewport(tester);
+      await tester.pumpWidget(_app(cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi()));
+      await _settle(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-buy');
+      await _chooseSaved(tester, origin: true, id: 'addr-zone');
+      expect(_badge('route-origin'), isFalse); // nothing was chosen
+    });
+
+    testWidgets('switching the service type drops choices made for the other service', (tester) async {
+      _tallViewport(tester);
+      await tester.pumpWidget(_app(cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi(), defaults: _allDefaults));
+      await _settle(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-buy');
+      await _chooseSaved(tester, origin: true);
+      expect(_badge('route-origin'), isTrue);
+
+      await tester.ensureVisible(find.byKey(const Key('hatly-service-type-deliver')));
       await tester.tap(find.byKey(const Key('hatly-service-type-deliver')));
       await _settle(tester);
+      expect(_badge('route-origin'), isFalse);
+      expect(_label(tester, 'route-destination-label'), 'وجهة وصّلي');
+    });
 
-      expect(find.byKey(const Key('hatly-service-destination-picker')),
-          findsOneWidget);
-      expect(
-          find.byKey(const Key('hatly-service-pickup-picker')), findsNothing);
+    testWidgets('the review step repeats the resolved route before the customer confirms', (tester) async {
+      _tallViewport(tester);
+      await tester.pumpWidget(_app(cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi(), defaults: _allDefaults));
+      await _settle(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-buy');
+      await _chooseSaved(tester, origin: true);
+      await tester.ensureVisible(_continueButton());
+      await tester.tap(_continueButton());
+      await _settle(tester);
+
+      expect(find.byKey(const Key('hatly-service-review-route')), findsOneWidget);
+      expect(_label(tester, 'route-origin-label'), 'المنزل');
+      expect(_label(tester, 'route-destination-label'), 'وجهة هاتلي');
     });
   });
 
-  group('HatlyServiceScreen — validation', () {
-    testWidgets(
-        'Continue is disabled until a type, a place name and a description are all set',
-        (tester) async {
-      _tallViewport(tester);
-      final cartApi = _FakeCartApi();
-      await tester
-          .pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi()));
+  group('submission payload', () {
+    Future<void> submit(WidgetTester tester) async {
+      await tester.ensureVisible(_continueButton());
+      await tester.tap(_continueButton()); // -> review
       await _settle(tester);
-
-      ElevatedButton continueButton() =>
-          tester.widget<ElevatedButton>(find.byType(ElevatedButton).first);
-      expect(continueButton().onPressed, isNull, reason: 'nothing set yet');
-
-      await tester.tap(find.byKey(const Key('hatly-service-type-buy')));
-      await _settle(tester);
-      expect(continueButton().onPressed, isNull,
-          reason: 'place name/description still empty');
-
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-place-name')), 'Carrefour');
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-description')), 'اشترى لي شاي');
-      await _settle(tester);
-      expect(continueButton().onPressed, isNull,
-          reason: 'BUY_FROM_PLACE also needs the place\'s location');
-
-      await _setPlace(tester);
-      await _settle(tester);
-      expect(continueButton().onPressed, isNotNull);
-    });
-
-    testWidgets(
-        'the review step shows the location as set and never mentions a Hatly default location',
-        (tester) async {
-      _tallViewport(tester);
-      final cartApi = _FakeCartApi();
-      await tester
-          .pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi()));
-      await _settle(tester);
-
-      for (final type in [
-        'hatly-service-type-buy',
-        'hatly-service-type-deliver'
-      ]) {
-        await tester.tap(find.byKey(Key(type)));
-        await tester.enterText(
-            find.byKey(const Key('hatly-service-place-name')), 'Somewhere');
-        await tester.enterText(
-            find.byKey(const Key('hatly-service-description')), 'شيء ما');
-        await _setPlace(tester);
-        await _settle(tester);
-        await tester.tap(find.byType(ElevatedButton).first); // -> review
-        await _settle(tester);
-
-        expect(find.byKey(const Key('hatly-service-review')), findsOneWidget);
-        expect(find.textContaining('الافتراضي'), findsNothing);
-        expect(find.textContaining('default'), findsNothing);
-
-        await tester.tap(find.byKey(const Key('hatly-service-edit')));
-        await _settle(tester);
-      }
-    });
-
-    testWidgets(
-        'a text-only request (no images) is a valid, submittable request',
-        (tester) async {
-      _tallViewport(tester);
-      final cartApi = _FakeCartApi();
-      await tester
-          .pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi()));
-      await _settle(tester);
-
-      await tester.tap(find.byKey(const Key('hatly-service-type-deliver')));
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-place-name')), "Mom's house");
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-description')), 'وصل الشنطة دي');
-      await _setDestination(
-          tester); // Part B: destination is now required for DELIVER_TO_PLACE
-      await _settle(tester);
-      await tester.tap(find.byType(ElevatedButton).first); // -> review
-      await _settle(tester);
-
-      expect(find.byKey(const Key('hatly-service-review')), findsOneWidget);
-    });
-
-    // Hatly Service location rule: the customer's own place is REQUIRED for both types (BUY_FROM_PLACE pickup, DELIVER_TO_PLACE
-    // destination) — Hatly's configured default location is never a stand-in. See `checkout-planner.service.ts`'s
-    // `resolveAdHocLocations` for the backend half. This Flutter-side gate prevents the customer from ever reaching a submission
-    // the backend would reject anyway.
-    testWidgets(
-        'DELIVER_TO_PLACE: Continue stays disabled until a destination is also set',
-        (tester) async {
-      _tallViewport(tester);
-      final cartApi = _FakeCartApi();
-      await tester
-          .pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi()));
-      await _settle(tester);
-
-      ElevatedButton continueButton() =>
-          tester.widget<ElevatedButton>(find.byType(ElevatedButton).first);
-
-      await tester.tap(find.byKey(const Key('hatly-service-type-deliver')));
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-place-name')), "Mom's house");
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-description')), 'وصل الشنطة دي');
-      await _settle(tester);
-      expect(continueButton().onPressed, isNull,
-          reason:
-              'type, place name and description are set, but no destination yet');
-
-      await _setDestination(tester);
-      await _settle(tester);
-      expect(continueButton().onPressed, isNotNull);
-    });
-
-    testWidgets(
-        'BUY_FROM_PLACE: Continue stays disabled until the pickup place is set — a missing pickup is never silently defaulted to Hatly\'s location',
-        (tester) async {
-      _tallViewport(tester);
-      final cartApi = _FakeCartApi();
-      await tester
-          .pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi()));
-      await _settle(tester);
-
-      await tester.tap(find.byKey(const Key('hatly-service-type-buy')));
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-place-name')), 'Carrefour');
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-description')), 'اشترى لي شاي');
-      await _settle(tester);
-
-      ElevatedButton continueButton() =>
-          tester.widget<ElevatedButton>(find.byType(ElevatedButton).first);
-      expect(continueButton().onPressed, isNull);
-      // Nothing is submitted by tapping a disabled button.
-      await tester.tap(find.byType(ElevatedButton).first, warnIfMissed: false);
-      await _settle(tester);
-      expect(find.byKey(const Key('hatly-service-review')), findsNothing);
-      expect(cartApi.addAdHocCalls, isEmpty);
-
-      await _setPlace(tester);
-      await _settle(tester);
-      expect(continueButton().onPressed, isNotNull);
-    });
-  });
-
-  group('HatlyServiceScreen — images', () {
-    testWidgets(
-        'adding 1 then 2 images shows both previews; the add button then hides (a 3rd is never offered)',
-        (tester) async {
-      _tallViewport(tester);
-      final cartApi = _FakeCartApi();
-      final img1 = _fakeImage('a');
-      final img2 = _fakeImage('b');
-      await tester.pumpWidget(_app(
-          cartApi: cartApi,
-          uploadsApi: _FakeUploadsApi(),
-          imagesToPick: [img1, img2]));
-      await _settle(tester);
-
-      await tester.tap(find.byKey(const Key('hatly-service-add-image')));
-      await _settle(tester);
-      expect(find.byKey(const Key('hatly-service-remove-image-0')),
-          findsOneWidget);
-      expect(find.byKey(const Key('hatly-service-add-image')), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('hatly-service-add-image')));
-      await _settle(tester);
-      expect(find.byKey(const Key('hatly-service-remove-image-0')),
-          findsOneWidget);
-      expect(find.byKey(const Key('hatly-service-remove-image-1')),
-          findsOneWidget);
-      // The cap is reached — the add-image tile is no longer offered at all.
-      expect(find.byKey(const Key('hatly-service-add-image')), findsNothing);
-    });
-
-    testWidgets('removing an image takes it out of the selection',
-        (tester) async {
-      _tallViewport(tester);
-      final cartApi = _FakeCartApi();
-      final img1 = _fakeImage('c');
-      await tester.pumpWidget(_app(
-          cartApi: cartApi,
-          uploadsApi: _FakeUploadsApi(),
-          imagesToPick: [img1]));
-      await _settle(tester);
-
-      await tester.tap(find.byKey(const Key('hatly-service-add-image')));
-      await _settle(tester);
-      expect(find.byKey(const Key('hatly-service-remove-image-0')),
-          findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('hatly-service-remove-image-0')));
-      await _settle(tester);
-      expect(
-          find.byKey(const Key('hatly-service-remove-image-0')), findsNothing);
-      // The add-image tile reappears now that there is room again.
-      expect(find.byKey(const Key('hatly-service-add-image')), findsOneWidget);
-    });
-  });
-
-  group('HatlyServiceScreen — submission payload per service type', () {
-    Future<void> fillAndReview(WidgetTester tester,
-        {required String typeKey,
-        required String placeName,
-        required String description}) async {
-      await tester.tap(find.byKey(Key(typeKey)));
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-place-name')), placeName);
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-description')), description);
-      await _settle(tester);
-      // Both types require the customer's own place before Continue is enabled.
-      await _setPlace(tester);
-      await _settle(tester);
-      await tester.tap(find.byType(ElevatedButton).first); // -> review
+      await tester.tap(find.byType(ElevatedButton).first); // add to cart
       await _settle(tester);
     }
 
-    testWidgets(
-        'BUY_FROM_PLACE submits the customer\'s chosen pickup place and no destination coordinates',
-        (tester) async {
+    testWidgets('only what the customer CHOSE is sent (with its label); an end left on the default is not sent, so the server resolves it', (tester) async {
       _tallViewport(tester);
       final cartApi = _FakeCartApi();
       final visited = <String>[];
-      await tester.pumpWidget(_app(
-          cartApi: cartApi, uploadsApi: _FakeUploadsApi(), visited: visited));
+      await tester.pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi(), visited: visited, defaults: _allDefaults));
       await _settle(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-buy');
+      await _chooseSaved(tester, origin: true);
+      await submit(tester);
 
-      await fillAndReview(tester,
-          typeKey: 'hatly-service-type-buy',
-          placeName: 'Carrefour',
-          description: 'اشترى لي شاي ليبتون');
-
-      await tester.tap(find.byType(ElevatedButton).first); // Add to cart
-      await _settle(tester);
-
-      expect(cartApi.addAdHocCalls, hasLength(1));
       final call = cartApi.addAdHocCalls.single;
       expect(call['adHocServiceType'], 'BUY_FROM_PLACE');
-      expect(call['adHocPlaceName'], 'Carrefour');
-      expect(call['freeTextDescription'], 'اشترى لي شاي ليبتون');
-      // The pickup is the customer's own chosen place — sent explicitly, never left for a backend default.
       expect(call['pickupLatitude'], 30.42);
       expect(call['pickupLongitude'], 31.56);
+      expect(call['pickupLabel'], 'المنزل');
       expect(call['destinationLatitude'], isNull);
       expect(call['destinationLongitude'], isNull);
+      expect(call['destinationLabel'], isNull);
       expect(visited, contains('/cart'));
     });
 
-    testWidgets(
-        'DELIVER_TO_PLACE submits adHocServiceType=DELIVER_TO_PLACE with no pickup coordinates',
-        (tester) async {
+    testWidgets('Wasally sends the customer-chosen ORIGIN as the pickup pair and its chosen destination as the destination pair', (tester) async {
       _tallViewport(tester);
       final cartApi = _FakeCartApi();
-      await tester
-          .pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi()));
+      await tester.pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi(), defaults: _allDefaults));
       await _settle(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-deliver');
+      await _chooseSaved(tester, origin: true);
+      await _chooseSaved(tester, origin: false, id: 'addr-shop');
+      await submit(tester);
 
-      await fillAndReview(tester,
-          typeKey: 'hatly-service-type-deliver',
-          placeName: "Mom's house",
-          description: 'وصل الشنطة دي بسرعة');
-
-      await tester.tap(find.byType(ElevatedButton).first);
-      await _settle(tester);
-
-      expect(cartApi.addAdHocCalls, hasLength(1));
       final call = cartApi.addAdHocCalls.single;
       expect(call['adHocServiceType'], 'DELIVER_TO_PLACE');
-      expect(call['pickupLatitude'], isNull);
-      expect(call['pickupLongitude'], isNull);
-      // Part B: the destination is no longer optional — it must actually
-      // be sent, never silently left for the backend to default.
-      expect(call['destinationLatitude'], 30.42);
-      expect(call['destinationLongitude'], 31.56);
+      expect([call['pickupLatitude'], call['pickupLongitude']], [30.42, 31.56]);
+      expect([call['destinationLatitude'], call['destinationLongitude']], [30.5, 31.7]);
+      expect(call['destinationLabel'], 'المحل');
     });
 
-    testWidgets('double-tapping "Add to cart" only submits once',
-        (tester) async {
+    testWidgets('double-tapping "Add to cart" only submits once', (tester) async {
       _tallViewport(tester);
       final cartApi = _FakeCartApi()..gate = Completer<void>();
-      await tester
-          .pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi()));
+      await tester.pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi(), defaults: _allDefaults));
+      await _settle(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-buy');
+      await tester.ensureVisible(_continueButton());
+      await tester.tap(_continueButton());
       await _settle(tester);
 
-      await fillAndReview(tester,
-          typeKey: 'hatly-service-type-buy',
-          placeName: 'Carrefour',
-          description: 'طلب تجريبي');
-
       final submitButton = find.byType(ElevatedButton).first;
-      // The first tap's call is held open by the gate — a second tap
-      // fired while it is still in flight must be a no-op, exactly as
-      // a rapid double-tap on a real (slow) network call would be.
       await tester.tap(submitButton);
       await tester.pump();
       await tester.tap(submitButton); // fires before the first completes
       await tester.pump();
       cartApi.gate!.complete();
       await _settle(tester);
-
       expect(cartApi.addAdHocCalls, hasLength(1));
     });
-  });
 
-  group('HatlyServiceScreen — image upload failure & retry', () {
-    testWidgets(
-        'an upload failure keeps the description text and the selected image, and shows an error',
-        (tester) async {
+    testWidgets('a failed photo upload submits nothing and keeps the entered request for a retry', (tester) async {
       _tallViewport(tester);
       final cartApi = _FakeCartApi();
-      final uploadsApi = _FakeUploadsApi()..failNextUpload = true;
-      final img = _fakeImage('d');
-      await tester.pumpWidget(
-          _app(cartApi: cartApi, uploadsApi: uploadsApi, imagesToPick: [img]));
+      final uploads = _FakeUploadsApi()..failNextUpload = true;
+      await tester.pumpWidget(_app(cartApi: cartApi, uploadsApi: uploads, defaults: _allDefaults, imagesToPick: [_fakeImage('a')]));
       await _settle(tester);
-
-      await tester.tap(find.byKey(const Key('hatly-service-type-buy')));
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-place-name')), 'Carrefour');
-      await tester.enterText(find.byKey(const Key('hatly-service-description')),
-          'وصف مهم لا يجب أن يضيع');
-      await _setPlace(tester);
+      await _basics(tester, typeKey: 'hatly-service-type-buy');
+      await tester.ensureVisible(find.byKey(const Key('hatly-service-add-image')));
       await tester.tap(find.byKey(const Key('hatly-service-add-image')));
-      await _settle(tester);
-      await tester.tap(find.byType(ElevatedButton).first); // -> review
-      await _settle(tester);
+      // A decoded photo thumbnail keeps scheduling frames, so step the clock instead of waiting for it to go idle.
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.ensureVisible(_continueButton());
+      await tester.tap(_continueButton());
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.byType(ElevatedButton).first);
+      // Reading the photo is real file IO, which only completes outside the test's fake clock.
+      for (var i = 0; i < 4; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 150)));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
-      // Real `dart:io` file reads (the image upload path) don't
-      // resolve under `testWidgets`' fake-async zone unless run
-      // through `runAsync`. `tap()` itself only awaits the SYNCHRONOUS
-      // part of `onPressed`, so the rest of `_submit`'s continuation
-      // (everything after the file read) keeps running in that same
-      // real zone after `tap()` returns — a short real delay inside
-      // `runAsync` lets it actually finish before the fake-zone pump
-      // below rebuilds the tree to reflect it.
-      await tester.runAsync(() async {
-        await tester
-            .tap(find.byType(ElevatedButton).first); // submit -> upload fails
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      });
-      await tester.pump();
-
+      expect(uploads.callCount, 1);
+      expect(cartApi.addAdHocCalls, isEmpty);
       expect(find.byKey(const Key('hatly-service-error')), findsOneWidget);
-      expect(cartApi.addAdHocCalls, isEmpty,
-          reason:
-              'the cart mutation must never be called when an image upload failed');
-
-      // Retry: go back, the text/image must still be there.
-      await tester.tap(find.byKey(const Key('hatly-service-edit')));
-      await _settle(tester);
-      expect(find.text('وصف مهم لا يجب أن يضيع'), findsOneWidget);
-      expect(find.byKey(const Key('hatly-service-remove-image-0')),
-          findsOneWidget);
-
-      // Retry submit — this time the upload succeeds.
-      await tester.tap(find.byType(ElevatedButton).first); // -> review again
-      await _settle(tester);
-      await tester.runAsync(() async {
-        await tester.tap(find.byType(ElevatedButton).first); // submit again
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      });
-      await tester.pump();
-
-      expect(cartApi.addAdHocCalls, hasLength(1));
     });
   });
 
-  group('HatlyServiceScreen — adding to an existing Hatly Service group', () {
-    testWidgets(
-        'when the cart already has an AD_HOC_SERVICE group, the type/place-name/location fields are hidden and the existing group id is reused',
-        (tester) async {
+  group('a request already in the cart', () {
+    CartGroup group({String type = 'BUY_FROM_PLACE', double? pickupLat, double? destinationLat}) => CartGroup(
+          id: 'existing-group',
+          groupType: 'AD_HOC_SERVICE',
+          adHocPlaceName: 'Carrefour',
+          adHocServiceType: type,
+          adHocPickupLatitude: pickupLat,
+          adHocPickupLongitude: pickupLat == null ? null : 31.0,
+          adHocPickupLabel: pickupLat == null ? null : 'بداية العميل',
+          adHocDestinationLatitude: destinationLat,
+          adHocDestinationLongitude: destinationLat == null ? null : 31.5,
+          adHocDestinationLabel: destinationLat == null ? null : 'وجهة العميل',
+          items: const [],
+        );
+
+    testWidgets('type, place name and a new route are not asked again — the existing group id is reused and Continue needs only a description', (tester) async {
       _tallViewport(tester);
-      const existing = CartGroup(
-        id: 'existing-group',
-        groupType: 'AD_HOC_SERVICE',
-        adHocPlaceName: 'Carrefour',
-        adHocServiceType: 'BUY_FROM_PLACE',
-        items: [],
-      );
-      final cartApi = _FakeCartApi(initialGroups: [existing]);
-      await tester
-          .pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi()));
+      final cartApi = _FakeCartApi(initialGroups: [group()]);
+      await tester.pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi(), defaults: _allDefaults));
       await _settle(tester);
 
-      expect(find.byKey(const Key('hatly-service-existing-group-notice')),
-          findsOneWidget);
+      expect(find.byKey(const Key('hatly-service-existing-group-notice')), findsOneWidget);
       expect(find.byKey(const Key('hatly-service-type-buy')), findsNothing);
-      expect(find.byKey(const Key('hatly-service-place-name')), findsNothing);
-
-      await tester.enterText(
-          find.byKey(const Key('hatly-service-description')), 'صنف إضافي');
+      await tester.enterText(find.byKey(const Key('hatly-service-description')), 'صنف إضافي');
       await _settle(tester);
-      await tester.tap(find.byType(ElevatedButton).first); // -> review
+      await tester.ensureVisible(_continueButton());
+      await tester.tap(_continueButton());
       await _settle(tester);
-      await tester.tap(find.byType(ElevatedButton).first); // submit
+      await tester.tap(find.byType(ElevatedButton).first);
       await _settle(tester);
 
-      expect(cartApi.addAdHocCalls, hasLength(1));
       final call = cartApi.addAdHocCalls.single;
       expect(call['cartVendorGroupId'], 'existing-group');
-      expect(call['adHocPlaceName'], isNull);
       expect(call['adHocServiceType'], isNull);
+      expect(call['pickupLatitude'], isNull); // ends of an existing group are changed only through the route edit
+    });
+
+    testWidgets('shows the group\'s own ends (customer choice, else default) and edits each end through the cart route update', (tester) async {
+      _tallViewport(tester);
+      final cartApi = _FakeCartApi(initialGroups: [group(pickupLat: 30.9)]);
+      await tester.pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi(), defaults: _allDefaults));
+      await _settle(tester);
+
+      expect(_label(tester, 'route-origin-label'), 'بداية العميل');
+      expect(_label(tester, 'route-destination-label'), 'وجهة هاتلي'); // default
+
+      await _chooseSaved(tester, origin: false, id: 'addr-shop');
+      expect(cartApi.routeCalls.single['destination'], isA<RouteEndpoint>());
+      expect(cartApi.routeCalls.single['clearOrigin'], isFalse);
+      expect(_label(tester, 'route-destination-label'), 'المحل');
+      expect(_label(tester, 'route-origin-label'), 'بداية العميل'); // untouched
+
+      await tester.ensureVisible(find.byKey(const Key('route-origin-change')));
+      await tester.tap(find.byKey(const Key('route-origin-change')));
+      await _settle(tester);
+      await tester.ensureVisible(find.byKey(const Key('route-sheet-use-default')));
+      await tester.tap(find.byKey(const Key('route-sheet-use-default')));
+      await _settle(tester);
+      expect(cartApi.routeCalls.last['clearOrigin'], isTrue);
+      expect(_badge('route-origin'), isTrue);
+      expect(_label(tester, 'route-origin-label'), 'نقطة بداية هاتلي');
+    });
+
+    testWidgets('a Wasally group without a chosen origin shows the missing origin (no default exists) instead of inventing one', (tester) async {
+      _tallViewport(tester);
+      final cartApi = _FakeCartApi(initialGroups: [group(type: 'DELIVER_TO_PLACE')]);
+      await tester.pumpWidget(_app(cartApi: cartApi, uploadsApi: _FakeUploadsApi(), defaults: _allDefaults));
+      await _settle(tester);
+      expect(_badge('route-origin'), isFalse);
+      expect(_label(tester, 'route-destination-label'), 'وجهة وصّلي');
     });
   });
 }

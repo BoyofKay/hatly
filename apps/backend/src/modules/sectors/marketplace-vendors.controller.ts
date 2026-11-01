@@ -42,6 +42,14 @@ export class ListVendorsQueryDto {
   @Min(1)
   limit?: number;
 
+  /**
+   * A MANUAL address has no coordinates — its delivery zone is its location. The zone's service area then narrows the list exactly as a
+   * GPS point would (a zone that is missing or inactive lists nothing). Ignored when coordinates are sent.
+   */
+  @IsOptional()
+  @IsUUID()
+  deliveryZoneId?: string;
+
   @IsOptional()
   @Type(() => Number)
   @IsLatitude()
@@ -95,6 +103,7 @@ export class MarketplaceVendorsController {
       limit: query.limit,
       latitude: query.latitude,
       longitude: query.longitude,
+      deliveryZoneId: query.deliveryZoneId,
       subcategoryId: query.subcategoryId,
       openNow: query.openNow,
       hasOffers: query.hasOffers,

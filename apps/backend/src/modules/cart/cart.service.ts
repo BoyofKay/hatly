@@ -1,6 +1,8 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
+import { assertNonNegativeUnitPrice, validateOptionSelection } from '../products/option-selection';
+import { sectorAllowsCustomRequests } from '../sectors/entities/marketplace-sector.entity';
 import { Cart, CartStatus } from './entities/cart.entity';
 import { CartVendorGroup } from './entities/cart-vendor-group.entity';
 import { CartItem } from './entities/cart-item.entity';
@@ -12,6 +14,7 @@ import { Product } from '../products/entities/product.entity';
 import { VendorBranch } from '../vendors/entities/vendor-branch.entity';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { AddAdHocCartItemDto } from './dto/add-adhoc-cart-item.dto';
+import { UpdateAdHocRouteDto } from './dto/update-adhoc-route.dto';
 import { AddVendorCustomItemDto } from './dto/add-vendor-custom-item.dto';
 import { CartPricingService } from './cart-pricing.service';
 import { CartView } from './cart-view.interface';
@@ -27,6 +30,12 @@ const MAX_IMAGES_PER_AD_HOC_ITEM = 2;
 const CART_RELATIONS = {
   groups: { items: { product: true, selectedOptionValues: { optionValue: true } } },
 } as const;
+
+/** A short display label: trimmed, capped at the column length, empty → null. */
+function cleanLabel(label: string | null | undefined): string | null {
+  const trimmed = (label ?? '').trim().slice(0, 120);
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 @Injectable()
 export class CartService {
@@ -220,10 +229,7 @@ export class CartService {
         }
         this.assertCanAddNewGroup(cart, groups, CartGroupType.AD_HOC_SERVICE);
 
-        // Cross-field validation: a coordinate pair is only meaningful
-        // for the matching service type — e.g. supplying a destination
-        // on a BUY_FROM_PLACE group would silently be ignored later,
-        // which is worse than rejecting it now. Each pair must also be
+        // Route endpoints (PD-012): both service types may carry an origin and/or a destination; each coordinate pair must be
         // supplied together, never just one half of it.
         const hasPickupPair = dto.pickupLatitude !== undefined || dto.pickupLongitude !== undefined;
         const hasDestinationPair =
@@ -243,19 +249,6 @@ export class CartService {
             details: { code: 'INCOMPLETE_COORDINATE' },
           });
         }
-        if (dto.adHocServiceType === AdHocServiceType.BUY_FROM_PLACE && hasDestinationPair) {
-          throw new BadRequestException({
-            message: 'A destination location does not apply to a "buy from a place" request.',
-            details: { code: 'LOCATION_DOES_NOT_MATCH_SERVICE_TYPE' },
-          });
-        }
-        if (dto.adHocServiceType === AdHocServiceType.DELIVER_TO_PLACE && hasPickupPair) {
-          throw new BadRequestException({
-            message: 'A pickup location does not apply to a "deliver to a place" request.',
-            details: { code: 'LOCATION_DOES_NOT_MATCH_SERVICE_TYPE' },
-          });
-        }
-
         group = await manager.save(
           CartVendorGroup,
           manager.create(CartVendorGroup, {
@@ -267,6 +260,8 @@ export class CartService {
             adHocPickupLongitude: dto.pickupLongitude ?? null,
             adHocDestinationLatitude: dto.destinationLatitude ?? null,
             adHocDestinationLongitude: dto.destinationLongitude ?? null,
+            adHocPickupLabel: dto.pickupLatitude !== undefined ? cleanLabel(dto.pickupLabel) : null,
+            adHocDestinationLabel: dto.destinationLatitude !== undefined ? cleanLabel(dto.destinationLabel) : null,
           }),
         );
       }
@@ -305,6 +300,33 @@ export class CartService {
     });
     // Rendered AFTER the transaction has committed and released its connection: buildView reads other tables through the
     // pool, and doing that while still holding a pooled connection starves the pool under concurrent load (M5 Batch 3).
+    return this.buildView(fullCart);
+  }
+
+  /**
+   * PD-012. Changes the route endpoints of the cart's Hatly / Wasally group, each independently:
+   *   - an endpoint object sets it; `null` clears it back to the service's configured default; an omitted end is left unchanged.
+   * Only stores what the customer chose — the server resolves and prices the route at quote and order time, so nothing here can
+   * change a price, and a changed endpoint makes any earlier quote stale (it is part of the quote fingerprint).
+   */
+  async updateAdHocRoute(customerId: string, dto: UpdateAdHocRouteDto): Promise<CartView> {
+    const fullCart = await this.dataSource.transaction(async (manager) => {
+      const cart = await this.getOrCreateActiveCartLocked(manager, customerId);
+      const group = await manager.findOne(CartVendorGroup, { where: { cartId: cart.id, groupType: CartGroupType.AD_HOC_SERVICE } });
+      if (!group) throw new NotFoundException('There is no Hatly Service request in the cart.');
+      if (dto.origin !== undefined) {
+        group.adHocPickupLatitude = dto.origin?.latitude ?? null;
+        group.adHocPickupLongitude = dto.origin?.longitude ?? null;
+        group.adHocPickupLabel = dto.origin ? cleanLabel(dto.origin.label) : null;
+      }
+      if (dto.destination !== undefined) {
+        group.adHocDestinationLatitude = dto.destination?.latitude ?? null;
+        group.adHocDestinationLongitude = dto.destination?.longitude ?? null;
+        group.adHocDestinationLabel = dto.destination ? cleanLabel(dto.destination.label) : null;
+      }
+      await manager.save(CartVendorGroup, group);
+      return this.loadCartWithRelations(manager, cart.id);
+    });
     return this.buildView(fullCart);
   }
 
@@ -383,6 +405,10 @@ export class CartService {
         }
       }
 
+      // The sector's admin setting is the rule, enforced here for EVERY route into this method (a new group or an existing one):
+      // hiding the entry point in the app is not a control. A branch without an active, enabled sector cannot take custom requests.
+      await this.assertCustomRequestsAllowed(manager, group.vendorBranchId);
+
       // Free Text OR Image fix. CONFIRMED: valid with free text, OR at
       // least one image, OR both — never required together. A
       // single-field validator can't express this, so it's enforced
@@ -430,6 +456,18 @@ export class CartService {
     // Rendered AFTER the transaction has committed and released its connection: buildView reads other tables through the
     // pool, and doing that while still holding a pooled connection starves the pool under concurrent load (M5 Batch 3).
     return this.buildView(fullCart);
+  }
+
+  private async assertCustomRequestsAllowed(manager: EntityManager, vendorBranchId: string | null | undefined): Promise<void> {
+    const branch = vendorBranchId
+      ? await manager.findOne(VendorBranch, { where: { id: vendorBranchId }, relations: { marketplaceSector: true } })
+      : null;
+    if (!sectorAllowsCustomRequests(branch?.marketplaceSector)) {
+      throw new ForbiddenException({
+        message: 'Custom requests are not available for this vendor.',
+        details: { code: 'CUSTOM_REQUESTS_NOT_AVAILABLE' },
+      });
+    }
   }
 
   async setFulfillmentType(customerId: string, fulfillmentType: FulfillmentType): Promise<CartView> {
@@ -544,6 +582,11 @@ export class CartService {
   }
 
   // ---- internals ----
+
+  /** The same group rules `addItem` applies — public so the read-only compatibility check shares them instead of copying them. */
+  assertNewGroupAllowed(cart: Cart, existingGroups: CartVendorGroup[], newGroupType: CartGroupType): void {
+    this.assertCanAddNewGroup(cart, existingGroups, newGroupType);
+  }
 
   private assertCanAddNewGroup(
     cart: Cart,
@@ -692,6 +735,7 @@ export class CartService {
           categoryId: item.product.categoryId,
           quantity: item.quantity,
           unitPriceMinor: itemView.unitPriceMinor,
+          basePriceMinor: item.product.priceMinor,
           pricingUnit: item.product.pricingUnit,
         });
       }
@@ -736,32 +780,8 @@ export class CartService {
   }
 
   private validateSelectedOptions(product: Product, selectedOptionValueIds: string[]): void {
-    const selectedSet = new Set(selectedOptionValueIds);
-
-    for (const option of product.options) {
-      const valueIdsForOption = new Set(option.values.map((v) => v.id));
-      const selectedForOption = option.values.filter((v) => selectedSet.has(v.id));
-
-      if (option.isRequired && selectedForOption.length === 0) {
-        throw new BadRequestException({
-          message: `"${option.name}" requires a selection.`,
-          details: { code: 'OPTION_REQUIRED', optionId: option.id },
-        });
-      }
-      if (!option.allowsMultiple && selectedForOption.length > 1) {
-        throw new BadRequestException({
-          message: `"${option.name}" only allows one selection.`,
-          details: { code: 'INVALID_OPTION_SELECTION', optionId: option.id },
-        });
-      }
-      for (const id of valueIdsForOption) selectedSet.delete(id);
-    }
-
-    if (selectedSet.size > 0) {
-      throw new BadRequestException({
-        message: 'One or more selected options do not belong to this product.',
-        details: { code: 'INVALID_OPTION_SELECTION' },
-      });
-    }
+    // One shared rule (also applied again at checkout): required / min / max / single-choice / foreign values.
+    validateOptionSelection(product.options, selectedOptionValueIds);
+    assertNonNegativeUnitPrice(product.priceMinor, product.options, selectedOptionValueIds);
   }
 }

@@ -128,7 +128,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get passwordSetupSectionSubtitle =>
-      'Set a password so you can also sign in without a text message code.';
+      'Change the password you sign in with.';
 
   @override
   String get passwordSetupSaveButton => 'Save password';
@@ -180,6 +180,44 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get errorSmsProviderUnavailable =>
       'We couldn\'t send the verification code right now. Please try again shortly';
+
+  @override
+  String get passwordTooShort => 'Your password must be at least 8 characters';
+
+  @override
+  String get passwordConfirmLabel => 'Confirm password';
+
+  @override
+  String get passwordMismatch => 'The two passwords don\'t match';
+
+  @override
+  String get errorInvalidCredentials =>
+      'The phone number or password is incorrect';
+
+  @override
+  String get errorRegistrationUnavailable =>
+      'We couldn\'t complete your registration. If you already have an account, log in.';
+
+  @override
+  String get errorTooManyFailedLogins =>
+      'Too many failed login attempts. Please try again shortly';
+
+  @override
+  String get errorInvalidInput => 'Please check what you entered and try again';
+
+  @override
+  String get errorPhoneVerificationUnavailable =>
+      'Phone verification isn\'t available right now';
+
+  @override
+  String get profileCurrentPasswordLabel => 'Current password';
+
+  @override
+  String get errorCurrentPasswordRequired =>
+      'Enter your current password to change it';
+
+  @override
+  String get errorCurrentPasswordInvalid => 'The current password is incorrect';
 
   @override
   String get homeComingSoon => 'Coming soon: browsing vendors and products';
@@ -355,11 +393,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customRequestEntryPoint => 'Can\'t find what you\'re looking for?';
 
   @override
-  String get customRequestSheetTitle => 'Request a custom item';
+  String get customRequestSheetTitle => 'Request an item that isn\'t listed';
 
   @override
   String get customRequestSheetSubtitle =>
-      'Describe what you need and/or add a photo — we\'ll pass it on to the vendor.';
+      'Describe what you need and/or add a photo. It\'s added to your cart and sent to the store with your order. The store confirms the item and sets its price — you\'ll see the final amount once it does.';
 
   @override
   String get customRequestTextHint => 'e.g. Panadol Extra 500mg, any brand';
@@ -711,9 +749,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeSectionOffers => 'Offers';
-
-  @override
-  String get homeSectionPopularNew => 'Popular & new';
 
   @override
   String get homeFavoritesShortcut => 'Favorites';
@@ -1116,6 +1151,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Choose the electronic payment method';
 
   @override
+  String get checkoutElectronicMethodHeading => 'Electronic payment method';
+
+  @override
+  String get checkoutElectronicMethodUnavailable =>
+      'This payment method is not available right now — choose another one';
+
+  @override
+  String get checkoutCannotConfirmYet =>
+      'We couldn\'t confirm the order yet. Check your choices and try again';
+
+  @override
   String get checkoutNoElectronicMethods =>
       'No electronic payment methods are available right now';
 
@@ -1264,6 +1310,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get checkoutBlockerFeeUnavailable =>
       'Couldn\'t calculate the delivery fee. Please try again shortly.';
+
+  @override
+  String get checkoutBlockerGpsUnavailable =>
+      'Delivery to a GPS location isn\'t available right now. Choose an address with a delivery area, or add one.';
 
   @override
   String get checkoutBlockerInvalidAddress =>
@@ -1422,7 +1472,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addressSearchNoResult =>
-      'We couldn\'t find that address. Try different words or use your current location.';
+      'We couldn\'t find that address. Address search isn\'t always available — you can type your address in the details above and save it without a map location, or use your current location.';
 
   @override
   String get addressLocationUnavailable =>
@@ -1850,7 +1900,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t load the delivery areas. Please try again.';
 
   @override
-  String get addressZonesEmpty => 'No delivery areas are available right now.';
+  String get addressZonesEmpty =>
+      'No delivery areas are available yet, so an address can\'t be saved right now. Please try again later.';
 
   @override
   String get addressDetailedLabel => 'Detailed address';
@@ -1894,15 +1945,593 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String checkoutHatlyServiceFeeFormula(String zoneFee, String multiplier) {
-    return 'Your area\'s delivery fee $zoneFee × $multiplier';
-  }
-
-  @override
   String get addressZoneAutoSelected =>
       'This is the only delivery area in this city, so it\'s selected for you.';
 
   @override
   String get addressCityNoZones =>
       'No delivery areas are available in this city right now.';
+
+  @override
+  String get guestSignInTitle => 'Sign in to continue';
+
+  @override
+  String get guestSignInBody =>
+      'Create an account or sign in to use your cart, orders and profile.';
+
+  @override
+  String get guestSignInAction => 'Sign in or register';
+
+  @override
+  String get guestBrowseAction => 'Browse without an account';
+
+  @override
+  String get weightEntryTitle => 'Enter the weight';
+
+  @override
+  String get weightEntryHint => 'e.g. 1.5';
+
+  @override
+  String get weightEntryConfirm => 'Set weight';
+
+  @override
+  String get weightEntryTooltip => 'Type a weight';
+
+  @override
+  String weightEntryInvalid(String min, String max) {
+    return 'Enter a weight between $min and $max';
+  }
+
+  @override
+  String weightGramsShort(int grams) {
+    return '$grams g';
+  }
+
+  @override
+  String weightKgShort(String kg) {
+    return '$kg kg';
+  }
+
+  @override
+  String get addressPickerHint => 'Choose a saved address';
+
+  @override
+  String get addressPickerNoPin => 'No map location — add one in My Addresses';
+
+  @override
+  String get addressPickerNeedsPin =>
+      'That address has no map location, so it can\'t be used here. Add a pin to it first.';
+
+  @override
+  String hatlyServiceRouteBuy(String place) {
+    return 'Hatly buys from $place and delivers to your delivery address';
+  }
+
+  @override
+  String hatlyServiceRouteDeliver(String place) {
+    return 'Hatly picks up from your delivery address and delivers to $place';
+  }
+
+  @override
+  String get hatlyServiceRoutePlaceUnset => 'the place you choose';
+
+  @override
+  String get hatlyServiceDeliveryOnly => 'Delivery fee only';
+
+  @override
+  String get homeSectionMostOrdered => 'Most ordered';
+
+  @override
+  String get homeSectionNew => 'New';
+
+  @override
+  String get homeSeeAllOffersTitle => 'Offers';
+
+  @override
+  String get homeSeeAllEmpty => 'Nothing here yet';
+
+  @override
+  String get notificationsTitle => 'Notifications';
+
+  @override
+  String get notificationsEmptyTitle => 'No notifications yet';
+
+  @override
+  String get notificationsEmptyBody =>
+      'We\'ll tell you here about every update on your orders.';
+
+  @override
+  String get notificationsLoadError => 'Couldn\'t load your notifications';
+
+  @override
+  String get notificationsMarkAllRead => 'Mark all as read';
+
+  @override
+  String get notificationsBellLabel => 'Notifications';
+
+  @override
+  String notificationsBellLabelUnread(int count) {
+    return 'Notifications, $count unread';
+  }
+
+  @override
+  String get notificationsUnread => 'Unread';
+
+  @override
+  String get notificationOrderPlacedTitle => 'Order received';
+
+  @override
+  String notificationOrderPlacedBody(String orderNumber) {
+    return 'We received your order $orderNumber.';
+  }
+
+  @override
+  String get notificationOrderConfirmedTitle => 'Order confirmed';
+
+  @override
+  String notificationOrderConfirmedBody(String orderNumber) {
+    return 'Your order $orderNumber has been confirmed.';
+  }
+
+  @override
+  String get notificationOrderPreparingTitle => 'Preparing your order';
+
+  @override
+  String notificationOrderPreparingBody(String orderNumber) {
+    return 'Your order $orderNumber is being prepared.';
+  }
+
+  @override
+  String get notificationOrderReadyForPickupTitle => 'Ready for pickup';
+
+  @override
+  String notificationOrderReadyForPickupBody(String orderNumber) {
+    return 'Your order $orderNumber is ready to collect from the branch.';
+  }
+
+  @override
+  String get notificationOrderOnTheWayTitle => 'Your order is on the way';
+
+  @override
+  String notificationOrderOnTheWayBody(String orderNumber) {
+    return 'Order $orderNumber is on its way to you.';
+  }
+
+  @override
+  String get notificationOrderDeliveredTitle => 'Order delivered';
+
+  @override
+  String notificationOrderDeliveredBody(String orderNumber) {
+    return 'Your order $orderNumber has been delivered.';
+  }
+
+  @override
+  String get notificationOrderCollectedTitle => 'Order collected';
+
+  @override
+  String notificationOrderCollectedBody(String orderNumber) {
+    return 'You collected your order $orderNumber.';
+  }
+
+  @override
+  String get notificationOrderCancelledTitle => 'Order cancelled';
+
+  @override
+  String notificationOrderCancelledBody(String orderNumber) {
+    return 'Your order $orderNumber has been cancelled.';
+  }
+
+  @override
+  String get notificationOrderFailedDeliveryTitle => 'Delivery failed';
+
+  @override
+  String notificationOrderFailedDeliveryBody(String orderNumber) {
+    return 'We couldn\'t deliver your order $orderNumber.';
+  }
+
+  @override
+  String get customRequestEntryHint =>
+      'Describe the item or add a photo — the store will check it and set its price.';
+
+  @override
+  String get customRequestAdded =>
+      'Added to your cart — the store will confirm the item and set its price.';
+
+  @override
+  String get cartErrorCustomRequestsUnavailable =>
+      'This store doesn\'t take custom requests.';
+
+  @override
+  String optionChooseBetween(int min, int max) {
+    return 'Choose $min to $max';
+  }
+
+  @override
+  String optionChooseAtLeast(int min) {
+    return 'Choose at least $min';
+  }
+
+  @override
+  String optionChooseUpTo(int max) {
+    return 'Choose up to $max';
+  }
+
+  @override
+  String optionMinError(int min) {
+    return 'Choose at least $min';
+  }
+
+  @override
+  String optionMaxReached(int max) {
+    return 'You can choose up to $max';
+  }
+
+  @override
+  String get cartErrorOptionLimit =>
+      'One of the options is outside what this item allows — review your choices.';
+
+  @override
+  String get deleteAccountAction => 'Delete my account';
+
+  @override
+  String get deleteAccountTitle => 'Delete your account permanently';
+
+  @override
+  String get deleteAccountExplanation =>
+      'Your personal data will be deleted: name, phone number, saved addresses, notifications, favorites and cart. Finished order and payment records stay, with nothing that identifies you, because vendors, drivers and Hatly need them for accounting. You will lose your Hatly points. This cannot be undone.';
+
+  @override
+  String get deleteAccountRequirements =>
+      'An account can\'t be deleted while an order is in progress or the Hatly wallet has a balance.';
+
+  @override
+  String get deleteAccountPasswordHint => 'Enter your password to confirm';
+
+  @override
+  String get deleteAccountConfirm => 'Delete account';
+
+  @override
+  String get deleteAccountCancel => 'Cancel';
+
+  @override
+  String get deleteAccountPasswordRequired =>
+      'Enter your password to confirm the deletion';
+
+  @override
+  String get deleteAccountErrorPassword => 'The password is incorrect';
+
+  @override
+  String get deleteAccountErrorActiveOrders =>
+      'You have an order in progress. You can delete your account after it is finished.';
+
+  @override
+  String get deleteAccountErrorWalletBalance =>
+      'Your Hatly wallet is not empty. Please contact Hatly support to settle it before deleting your account.';
+
+  @override
+  String get deleteAccountErrorGeneric =>
+      'Couldn\'t delete the account. Please try again.';
+
+  @override
+  String get homeNoStoresTitle => 'No stores are available yet';
+
+  @override
+  String get homeNoStoresBody =>
+      'Stores and categories will appear here as soon as they open in your area. Please check again soon.';
+
+  @override
+  String get phoneEgyptOnly =>
+      'Hatly currently accepts Egyptian mobile numbers only (+20).';
+
+  @override
+  String get addressMapLocationSaved => 'Map location saved';
+
+  @override
+  String get addressTextOnly => 'Address text only — no map location';
+
+  @override
+  String get addressMethodTitle => 'How do you want to add your address?';
+
+  @override
+  String get addressMethodSubtitle =>
+      'Choose ONE method — you never need both.';
+
+  @override
+  String get addressMethodGpsTitle => 'Use my current location (GPS)';
+
+  @override
+  String get addressMethodGpsHint =>
+      'We read your location and price delivery by the road distance. No area to choose and no address to type.';
+
+  @override
+  String get addressMethodManualTitle => 'Enter my address manually';
+
+  @override
+  String get addressMethodManualHint =>
+      'Choose your area and write your address. Delivery uses your area\'s fixed fee. We never ask for your location.';
+
+  @override
+  String get addressMethodGpsUnavailable =>
+      'Delivery by GPS location isn\'t available right now. Please enter your address manually.';
+
+  @override
+  String get addressChangeMethod => 'Change address method';
+
+  @override
+  String get addressChangeMethodTitle => 'Change address method?';
+
+  @override
+  String get addressChangeMethodDiscardsGps =>
+      'The detected location will be discarded.';
+
+  @override
+  String get addressChangeMethodDiscardsManual =>
+      'The selected area and the address you typed will be discarded.';
+
+  @override
+  String get addressChangeMethodConfirm => 'Change method';
+
+  @override
+  String get addressGpsJourneyTitle => 'Your location';
+
+  @override
+  String get addressGpsHelp =>
+      'Tap the button to share your current location. You don\'t need to choose an area or type an address.';
+
+  @override
+  String get addressGpsDetected => 'Location detected';
+
+  @override
+  String get addressGpsFeeNote =>
+      'The delivery fee is calculated at checkout from the road distance. Any amount shown before then is only an estimate.';
+
+  @override
+  String get addressGpsNeedLocation => 'Share your location first to continue.';
+
+  @override
+  String get addressGpsOutsideCoverage =>
+      'Hatly doesn\'t deliver to this location yet.';
+
+  @override
+  String get addressGpsInvalidLocation =>
+      'We couldn\'t use this location. Please try again.';
+
+  @override
+  String get addressGpsSaved => 'GPS location';
+
+  @override
+  String get addressManualJourneyTitle => 'Manual address';
+
+  @override
+  String get addressGpsJourneyBadge => 'GPS method';
+
+  @override
+  String get addressManualJourneyBadge => 'Manual method';
+
+  @override
+  String get addressMethodsLoading => 'Loading address methods…';
+
+  @override
+  String get routeSectionTitle => 'Request route';
+
+  @override
+  String get routeFromLabel => 'From';
+
+  @override
+  String get routeToLabel => 'To';
+
+  @override
+  String get routeBadgeDefault => 'Default';
+
+  @override
+  String get routeBadgeChosen => 'Your choice';
+
+  @override
+  String get routeChange => 'Change';
+
+  @override
+  String get routeChoose => 'Choose';
+
+  @override
+  String get routeNotSet => 'Not set yet';
+
+  @override
+  String get routeDefaultMissingHint =>
+      'There is no default point right now — please choose one.';
+
+  @override
+  String get routeOriginRequiredHint =>
+      'Choose where the pick-up should happen.';
+
+  @override
+  String get routeSheetTitleOrigin => 'Choose the starting point';
+
+  @override
+  String get routeSheetTitleDestination => 'Choose the destination';
+
+  @override
+  String get routeSheetPointSection =>
+      'Your current location or a point on the map';
+
+  @override
+  String get routeSheetSavedSection => 'From my saved addresses';
+
+  @override
+  String get routeNameThisPlace => 'Name this place (optional)';
+
+  @override
+  String get routeNameThisPlaceHint => 'e.g. Mom\'s house';
+
+  @override
+  String get routeUseDefault => 'Use the default point';
+
+  @override
+  String get routeConfirmPoint => 'Confirm this point';
+
+  @override
+  String get routeCurrentLocationLabel => 'My current location';
+
+  @override
+  String get routeSelectedPointLabel => 'Selected point';
+
+  @override
+  String get routeDirectionNote =>
+      'Direction: from the first point to the second.';
+
+  @override
+  String get routeOrderSectionTitle => 'Request route';
+
+  @override
+  String get cartErrorAdHocOriginRequired =>
+      'Please choose where to pick up from before adding this request to your cart.';
+
+  @override
+  String get checkoutBlockerAdHocOriginRequired =>
+      'This Wasally request has no pick-up point. Choose one and add it again.';
+
+  @override
+  String get checkoutBlockerHatlyDefaultPickupMissing =>
+      'Hatly\'s default starting point isn\'t set up yet. Please choose a starting point for your request.';
+
+  @override
+  String get checkoutBlockerHatlyDefaultDestinationMissing =>
+      'Hatly\'s default destination isn\'t set up yet. Please choose a destination for your request.';
+
+  @override
+  String get checkoutBlockerWasallyDefaultDestinationMissing =>
+      'Wasally\'s default destination isn\'t set up yet. Please choose a destination for your request.';
+
+  @override
+  String get orderPartCancelledTitle => 'Part of your order was cancelled';
+
+  @override
+  String orderPartCancelledBody(int rejected, int total) {
+    return '$rejected of $total vendors could not prepare their part. The rest of your order continues.';
+  }
+
+  @override
+  String get orderPartCancelledNoCharge =>
+      'You will not be charged for the cancelled part.';
+
+  @override
+  String orderRejectionReasonLine(String reason) {
+    return 'Reason: $reason';
+  }
+
+  @override
+  String orderRefundWalletLine(String amount) {
+    return '$amount was returned to your wallet.';
+  }
+
+  @override
+  String orderRefundTransferPendingLine(String amount) {
+    return '$amount will be sent back to you by Hatly. We will mark it as sent once it is.';
+  }
+
+  @override
+  String orderRefundTransferSentLine(String amount) {
+    return '$amount was sent back to you.';
+  }
+
+  @override
+  String orderRefundReviewLine(String amount) {
+    return '$amount will be settled once your payment has been reviewed.';
+  }
+
+  @override
+  String get notificationOrderPartCancelledTitle =>
+      'Part of your order was cancelled';
+
+  @override
+  String notificationOrderPartCancelledBody(String orderNumber) {
+    return 'A vendor could not prepare their part of order $orderNumber. The rest of your order continues.';
+  }
+
+  @override
+  String get itemUnavailableTitle => 'Some items are unavailable';
+
+  @override
+  String get itemUnavailableBody =>
+      'These items can\'t be prepared. Choose how to continue — nothing changes until you decide.';
+
+  @override
+  String get itemUnavailableContinue => 'Continue without them';
+
+  @override
+  String get itemUnavailableCancel => 'Cancel the whole order';
+
+  @override
+  String get itemUnavailableCancelConfirmTitle => 'Cancel the whole order?';
+
+  @override
+  String get itemUnavailableCancelConfirmBody =>
+      'We will pass your request to our team to cancel this order. Money you paid in advance is returned under our usual rules.';
+
+  @override
+  String get itemUnavailableCancelConfirmAction => 'Yes, cancel the order';
+
+  @override
+  String get itemUnavailableKeepOrder => 'Keep my order';
+
+  @override
+  String get itemUnavailableCancelRequested =>
+      'We received your request to cancel. Our team will process it and contact you if needed.';
+
+  @override
+  String get itemUnavailableTeamContact =>
+      'Our team will contact you about this order.';
+
+  @override
+  String get itemUnavailableDone =>
+      'Done — your order continues without these items.';
+
+  @override
+  String get itemUnavailableError =>
+      'Couldn\'t send your answer. Please try again.';
+
+  @override
+  String get orderRemovedItemsTitle => 'Removed from your order';
+
+  @override
+  String get notificationItemUnavailableTitle =>
+      'An item in your order is unavailable';
+
+  @override
+  String notificationItemUnavailableBody(String orderNumber) {
+    return 'Open order $orderNumber to continue without the item or cancel the order.';
+  }
+
+  @override
+  String get cartCompatTitle => 'This item can\'t be added right now';
+
+  @override
+  String get cartCompatMultiVendorDisabled =>
+      'Ordering from more than one vendor is not available right now. Finish your current order or empty the cart to order from another vendor.';
+
+  @override
+  String get cartCompatBranchPickupDisabled =>
+      'This vendor does not offer pickup.';
+
+  @override
+  String get cartCompatSwitchToDelivery => 'Switch to delivery and add';
+
+  @override
+  String get cartCompatStartNewCart => 'Empty the cart and add this';
+
+  @override
+  String get cartCompatKeepCart => 'Keep my cart';
+
+  @override
+  String get cartCompatOk => 'OK';
+
+  @override
+  String get addressOpenLocationSettings => 'Open location settings';
+
+  @override
+  String get weightInlineLabel => 'Or type the weight in kilograms';
+
+  @override
+  String weightEstimateNote(String price) {
+    return 'Estimated: $price — the final price is set by the actual weight when your order is prepared.';
+  }
 }

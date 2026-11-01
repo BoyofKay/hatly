@@ -195,7 +195,7 @@ describe('E2E — order lifecycle', () => {
       const customer = await s.customer();
       const order = await s.simpleOrder(customer, vendor, product.id, home);
       const segmentId = (await world.ds.query('SELECT id FROM order_vendor_segments WHERE order_id = $1', [order.id]))[0].id;
-      const go = (status: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: vendor.manager.accessToken, body: { status } });
+      const go = (status: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: vendor.manager.accessToken, body: { status, ...(status === 'CANCELLED' ? { reason: 'Out of stock' } : {}) } });
       expect((await go('PREPARING')).status).toBe(400); // skip
       expect((await go('READY_FOR_PICKUP')).status).toBe(400); // skip
       expect((await go('PICKED_UP')).status).toBe(400); // never a vendor action
@@ -209,6 +209,7 @@ describe('E2E — order lifecycle', () => {
 
     it('the vendor cannot hand over a segment that still has an unpriced custom item (UNPRICED_CUSTOM_ITEMS_REMAIN) until it prices it; pricing is once-only', async () => {
       const vendor = await s.vendor({ serviceAreaId: area.id, lat: 30.421, lng: 31.561 });
+      await s.allowCustomRequests(vendor);
       const product = await s.product(vendor, { inventoryMode: 'OPEN', priceMinor: 10000 });
       const customer = await s.customer();
       const base = await s.addToCart(customer, product.id, 1);
@@ -217,7 +218,7 @@ describe('E2E — order lifecycle', () => {
       const view = expectData(await world.api('get', `/vendor/orders/${order.id}`, { token: vendor.manager.accessToken }));
       const segmentId = view.segments[0].id;
       const custom = view.segments[0].items.find((i: any) => i.productId === null);
-      const go = (status: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: vendor.manager.accessToken, body: { status } });
+      const go = (status: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: vendor.manager.accessToken, body: { status, ...(status === 'CANCELLED' ? { reason: 'Out of stock' } : {}) } });
       expectData(await go('CONFIRMED'));
       expectData(await go('PREPARING'));
       const blocked = await go('READY_FOR_PICKUP');
@@ -339,7 +340,7 @@ describe('E2E — order lifecycle', () => {
       const of = (vendor: VendorFixture) => segments.find((r: any) => r.vendor_branch_id === vendor.branchId).id as string;
 
       const before = await orderRow(order.id);
-      expectData(await world.api('patch', `/vendor/orders/segments/${of(v2)}/status`, { token: v2.manager.accessToken, body: { status: 'CANCELLED' } }));
+      expectData(await world.api('patch', `/vendor/orders/segments/${of(v2)}/status`, { token: v2.manager.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } }));
       expect(await stock(t2.id)).toBe(10); // the 2 units of the cancelled vendor are back
       expect(await stock(t1.id)).toBe(9); // the other vendor's units are untouched
 
@@ -376,7 +377,7 @@ describe('E2E — order lifecycle', () => {
       const order = await s.checkout(customer, home);
       const segments = await world.ds.query('SELECT id, vendor_branch_id FROM order_vendor_segments WHERE order_id = $1', [order.id]);
       const of = (vendor: VendorFixture) => segments.find((r: any) => r.vendor_branch_id === vendor.branchId).id as string;
-      expectData(await world.api('patch', `/vendor/orders/segments/${of(v2)}/status`, { token: v2.manager.accessToken, body: { status: 'CANCELLED' } }));
+      expectData(await world.api('patch', `/vendor/orders/segments/${of(v2)}/status`, { token: v2.manager.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } }));
       expectData(await world.api('patch', `/orders/${order.id}/status`, { token: superAdmin.accessToken, body: { status: 'CANCELLED', cancellationReason: 'both' } }));
       expect([await stock(t1.id), await stock(t2.id)]).toEqual([10, 10]);
       // and cancelling the other way round (order first, then a segment) does not restore twice either
@@ -386,7 +387,7 @@ describe('E2E — order lifecycle', () => {
       const o2 = await s.checkout(c2, home);
       const seg2 = await world.ds.query('SELECT id, vendor_branch_id FROM order_vendor_segments WHERE order_id = $1', [o2.id]);
       expectData(await world.api('patch', `/orders/${o2.id}/status`, { token: superAdmin.accessToken, body: { status: 'CANCELLED', cancellationReason: 'first' } }));
-      await world.api('patch', `/vendor/orders/segments/${seg2.find((r: any) => r.vendor_branch_id === v2.branchId).id}/status`, { token: v2.manager.accessToken, body: { status: 'CANCELLED' } });
+      await world.api('patch', `/vendor/orders/segments/${seg2.find((r: any) => r.vendor_branch_id === v2.branchId).id}/status`, { token: v2.manager.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } });
       expect([await stock(t1.id), await stock(t2.id)]).toEqual([10, 10]);
     });
   });

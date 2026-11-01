@@ -5,6 +5,7 @@ import '../../../core/network/providers.dart';
 import '../presentation/driver_location_service.dart';
 import '../presentation/driver_polling_service.dart';
 import '../presentation/proof_of_delivery_sheet.dart';
+import '../../earnings/domain/earnings.dart';
 import '../domain/delivery.dart';
 import 'driver_api.dart';
 
@@ -108,3 +109,6 @@ final driverPollingServiceProvider =
   ref.onDispose(service.dispose);
   return service;
 });
+
+/// The driver's recorded money (open-period preview + closed periods). Re-read when the screen is opened or refreshed.
+final earningsProvider = FutureProvider.autoDispose<DriverEarnings>((ref) => ref.watch(driverApiProvider).getEarnings());

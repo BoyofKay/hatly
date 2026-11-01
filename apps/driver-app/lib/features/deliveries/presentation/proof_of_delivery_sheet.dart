@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../../../core/localization/bilingual.dart';
 
 typedef PickPhotoBytes = Future<({Uint8List bytes, String filename})?> Function();
 
@@ -59,7 +60,7 @@ class _ProofOfDeliverySheetState extends State<ProofOfDeliverySheet> {
       if (!mounted) return;
       setState(() => _uploadedUrl = url);
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not upload the photo. Try again.');
+      if (mounted) setState(() => _error = context.t('Could not upload the photo. Try again.', 'تعذّر رفع الصورة. حاول مرة أخرى.'));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -87,9 +88,9 @@ class _ProofOfDeliverySheetState extends State<ProofOfDeliverySheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Proof of Delivery', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(context.t('Proof of Delivery', 'إثبات التسليم'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          const Text('Take a photo to confirm this delivery.'),
+          Text(context.t('Take a photo to confirm this delivery.', 'التقط صورة لتأكيد هذا التسليم.')),
           const SizedBox(height: 12),
           if (_photoBytes != null)
             ClipRRect(
@@ -115,23 +116,23 @@ class _ProofOfDeliverySheetState extends State<ProofOfDeliverySheet> {
             key: const Key('pod-pick-photo'),
             onPressed: _isUploading ? null : _pickAndUpload,
             icon: const Icon(Icons.camera_alt_outlined),
-            label: Text(_photoBytes == null ? 'Take Photo' : 'Retake Photo'),
+            label: Text(_photoBytes == null ? context.t('Take Photo', 'التقاط صورة') : context.t('Retake Photo', 'إعادة التقاط')),
           ),
           if (_isUploading) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator()),
           if (_uploadedUrl != null)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Row(children: [
-                Icon(Icons.check_circle, color: Colors.green, size: 16),
-                SizedBox(width: 4),
-                Text('Photo uploaded', style: TextStyle(color: Colors.green)),
+                const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                const SizedBox(width: 4),
+                Text(context.t('Photo uploaded', 'تم رفع الصورة'), style: const TextStyle(color: Colors.green)),
               ]),
             ),
           const SizedBox(height: 12),
           TextField(
             key: const Key('pod-recipient-name'),
             controller: _recipientController,
-            decoration: const InputDecoration(labelText: 'Recipient name (optional)', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: context.t('Recipient name (optional)', 'اسم المستلم (اختياري)'), border: const OutlineInputBorder()),
           ),
           if (_error != null)
             Padding(
@@ -145,7 +146,7 @@ class _ProofOfDeliverySheetState extends State<ProofOfDeliverySheet> {
                 child: OutlinedButton(
                   key: const Key('pod-cancel'),
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  child: Text(context.t('Cancel', 'إلغاء')),
                 ),
               ),
               const SizedBox(width: 8),
@@ -153,7 +154,7 @@ class _ProofOfDeliverySheetState extends State<ProofOfDeliverySheet> {
                 child: FilledButton(
                   key: const Key('pod-confirm'),
                   onPressed: _uploadedUrl != null ? _confirm : null,
-                  child: const Text('Confirm Delivered'),
+                  child: Text(context.t('Confirm Delivered', 'تأكيد التسليم')),
                 ),
               ),
             ],

@@ -80,3 +80,20 @@ npx playwright show-trace test-results/<test-name>/trace.zip
   rendering. The Customer half of the Customer→Vendor vertical slice is instead exercised over the
   real HTTP API (see `global-setup.ts`'s `registerFixtureCustomer`/`placeFixtureOrder`) — the exact
   same requests the real Customer app's network layer makes, just not through a rendered UI.
+
+## Dashboard sessions are cookies now
+`global-setup.ts` signs the fixture accounts in through the real `POST /auth/dashboard/login`; the HttpOnly cookies become the Playwright storage
+state (no token is ever written into browser storage). Bearer tokens for the Node-side helpers live in `e2e/.auth/tokens.json` only.
+`auth/dashboard/login` is throttled to 10 requests per minute per client, and `global-setup` already uses three of them: a full run can hit the
+limit when many specs sign in through the form in the same minute — rerun the failing spec files after a minute rather than loosening the limit.
+
+`e2e/admin-mfa.spec.ts` needs one extra dev account (never a production one): an ADMIN with phone `+201099999998` and password
+`Playwright-Dev-1!`, created once in `hatly_dev` (the `bootstrap-admin` script only creates a SUPER_ADMIN when none exists, so insert the row with
+a bcrypt hash of the password). The spec skips itself when the account is missing or already has an authenticator, and removes the authenticator
+it enrols.
+
+## Determinism preconditions (found 2026-10-31)
+
+- **Run against the production build**, not `next dev`: `next build && next start -p 3002` (Playwright reuses a server already listening on the port). `next dev` compiles each route on first visit; under CPU load a first visit (e.g. `/finance/revenue`) took 7.5 s against the 5 s expectation. Production build: `enterprise-admin` 73/73, 1.1–1.3 min.
+- **No stale orders waiting for a driver.** `admin-control-tower` brings fresh test drivers online with automatic dispatch ON; the dispatcher hands ANY waiting `READY_FOR_PICKUP` order to a driver that becomes eligible, so a leftover order from an earlier run or from old manual QA (the dev template had ~225) can land on a test driver and make it busy (`DRIVER_UNAVAILABLE` / `NO_AVAILABLE_DRIVER`). `cancelTestOrder` used to send the vendor cancellation without the mandatory reason and ignore the 400, so every fixture order stayed waiting forever; it now sends the reason and fails loudly. Orders left by OLDER runs must be cleared in the disposable database copy before a run (proven: Control Tower 4/4 after clearing them, 14–15/15 before).
+- Use a **disposable copy** of the dev database (`createdb -T hatly_dev hatly_pw`), backend on Redis db 13, flush Redis between spec files.

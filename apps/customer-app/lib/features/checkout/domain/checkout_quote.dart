@@ -2,6 +2,8 @@
 /// the app displays these amounts and never recomputes a fee, a discount, an ETA or a payment split itself.
 library;
 
+import '../../hatly_service/domain/route_endpoint.dart';
+import '../../addresses/domain/saved_address.dart';
 import '../../addresses/domain/delivery_zone.dart';
 
 /// A reason the order cannot be placed right now (machine-readable [code], server-written [message]).
@@ -163,7 +165,14 @@ class QuoteAddressSnapshot {
   factory QuoteAddressSnapshot.fromJson(Map<String, dynamic> json) =>
       QuoteAddressSnapshot(
         label: json['label'] as String?,
-        line1: json['line1'] as String,
+        // A GPS address has no written text (the server stores ''): show its coordinates instead of a blank line.
+        line1: ((json['line1'] as String?)?.trim().isNotEmpty ?? false)
+            ? json['line1'] as String
+            : (((json['formattedAddress'] as String?)?.trim().isNotEmpty ?? false)
+                ? (json['formattedAddress'] as String).trim()
+                : json['latitude'] is num && json['longitude'] is num
+                ? gpsAddressText((json['latitude'] as num).toDouble(), (json['longitude'] as num).toDouble())
+                : ''),
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
         deliveryZone: json['deliveryZone'] is Map<String, dynamic>
@@ -303,6 +312,8 @@ class QuoteDelivery {
     this.pricingSource,
     this.deliveryZone,
     this.hatlyService,
+    this.route,
+    this.service,
   });
 
   /// `DISTANCE` · `DELIVERY_ZONE` · null (not priced yet).
@@ -311,8 +322,15 @@ class QuoteDelivery {
   /// The zone the fee was priced for (frozen into the order when placed).
   final DeliveryZone? deliveryZone;
 
-  /// Hatly Service only: the fee is [QuoteHatlyServiceFee.zoneDeliveryFeeMinor] × [QuoteHatlyServiceFee.multiplier].
+  /// Hatly / Wasally only: the fee is [QuoteHatlyServiceFee.baseFeeMinor] × [QuoteHatlyServiceFee.multiplier].
   final QuoteHatlyServiceFee? hatlyService;
+
+  /// Hatly / Wasally only (PD-012): the route exactly as the server resolved it — origin → destination, each with its label and whether
+  /// it was the customer's choice or the service default. Null for every other order.
+  final ResolvedRoute? route;
+
+  /// `HATLY` · `WASALLY` · null.
+  final String? service;
 
   bool get pricedByZone => pricingSource == 'DELIVERY_ZONE';
 
@@ -351,16 +369,25 @@ class QuoteDelivery {
         hatlyService: json['hatlyService'] is Map<String, dynamic>
             ? QuoteHatlyServiceFee.fromJson(json['hatlyService'] as Map<String, dynamic>)
             : null,
+        route: ResolvedRoute.tryParse(json['route']),
+        service: json['service'] as String?,
       );
 }
 
-/// The two server-computed parts of a Hatly Service delivery fee (PD-009 amended: the selected area's delivery fee × the
-/// multiplier, pin or not) — shown, never recomputed by the app.
+/// The two server-computed parts of a Hatly / Wasally delivery fee: the ordinary delivery BASE fee (the selected area's fixed fee for a
+/// manual address, or the road-distance fee for a GPS address) and the multiplier applied once to it — shown, never recomputed by the app.
 class QuoteHatlyServiceFee {
-  const QuoteHatlyServiceFee({required this.zoneDeliveryFeeMinor, required this.multiplier});
+  const QuoteHatlyServiceFee({required this.baseFeeMinor, required this.multiplier, this.pricingSource, this.distanceMeters});
 
-  final int zoneDeliveryFeeMinor;
+  /// The base fee BEFORE the multiplier.
+  final int baseFeeMinor;
   final double multiplier;
+
+  /// `DELIVERY_ZONE` (manual address) or `DISTANCE` (GPS); null from a server that predates the GPS method.
+  final String? pricingSource;
+
+  /// The rounded road distance, for a GPS fee.
+  final int? distanceMeters;
 
   /// "1.5" — never "1.50000".
   String get multiplierText {
@@ -369,8 +396,11 @@ class QuoteHatlyServiceFee {
   }
 
   factory QuoteHatlyServiceFee.fromJson(Map<String, dynamic> json) => QuoteHatlyServiceFee(
-        zoneDeliveryFeeMinor: (json['zoneDeliveryFeeMinor'] as num).toInt(),
+        // An older server sends only the zone fee: that was the base fee.
+        baseFeeMinor: ((json['baseFeeMinor'] ?? json['zoneDeliveryFeeMinor']) as num).toInt(),
         multiplier: (json['multiplier'] as num).toDouble(),
+        pricingSource: json['pricingSource'] as String?,
+        distanceMeters: (json['distanceMeters'] as num?)?.toInt(),
       );
 }
 

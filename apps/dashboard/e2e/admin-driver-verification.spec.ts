@@ -38,13 +38,13 @@ test.describe('Admin Driver Verification', () => {
       await route.continue();
     });
 
-    await page.goto('/drivers');
+    await page.goto(`/drivers?search=${encodeURIComponent(driver.fullName)}`);
     const row = page.locator('li', { hasText: driver.fullName });
     await expect(row).toBeVisible();
     await expect(row.getByText('PENDING')).toBeVisible();
 
-    page.once('dialog', (dialog) => dialog.dismiss());
     await row.getByRole('button', { name: 'Approve' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
 
     expect(verifyRequestSent).toBe(false);
     await expect(row.getByText('PENDING')).toBeVisible();
@@ -53,14 +53,14 @@ test.describe('Admin Driver Verification', () => {
   test('accepting the confirmation approves the driver, re-fetched from the server', async ({ page }) => {
     const driver = await createThrowawayDriver();
 
-    await page.goto('/drivers');
+    await page.goto(`/drivers?search=${encodeURIComponent(driver.fullName)}`);
     const row = page.locator('li', { hasText: driver.fullName });
     await expect(row).toBeVisible();
 
-    page.once('dialog', (dialog) => dialog.accept());
+    await row.getByRole('button', { name: 'Approve' }).click();
     await Promise.all([
       page.waitForResponse((res) => res.url().includes(`/admin/drivers/${driver.id}/verification`) && res.ok()),
-      row.getByRole('button', { name: 'Approve' }).click(),
+      page.getByRole('dialog').getByRole('button', { name: 'Approve' }).click(),
     ]);
 
     await expect(row.getByText('APPROVED')).toBeVisible();

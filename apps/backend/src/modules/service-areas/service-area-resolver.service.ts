@@ -13,7 +13,8 @@ const EARTH_RADIUS_METERS = 6371000;
  * run cheaply and frequently (every Discovery browse, every dispatch
  * ranking call).
  */
-function haversineDistanceMeters(
+/** Great-circle (straight-line) distance — geometry only, never a road distance. Also used by dispatch ranking when Maps are disabled. */
+export function haversineDistanceMeters(
   aLat: number,
   aLng: number,
   bLat: number,

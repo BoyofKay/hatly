@@ -43,13 +43,20 @@ import { SectorsModule } from './modules/sectors/sectors.module';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { ServiceAreasModule } from './modules/service-areas/service-areas.module';
 import { DeliveryZonesModule } from './modules/delivery-zones/delivery-zones.module';
+import { HomeBannersModule } from './modules/home-banners/home-banners.module';
+import { HomeProductsModule } from './modules/home-products/home-products.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { AdminMutationAuditInterceptor } from './modules/audit/admin-mutation-audit.interceptor';
+import { CsrfGuard } from './common/guards/csrf.guard';
+import { MfaEnrollmentGuard } from './common/guards/mfa-enrollment.guard';
 import { DiscoveryModule } from './modules/discovery/discovery.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { DriverCashRemainderModule } from './modules/driver-cash-remainder/driver-cash-remainder.module';
 import { AdminCustomersModule } from './modules/admin-customers/admin-customers.module';
+import { AdminPlatformModule } from './modules/admin-platform/admin-platform.module';
 
 import { User } from './modules/users/entities/user.entity';
 import { Vendor } from './modules/vendors/entities/vendor.entity';
@@ -77,6 +84,9 @@ import { DriverSettlementPeriod } from './modules/finance/entities/driver-settle
 import { Driver } from './modules/delivery/entities/driver.entity';
 import { Delivery } from './modules/delivery/entities/delivery.entity';
 import { DispatchAlert } from './modules/delivery/entities/dispatch-alert.entity';
+import { DispatchAttempt } from './modules/delivery/entities/dispatch-attempt.entity';
+import { OrderVendorSegmentEvent } from './modules/orders/entities/order-vendor-segment-event.entity';
+import { RefundPayout } from './modules/payments/entities/refund-payout.entity';
 import { AdminPermission } from './modules/permissions/entities/admin-permission.entity';
 import { BusinessConfig } from './modules/business-config/entities/business-config.entity';
 import { VehicleType } from './modules/business-config/entities/vehicle-type.entity';
@@ -184,6 +194,9 @@ import { ProductRating } from './modules/ratings/entities/product-rating.entity'
           Driver,
           Delivery,
           DispatchAlert,
+          DispatchAttempt,
+          OrderVendorSegmentEvent,
+          RefundPayout,
           AdminPermission,
           BusinessConfig,
           VehicleType,
@@ -228,13 +241,17 @@ import { ProductRating } from './modules/ratings/entities/product-rating.entity'
     AddressesModule,
     ServiceAreasModule,
     DeliveryZonesModule,
+    HomeBannersModule,
+    HomeProductsModule,
     NotificationsModule,
+    AuditModule,
     DiscoveryModule,
     CatalogModule,
     LoyaltyModule,
     WalletModule,
     DriverCashRemainderModule,
     AdminCustomersModule,
+    AdminPlatformModule,
   ],
   providers: [
     // Order matters: JwtAuthGuard runs first (authentication — populates
@@ -247,8 +264,12 @@ import { ProductRating } from './modules/ratings/entities/product-rating.entity'
     // adds zero behavior change for every route that doesn't use it.
     // RolesGuard remains per-controller/unchanged — not every authenticated
     // route needs a role check, and this doesn't replace that mechanism.
+    // Cookie-session CSRF defence first (it only affects requests authenticated by the dashboard's cookies), then identity, throttling,
+    // the admin second-factor enrolment policy (off by default), then permissions.
+    { provide: APP_GUARD, useClass: CsrfGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: HatlyThrottlerGuard },
+    { provide: APP_GUARD, useClass: MfaEnrollmentGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     {
       provide: APP_FILTER,
@@ -257,6 +278,7 @@ import { ProductRating } from './modules/ratings/entities/product-rating.entity'
         new HttpExceptionFilter(requestContext, !config.get<boolean>('http.strict')),
     },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: AdminMutationAuditInterceptor },
   ],
 })
 export class AppModule implements NestModule {

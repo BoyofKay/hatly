@@ -16,6 +16,8 @@ function buildHarness(params: {
   const drivers = new Map((params.drivers ?? []).map((d) => [d.id, d]));
 
   const ordersRepository = {
+    // Raw reads for the segment history / refund summary (no rows in these tests).
+    query: jest.fn(async () => []),
     findAndCount: jest.fn(async (opts: any) => {
       let filtered = orders.filter((o) => o.customerId === opts.where.customerId);
       if (opts.where.status) {

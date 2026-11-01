@@ -43,6 +43,7 @@ export async function createIntegrationApp(options: IntegrationAppOptions = {}):
   const app = moduleRef.createNestApplication<NestExpressApplication>();
   configureApp(app);
   await app.init();
-  if (options.listen) await app.listen(0);
+  // 127.0.0.1, the address tests call — a wildcard bind can share a port another process holds on 127.0.0.1 (macOS), and calls would reach it.
+  if (options.listen) await app.listen(0, '127.0.0.1');
   return app;
 }

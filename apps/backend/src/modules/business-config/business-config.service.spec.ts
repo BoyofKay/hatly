@@ -160,3 +160,100 @@ describe('BusinessConfigService — Hatly Service delivery fee multiplier (PD-00
     await expect(service.set('HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER', 2, 'admin-1')).resolves.toMatchObject({ value: 2 });
   });
 });
+
+describe('BusinessConfigService — customer OTP switch (temporary admin control)', () => {
+  const svc = (rows: Array<{ id: string; key: string; value: unknown }> = []) => new BusinessConfigService(buildMockRepo(rows) as any);
+
+  it('defaults to ON when never set', async () => {
+    expect(await svc().isCustomerOtpEnabled()).toBe(true);
+  });
+
+  it('only an explicit boolean false turns it off; malformed legacy values stay ON (fail safe)', async () => {
+    expect(await svc([{ id: 'c', key: 'CUSTOMER_OTP_ENABLED', value: false }]).isCustomerOtpEnabled()).toBe(false);
+    expect(await svc([{ id: 'c', key: 'CUSTOMER_OTP_ENABLED', value: true }]).isCustomerOtpEnabled()).toBe(true);
+    for (const value of [0, '', 'false', null]) {
+      expect(await svc([{ id: 'c', key: 'CUSTOMER_OTP_ENABLED', value }]).isCustomerOtpEnabled()).toBe(true);
+    }
+  });
+
+  it('accepts only true/false on write (persisted), refuses anything else with INVALID_BUSINESS_CONFIG_VALUE and stores nothing', async () => {
+    const s = svc();
+    await s.set('CUSTOMER_OTP_ENABLED', false, 'admin-1');
+    expect(await s.isCustomerOtpEnabled()).toBe(false);
+    await s.set('CUSTOMER_OTP_ENABLED', true, 'admin-1'); // re-enabling works
+    expect(await s.isCustomerOtpEnabled()).toBe(true);
+    for (const value of [0, 1, '', 'false', null, {}]) {
+      await expect(s.set('CUSTOMER_OTP_ENABLED', value, 'admin-1')).rejects.toMatchObject({ response: { details: { code: 'INVALID_BUSINESS_CONFIG_VALUE', key: 'CUSTOMER_OTP_ENABLED' } } });
+    }
+    expect(await s.isCustomerOtpEnabled()).toBe(true);
+  });
+});
+
+describe('BusinessConfigService — Hatly / Wasally default route locations (PD-012)', () => {
+  const PICKUP = BusinessConfigKey.HATLY_SERVICE_DEFAULT_PICKUP_LOCATION;
+  const HATLY_END = BusinessConfigKey.HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION;
+  const WASALLY_END = BusinessConfigKey.WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION;
+  const good = { latitude: 30.42, longitude: 31.56, label: 'Demo point' };
+  const code = (e: any) => e?.response?.details?.code;
+
+  it.each([PICKUP, HATLY_END, WASALLY_END])('%s accepts { latitude, longitude, label } inside Egypt', async (key) => {
+    const service = new BusinessConfigService(buildMockRepo() as any);
+    await expect(service.set(key, good, 'admin-1')).resolves.toMatchObject({ value: good });
+  });
+
+  it.each([
+    ['missing label', { latitude: 30.4, longitude: 31.5 }],
+    ['blank label', { latitude: 30.4, longitude: 31.5, label: '   ' }],
+    ['over-long label', { latitude: 30.4, longitude: 31.5, label: 'x'.repeat(121) }],
+    ['string coordinates', { latitude: '30.4', longitude: '31.5', label: 'A' }],
+    ['a point outside Egypt', { latitude: 48.8, longitude: 2.3, label: 'Paris' }],
+    ['NaN', { latitude: Number.NaN, longitude: 31.5, label: 'A' }],
+    ['a bare string', 'Belbeis'],
+    ['a number', 7],
+    ['null (clearing is DELETE, not a null value)', null],
+  ])('refuses %s (INVALID_BUSINESS_CONFIG_VALUE) instead of storing it', async (_name, value) => {
+    const repo = buildMockRepo();
+    const service = new BusinessConfigService(repo as any);
+    for (const key of [PICKUP, HATLY_END, WASALLY_END]) {
+      const error = await service.set(key, value, 'admin-1').catch((e) => e);
+      expect(code(error)).toBe('INVALID_BUSINESS_CONFIG_VALUE');
+    }
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  it('getServiceRouteDefaults returns each configured default (label trimmed) and null for anything unset', async () => {
+    const repo = buildMockRepo([
+      { id: 'a', key: PICKUP, value: { ...good, label: '  Hatly start  ' } },
+      { id: 'b', key: WASALLY_END, value: { latitude: 30.5, longitude: 31.6, label: 'Wasally end' } },
+    ]);
+    const defaults = await new BusinessConfigService(repo as any).getServiceRouteDefaults();
+    expect(defaults).toEqual({
+      hatly: { origin: { latitude: 30.42, longitude: 31.56, label: 'Hatly start' }, destination: null },
+      wasally: { destination: { latitude: 30.5, longitude: 31.6, label: 'Wasally end' } },
+    });
+  });
+
+  it('a stored value that is no longer valid is treated as NOT configured — never used to route a courier', async () => {
+    const repo = buildMockRepo([{ id: 'a', key: HATLY_END, value: { latitude: 0, longitude: 0, label: 'Null Island' } }]);
+    await expect(new BusinessConfigService(repo as any).getServiceLocation(HATLY_END)).resolves.toBeNull();
+  });
+
+  it('the three keys are separate: Hatly and Wasally never share a default', async () => {
+    const repo = buildMockRepo([{ id: 'a', key: HATLY_END, value: good }]);
+    const defaults = await new BusinessConfigService(repo as any).getServiceRouteDefaults();
+    expect(defaults.hatly.destination).not.toBeNull();
+    expect(defaults.wasally.destination).toBeNull();
+  });
+
+  it('unset clears ONLY a route default (idempotent); every other setting is refused', async () => {
+    const repo: any = { ...buildMockRepo(), delete: jest.fn(async () => ({ affected: 1 })) };
+    const service = new BusinessConfigService(repo);
+    await expect(service.unset(PICKUP)).resolves.toEqual({ key: PICKUP, cleared: true });
+    repo.delete.mockResolvedValueOnce({ affected: 0 });
+    await expect(service.unset(WASALLY_END)).resolves.toEqual({ key: WASALLY_END, cleared: false });
+    for (const key of ['HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER', 'REGISTERED_VENDOR_PRICE_PER_100M_MINOR', 'SOMETHING_ELSE']) {
+      expect(code(await service.unset(key).catch((e) => e))).toBe('BUSINESS_CONFIG_NOT_CLEARABLE');
+    }
+    expect(repo.delete).toHaveBeenCalledTimes(2);
+  });
+});

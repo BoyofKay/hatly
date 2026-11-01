@@ -93,7 +93,7 @@ export function DispatchAction({
             setDriverId(e.target.value);
             setError(null);
           }}
-          className="min-w-0 flex-1 rounded border px-2 py-1 text-sm"
+          className="min-w-0 flex-1 rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
         >
           <option value="">{choices.length === 0 ? t('dxNoDrivers') : t('dxSelectDriver')}</option>
           {choices.map((d) => (
@@ -106,7 +106,7 @@ export function DispatchAction({
           data-testid="dispatch-submit"
           onClick={submit}
           disabled={pending}
-          className="whitespace-nowrap rounded bg-hatly-orange px-3 py-1 text-sm font-medium text-white disabled:opacity-50"
+          className="whitespace-nowrap rounded-lg bg-hatly-orange px-3 py-1 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
         >
           {pending ? t('dxWorking') : isReassign ? t('dxReassign') : t('dxAssign')}
         </button>

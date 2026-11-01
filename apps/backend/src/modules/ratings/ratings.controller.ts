@@ -10,6 +10,7 @@ import { ProductRatingService } from './product-rating.service';
 import { CreateVendorRatingDto } from './dto/create-vendor-rating.dto';
 import { CreateDriverRatingDto } from './dto/create-driver-rating.dto';
 import { CreateProductRatingDto } from './dto/create-product-rating.dto';
+import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
 
 /**
  * CONFIRMED business decision: no update/delete endpoint exists here,
@@ -28,6 +29,7 @@ export class RatingsController {
     private readonly productRatingService: ProductRatingService,
   ) {}
 
+  @Throttled(RateLimitPolicies.ratingSubmit)
   @Post('vendor')
   async rateVendor(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateVendorRatingDto) {
     const rating = await this.vendorRatingService.create({
@@ -39,6 +41,7 @@ export class RatingsController {
     return { data: rating };
   }
 
+  @Throttled(RateLimitPolicies.ratingSubmit)
   @Post('driver')
   async rateDriver(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateDriverRatingDto) {
     const rating = await this.driverRatingService.create({
@@ -50,6 +53,7 @@ export class RatingsController {
     return { data: rating };
   }
 
+  @Throttled(RateLimitPolicies.ratingSubmit)
   @Post('product')
   async rateProduct(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateProductRatingDto) {
     const rating = await this.productRatingService.create({

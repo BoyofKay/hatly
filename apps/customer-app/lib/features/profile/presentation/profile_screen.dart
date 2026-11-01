@@ -2,22 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/localization/l10n/app_localizations.dart';
-import '../../../core/network/api_exception.dart';
 import '../../../core/theme/hatly_theme.dart';
 import '../../../core/utils/money_formatter.dart';
 import '../../../shared_widgets/hatly_button.dart';
 import '../../../shared_widgets/hatly_surface.dart';
-import '../../../shared_widgets/hatly_text_field.dart';
 import '../../addresses/data/addresses_providers.dart';
 import '../../addresses/domain/saved_address.dart';
-import '../../auth/data/auth_providers.dart';
-import '../../auth/presentation/auth_error_messages.dart';
+import '../../auth/presentation/display_name_provider.dart';
 import '../../auth/presentation/session_controller.dart';
 import '../../support/presentation/support_contact_action.dart';
 import '../../wallet/data/wallet_providers.dart';
 import '../../wallet/domain/wallet_transaction.dart';
 import '../../loyalty/data/loyalty_providers.dart';
 import '../../loyalty/domain/loyalty_transaction.dart';
+import 'widgets/delete_account_section.dart';
+import 'widgets/password_change_section.dart';
 import 'widgets/theme_mode_selector.dart';
 
 /// The customer's approved, minimal Profile: a header, the real
@@ -36,21 +35,9 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isLoggingOut = false;
 
-  final _passwordController = TextEditingController();
-  bool _isSavingPassword = false;
-  String? _passwordErrorCode;
-  bool _passwordSaved = false;
-
-  @override
-  void dispose() {
-    _passwordController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final p = context.palette;
     final addressesAsync = ref.watch(savedAddressesProvider);
     final balanceAsync = ref.watch(walletBalanceProvider);
     final loyaltyBalanceAsync = ref.watch(loyaltyBalanceProvider);
@@ -62,6 +49,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _ProfileHeader(name: ref.watch(displayNameProvider).valueOrNull),
+            const SizedBox(height: HatlySpacing.md),
             _DefaultAddressCard(addressesAsync: addressesAsync),
             const SizedBox(height: HatlySpacing.md),
             _WalletCard(balanceAsync: balanceAsync),
@@ -80,79 +69,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               messageBuilder: (l10n) => l10n.supportMessageGeneral,
             ),
             const SizedBox(height: HatlySpacing.xl),
-            Text(l10n.passwordSetupSectionTitle,
-                style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: HatlySpacing.xs),
-            Text(l10n.passwordSetupSectionSubtitle,
-                style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: HatlySpacing.ms),
-            HatlyTextField(
-              controller: _passwordController,
-              obscureText: true,
-              hintText: l10n.passwordHint,
-            ),
-            const SizedBox(height: HatlySpacing.sm),
-            if (_passwordErrorCode != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: HatlySpacing.sm),
-                child: Text(
-                  localizedErrorMessage(context, _passwordErrorCode),
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelLarge
-                      ?.copyWith(color: p.urgent),
-                ),
-              ),
-            if (_passwordSaved)
-              Padding(
-                padding: const EdgeInsets.only(bottom: HatlySpacing.sm),
-                child: Text(
-                  l10n.passwordSetupSuccess,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelLarge
-                      ?.copyWith(color: p.success),
-                ),
-              ),
-            HatlyButton(
-              label: l10n.passwordSetupSaveButton,
-              isLoading: _isSavingPassword,
-              onPressed: _savePassword,
-            ),
+            const PasswordChangeSection(),
             const SizedBox(height: HatlySpacing.xl),
             HatlyButton(
               label: l10n.logout,
               isLoading: _isLoggingOut,
               onPressed: _logout,
             ),
+            const SizedBox(height: HatlySpacing.md),
+            const DeleteAccountSection(),
           ],
         ),
       ),
     );
-  }
-
-  Future<void> _savePassword() async {
-    if (_isSavingPassword) return;
-    setState(() {
-      _isSavingPassword = true;
-      _passwordErrorCode = null;
-      _passwordSaved = false;
-    });
-    try {
-      await ref
-          .read(authRepositoryProvider)
-          .setPassword(password: _passwordController.text);
-      setState(() {
-        _isSavingPassword = false;
-        _passwordSaved = true;
-      });
-      _passwordController.clear();
-    } on ApiException catch (e) {
-      setState(() {
-        _isSavingPassword = false;
-        _passwordErrorCode = e.businessCode ?? e.code;
-      });
-    }
   }
 
   Future<void> _logout() async {
@@ -164,6 +93,56 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     // navigate itself.
     await ref.read(sessionControllerProvider.notifier).logout();
     if (mounted) setState(() => _isLoggingOut = false);
+  }
+}
+
+/// The top of the account: an orange avatar with the customer's initial and, when it is known on this device, their name.
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.name});
+
+  final String? name;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final p = context.palette;
+    final trimmed = name?.trim() ?? '';
+    final initial =
+        trimmed.isEmpty ? null : trimmed.characters.first.toUpperCase();
+    return Container(
+      key: const Key('profile-header'),
+      padding: const EdgeInsets.all(HatlySpacing.md),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(HatlyRadius.card),
+        gradient: LinearGradient(
+          begin: AlignmentDirectional.topStart,
+          end: AlignmentDirectional.bottomEnd,
+          colors: [p.accentSoft, p.accentSoft.withValues(alpha: 0.4)],
+        ),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 28,
+            backgroundColor: p.accent,
+            foregroundColor: p.accentOn,
+            child: initial == null
+                ? const Icon(Icons.person_rounded, size: 30)
+                : Text(initial,
+                    style: context.type.h2.copyWith(color: p.accentOn)),
+          ),
+          const SizedBox(width: HatlySpacing.ms),
+          Expanded(
+            child: Text(
+              trimmed.isEmpty ? l10n.profile : trimmed,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.type.h2,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -196,7 +175,11 @@ class _DefaultAddressCard extends StatelessWidget {
       onTap: () => context.push('/profile/addresses'),
       child: Row(
         children: [
-          Icon(Icons.location_on_outlined, color: p.textMuted),
+          CircleAvatar(
+            backgroundColor: p.accentSoft,
+            foregroundColor: p.accent,
+            child: const Icon(Icons.location_on_outlined),
+          ),
           const SizedBox(width: HatlySpacing.ms),
           Expanded(
             child: Column(

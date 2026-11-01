@@ -134,6 +134,29 @@ export class FinancialEventService {
     });
   }
 
+  /**
+   * PD-015 - the Hatly-funded promotional cost of an order, NET of what was restored by rejections/cancellations:
+   * recorded (the original, immutable event) - restored (the compensating events). Both are INFORMATIONAL facts; this is the only
+   * place a report should read the cost from, so a restored discount is never counted as still funded and never subtracted twice.
+   */
+  async hatlyFundedDiscountSummary(orderId: string, manager?: EntityManager): Promise<{ recordedMinor: number; restoredMinor: number; netMinor: number }> {
+    const repo = manager ? manager.getRepository(FinancialEvent) : this.financialEventsRepository;
+    const rows: Array<{ type: string; total: string | null }> = await repo
+      .createQueryBuilder('e')
+      .select('e.type', 'type')
+      .addSelect('COALESCE(SUM(e.amount_minor), 0)', 'total')
+      .where('e.order_id = :orderId', { orderId })
+      .andWhere('e.type IN (:...types)', {
+        types: [FinancialEventType.HATLY_FUNDED_OFFER_DISCOUNT_RECORDED, FinancialEventType.HATLY_FUNDED_OFFER_DISCOUNT_RESTORED],
+      })
+      .groupBy('e.type')
+      .getRawMany();
+    const sum = (type: FinancialEventType) => Number(rows.find((r) => r.type === type)?.total ?? 0);
+    const recordedMinor = sum(FinancialEventType.HATLY_FUNDED_OFFER_DISCOUNT_RECORDED);
+    const restoredMinor = sum(FinancialEventType.HATLY_FUNDED_OFFER_DISCOUNT_RESTORED);
+    return { recordedMinor, restoredMinor, netMinor: recordedMinor - restoredMinor };
+  }
+
   async findByOrderId(orderId: string): Promise<FinancialEvent[]> {
     return this.financialEventsRepository.find({ where: { orderId }, order: { createdAt: 'ASC' } });
   }

@@ -1,8 +1,8 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../../shared_widgets/hatly_soft_image.dart';
+import '../../../../shared_widgets/looping_pager.dart';
 import '../../domain/home_content.dart';
 import 'promo_cta_button.dart';
 
@@ -13,66 +13,43 @@ import 'promo_cta_button.dart';
 /// Auto-rotation pauses while the user is dragging, stops when the OS asks for
 /// reduced motion (`MediaQuery.disableAnimations`) and never runs for a single
 /// promo. It is presentation-only: [onAction] decides what a CTA does.
+/// The hero banner's proportions: each card is about 1.6 : 1 (it used to be ~2 : 1, a thin strip), within a sane range so a
+/// tablet does not get a giant banner and a small phone still gets a full-size one.
+const double kPromoBannerAspect = 1.5;
+const double kPromoViewportFraction = 0.92;
+const double kPromoBannerMinHeight = 210;
+const double kPromoBannerMaxHeight = 320;
+
+double promoBannerHeight(double availableWidth) {
+  final cardWidth =
+      availableWidth * kPromoViewportFraction - 2 * HatlySpacing.xs;
+  return (cardWidth / kPromoBannerAspect)
+      .clamp(kPromoBannerMinHeight, kPromoBannerMaxHeight);
+}
+
 class PromoCarousel extends StatefulWidget {
   const PromoCarousel({
     super.key,
     required this.promos,
     required this.onAction,
     this.autoRotateInterval = const Duration(seconds: 5),
-    this.height = 176,
+    this.height,
   });
 
   final List<HomePromo> promos;
   final ValueChanged<HomePromo> onAction;
   final Duration autoRotateInterval;
-  final double height;
+
+  /// A fixed height (tests / special layouts). Null = the banner's own proportions, from the screen width
+  /// ([promoBannerHeight]).
+  final double? height;
 
   @override
   State<PromoCarousel> createState() => _PromoCarouselState();
 }
 
 class _PromoCarouselState extends State<PromoCarousel> {
-  late final PageController _controller =
-      PageController(viewportFraction: 0.92);
-  Timer? _timer;
   int _page = 0;
-  bool _reduceMotion = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _reduceMotion = MediaQuery.of(context).disableAnimations;
-    _restartTimer();
-  }
-
-  @override
-  void didUpdateWidget(PromoCarousel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.promos.length != widget.promos.length) {
-      if (_page >= widget.promos.length) _page = 0;
-      _restartTimer();
-    }
-  }
-
-  void _restartTimer() {
-    _timer?.cancel();
-    _timer = null;
-    if (_reduceMotion || widget.promos.length < 2) return;
-    _timer = Timer.periodic(widget.autoRotateInterval, (_) {
-      if (!mounted || !_controller.hasClients) return;
-      final next = (_page + 1) % widget.promos.length;
-      _controller.animateToPage(next,
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOutCubic);
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,22 +66,17 @@ class _PromoCarouselState extends State<PromoCarousel> {
       label: l10n.homePromoCarouselLabel,
       child: Column(
         children: [
-          SizedBox(
-            height: widget.height * textScale,
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (n) {
-                // User is interacting → stop auto-rotation until they let go.
-                if (n is ScrollStartNotification && n.dragDetails != null) {
-                  _timer?.cancel();
-                } else if (n is ScrollEndNotification) {
-                  _restartTimer();
-                }
-                return false;
-              },
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: promos.length,
-                onPageChanged: (i) => setState(() => _page = i),
+          LayoutBuilder(
+            builder: (context, constraints) => SizedBox(
+              height:
+                  (widget.height ?? promoBannerHeight(constraints.maxWidth)) *
+                      textScale,
+              // Endless in both directions; auto-play always glides forward (see LoopingPager).
+              child: LoopingPager(
+                count: promos.length,
+                viewportFraction: kPromoViewportFraction,
+                autoPlayInterval: widget.autoRotateInterval,
+                onIndexChanged: (i) => setState(() => _page = i),
                 itemBuilder: (context, index) => Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: HatlySpacing.xs),
@@ -148,7 +120,7 @@ class _PromoCard extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            flex: 6,
+            flex: 5,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -171,7 +143,7 @@ class _PromoCard extends StatelessWidget {
           ),
           const SizedBox(width: HatlySpacing.md),
           Expanded(
-            flex: 4,
+            flex: 5,
             child: HatlySoftImage(
               url: promo.imageUrl,
               width: double.infinity,

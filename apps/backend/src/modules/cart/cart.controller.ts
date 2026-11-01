@@ -1,16 +1,20 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { CartService } from './cart.service';
+import { CartCompatibilityService } from './cart-compatibility.service';
+import { CheckAddItemDto } from './dto/check-add-item.dto';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
+import { UpdateAdHocRouteDto } from './dto/update-adhoc-route.dto';
 import { AddAdHocCartItemDto } from './dto/add-adhoc-cart-item.dto';
 import { AddVendorCustomItemDto } from './dto/add-vendor-custom-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { SetFulfillmentTypeDto } from './dto/set-fulfillment-type.dto';
 import { QuoteDeliveryFeeDto } from './dto/quote-delivery-fee.dto';
+import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
 
 /**
  * Every endpoint here acts on "the current customer's cart" — there is
@@ -24,12 +28,19 @@ import { QuoteDeliveryFeeDto } from './dto/quote-delivery-fee.dto';
 @UseGuards(RolesGuard)
 @Roles(Role.CUSTOMER)
 export class CartController {
-  constructor(private readonly cartService: CartService) {}
+  constructor(private readonly cartService: CartService, private readonly compatibility: CartCompatibilityService) {}
 
   @Get()
   async getCart(@CurrentUser() user: AuthenticatedUser) {
     const cart = await this.cartService.getCartView(user.id);
     return { data: cart };
+  }
+
+  /** Would this product fit in the current cart? Read-only; the answer carries the server's own reason and the way out (see CartCompatibilityService). */
+  @Post('items/check')
+  @HttpCode(200)
+  async checkAddItem(@CurrentUser() user: AuthenticatedUser, @Body() dto: CheckAddItemDto) {
+    return { data: await this.compatibility.checkAdd(user.id, dto.productId) };
   }
 
   @Post('items')
@@ -38,9 +49,17 @@ export class CartController {
     return { data: cart };
   }
 
+  @Throttled(RateLimitPolicies.customRequest)
   @Post('adhoc-items')
   async addAdHocItem(@CurrentUser() user: AuthenticatedUser, @Body() dto: AddAdHocCartItemDto) {
     const cart = await this.cartService.addAdHocItem(user.id, dto);
+    return { data: cart };
+  }
+
+  /** PD-012: change the Hatly / Wasally route origin and/or destination (each independently; `null` = back to the configured default). */
+  @Patch('adhoc-route')
+  async updateAdHocRoute(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateAdHocRouteDto) {
+    const cart = await this.cartService.updateAdHocRoute(user.id, dto);
     return { data: cart };
   }
 
@@ -52,6 +71,7 @@ export class CartController {
    * (this one requires an existing CATALOG group; that one can start
    * a new AD_HOC_SERVICE group).
    */
+  @Throttled(RateLimitPolicies.customRequest)
   @Post('vendor-custom-items')
   async addVendorCustomItem(@CurrentUser() user: AuthenticatedUser, @Body() dto: AddVendorCustomItemDto) {
     const cart = await this.cartService.addVendorCustomItem(user.id, dto);
@@ -64,6 +84,7 @@ export class CartController {
     return { data: cart };
   }
 
+  @Throttled(RateLimitPolicies.deliveryFeeQuote)
   @Post('delivery-fee-quote')
   async quoteDeliveryFee(@CurrentUser() user: AuthenticatedUser, @Body() dto: QuoteDeliveryFeeDto) {
     const quote = await this.cartService.quoteDeliveryFee(user.id, {

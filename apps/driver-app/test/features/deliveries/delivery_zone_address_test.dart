@@ -131,6 +131,16 @@ void main() {
           ],
         };
 
+    test('a withheld customer phone (absent, null or blank) parses as null — never a crash (installed apps must survive server-side redaction)', () {
+      for (final phone in <Object?>[null, '', '   ']) {
+        final json = payload()..['customerPhone'] = phone;
+        expect(Delivery.fromJson(json).customerPhone, isNull);
+      }
+      final absent = payload()..remove('customerPhone');
+      expect(Delivery.fromJson(absent).customerPhone, isNull);
+      expect(Delivery.fromJson(payload()).customerPhone, '+201000000099');
+    });
+
     test('parses without a crash: null total is kept as "unknown", never 0; the address has no pin', () {
       final d = Delivery.fromJson(payload());
       expect(d.totalMinor, isNull);
@@ -147,5 +157,29 @@ void main() {
       expect(find.text('بلبيس — أبو نصيب'), findsOneWidget);
       expect(find.byKey(const Key('delivery-no-pin')), findsOneWidget);
     });
+  });
+
+  testWidgets('without a customer phone the detail screen shows the customer but no number and no call button', (tester) async {
+    final d = Delivery(
+      id: 'delivery-1',
+      orderId: 'order-1',
+      orderStatus: 'DELIVERED',
+      fulfillmentType: 'DELIVERY',
+      paymentMethod: 'COD',
+      totalMinor: 10000,
+      customerName: 'Jane Customer',
+      deliveryAddress: DeliveryAddress.fromJson({'line1': '12 Market St', 'latitude': 30.1, 'longitude': 31}),
+      segments: const [],
+    );
+    await _pump(tester, d);
+    expect(find.text('Jane Customer'), findsOneWidget);
+    expect(find.byKey(const Key('call-customer')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('with a phone the call button is there as before', (tester) async {
+    await _pump(tester, _delivery(DeliveryAddress.fromJson({'line1': '12 Market St', 'latitude': 30.1, 'longitude': 31})));
+    expect(find.byKey(const Key('call-customer')), findsOneWidget);
+    expect(find.text('+201000000099'), findsOneWidget);
   });
 }

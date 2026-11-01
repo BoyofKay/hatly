@@ -10,7 +10,7 @@
  * request succeeds once the fault is gone, and (d) the client sees a generic 5xx with no internals.
  */
 import { bootWorld, World } from './support/world';
-import { Scenario, Actor, DriverFixture, VendorFixture, expectData, withQuoteToken } from './support/actors';
+import { Scenario, Actor, DriverFixture, VendorFixture, expectData, withQuoteToken, DEFAULT_PASSWORD } from './support/actors';
 import { boundary } from './support/external-boundary';
 import { Permission } from '../../src/modules/permissions/permission.enum';
 
@@ -321,10 +321,16 @@ describe('E2E — transaction failure, retry and provider isolation', () => {
     });
 
     it('SMS outage fails OTP closed; Maps outage fails pricing closed; each recovers when the provider does — with no cross-effect', async () => {
-      const phone = '+201055500001';
+      const smsCustomer = await s.unverifiedCustomer('Provider Down');
+      const smsPhone = smsCustomer.phone;
       boundary.smsOutage = true;
-      expect((await world.api('post', '/auth/register', { body: { phone, fullName: 'Provider Down' } })).status).toBe(400);
-      expect(await q('SELECT 1 FROM users WHERE phone = $1', [phone])).toHaveLength(1); // account row exists; no usable code does
+      // A phone-verification code that cannot be delivered fails closed with a controlled, specific error — no usable code remains:
+      const down = await world.api('post', '/auth/customer/verify-phone/request', { token: smsCustomer.accessToken });
+      expect(down.status).toBe(400);
+      expect(down.body.error.details).toMatchObject({ code: 'SMS_PROVIDER_UNAVAILABLE' });
+      expect(await world.redis.get(`otp:${smsPhone}`)).toBeNull();
+      // ...and the outage never touches password sign-in, which is how customers log in:
+      expect((await world.api('post', '/auth/customer/password/login', { body: { phone: smsPhone, password: DEFAULT_PASSWORD } })).status).toBe(200);
       boundary.smsOutage = false;
       boundary.mapsOutage = true;
       const product = await s.product(vendor, { inventoryMode: 'OPEN' });
@@ -333,9 +339,10 @@ describe('E2E — transaction failure, retry and provider isolation', () => {
       expect((await world.api('post', '/orders', { token: c.accessToken, body: { deliveryAddress: { line1: 'x', latitude: 30.4444, longitude: 31.5444 }, paymentMethod: 'COD' } })).status).toBe(400);
       boundary.mapsOutage = false;
       expect((await world.api('post', '/orders', { token: c.accessToken, body: await withQuoteToken(world, c.accessToken, { deliveryAddress: { line1: 'x', latitude: 30.4555, longitude: 31.5555 }, paymentMethod: 'COD' }) })).status).toBe(201);
-      await world.redis.del(`otp-cooldown:${phone}`);
-      expect((await world.api('post', '/auth/login', { body: { phone } })).status).toBe(200);
-      expect(boundary.sms.some((m) => m.to === phone.slice(1))).toBe(true);
+      // SMS recovers: the same customer can now receive a code (the failed attempt left no cooldown behind)
+      await world.redis.del(`otp-cooldown:${smsPhone}`);
+      expect((await world.api('post', '/auth/customer/verify-phone/request', { token: smsCustomer.accessToken })).status).toBe(200);
+      expect(boundary.sms.some((m) => m.to === smsPhone.slice(1))).toBe(true);
     });
 
     it('Maps distances are cached in Redis: an identical route costs ONE provider call, and a cached route keeps working through a Maps outage', async () => {

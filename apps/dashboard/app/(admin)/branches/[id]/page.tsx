@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   VendorBranch,
@@ -33,8 +34,12 @@ import {
   validateAdminImport,
 } from '../../../../lib/api/admin-catalog';
 import { MarketplaceSector, listSectors } from '../../../../lib/api/sectors';
+import { ProductOptionsEditor } from '../../../../components/products/ProductOptionsEditor';
 import { ServiceArea, listServiceAreas } from '../../../../lib/api/admin-service-areas';
 import { apiErrorMessage } from '../../../../lib/api/errors';
+import { BranchAcceptanceMode } from '../../../../components/operations/BranchAcceptanceMode';
+import { BranchClosures } from '../../../../components/vendor/BranchClosures';
+import { BranchHoursEditor } from '../../../../components/vendor/BranchHoursEditor';
 
 /**
  * Real Branch detail/edit/activate + Sector assignment (reuses the
@@ -68,6 +73,7 @@ export default function BranchDetailPage() {
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [categoryName, setCategoryName] = useState('');
 
+  const [optionsOpenId, setOptionsOpenId] = useState<string | null>(null);
   const [showProductForm, setShowProductForm] = useState(false);
   const [productName, setProductName] = useState('');
   const [productCategoryId, setProductCategoryId] = useState('');
@@ -355,7 +361,7 @@ export default function BranchDetailPage() {
 
   if (error) {
     return (
-      <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
         {error}{' '}
         <button onClick={refresh} className="underline">
           Retry
@@ -368,10 +374,18 @@ export default function BranchDetailPage() {
   const categoryName_ = (categoryId: string) => categories.find((c) => c.id === categoryId)?.name ?? '—';
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="rounded border bg-white p-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold">{branch.name}</h1>
+    <div className="max-w-6xl space-y-6">
+      <div>
+        <Link href={`/vendors/${branch.vendorId}`} className="inline-flex min-h-[36px] items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900"><span aria-hidden className="rtl:rotate-180">←</span> Vendor</Link>
+        <nav aria-label="Branch sections" className="sticky top-0 z-10 -mx-1 mt-1 flex gap-2 overflow-x-auto bg-gray-50/95 px-1 py-2 backdrop-blur" data-testid="branch-nav">
+          {[['sec-hours', 'Hours'], ['sec-closures', 'Closures'], ['sec-sector', 'Sector'], ['sec-area', 'Service area'], ['sec-categories', 'Categories'], ['sec-products', 'Products']].map(([id, label]) => (
+            <a key={id} href={`#${id}`} className="inline-flex min-h-[40px] shrink-0 items-center rounded-full border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{label}</a>
+          ))}
+        </nav>
+      </div>
+      <div className="rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{branch.name}</h1>
           <div className="flex items-center gap-2">
             <span
               className={`rounded px-2 py-0.5 text-xs font-medium ${
@@ -383,7 +397,7 @@ export default function BranchDetailPage() {
             <button
               onClick={handleToggleOpen}
               disabled={isTogglingOpen}
-              className={`rounded px-3 py-1 text-sm font-medium disabled:opacity-50 ${
+              className={`min-h-[40px] rounded-lg px-4 py-1 text-sm font-medium disabled:opacity-50 ${
                 branch.isOpen ? 'bg-gray-200 text-gray-700' : 'bg-green-600 text-white'
               }`}
             >
@@ -391,7 +405,7 @@ export default function BranchDetailPage() {
             </button>
             <button
               onClick={handleToggleActive}
-              className={`rounded px-3 py-1 text-sm font-medium ${
+              className={`min-h-[40px] rounded-lg px-4 py-1 text-sm font-medium ${
                 branch.isActive ? 'bg-gray-200 text-gray-700' : 'bg-green-600 text-white'
               }`}
             >
@@ -403,15 +417,15 @@ export default function BranchDetailPage() {
         <form onSubmit={handleSaveBranch} className="mt-4 space-y-3">
           <div>
             <label className="block text-sm font-medium">Name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
+            <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           </div>
           <div>
             <label className="block text-sm font-medium">Address</label>
-            <input value={address} onChange={(e) => setAddress(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
+            <input value={address} onChange={(e) => setAddress(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           </div>
           <div>
             <label className="block text-sm font-medium">Commission rate (basis points)</label>
-            <input value={commission} onChange={(e) => setCommission(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
+            <input value={commission} onChange={(e) => setCommission(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           </div>
           <div className="flex gap-4 text-sm">
             <label className="flex items-center gap-2">
@@ -427,15 +441,19 @@ export default function BranchDetailPage() {
           <button
             type="submit"
             disabled={isSaving}
-            className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
           >
             {isSaving ? 'Saving...' : 'Save'}
           </button>
         </form>
       </div>
 
-      <div className="rounded border bg-white p-4">
-        <h2 className="font-semibold">Marketplace Sector</h2>
+      <BranchAcceptanceMode branchId={branch.id} autoAcceptEnabled={branch.autoAcceptEnabled === true} onChanged={refresh} />
+      <div id="sec-hours" className="scroll-mt-16"><BranchHoursEditor key={`${branch.id}-${JSON.stringify(branch.openingHours)}-${branch.preparationTimeMinutes ?? ''}`} initialHours={branch.openingHours as any} initialPrep={branch.preparationTimeMinutes ?? null} canEdit onSave={async (openingHours, preparationTimeMinutes) => { await updateVendorBranch(branch.id, { openingHours: openingHours as any, preparationTimeMinutes }); await refresh(); }} /></div>
+      <div id="sec-closures" className="scroll-mt-16"><BranchClosures scope="admin" branchId={branch.id} onChanged={refresh} /></div>
+
+      <div className="rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
+        <h2 id="sec-sector" className="scroll-mt-16 font-semibold">Marketplace Sector</h2>
         <p className="text-sm text-gray-500">
           Current: {sectors.find((s) => s.id === branch.marketplaceSectorId)?.name ?? 'Not assigned'}
         </p>
@@ -443,7 +461,7 @@ export default function BranchDetailPage() {
           <select
             value={selectedSectorId}
             onChange={(e) => setSelectedSectorId(e.target.value)}
-            className="rounded border px-3 py-2 text-sm"
+            className="rounded-lg border px-3 py-2 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
           >
             <option value="">Select a sector...</option>
             {sectors.map((s) => (
@@ -452,14 +470,14 @@ export default function BranchDetailPage() {
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded bg-hatly-orange px-3 py-2 text-sm font-medium text-white">
+          <button type="submit" className="rounded-lg bg-hatly-orange px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
             Assign
           </button>
         </form>
       </div>
 
-      <div className="rounded border bg-white p-4">
-        <h2 className="font-semibold">Service Area</h2>
+      <div className="rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
+        <h2 id="sec-area" className="scroll-mt-16 font-semibold">Service Area</h2>
         <p className="text-sm text-gray-500">
           Current: {serviceAreas.find((sa) => sa.id === branch.serviceAreaId)?.name ?? 'Not assigned'}
         </p>
@@ -470,7 +488,7 @@ export default function BranchDetailPage() {
           <select
             value={selectedServiceAreaId}
             onChange={(e) => setSelectedServiceAreaId(e.target.value)}
-            className="rounded border px-3 py-2 text-sm"
+            className="rounded-lg border px-3 py-2 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
           >
             <option value="">Select a service area...</option>
             {serviceAreas.map((sa) => (
@@ -479,17 +497,17 @@ export default function BranchDetailPage() {
               </option>
             ))}
           </select>
-          <button type="submit" className="rounded bg-hatly-orange px-3 py-2 text-sm font-medium text-white">
+          <button type="submit" className="rounded-lg bg-hatly-orange px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
             Assign
           </button>
         </form>
         {serviceAreaError && <p className="mt-1 text-sm text-red-600">{serviceAreaError}</p>}
       </div>
 
-      <div className="rounded border bg-white p-4">
+      <div className="rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Categories</h2>
-          <button onClick={() => setShowCategoryForm((v) => !v)} className="rounded bg-hatly-orange px-3 py-1.5 text-sm font-medium text-white">
+          <h2 id="sec-categories" className="scroll-mt-16 font-semibold">Categories</h2>
+          <button onClick={() => setShowCategoryForm((v) => !v)} className="rounded-lg bg-hatly-orange px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
             {showCategoryForm ? 'Cancel' : 'New Category'}
           </button>
         </div>
@@ -500,9 +518,9 @@ export default function BranchDetailPage() {
               value={categoryName}
               onChange={(e) => setCategoryName(e.target.value)}
               placeholder="Category name"
-              className="flex-1 rounded border px-3 py-2"
+              className="flex-1 rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
             />
-            <button type="submit" className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white">
+            <button type="submit" className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
               Create
             </button>
           </form>
@@ -527,14 +545,14 @@ export default function BranchDetailPage() {
         </ul>
       </div>
 
-      <div className="rounded border bg-white p-4">
+      <div className="rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Products</h2>
+          <h2 id="sec-products" className="scroll-mt-16 font-semibold">Products</h2>
           <div className="flex gap-2">
-            <button onClick={() => setShowImport((v) => !v)} className="rounded border border-gray-300 px-3 py-1.5 text-sm font-medium">
+            <button onClick={() => setShowImport((v) => !v)} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
               {showImport ? 'Cancel' : 'Import Excel'}
             </button>
-            <button onClick={() => setShowProductForm((v) => !v)} className="rounded bg-hatly-orange px-3 py-1.5 text-sm font-medium text-white">
+            <button onClick={() => setShowProductForm((v) => !v)} className="rounded-lg bg-hatly-orange px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
               {showProductForm ? 'Cancel' : 'New Product'}
             </button>
           </div>
@@ -544,10 +562,10 @@ export default function BranchDetailPage() {
           <div className="mt-3 space-y-3 rounded border p-3">
             <h3 className="text-sm font-semibold">Import Excel</h3>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => handleDownloadTemplate(true)} className="rounded border px-3 py-1.5 text-xs">
+              <button onClick={() => handleDownloadTemplate(true)} className="rounded-lg border px-3 py-1.5 text-xs border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
                 Download Current Catalog Template
               </button>
-              <button onClick={() => handleDownloadTemplate(false)} className="rounded border px-3 py-1.5 text-xs">
+              <button onClick={() => handleDownloadTemplate(false)} className="rounded-lg border px-3 py-1.5 text-xs border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
                 Download Empty Template
               </button>
             </div>
@@ -558,7 +576,7 @@ export default function BranchDetailPage() {
               <button
                 onClick={handleValidateImport}
                 disabled={isValidatingImport}
-                className="rounded bg-hatly-orange px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                className="rounded-lg bg-hatly-orange px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
               >
                 {isValidatingImport ? 'Validating…' : 'Validate'}
               </button>
@@ -574,12 +592,12 @@ export default function BranchDetailPage() {
                 </p>
                 <div className="max-h-64 overflow-y-auto rounded border">
                   <table className="w-full text-xs">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-gray-50 tracking-wide">
                       <tr>
-                        <th className="p-1.5 text-left">Row</th>
-                        <th className="p-1.5 text-left">Product</th>
-                        <th className="p-1.5 text-left">Changed Fields</th>
-                        <th className="p-1.5 text-left">Errors</th>
+                        <th className="p-1.5 text-left font-medium">Row</th>
+                        <th className="p-1.5 text-left font-medium">Product</th>
+                        <th className="p-1.5 text-left font-medium">Changed Fields</th>
+                        <th className="p-1.5 text-left font-medium">Errors</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -597,7 +615,7 @@ export default function BranchDetailPage() {
                 <button
                   onClick={handleApplyImport}
                   disabled={importSummary.status !== 'READY' || isApplyingImport}
-                  className="rounded bg-hatly-orange px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                  className="rounded-lg bg-hatly-orange px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
                 >
                   {isApplyingImport ? 'Applying…' : 'Confirm Apply'}
                 </button>
@@ -625,7 +643,7 @@ export default function BranchDetailPage() {
                 required
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
               />
             </div>
             <div>
@@ -634,7 +652,7 @@ export default function BranchDetailPage() {
                 required
                 value={productCategoryId}
                 onChange={(e) => setProductCategoryId(e.target.value)}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
               >
                 <option value="">Select a category...</option>
                 {categories.map((c) => (
@@ -652,7 +670,7 @@ export default function BranchDetailPage() {
                   value={productPrice}
                   onChange={(e) => setProductPrice(e.target.value)}
                   placeholder="e.g. 10000 = 100.00"
-                  className="mt-1 w-full rounded border px-3 py-2"
+                  className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                 />
               </div>
               <div>
@@ -660,7 +678,7 @@ export default function BranchDetailPage() {
                 <select
                   value={productPricingUnit}
                   onChange={(e) => setProductPricingUnit(e.target.value as 'PIECE' | 'WEIGHT')}
-                  className="mt-1 w-full rounded border px-3 py-2"
+                  className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                 >
                   <option value="PIECE">Piece</option>
                   <option value="WEIGHT">Weight (per kg)</option>
@@ -671,7 +689,7 @@ export default function BranchDetailPage() {
               Pricing unit cannot be changed after creation. For weighted products, price is per kilogram.
             </p>
             {productError && <p className="text-sm text-red-600">{productError}</p>}
-            <button type="submit" className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white">
+            <button type="submit" className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
               Create Product
             </button>
           </form>
@@ -679,7 +697,8 @@ export default function BranchDetailPage() {
         <ul className="mt-4 divide-y rounded border">
           {products.length === 0 && <li className="px-4 py-3 text-sm text-gray-500">No products yet.</li>}
           {products.map((p) => (
-            <li key={p.id} className="flex items-center justify-between px-4 py-3">
+            <li key={p.id} className="px-4 py-3">
+              <div className="flex items-center justify-between">
               <div>
                 <button onClick={() => handleRenameProduct(p)} className="text-left font-medium hover:underline">
                   {p.name}
@@ -701,7 +720,16 @@ export default function BranchDetailPage() {
                     Set Inventory to 0
                   </button>
                 )}
+                <button
+                  data-testid={`product-options-toggle-${p.id}`}
+                  onClick={() => setOptionsOpenId((cur) => (cur === p.id ? null : p.id))}
+                  className="text-xs text-hatly-orange underline"
+                >
+                  {optionsOpenId === p.id ? 'Hide options' : 'Options'}
+                </button>
               </div>
+              </div>
+              {optionsOpenId === p.id && <ProductOptionsEditor scope="admin" productId={p.id} />}
             </li>
           ))}
         </ul>

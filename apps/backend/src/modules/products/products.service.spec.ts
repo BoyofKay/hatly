@@ -76,7 +76,9 @@ function buildHarness(seed: { products?: any[]; categories?: any[] }) {
   }
 
   const productsRepository = { createQueryBuilder: jest.fn(() => makeQb()) };
-  const branchesRepository = { findOne: jest.fn(async () => ({ id: 'branch-1' })) };
+  // `manager.query` answers the branch-closure lookup: no branch is under a closure in these tests.
+  const branchesRepository = {
+    manager: { query: jest.fn(async () => []) }, findOne: jest.fn(async () => ({ id: 'branch-1' })) };
 
   const service = new ProductsService(categoriesRepository as any, productsRepository as any, branchesRepository as any);
   return { service };
@@ -238,7 +240,9 @@ describe('ProductsService.getProductById', () => {
   it('rejects a non-existent product', async () => {
     const productsRepository = { findOne: async () => null };
     const categoriesRepository = { find: jest.fn() };
-    const branchesRepository = { findOne: jest.fn() };
+    // `manager.query` answers the branch-closure lookup: no branch is under a closure in these tests.
+  const branchesRepository = {
+    manager: { query: jest.fn(async () => []) }, findOne: jest.fn() };
     const service = new ProductsService(categoriesRepository as any, productsRepository as any, branchesRepository as any);
     await expect(service.getProductById('missing')).rejects.toThrow(NotFoundException);
   });
@@ -246,7 +250,9 @@ describe('ProductsService.getProductById', () => {
 
 describe('ProductsService.getBranchDetails (L1-B)', () => {
   function buildDetailsHarness(branchRow: any) {
-    const branchesRepository = {
+    // `manager.query` answers the branch-closure lookup: no branch is under a closure in these tests.
+  const branchesRepository = {
+    manager: { query: jest.fn(async () => []) },
       findOne: jest.fn(async (opts: any) => (opts.where.id === branchRow?.id ? branchRow : null)),
     };
     const service = new ProductsService({} as any, {} as any, branchesRepository as any);

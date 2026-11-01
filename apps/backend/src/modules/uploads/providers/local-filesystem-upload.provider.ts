@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { UploadProvider, UploadResult } from '../upload-provider.interface';
+import { STORED_FILE_NAME } from './storage-keys';
 
 /**
  * CHUNK 12B-1 CORRECTION. Real implementation of the existing
@@ -69,6 +70,27 @@ export class LocalFilesystemUploadProvider implements UploadProvider {
     await fs.writeFile(fullPath, buffer, { flag: 'wx' });
 
     return { url: `${this.publicUrlPrefix}/${storageKey}` };
+  }
+
+  /**
+   * Deletes a file this provider wrote. Only an exact `<prefix>/<uuid>.<ext>` reference is resolved (seeded `marketplace/...` media, other
+   * prefixes, traversal attempts and arbitrary names are refused, `false`); the resolved path must sit directly in the uploads directory.
+   * An already-missing file counts as removed.
+   */
+  async remove(storedUrl: string): Promise<boolean> {
+    const prefix = `${this.publicUrlPrefix.replace(/\/+$/, '')}/`;
+    if (typeof storedUrl !== 'string' || !storedUrl.startsWith(prefix)) return false;
+    const fileName = storedUrl.slice(prefix.length);
+    if (!STORED_FILE_NAME.test(fileName)) return false;
+    const dir = path.resolve(this.storageDir);
+    const fullPath = path.resolve(dir, fileName);
+    if (path.dirname(fullPath) !== dir) return false;
+    try {
+      await fs.unlink(fullPath);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException)?.code === 'ENOENT';
+    }
   }
 
   /**

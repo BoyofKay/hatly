@@ -1,4 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { OrderVendorSegmentStatus } from './order-vendor-segment-status.enum';
+import { loadRefundSummary, OrderRefundSummary } from './order-refund-summary';
+import { loadSegmentHistory, SegmentHistoryEntry } from './order-segment-history';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Order } from './entities/order.entity';
@@ -131,11 +134,17 @@ export interface CustomerOrderSegmentView {
   adHocDestinationLatitudeSnapshot: number | null;
   adHocDestinationLongitudeSnapshot: number | null;
   items: CustomerOrderItemView[];
+  /** Items taken off the order because they were unavailable (PD-016). Not part of `items`, so older apps never show them as live. */
+  removedItems: Array<{ id: string; productNameSnapshot: string | null; productNameArSnapshot: string | null; quantity: number; removedAmountMinor: number | null; removedAt: Date }>;
   offerDiscountTypeSnapshot: string | null;
   offerDiscountValueSnapshot: number | null;
   offerEligibleSubtotalMinorSnapshot: number | null;
   offerDiscountAmountMinor: number | null;
   couponCodeSnapshot: string | null;
+  /** Why this vendor's part was rejected (shown to the customer); null unless the segment was rejected with a reason. */
+  rejectionReason: string | null;
+  /** What happened to this segment, oldest first — without naming staff. `actorRole`: VENDOR · HATLY (operations on the vendor's behalf) · SYSTEM. */
+  history: SegmentHistoryEntry[];
   /** Operational — may change; never affects any amount. */
   expectedReadyAt: Date | null;
   preparationEstimateMinutes: number | null;
@@ -176,6 +185,12 @@ export interface CustomerOrderDetailsView {
   amountDueMinor: number | null;
   coupon: { code: string; offerName: string; discountMinor: number; vendorBranchId: string; orderVendorSegmentId: string | null } | null;
   deliveryBreakdown: OrderDeliveryBreakdownView | null;
+  /** Hatly / Wasally only (PD-012): the frozen route, origin → destination, each with label, coordinates and source. */
+  deliveryRoute: { service: string | null; origin: unknown; destination: unknown } | null;
+  /** What has been given back so far, from the real ledgers — a refund is never shown as completed before it is. */
+  refundSummary: OrderRefundSummary;
+  /** Set when some — but not all — vendor parts were rejected: the rest of the order continues. */
+  partialRejection: { rejectedSegmentCount: number; activeSegmentCount: number } | null;
   eta: OrderEtaView;
   timeline: OrderTimelineEntryView[];
   /** Whether the customer can cancel the whole order right now (the server rule; the app only offers it when true). */
@@ -273,7 +288,7 @@ export class CustomerOrdersService {
 
     const data: CustomerOrderSummaryView[] = [];
     for (const order of orders) {
-      const items = order.segments.flatMap((s) => s.items ?? []);
+      const items = order.segments.flatMap((s) => (s.items ?? []).filter((i) => !i.removedAt));
       const payment = order.paymentMethod === 'MANUAL_TRANSFER' ? await this.paymentsRepository.findOne({ where: { orderId: order.id } }) : null;
       data.push({
         id: order.id,
@@ -314,6 +329,9 @@ export class CustomerOrdersService {
     const payment = order.paymentMethod === 'MANUAL_TRANSFER' ? await this.paymentsRepository.findOne({ where: { orderId } }) : null;
     const driver = await this.loadDriverView(orderId);
     const delivery = await this.deliveriesRepository.findOne({ where: { orderId } });
+    const query = (sql: string, params?: unknown[]) => this.ordersRepository.query(sql, params);
+    const [segmentHistory, refundSummary] = await Promise.all([loadSegmentHistory(query, orderId, 'PUBLIC'), loadRefundSummary(query, orderId)]);
+    const rejectedSegments = order.segments.filter((s) => s.status === OrderVendorSegmentStatus.CANCELLED).length;
     const eta = await this.orderEtaService.compute({
       status: order.status,
       fulfillmentType: order.fulfillmentType,
@@ -341,9 +359,16 @@ export class CustomerOrdersService {
       amountDueMinor: order.amountDueMinor ?? null,
       coupon: order.couponSnapshot ?? null,
       deliveryBreakdown: this.publicBreakdown(order.deliveryFeeBreakdownSnapshot),
+      // Hatly / Wasally (PD-012): the route as it was frozen at checkout (origin → destination with labels); null for every other order.
+      deliveryRoute: this.publicRoute(order.deliveryFeeBreakdownSnapshot),
+      refundSummary,
+      partialRejection:
+        rejectedSegments > 0 && rejectedSegments < order.segments.length && order.status !== OrderStatus.CANCELLED
+          ? { rejectedSegmentCount: rejectedSegments, activeSegmentCount: order.segments.length - rejectedSegments }
+          : null,
       eta,
       timeline: await this.loadTimeline(orderId),
-      customerCanCancel: customerCancellationBlock(order.status, order.segments.map((s) => s.status)) === null,
+      customerCanCancel: customerCancellationBlock(order.status, order.segments) === null,
       payment: this.paymentView(order, payment),
       cancellationReason: order.cancellationReason ?? null,
       cancelledByRole: order.cancelledByRole ?? null,
@@ -368,9 +393,12 @@ export class CustomerOrdersService {
         offerEligibleSubtotalMinorSnapshot: segment.offerEligibleSubtotalMinorSnapshot ?? null,
         offerDiscountAmountMinor: segment.offerDiscountAmountMinor ?? null,
         couponCodeSnapshot: segment.couponCodeSnapshot ?? null,
+        history: segmentHistory.get(segment.id) ?? [],
+        rejectionReason: [...(segmentHistory.get(segment.id) ?? [])].reverse().find((e) => e.toStatus === 'CANCELLED')?.reason ?? null,
         expectedReadyAt: segment.expectedReadyAt ?? null,
         preparationEstimateMinutes: segment.preparationEstimateMinutes ?? null,
-        items: segment.items.map((item) => ({
+        removedItems: segment.items.filter((item) => item.removedAt).map((item) => ({ id: item.id, productNameSnapshot: item.productNameSnapshot ?? null, productNameArSnapshot: item.productNameArSnapshot ?? null, quantity: item.quantity, removedAmountMinor: item.removedAmountMinor == null ? null : Number(item.removedAmountMinor), removedAt: item.removedAt! })),
+        items: segment.items.filter((item) => !item.removedAt).map((item) => ({
           id: item.id,
           productId: item.productId ?? null,
           productNameSnapshot: item.productNameSnapshot ?? null,
@@ -437,7 +465,7 @@ export class CustomerOrdersService {
         status: paymentView.status,
         awaitingApproval: paymentView.awaitingApproval,
       },
-      customerCanCancel: customerCancellationBlock(order.status, order.segments.map((s) => s.status)) === null,
+      customerCanCancel: customerCancellationBlock(order.status, order.segments) === null,
       cancellationReason: order.cancellationReason ?? null,
     };
   }
@@ -486,6 +514,12 @@ export class CustomerOrdersService {
   }
 
   /** The customer-safe subset of the frozen delivery breakdown (no internal route legs). Null for pickup / ad-hoc orders. */
+  private publicRoute(snapshot: unknown): { service: string | null; origin: unknown; destination: unknown } | null {
+    const b = snapshot as { service?: string; route?: { origin?: unknown; destination?: unknown } } | null;
+    if (!b?.route?.origin || !b.route.destination) return null;
+    return { service: b.service ?? null, origin: b.route.origin, destination: b.route.destination };
+  }
+
   private publicBreakdown(snapshot: unknown): OrderDeliveryBreakdownView | null {
     const b = snapshot as Partial<DeliveryFeeBreakdown> | null;
     if (!b || !Array.isArray(b.vendorSequence) || typeof b.deliveryFeeMinor !== 'number') return null;

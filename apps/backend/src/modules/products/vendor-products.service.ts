@@ -72,7 +72,7 @@ export class VendorProductsService {
   }
 
   async applyImport(userId: string, buffer: Buffer): Promise<ExcelImportApplyResult> {
-    return this.productExcelImportService.apply(buffer, this.branchAuthorizer(userId));
+    return this.productExcelImportService.apply(buffer, this.branchAuthorizer(userId), { userId, role: 'VENDOR' });
   }
 
   private async assertOwnsProductBranch(userId: string, product: Product): Promise<void> {
@@ -186,7 +186,7 @@ export class VendorProductsService {
   async updateForUser(userId: string, productId: string, dto: VendorUpdateProductDto): Promise<Product> {
     const product = await this.productsService.adminGetProduct(productId);
     await this.assertOwnsProductBranch(userId, product);
-    return this.productsService.adminUpdateProduct(productId, dto);
+    return this.productsService.adminUpdateProduct(productId, dto, undefined, { userId, role: 'VENDOR' });
   }
 
   async activateForUser(userId: string, productId: string): Promise<Product> {
@@ -211,7 +211,7 @@ export class VendorProductsService {
   async setInventoryToZeroForUser(userId: string, productId: string): Promise<Product> {
     const product = await this.productsService.adminGetProduct(productId);
     await this.assertOwnsProductBranch(userId, product);
-    return this.productsService.adminSetInventoryToZero(productId);
+    return this.productsService.adminSetInventoryToZero(productId, { userId, role: 'VENDOR' });
   }
 
   /**

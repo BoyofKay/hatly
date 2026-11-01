@@ -114,7 +114,7 @@ describe('VendorProductsService.updateForUser', () => {
     });
     const updated = await service.updateForUser('user-1', 'p1', { name: 'New' } as any);
     expect(updated.name).toBe('New');
-    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' });
+    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' }, undefined, { userId: expect.anything(), role: 'VENDOR' });
   });
 
   it('CRITICAL: rejects updating a product in a branch the user does not own, and never calls adminUpdateProduct', async () => {
@@ -242,7 +242,7 @@ describe('VendorProductsService.uploadImageForUser (Chunk 12B-1 Correction)', ()
     });
     const updated = await service.updateForUser('user-1', 'p1', { name: 'New' } as any);
     expect(updated.name).toBe('New');
-    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' });
+    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' }, undefined, { userId: expect.anything(), role: 'VENDOR' });
   });
 });
 
@@ -434,7 +434,7 @@ describe('VendorProductsService — 12B-1/12B-2 regression after 12B-3 (category
     });
     const updated = await service.updateForUser('user-1', 'p1', { name: 'New' } as any);
     expect(updated.name).toBe('New');
-    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' });
+    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' }, undefined, { userId: expect.anything(), role: 'VENDOR' });
   });
 });
 
@@ -446,7 +446,7 @@ describe('VendorProductsService.setInventoryToZeroForUser (Tracked Inventory Ord
     });
     const updated = await service.setInventoryToZeroForUser('user-1', 'p1');
     expect(updated.quantity).toBe(0);
-    expect(productsService.adminSetInventoryToZero).toHaveBeenCalledWith('p1');
+    expect(productsService.adminSetInventoryToZero).toHaveBeenCalledWith('p1', { userId: expect.anything(), role: 'VENDOR' });
   });
 
   it('CRITICAL: rejects for a product in a branch the Vendor does not own, and never calls the underlying service method', async () => {

@@ -142,7 +142,11 @@ void main() {
     final taps = <String?>[];
     await _pump(tester, selected: 'sc-fast', onChanged: taps.add);
 
+    // The pills scroll sideways; bring each one into view before tapping it, as a finger would.
+    await tester
+        .ensureVisible(find.byKey(const Key('subcategory-chip-sc-oriental')));
     await tester.tap(find.byKey(const Key('subcategory-chip-sc-oriental')));
+    await tester.ensureVisible(find.byKey(const Key('subcategory-chip-all')));
     await tester.tap(find.byKey(const Key('subcategory-chip-all')));
     expect(taps, ['sc-oriental', null]);
   });
@@ -227,23 +231,20 @@ void main() {
   }
 
   testWidgets(
-      'selected and unselected items differ visibly (border) in both themes',
+      'selected and unselected items differ visibly (orange fill vs white pill) in both themes',
       (tester) async {
     for (final dark in [false, true]) {
       await _pump(tester, dark: dark, selected: 'sc-fast');
-      BorderSide side(String id) {
-        final material = tester.widget<Material>(find
-            .descendant(
-                of: find.byKey(Key('subcategory-chip-$id')),
-                matching: find.byType(Material))
-            .first);
-        return (material.shape as RoundedRectangleBorder).side;
-      }
-
-      expect(side('sc-fast').width, greaterThan(side('sc-oriental').width),
+      Color fill(String id) => tester
+          .widget<Material>(find
+              .descendant(
+                  of: find.byKey(Key('subcategory-chip-$id')),
+                  matching: find.byType(Material))
+              .first)
+          .color!;
+      expect(fill('sc-fast'), isNot(equals(fill('sc-oriental'))),
           reason: 'dark=$dark');
-      expect(side('sc-fast').color, isNot(equals(side('sc-oriental').color)),
-          reason: 'dark=$dark');
+      expect(fill('sc-oriental'), equals(fill('all')), reason: 'dark=$dark');
     }
   });
 }

@@ -66,9 +66,19 @@ void main() {
     return urls;
   }
 
+  // Android renders into a SurfaceView that cannot be captured: it must be converted once (per test) before the first screenshot.
+  var surfaceConverted = false;
   Future<void> shot(WidgetTester tester, String name) async {
+    if (Platform.isAndroid && !surfaceConverted) {
+      await binding.convertFlutterSurfaceToImage();
+      surfaceConverted = true;
+    }
     await tester.pump();
-    await binding.takeScreenshot(name);
+    final bytes = await binding.takeScreenshot(name);
+    // also kept on the device (app cache), so a host can pull them even if the driver connection ends early
+    File('${Directory.systemTemp.path}/store-shots/$name.png')
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(bytes);
   }
 
   void go(WidgetTester tester, String location) =>
@@ -81,8 +91,12 @@ void main() {
 
   testWidgets('signed out: the sign-in screen shows the supplied Hatly logo', (tester) async {
     await TokenStorage().clear();
+    surfaceConverted = false;
     await tester.pumpWidget(app());
-    // the SIGN-IN screen (not the splash, which shows the same logo while the session is restored)
+    // a guest lands on Home (guest browsing); the SIGN-IN screen is /phone
+    await waitFor(tester, find.byType(Scaffold));
+    await tester.pump(const Duration(seconds: 1));
+    GoRouter.of(tester.element(find.byType(Scaffold).first)).go('/phone');
     await waitFor(tester, find.byType(TextField));
     // the splash → sign-in transition briefly shows both screens' logos; wait until only the sign-in one remains
     final end = DateTime.now().add(const Duration(seconds: 30));
@@ -114,6 +128,7 @@ void main() {
     final pizza = vendors.firstWhere((v) => '${v['name']} ${v['nameAr']}'.contains('Flatini') || '${v['name']}'.contains('فلاتيني'),
         orElse: () => vendors.first);
 
+    surfaceConverted = false;
     await tester.pumpWidget(app());
 
     // Home: "Shop by category" sector tiles

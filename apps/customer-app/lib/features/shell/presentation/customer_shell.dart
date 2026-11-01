@@ -9,9 +9,10 @@ import '../../search/presentation/search_screen.dart';
 import '../../orders/presentation/orders_screen.dart';
 import '../../favorites/presentation/favorites_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../auth/presentation/auth_gate.dart';
 import 'shell_tab_provider.dart';
 
-/// The authenticated app shell: a single route ('/') whose tab state lives in
+/// The app shell (public for guests; account tabs need a session): a single route ('/') whose tab state lives in
 /// [shellTabIndexProvider] rather than local State, so Home's shortcuts (profile
 /// avatar, favorites) can change it without a reference to this widget.
 ///
@@ -23,14 +24,16 @@ import 'shell_tab_provider.dart';
 class CustomerShell extends ConsumerWidget {
   const CustomerShell({super.key});
 
-  static const _tabs = [
-    HomeScreen(),
-    // Explore tab: a discovery page, so it must not grab the keyboard.
-    SearchScreen(autofocus: false),
-    OrdersScreen(),
-    FavoritesScreen(),
-    ProfileScreen(),
-  ];
+  /// Home and Explore are public. Orders / Favorites / Profile need an account: a GUEST gets a sign-in prompt in their place
+  /// (the real screens are not even built, so no authenticated request is made).
+  static List<Widget> tabsFor({required bool signedIn}) => [
+        const HomeScreen(),
+        // Explore tab: a discovery page, so it must not grab the keyboard.
+        const SearchScreen(autofocus: false),
+        signedIn ? const OrdersScreen() : const SignInRequiredView(),
+        signedIn ? const FavoritesScreen() : const SignInRequiredView(),
+        signedIn ? const ProfileScreen() : const SignInRequiredView(),
+      ];
 
   /// Bar position → shell tab index (null = not a tab: Cart pushes a route).
   static const List<int?> barToTab = [
@@ -52,11 +55,20 @@ class CustomerShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final tab = ref.watch(shellTabIndexProvider);
-    final cartCount =
-        ref.watch(cartControllerProvider).valueOrNull?.itemCount ?? 0;
+    final signedIn = ref.watch(isSignedInProvider);
+    final cartCount = signedIn
+        ? ref.watch(cartControllerProvider).valueOrNull?.itemCount ?? 0
+        : 0;
+
+    // After signing out, return to Home instead of leaving the (now signed-out) account tab selected.
+    ref.listen<bool>(isSignedInProvider, (was, now) {
+      if (was == true && !now) {
+        ref.read(shellTabIndexProvider.notifier).state = ShellTab.home;
+      }
+    });
 
     return Scaffold(
-      body: IndexedStack(index: tab, children: _tabs),
+      body: IndexedStack(index: tab, children: tabsFor(signedIn: signedIn)),
       bottomNavigationBar: HatlyFloatingNavBar(
         selectedIndex: barIndexForTab(tab),
         onTap: (barIndex) {

@@ -43,6 +43,8 @@ typedef VendorListKey = ({
   String? search,
   double? latitude,
   double? longitude,
+  // A manual address has no coordinates: its delivery zone narrows the listing instead (changing it starts over from page 1).
+  String? deliveryZoneId,
   // Consolidated customer-commerce milestone, Part E: part of the key
   // for the same reason sort/search are — selecting a different
   // subcategory is exactly the same kind of "start over from page 1"
@@ -81,6 +83,7 @@ class VendorListController extends StateNotifier<AsyncValue<List<Vendor>>> {
         limit: _limit,
         latitude: _key.latitude,
         longitude: _key.longitude,
+        deliveryZoneId: _key.deliveryZoneId,
         subcategoryId: _key.subcategoryId,
         openNow: _key.openNow,
         hasOffers: _key.hasOffers,
@@ -114,6 +117,7 @@ class VendorListController extends StateNotifier<AsyncValue<List<Vendor>>> {
         limit: _limit,
         latitude: _key.latitude,
         longitude: _key.longitude,
+        deliveryZoneId: _key.deliveryZoneId,
         subcategoryId: _key.subcategoryId,
         openNow: _key.openNow,
         hasOffers: _key.hasOffers,

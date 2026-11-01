@@ -151,7 +151,10 @@ export class OtpService {
       return false;
     }
 
-    await this.redis.del(this.key(phone));
-    return true;
+    // SINGLE USE, even under concurrency: the code is consumed by the DEL itself. Two simultaneous requests can both pass the
+    // hash comparison above, but Redis hands "1 key deleted" to exactly one of them — the other is refused. (A plain
+    // get-compare-then-delete would let both succeed.)
+    const consumed = await this.redis.del(this.key(phone));
+    return consumed === 1;
   }
 }

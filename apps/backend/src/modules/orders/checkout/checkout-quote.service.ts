@@ -18,7 +18,7 @@ import { DeliveryAddressSnapshot } from '../entities/order.entity';
 
 /** The cart relations checkout needs — a superset of what CartService loads (see OrderCreationService). */
 export const CHECKOUT_CART_RELATIONS = {
-  groups: { items: { product: true, selectedOptionValues: { optionValue: { option: true } } } },
+  groups: { items: { product: { options: { values: true } }, selectedOptionValues: { optionValue: { option: true } } } },
 } as const;
 
 export interface EtaView {
@@ -224,10 +224,24 @@ export class CheckoutQuoteService {
           deliveryZone: plan.address?.deliveryZone ?? null,
           distanceMeters: isRegistered && !pricedByZone && breakdown!.roundedTotalDistanceMeters != null ? Number(breakdown!.roundedTotalDistanceMeters) : null,
           // Hatly Service: fee = the delivery zone's fee × multiplier — both parts shown, never a hidden formula.
+          // Both parts are shown (base fee and multiplier), whichever method found the base: `pricingSource` says which.
           hatlyService:
-            hatlyCharge && typeof hatlyCharge.multiplierUsed === 'number' && typeof hatlyCharge.zoneDeliveryFeeMinorUsed === 'number'
-              ? { zoneDeliveryFeeMinor: hatlyCharge.zoneDeliveryFeeMinorUsed, multiplier: hatlyCharge.multiplierUsed }
+            hatlyCharge &&
+            typeof hatlyCharge.multiplierUsed === 'number' &&
+            (typeof hatlyCharge.baseFeeMinor === 'number' || typeof hatlyCharge.zoneDeliveryFeeMinorUsed === 'number')
+              ? {
+                  baseFeeMinor: hatlyCharge.baseFeeMinor ?? hatlyCharge.zoneDeliveryFeeMinorUsed,
+                  // Kept for app builds that read the zone-only shape: the zone's fee when the base came from a zone.
+                  zoneDeliveryFeeMinor: hatlyCharge.zoneDeliveryFeeMinorUsed ?? null,
+                  multiplier: hatlyCharge.multiplierUsed,
+                  pricingSource: hatlyCharge.pricingSource ?? 'DELIVERY_ZONE',
+                  distanceMeters: hatlyCharge.roundedDistanceMeters ?? null,
+                }
               : null,
+          // PD-012: the Hatly / Wasally route as the server resolved it (customer's choice or the service default), direction preserved:
+          // origin → destination, each with its label and source. Null for every other order.
+          route: plan.delivery.adHocLocations?.route ?? null,
+          service: hatlyCharge?.service ?? null,
           vendors: isRegistered
             ? (breakdown!.vendorSequence ?? []).map((stop) => ({
                 vendorBranchId: stop.vendorBranchId,

@@ -71,7 +71,9 @@ function buildHarness(seed: {
     return qb;
   }
 
-  const branchesRepository = { createQueryBuilder: jest.fn(() => makeQb()) };
+  // `manager.query` answers the branch-closure lookup: no branch is under a closure in these tests.
+  const branchesRepository = {
+    manager: { query: jest.fn(async () => []) }, createQueryBuilder: jest.fn(() => makeQb()) };
   const serviceAreaResolverService = {
     resolveForPoint: jest.fn(async () => {
       throw new Error('resolveForPoint should not be called in these tests');

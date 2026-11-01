@@ -7,12 +7,15 @@ import 'package:hatly_customer/features/auth/presentation/phone_verification_pro
 import 'package:hatly_customer/features/cart/data/cart_api.dart';
 import 'package:hatly_customer/features/cart/data/cart_providers.dart';
 import 'package:hatly_customer/features/cart/domain/cart.dart';
+import 'package:hatly_customer/features/home/data/home_banners_providers.dart';
 import 'package:hatly_customer/features/home/data/home_demo_content.dart';
+import 'package:hatly_customer/features/home/domain/home_banner.dart';
 import 'package:hatly_customer/features/home/data/home_providers.dart';
 import 'package:hatly_customer/features/home/domain/home_content.dart';
 import 'package:hatly_customer/features/home/data/home_address_provider.dart';
 import 'package:hatly_customer/features/home/presentation/home_screen.dart';
 import 'package:hatly_customer/features/home/presentation/widgets/category_card.dart';
+import 'package:hatly_customer/features/home/presentation/widgets/home_banner_section.dart';
 import 'package:hatly_customer/features/home/presentation/widgets/promo_carousel.dart';
 import 'package:hatly_customer/features/sectors/domain/sector.dart';
 import 'package:hatly_customer/features/vendors/presentation/widgets/vendor_cover_card.dart';
@@ -52,6 +55,8 @@ List<Override> _overrides({
         .overrideWith((ref) => (categories ?? () async => demoCategories())()),
     homeSnapshotProvider
         .overrideWith((ref) => (snapshot ?? () async => _snapshot)()),
+    // Home now also asks for admin banners; none configured here, so the offer-derived promos are the hero (the previous behaviour).
+    homeBannersProvider.overrideWith((ref) async => <HomeBanner>[]),
     homeActiveAddressProvider.overrideWithValue(AsyncData(address)),
     phoneVerificationStatusProvider.overrideWith((ref) async => true),
     cartApiProvider.overrideWithValue(_EmptyCartApi()),
@@ -65,6 +70,26 @@ void _phone(WidgetTester tester, {double width = 390, double height = 3200}) {
 }
 
 void main() {
+  testWidgets(
+      'admin banners are the hero when there are any (the offer-derived promos step aside); the rest of Home is unchanged',
+      (tester) async {
+    _phone(tester);
+    await tester.pumpWidget(hatlyTestApp(const HomeScreen(), overrides: [
+      ..._overrides(),
+      homeBannersProvider.overrideWith((ref) async => [
+            const HomeBanner(id: 'b1', title: 'Weekend offers', titleAr: 'عروض نهاية الأسبوع', imageUrl: '/uploads/files/a.png'),
+            const HomeBanner(id: 'b2', title: 'New stores', imageUrl: '/uploads/files/b.png'),
+          ]),
+    ]));
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    expect(find.byType(HomeBannerCarousel), findsOneWidget);
+    expect(find.byType(PromoCarousel), findsNothing);
+    expect(find.byKey(const Key('home-banner-b1')), findsOneWidget);
+    expect(find.byType(HatlySearchBar), findsOneWidget);
+    expect(find.text('تسوّق حسب الفئة'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
       'renders the approved sections in the approved ORDER (RTL Arabic)',
       (tester) async {
@@ -86,7 +111,8 @@ void main() {
       find.byType(PromoCarousel), // 3 promo carousel
       find.text('تسوّق حسب الفئة'), // 4 categories
       find.text('العروض'), // 5 offers
-      find.text('الأكثر طلبًا والجديد'), // 6 popular & new
+      find.text('الأكثر طلبًا'), // 6 most ordered
+      find.text('الجديد'), // 7 new
     ];
     for (final f in ordered) {
       expect(f, findsWidgets);
@@ -96,8 +122,8 @@ void main() {
           reason: 'section $i must come after section ${i - 1}');
     }
     expect(find.text('بتدور على إيه؟'), findsOneWidget);
-    // two "عرض الكل ←" links: offers, popular & new — categories have none (≤ 12)
-    expect(find.text('عرض الكل'), findsNWidgets(2));
+    // three "عرض الكل ←" links: offers, most ordered, new — categories have none (≤ 12)
+    expect(find.text('عرض الكل'), findsNWidgets(3));
     // Popular Near You is gone from Home, even though the snapshot still carries vendors
     expect(find.text('الأشهر بالقرب منك'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -118,8 +144,8 @@ void main() {
     expect(find.text('باكدج'), findsWidgets);
     // popular & new tags
     expect(find.text('جديد'), findsWidgets);
-    // "Popular" is not repeated as a badge on every card — the section says it
-    expect(find.text('الأكثر طلبًا'), findsNothing);
+    // "Most ordered" is the section's title, not a badge repeated on every card
+    expect(find.text('الأكثر طلبًا'), findsOneWidget);
   });
 
   testWidgets(
@@ -166,7 +192,8 @@ void main() {
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     expect(find.byType(PromoCarousel), findsNothing);
     expect(find.text('العروض'), findsNothing);
-    expect(find.text('الأكثر طلبًا والجديد'), findsNothing);
+    expect(find.text('الأكثر طلبًا'), findsNothing);
+    expect(find.text('الجديد'), findsNothing);
     expect(find.text('تسوّق حسب الفئة'), findsOneWidget);
   });
 

@@ -40,7 +40,7 @@ describe('E2E — customer order cancellation (PD-005)', () => {
   const stock = async (productId: string) => num((await world.ds.query('SELECT quantity FROM products WHERE id = $1', [productId]))[0].quantity);
   const cancel = (c: Actor, orderId: string, body: Record<string, unknown> = {}) => world.api('post', `/orders/${orderId}/cancel`, { token: c.accessToken, body });
   const adminStatus = (orderId: string, status: string) => world.api('patch', `/orders/${orderId}/status`, { token: superAdmin.accessToken, body: { status } });
-  const cancelSegment = (v: VendorFixture, segmentId: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status: 'CANCELLED' } });
+  const cancelSegment = (v: VendorFixture, segmentId: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } });
   const claim = (c: Actor, orderId: string) => world.api('post', `/payments/manual-transfer/orders/${orderId}/claim`, { token: c.accessToken, body: {} });
   const approve = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/approve`, { token: reviewer.accessToken });
   const reject = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/reject`, { token: reviewer.accessToken, body: { reason: 'no money' } });

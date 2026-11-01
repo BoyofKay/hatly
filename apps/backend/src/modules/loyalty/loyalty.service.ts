@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { LoyaltyPointsTransaction } from './entities/loyalty-points-transaction.entity';
 import { LoyaltyTransactionType } from './loyalty-transaction-type.enum';
 import { Order } from '../orders/entities/order.entity';
@@ -39,6 +39,9 @@ const MAX_LIMIT = 50;
  * different type (e.g. EARNING_REVERSED), never an update to an
  * existing row.
  */
+/** The ledger key for a customer-requested points → wallet conversion: the client's key, scoped to that customer (see convertPointsToWallet). */
+export const loyaltyConversionKey = (customerId: string, clientKey: string): string => `loyalty-convert:${customerId}:${clientKey}`;
+
 @Injectable()
 export class LoyaltyService {
   private readonly logger = new Logger(LoyaltyService.name);
@@ -236,6 +239,7 @@ export class LoyaltyService {
 
     const itemAmountBySegmentId = new Map<string, number>();
     for (const item of items) {
+      if (item.removedAt) continue; // taken off the order as unavailable (PD-016): nothing was bought
       const amount =
         item.pricingUnitSnapshot === PricingUnit.WEIGHT
           ? item.finalAmountMinor ?? item.estimatedAmountMinor ?? 0
@@ -363,6 +367,16 @@ export class LoyaltyService {
       });
     }
 
+    // Security milestone: the CLIENT's key is namespaced per customer before it touches the ledgers. Both ledger tables keep a
+    // GLOBAL unique index on idempotency_key, shared with system keys such as `order-refund:<orderId>:cancel`; a raw client key could
+    // pre-occupy such a system key (anyone who knows an order id — e.g. staff who also hold a customer account) and make that order's
+    // later refund credit collide (the cancellation then failed). Namespaced, a client key can only ever collide with the same
+    // customer's own conversions. Rows written before this change stored the raw key, so lookups accept both forms (a retry that
+    // straddles the deploy is still recognised as a replay).
+    const clientKey = idempotencyKey;
+    idempotencyKey = loyaltyConversionKey(customerId, clientKey);
+    const keyForms = [idempotencyKey, clientKey];
+
     const pointsPerEgp = await this.businessConfigService.getLoyaltyWalletConversionPointsPerEgp();
     const minimumPoints = 5 * pointsPerEgp; // approved V1 rule: 5 EGP worth of points (500 at the default 100 pts/EGP)
     if (requestedPoints < minimumPoints) {
@@ -388,7 +402,7 @@ export class LoyaltyService {
     // before the balance check, mirrors FinancialEventService.record's own "pre-check, then a
     // race-fallback re-check on 23505" shape (see this class's own top comment) exactly — this is
     // just the missing "pre-check" half of that same pattern for THIS method.
-    const precheckExisting = await this.loyaltyTransactionsRepository.findOne({ where: { idempotencyKey, customerId } });
+    const precheckExisting = await this.loyaltyTransactionsRepository.findOne({ where: { idempotencyKey: In(keyForms), customerId } });
     if (precheckExisting) {
       logBusinessEvent(this.logger, 'warn', BusinessEvent.LOYALTY_REDEMPTION_DUPLICATE, () => this.requestContextService.getCorrelationId(), {
         customerId,
@@ -413,7 +427,7 @@ export class LoyaltyService {
 
         // Re-checked INSIDE the lock — a concurrent request for the SAME key could have committed
         // between the pre-check above and acquiring this lock.
-        const existingInsideLock = await manager.findOne(LoyaltyPointsTransaction, { where: { idempotencyKey, customerId } });
+        const existingInsideLock = await manager.findOne(LoyaltyPointsTransaction, { where: { idempotencyKey: In(keyForms), customerId } });
         if (existingInsideLock) return;
 
         const transactions = await manager.find(LoyaltyPointsTransaction, { where: { customerId } });
@@ -483,7 +497,7 @@ export class LoyaltyService {
         // A genuine retry of an already-successful conversion —
         // CONFIRMED, look up and return the EXISTING result rather
         // than fabricating one or silently no-op'ing.
-        const existing = await this.loyaltyTransactionsRepository.findOne({ where: { idempotencyKey, customerId } });
+        const existing = await this.loyaltyTransactionsRepository.findOne({ where: { idempotencyKey: In(keyForms), customerId } });
         if (!existing) {
           // The key exists but belongs to ANOTHER customer's conversion. Treating that as a replay
           // returned a success (and the other customer's amounts) for a conversion that never happened

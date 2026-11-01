@@ -25,6 +25,7 @@ Product _product({
   String pricingUnit = 'PIECE',
   String inventoryMode = 'OPEN',
   int? quantity,
+  ActiveOffer? activeOffer,
 }) =>
     Product(
       id: 'p',
@@ -37,6 +38,7 @@ Product _product({
       inventoryMode: inventoryMode,
       quantity: quantity,
       options: options,
+      activeOffer: activeOffer,
     );
 
 void main() {
@@ -173,6 +175,201 @@ void main() {
               .canIncreaseWeight(tracked),
           isFalse);
       expect(ProductConfiguration.weightStepGrams, 100);
+    });
+  });
+
+  group(
+      'estimated total follows the SAME flash-sale rules as checkout (Kefta showed 90 in the header and 110 in the total)',
+      () {
+    const flash = ActiveOffer(mechanism: 'FLASH_SALE', specialPriceMinor: 9000);
+
+    test(
+        'one unit on a flash sale: the total is the special price, matching the price shown on the card',
+        () {
+      final product = _product(price: 11000, activeOffer: flash);
+      expect(const ProductConfiguration().estimatedTotalMinor(product), 9000);
+    });
+
+    test(
+        'several units with no per-order cap: every unit gets the special price',
+        () {
+      final product = _product(price: 11000, activeOffer: flash);
+      expect(
+          const ProductConfiguration(quantity: 3).estimatedTotalMinor(product),
+          27000);
+    });
+
+    test(
+        'a per-order cap: only that many units are discounted, the rest cost the normal price',
+        () {
+      final product = _product(
+          price: 11000,
+          activeOffer: const ActiveOffer(
+              mechanism: 'FLASH_SALE',
+              specialPriceMinor: 9000,
+              perOrderLimit: 2));
+      expect(
+          const ProductConfiguration(quantity: 1).estimatedTotalMinor(product),
+          9000);
+      expect(
+          const ProductConfiguration(quantity: 2).estimatedTotalMinor(product),
+          18000);
+      expect(
+          const ProductConfiguration(quantity: 3).estimatedTotalMinor(product),
+          18000 + 11000);
+    });
+
+    test(
+        'a special price that is not below the price is no discount (never a price increase)',
+        () {
+      final product = _product(
+          price: 11000,
+          activeOffer: const ActiveOffer(
+              mechanism: 'FLASH_SALE', specialPriceMinor: 12000));
+      expect(
+          const ProductConfiguration(quantity: 2).estimatedTotalMinor(product),
+          22000);
+    });
+
+    test(
+        'paid modifiers are added ON TOP of the promotional base (base 110, special 90, option +10 → 100), never absorbed',
+        () {
+      final product = _product(
+          price: 11000,
+          options: [
+            _option('extra', values: const [('x', 1000)])
+          ],
+          activeOffer: flash);
+      final config =
+          const ProductConfiguration().toggle(product.options.first, 'extra-x');
+      expect(config.estimatedTotalMinor(product), 10000);
+    });
+
+    test(
+        'base 150, promo base 100, option +20 → 120 per promoted unit; the cap leaves the rest at base + option',
+        () {
+      final product = _product(
+          price: 15000,
+          options: [
+            _option('extra', values: const [('x', 2000)])
+          ],
+          activeOffer: const ActiveOffer(
+              mechanism: 'FLASH_SALE',
+              specialPriceMinor: 10000,
+              perOrderLimit: 2));
+      final one =
+          const ProductConfiguration().toggle(product.options.first, 'extra-x');
+      expect(one.estimatedTotalMinor(product), 12000);
+      expect(one.copyWith(quantity: 2).estimatedTotalMinor(product), 24000);
+      expect(one.copyWith(quantity: 3).estimatedTotalMinor(product),
+          24000 + 17000);
+    });
+
+    test('a negative option still leaves the promotional base untouched', () {
+      final product = _product(
+          price: 11000,
+          options: [
+            _option('small', values: const [('s', -1000)])
+          ],
+          activeOffer: flash);
+      final config =
+          const ProductConfiguration().toggle(product.options.first, 'small-s');
+      expect(config.estimatedTotalMinor(product),
+          8000); // 90 promo base − 10 option
+    });
+
+    test('a SUBTOTAL_DISCOUNT presence signal changes no unit price', () {
+      final product = _product(
+          price: 11000,
+          activeOffer: const ActiveOffer(mechanism: 'SUBTOTAL_DISCOUNT'));
+      expect(
+          const ProductConfiguration(quantity: 2).estimatedTotalMinor(product),
+          22000);
+    });
+
+    test(
+        'a weighed product is never discounted (it is per kg, scaled by the grams)',
+        () {
+      final product =
+          _product(price: 11000, pricingUnit: 'WEIGHT', activeOffer: flash);
+      expect(
+          const ProductConfiguration(requestedWeightGrams: 500)
+              .estimatedTotalMinor(product),
+          5500);
+    });
+  });
+
+  group('explicit minimum / maximum selections (mirror the backend rules)', () {
+    ProductOption limited({int min = 0, int? max, bool required = false}) =>
+        ProductOption(
+          id: 'top',
+          name: 'Toppings',
+          isRequired: required,
+          allowsMultiple: true,
+          minSelections: min,
+          maxSelections: max,
+          values: const [
+            ProductOptionValue(id: 'a', name: 'A'),
+            ProductOptionValue(id: 'b', name: 'B'),
+            ProductOptionValue(id: 'c', name: 'C'),
+          ],
+        );
+
+    test(
+        'effective limits fall back to the original flags (a legacy group is unchanged)',
+        () {
+      const legacySingle = ProductOption(
+          id: 's',
+          name: 's',
+          isRequired: true,
+          allowsMultiple: false,
+          values: []);
+      expect([legacySingle.effectiveMin, legacySingle.effectiveMax], [1, 1]);
+      const legacyMulti = ProductOption(
+          id: 'm',
+          name: 'm',
+          isRequired: false,
+          allowsMultiple: true,
+          values: []);
+      expect([legacyMulti.effectiveMin, legacyMulti.effectiveMax], [0, null]);
+      expect([
+        limited(min: 2, max: 4).effectiveMin,
+        limited(min: 2, max: 4).effectiveMax
+      ], [
+        2,
+        4
+      ]);
+    });
+
+    test(
+        'a further value is not added once the maximum is reached; unticking frees a slot',
+        () {
+      final option = limited(max: 2);
+      final product = _product(options: [option]);
+      var config = const ProductConfiguration();
+      config =
+          config.toggle(option, 'a').toggle(option, 'b').toggle(option, 'c');
+      expect(config.selectedFor(option), {'a', 'b'});
+      config = config.toggle(option, 'a').toggle(option, 'c');
+      expect(config.selectedFor(option), {'b', 'c'});
+      expect(config.isValid(product), isTrue);
+    });
+
+    test(
+        'below the minimum is invalid (but nothing chosen is the "required" case, not "below minimum")',
+        () {
+      final option = limited(min: 2);
+      final product = _product(options: [option]);
+      var config = const ProductConfiguration();
+      expect(config.missingRequired(product), isEmpty,
+          reason:
+              'min without isRequired flag: the server marks min >= 1 as required, the app learns that from isRequired');
+      config = config.toggle(option, 'a');
+      expect(config.belowMinimum(product), [option]);
+      expect(config.isValid(product), isFalse);
+      config = config.toggle(option, 'b');
+      expect(config.belowMinimum(product), isEmpty);
+      expect(config.isValid(product), isTrue);
     });
   });
 }

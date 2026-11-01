@@ -91,13 +91,19 @@ class _AddressSelectionScreenState
       appBar: AppBar(
         title: Text(l10n.addressSelectTitle),
         actions: [
-          TextButton(
-            onPressed: () async {
-              final created =
-                  await context.push<SavedAddress>('/addresses/add');
-              if (created != null && context.mounted) context.pop(created);
-            },
-            child: Text(l10n.addressAddNew),
+          // Capped (and ellipsised) so a very large system font on a narrow phone cannot push it off the bar.
+          ConstrainedBox(
+            constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * 0.42),
+            child: TextButton(
+              onPressed: () async {
+                final created =
+                    await context.push<SavedAddress>('/addresses/add');
+                if (created != null && context.mounted) context.pop(created);
+              },
+              child: Text(l10n.addressAddNew,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
           ),
         ],
       ),
@@ -135,10 +141,13 @@ class _AddressSelectionScreenState
                     context.pop(address);
                     return;
                   }
-                  final completed = await context.push<SavedAddress>('/addresses/add', extra: address);
+                  final completed = await context
+                      .push<SavedAddress>('/addresses/add', extra: address);
                   if (!context.mounted) return;
                   ref.invalidate(savedAddressesProvider);
-                  if (completed != null && !completed.needsZoneSelection) context.pop(completed);
+                  if (completed != null && !completed.needsZoneSelection) {
+                    context.pop(completed);
+                  }
                 },
                 semanticLabel: address.label?.isNotEmpty == true
                     ? '${address.label}, ${address.line1}'
@@ -151,18 +160,19 @@ class _AddressSelectionScreenState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          // Wrap, not Row: with a large font on a narrow phone the "Default" badge moves under the name.
+                          Wrap(
+                            spacing: HatlySpacing.sm,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Flexible(
-                                child: Text(
-                                  address.label?.isNotEmpty == true
-                                      ? address.label!
-                                      : address.line1,
-                                  style: context.type.title,
-                                ),
+                              Text(
+                                address.label?.isNotEmpty == true
+                                    ? address.label!
+                                    : address.line1,
+                                style: context.type.title,
                               ),
                               if (address.isDefault) ...[
-                                const SizedBox(width: HatlySpacing.sm),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: HatlySpacing.sm, vertical: 2),

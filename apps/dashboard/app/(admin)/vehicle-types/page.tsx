@@ -1,161 +1,149 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import {
-  VehicleType,
-  createVehicleType,
-  listVehicleTypes,
-  updateVehicleType,
-} from '../../../lib/api/admin-vehicle-types';
+import { useCallback, useEffect, useState } from 'react';
+import { VehicleType, createVehicleType, listVehicleTypes, updateVehicleType } from '../../../lib/api/admin-vehicle-types';
 import { apiErrorMessage } from '../../../lib/api/errors';
+import { useLang } from '../../../lib/ui/lang';
+import { Badge, Button, Card, Column, ConfirmDialog, DataTable, LabeledInput, Modal, PageHeader, useToast } from '../../../components/ui';
 
 /**
- * M3a (Launch-Readiness Gap Audit, G-29). Reuses the existing, unchanged
- * `admin/vehicle-types` endpoints exactly. Kept deliberately simple — a
- * list with inline edit controls plus a create form, matching the
- * Drivers page's own "create form + list" shape. `maxActiveDeliveries`
- * is scaffolding only today (nothing reads/enforces it yet — see the
- * entity's own comment); this page just lets Admin manage the data the
- * backend already stores, not a new business rule.
+ * Vehicle Types — the catalogue drivers choose their vehicle from. Reuses the existing `admin/vehicle-types` endpoints exactly. `maxActiveDeliveries`
+ * is scaffolding only today (nothing reads or enforces it yet — see the entity's own comment): this page manages the data the backend already stores,
+ * it does not define a business rule. Only a bicycle type limits how far a driver is sent to a pickup. Deactivating is confirmed first.
  */
 export default function VehicleTypesPage() {
+  const { t } = useLang();
+  const toast = useToast();
   const [types, setTypes] = useState<VehicleType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
+  const [editing, setEditing] = useState<VehicleType | 'new' | null>(null);
   const [name, setName] = useState('');
   const [nameAr, setNameAr] = useState('');
-  const [maxActiveDeliveries, setMaxActiveDeliveries] = useState('');
+  const [maxActive, setMaxActive] = useState('');
   const [isBicycle, setIsBicycle] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const [savingId, setSavingId] = useState<string | null>(null);
-  const [rowErrorById, setRowErrorById] = useState<Record<string, string>>({});
+  const [deactivate, setDeactivate] = useState<VehicleType | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [rowError, setRowError] = useState<string | null>(null);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setError(null);
+    setLoading(true);
     try {
       setTypes(await listVehicleTypes(true));
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to load vehicle types.'));
+      setError(apiErrorMessage(err, t('Failed to load vehicle types.', 'تعذّر تحميل أنواع المركبات.')));
+    } finally {
+      setLoading(false);
     }
-  }
+  }, [t]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleCreate(e: React.FormEvent) {
+  function open(target: VehicleType | 'new') {
+    setFormError(null);
+    setEditing(target);
+    if (target === 'new') { setName(''); setNameAr(''); setMaxActive(''); setIsBicycle(false); }
+    else { setName(target.name); setNameAr(target.nameAr ?? ''); setMaxActive(String(target.maxActiveDeliveries)); setIsBicycle(target.isBicycle); }
+  }
+
+  async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (isCreating) return;
-    setCreateError(null);
-    const max = Number(maxActiveDeliveries);
-    if (!name.trim() || !maxActiveDeliveries || !Number.isInteger(max) || max <= 0) {
-      setCreateError('Name and a positive integer max active deliveries are required.');
-      return;
-    }
-    setIsCreating(true);
+    if (saving || !editing) return;
+    const max = Number(maxActive);
+    if (!name.trim() || !maxActive || !Number.isInteger(max) || max <= 0) return setFormError(t('A name and a whole number of max active deliveries (at least 1) are required.', 'الاسم وعدد صحيح للحد الأقصى للتوصيلات النشطة (1 على الأقل) مطلوبان.'));
+    setSaving(true);
+    setFormError(null);
     try {
-      await createVehicleType({ name: name.trim(), nameAr: nameAr.trim() || undefined, maxActiveDeliveries: max, isBicycle });
-      setName('');
-      setNameAr('');
-      setMaxActiveDeliveries('');
-      setIsBicycle(false);
+      if (editing === 'new') await createVehicleType({ name: name.trim(), nameAr: nameAr.trim() || undefined, maxActiveDeliveries: max, isBicycle });
+      else await updateVehicleType(editing.id, { name: name.trim(), nameAr: nameAr.trim() || undefined, maxActiveDeliveries: max, isBicycle });
+      toast.push('success', editing === 'new' ? t('Vehicle type created.', 'تم إنشاء نوع المركبة.') : t('Vehicle type saved.', 'تم حفظ نوع المركبة.'));
+      setEditing(null);
       await refresh();
     } catch (err: any) {
-      setCreateError(apiErrorMessage(err, 'Failed to create vehicle type.'));
+      setFormError(apiErrorMessage(err, t('Failed to save the vehicle type.', 'تعذّر حفظ نوع المركبة.')));
     } finally {
-      setIsCreating(false);
+      setSaving(false);
     }
   }
 
-  /** Deactivating hides this vehicle type from future assignment eligibility — confirmed before sending, same as every other irreversible-feeling toggle in this dashboard. */
-  async function handleToggleActive(type: VehicleType) {
-    if (savingId) return;
-    const next = !type.isActive;
-    if (!next && !window.confirm(`Deactivate "${type.name}"? Drivers using this vehicle type may become ineligible for new assignments.`)) {
-      return;
-    }
-    setSavingId(type.id);
-    setRowErrorById((prev) => ({ ...prev, [type.id]: '' }));
+  async function setActive(type: VehicleType, next: boolean) {
+    if (busy) return;
+    setBusy(true);
+    setRowError(null);
     try {
       await updateVehicleType(type.id, { isActive: next });
+      toast.push('success', next ? t('Vehicle type activated.', 'تم تفعيل نوع المركبة.') : t('Vehicle type deactivated.', 'تم إيقاف نوع المركبة.'));
+      setDeactivate(null);
       await refresh();
     } catch (err: any) {
-      setRowErrorById((prev) => ({ ...prev, [type.id]: apiErrorMessage(err, 'Failed to update.' )}));
+      setRowError(apiErrorMessage(err, t('Failed to update.', 'تعذّر التحديث.')));
     } finally {
-      setSavingId(null);
+      setBusy(false);
     }
   }
 
+  const columns: Column<VehicleType>[] = [
+    { key: 'name', header: t('Name', 'الاسم'), cell: (v) => <span><span className="font-medium text-gray-900">{v.name}</span>{v.nameAr && <span className="ms-2 text-gray-500" dir="rtl">{v.nameAr}</span>}</span> },
+    { key: 'kind', header: t('Kind', 'النوع'), cell: (v) => (v.isBicycle ? <Badge tone="blue">{t('Bicycle', 'دراجة')}</Badge> : <span className="text-gray-500">{t('Motorised', 'بمحرك')}</span>) },
+    { key: 'max', header: t('Max active deliveries', 'الحد الأقصى للتوصيلات النشطة'), align: 'end', cell: (v) => v.maxActiveDeliveries },
+    { key: 'status', header: t('Status', 'الحالة'), cell: (v) => <Badge tone={v.isActive ? 'green' : 'gray'}>{v.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge> },
+    {
+      key: 'actions', header: '', align: 'end',
+      cell: (v) => (
+        <span className="inline-flex gap-2">
+          <Button size="sm" className="min-h-[36px]" onClick={() => open(v)}>{t('Edit', 'تعديل')}</Button>
+          {v.isActive ? <Button size="sm" className="min-h-[36px]" onClick={() => { setRowError(null); setDeactivate(v); }}>{t('Deactivate', 'إيقاف')}</Button> : <Button size="sm" variant="primary" className="min-h-[36px]" loading={busy} onClick={() => void setActive(v, true)}>{t('Activate', 'تفعيل')}</Button>}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-xl font-semibold">Vehicle Types</h1>
+    <div className="max-w-5xl">
+      <PageHeader
+        title={t('Vehicle Types', 'أنواع المركبات')}
+        subtitle={t('The vehicles drivers can choose from. Only a bicycle type limits how far a driver is sent to a pickup.', 'المركبات التي يختار منها السائقون. نوع الدراجة وحده يحدّ من مسافة الاستلام التي يُرسَل إليها السائق.')}
+        actions={<><Button onClick={refresh} loading={loading}>{t('Refresh', 'تحديث')}</Button><Button variant="primary" onClick={() => open('new')}>{t('New vehicle type', 'نوع مركبة جديد')}</Button></>}
+      />
+      <Card pad={false}>
+        <DataTable columns={columns} rows={types ?? undefined} rowKey={(v) => v.id} loading={loading} error={error} onRetry={refresh} emptyTitle={t('No vehicle types yet.', 'لا توجد أنواع مركبات بعد.')} emptyHint={t('Add the vehicles your drivers use.', 'أضف المركبات التي يستخدمها سائقوك.')} />
+      </Card>
+      {rowError && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{rowError}</p>}
 
-      <section className="rounded border bg-white p-4">
-        <h2 className="font-semibold">Create Vehicle Type</h2>
-        <form onSubmit={handleCreate} className="mt-3 space-y-2">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="w-full rounded border px-2 py-1.5 text-sm" />
-          <input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="Name (Arabic, optional)" className="w-full rounded border px-2 py-1.5 text-sm" />
-          <input type="number" min={1} step={1} value={maxActiveDeliveries} onChange={(e) => setMaxActiveDeliveries(e.target.value)} placeholder="Max active deliveries" className="w-full rounded border px-2 py-1.5 text-sm" />
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={isBicycle} onChange={(e) => setIsBicycle(e.target.checked)} />
-            Bicycle (subject to the max pickup distance policy)
-          </label>
-          {createError && <p className="text-sm text-red-600">{createError}</p>}
-          <button type="submit" disabled={isCreating} className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-            {isCreating ? 'Creating...' : 'Create'}
-          </button>
+      <Modal
+        open={editing !== null}
+        title={editing === 'new' ? t('New vehicle type', 'نوع مركبة جديد') : t('Edit vehicle type', 'تعديل نوع المركبة')}
+        onClose={() => !saving && setEditing(null)}
+        footer={<><Button onClick={() => setEditing(null)} disabled={saving}>{t('Cancel', 'إلغاء')}</Button><Button variant="primary" type="submit" form="vt-form" loading={saving}>{t('Save', 'حفظ')}</Button></>}
+      >
+        <form id="vt-form" onSubmit={save} className="space-y-3">
+          <LabeledInput label={t('Name', 'الاسم')} required value={name} onChange={(e) => setName(e.target.value)} />
+          <LabeledInput label={t('Name (Arabic, optional)', 'الاسم (بالعربية، اختياري)')} dir="rtl" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+          <LabeledInput label={t('Max active deliveries', 'الحد الأقصى للتوصيلات النشطة')} type="number" min={1} step={1} inputMode="numeric" required value={maxActive} onChange={(e) => setMaxActive(e.target.value)} hint={t('Stored for future use; not enforced yet.', 'يُخزَّن للاستخدام المستقبلي؛ لا يُطبَّق بعد.')} />
+          <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={isBicycle} onChange={(e) => setIsBicycle(e.target.checked)} />{t('Bicycle (subject to the max pickup distance policy)', 'دراجة (تخضع لسياسة الحد الأقصى لمسافة الاستلام)')}</label>
+          {formError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
         </form>
-      </section>
+      </Modal>
 
-      <section>
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">All Vehicle Types</h2>
-          <button onClick={refresh} className="text-sm text-gray-500 underline">
-            Refresh
-          </button>
-        </div>
-        {error && (
-          <div className="mt-2 rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}{' '}
-            <button onClick={refresh} className="underline">
-              Retry
-            </button>
-          </div>
-        )}
-        {!error && types === null && <p className="mt-2 text-gray-500">Loading...</p>}
-        {!error && types !== null && types.length === 0 && <p className="mt-2 text-gray-500">No vehicle types yet.</p>}
-        {!error && types !== null && types.length > 0 && (
-          <ul className="mt-2 divide-y rounded border bg-white">
-            {types.map((t) => (
-              <li key={t.id} className="px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">
-                      {t.name} {t.isBicycle && <span className="ml-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700">Bicycle</span>}
-                    </p>
-                    <p className="text-xs text-gray-500">Max active deliveries: {t.maxActiveDeliveries}</p>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className={`rounded px-2 py-0.5 ${t.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
-                      {t.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                    <button
-                      onClick={() => handleToggleActive(t)}
-                      disabled={savingId === t.id}
-                      className="rounded bg-gray-200 px-2 py-1 font-medium text-gray-700 disabled:opacity-50"
-                    >
-                      {t.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                  </div>
-                </div>
-                {rowErrorById[t.id] && <p className="mt-1 text-xs text-red-600">{rowErrorById[t.id]}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <ConfirmDialog
+        open={!!deactivate}
+        title={t('Deactivate this vehicle type?', 'إيقاف نوع المركبة هذا؟')}
+        message={deactivate ? t(`Deactivate "${deactivate.name}"? Drivers using this vehicle type may become ineligible for new assignments.`, `إيقاف "${deactivate.name}"؟ قد يصبح السائقون الذين يستخدمون هذا النوع غير مؤهلين للتعيينات الجديدة.`) : ''}
+        confirmLabel={t('Deactivate', 'إيقاف')}
+        danger
+        busy={busy}
+        error={rowError}
+        onConfirm={() => deactivate && void setActive(deactivate, false)}
+        onClose={() => setDeactivate(null)}
+      />
     </div>
   );
 }

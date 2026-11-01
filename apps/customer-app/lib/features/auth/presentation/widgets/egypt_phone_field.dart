@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/hatly_theme.dart';
+import '../../../../core/utils/egypt_phone_number.dart';
 
 /// A phone field that always shows the +20 (Egypt) country code as a
 /// fixed prefix — the customer only ever types the national number
@@ -95,11 +96,7 @@ class _EgyptPhoneFieldState extends State<EgyptPhoneField> {
                 focusNode: _focusNode,
                 autofocus: widget.autofocus,
                 keyboardType: TextInputType.phone,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(
-                      11), // covers a leading-0 local format too
-                ],
+                inputFormatters: const [EgyptNationalNumberFormatter()],
                 style: context.type.body.copyWith(
                   color: p.textPrimary,
                   fontWeight: FontWeight.w500,
@@ -123,5 +120,35 @@ class _EgyptPhoneFieldState extends State<EgyptPhoneField> {
         ),
       ),
     );
+  }
+}
+
+/// Keeps the field in NATIONAL form (what the fixed +20 chip expects) whatever way the number arrives — typed on an Arabic keyboard
+/// (Arabic-Indic digits), or typed / pasted / autofilled WITH the country code (`+20…`, `0020…`, `20` + 10 digits). It used to keep
+/// ASCII digits only and cut at 11 characters, which turned `+201012345678` into the invalid `20101234567` and erased Arabic-Indic
+/// digits, so a customer could not sign in again with the number they registered (regression test: egypt_phone_field_input_test).
+/// Which numbers are valid is still decided by [EgyptPhoneNumber.normalize] (and the backend); this only stops the field mangling input.
+class EgyptNationalNumberFormatter extends TextInputFormatter {
+  const EgyptNationalNumberFormatter();
+
+  static const _maxNational = 11; // a leading-0 local number: 010XXXXXXXX
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    var text = EgyptPhoneNumber.asciiDigits(newValue.text).replaceAll(RegExp(r'[^0-9+]'), '');
+    text = text.isEmpty ? text : text[0] + text.substring(1).replaceAll('+', ''); // a '+' only as the first character
+    if (text.startsWith('+20')) {
+      text = text.substring(3);
+    } else if (text.startsWith('0020')) {
+      text = text.substring(4);
+    } else if (text.startsWith('20') && text.length >= 12) {
+      text = text.substring(2);
+    }
+    if (text.startsWith('+') && text.length > 3) text = text.substring(0, 3); // an unfinished "+2"/"+20" while typing, nothing else
+    if (text.length > _maxNational && !text.startsWith('+') && !text.startsWith('00') && !text.startsWith('20')) {
+      text = text.substring(0, _maxNational);
+    }
+    if (text.length > 15) text = text.substring(0, 15); // the longest unfinished international form: 0020 + 11
+    return TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
   }
 }

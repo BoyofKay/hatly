@@ -360,3 +360,47 @@ describe('DriverRankingService — ServiceArea boundary (Phase I-B)', () => {
     expect(ranked).toEqual([]);
   });
 });
+
+describe('DriverRankingService — Maps disabled (PD-009 G: straight-line ranking)', () => {
+  function disabledHarness(drivers: any[], maxBicycleDistanceMeters: number | null = 5000) {
+    const h = buildHarness({ drivers, branches: [{ id: 'branch-1', latitude: 30.1, longitude: 31.1 }], distances: {}, maxBicycleDistanceMeters });
+    (h.mapProvider as any).available = false; // exactly what UnavailableMapProvider exposes
+    return h;
+  }
+
+  it('ranks by straight-line distance to the first pickup and never calls the map provider', async () => {
+    const { service, mapProvider } = disabledHarness([
+      makeDriver({ id: 'far', lastLatitude: 30.2, lastLongitude: 31.2 }),
+      makeDriver({ id: 'near', lastLatitude: 30.101, lastLongitude: 31.101 }),
+      makeDriver({ id: 'mid', lastLatitude: 30.12, lastLongitude: 31.12 }),
+    ]);
+    expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['near', 'mid', 'far']);
+    expect(mapProvider.distanceAndEta).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-rank bicycle drivers (their limit is a road distance that cannot be verified), even very close ones', async () => {
+    const { service } = disabledHarness([
+      makeDriver({ id: 'bike', lastLatitude: 30.1001, lastLongitude: 31.1001, vehicleTypeId: 'vt-1', vehicleType: { isBicycle: true } }),
+      makeDriver({ id: 'car', lastLatitude: 30.15, lastLongitude: 31.15 }),
+    ]);
+    expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['car']);
+  });
+
+  it('keeps every other eligibility rule: no location, other service area, offline', async () => {
+    const drivers = [
+      makeDriver({ id: 'no-loc', lastLatitude: null, lastLongitude: null }),
+      makeDriver({ id: 'offline', isOnline: false }),
+      makeDriver({ id: 'elsewhere', lastLatitude: 31.2, lastLongitude: 29.9 }),
+      makeDriver({ id: 'ok', lastLatitude: 30.11, lastLongitude: 31.11 }),
+    ];
+    const { service, serviceAreaResolverService } = disabledHarness(drivers);
+    serviceAreaResolverService.resolveForPoint.mockImplementation(async (lat: number) => (lat > 31 ? { id: 'zone-other', isActive: true } : { id: 'zone-default', isActive: true }));
+    expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['ok']);
+  });
+
+  it('admin named-assignment eligibility follows the same straight-line ranking', async () => {
+    const { service } = disabledHarness([makeDriver({ id: 'ok', lastLatitude: 30.11, lastLongitude: 31.11 })]);
+    await expect(service.isDriverEligibleForOrder(makeCatalogOrder(), 'ok')).resolves.toBe(true);
+    await expect(service.isDriverEligibleForOrder(makeCatalogOrder(), 'nobody')).resolves.toBe(false);
+  });
+});

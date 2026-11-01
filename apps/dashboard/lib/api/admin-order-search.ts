@@ -15,6 +15,10 @@ export interface AdminOrderListItem {
   segmentCount: number;
   /** At least one Hatly Service request has no confirmed price yet. */
   hasPendingHatlyServicePricing: boolean;
+  /** Names of the vendor branches with a part in this order. */
+  vendorNames?: string[];
+  /** The driver on the order while one is on record; null while it waits for a driver. */
+  driver?: { id: string; fullName: string } | null;
 }
 
 export interface AdminOrderSearchParams {
@@ -30,6 +34,13 @@ export interface AdminOrderSearchParams {
   hasPendingPricing?: boolean;
   /** DELIVERY or PICKUP. */
   fulfillmentType?: string;
+  /** Any of these statuses, comma-separated (queue views). */
+  statuses?: string;
+  /** Orders with a part from this vendor branch. */
+  vendorBranchId?: string;
+  /** Africa/Cairo calendar dates, YYYY-MM-DD, inclusive. */
+  from?: string;
+  to?: string;
 }
 
 export interface AdminOrderSearchResult {

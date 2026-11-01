@@ -44,7 +44,7 @@ test.describe('Admin — driver vehicle type', () => {
   });
 
   async function driverRow(page: Page) {
-    await page.goto('/drivers');
+    await page.goto(`/drivers?search=${encodeURIComponent(driver.fullName)}`);
     const row = page.getByTestId(`driver-row-${driver.id}`);
     await expect(row.getByTestId('driver-vehicle-select')).toBeVisible();
     return row;
@@ -104,7 +104,7 @@ test.describe('Admin — driver vehicle type', () => {
   });
 
   test('Arabic: the Drivers page renders right-to-left with Arabic labels and the Arabic vehicle name', async ({ page }) => {
-    await page.goto('/drivers?lang=ar');
+    await page.goto(`/drivers?lang=ar&search=${encodeURIComponent(driver.fullName)}`);
     await expect(page.getByRole('heading', { name: 'السائقون' })).toBeVisible();
     await expect(page.locator('[dir="rtl"]').first()).toBeVisible();
     const row = page.getByTestId(`driver-row-${driver.id}`);

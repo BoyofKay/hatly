@@ -60,7 +60,7 @@ function build(params: {
       updates.push({ where, set });
     }),
   };
-  const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined) };
+  const offerConsumptionService = { reverseFlashSaleConsumptionForOrder: jest.fn(async () => undefined), reverseSubtotalDiscountConsumptionForOrder: jest.fn(async () => undefined) };
   const manualTransferRefundService = {
     reconcileReducedTotal: jest.fn(async () => ({ refundedMinor: params.refundMinor ?? 0, pendingRefundMinor: params.pendingRefundMinor ?? 0 })),
   };
@@ -160,6 +160,8 @@ describe('OrderSegmentCancellationService.applyPartialCancellation', () => {
     });
     await h.run('B');
     expect(h.offerConsumptionService.reverseFlashSaleConsumptionForOrder).toHaveBeenCalledWith(expect.anything(), 'order-1', ['iB1', 'iB2']);
+    // PD-014: the rejected segment's subtotal-discount / coupon entitlement goes back with it — only that segment's
+    expect(h.offerConsumptionService.reverseSubtotalDiscountConsumptionForOrder).toHaveBeenCalledWith(expect.anything(), 'order-1', ['B']);
   });
 
   it('refund: the SERVER-derived new total is what the refund service is asked to reconcile against (the client never supplies an amount)', async () => {

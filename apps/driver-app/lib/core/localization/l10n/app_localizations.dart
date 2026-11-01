@@ -116,24 +116,6 @@ abstract class AppLocalizations {
   /// **'إنهاء الاستلام'**
   String get goOffline;
 
-  /// No description provided for @incomingRequest.
-  ///
-  /// In ar, this message translates to:
-  /// **'طلب توصيل جديد'**
-  String get incomingRequest;
-
-  /// No description provided for @accept.
-  ///
-  /// In ar, this message translates to:
-  /// **'قبول'**
-  String get accept;
-
-  /// No description provided for @reject.
-  ///
-  /// In ar, this message translates to:
-  /// **'رفض'**
-  String get reject;
-
   /// No description provided for @pickupDetails.
   ///
   /// In ar, this message translates to:

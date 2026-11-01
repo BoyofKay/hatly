@@ -4,6 +4,7 @@ import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../shell/presentation/shell_tab_provider.dart';
 import '../../data/home_address_provider.dart';
+import '../../../notifications/presentation/widgets/notification_bell.dart';
 import 'address_selection_sheet.dart';
 
 /// Compact location row: pin + the active/selected address + chevron (opens
@@ -68,6 +69,7 @@ class HomeLocationBar extends ConsumerWidget {
               ),
             ),
           ),
+          const NotificationBell(),
           _RoundIconButton(
             icon: Icons.favorite_border_rounded,
             tooltip: l10n.homeFavoritesShortcut,

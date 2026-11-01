@@ -95,10 +95,12 @@ describe('E2E — operational completion', () => {
       const stale = await staleSnapshot(d);
       const order = await readyOrder();
       expectData(await world.api('post', `/admin/orders/${order.id}/assign-driver`, { token: superAdmin.accessToken, body: { driverId: d.driverId } }), 201);
-      const repo = world.ds.getRepository(Driver);
-      const realFindOne = repo.findOne.bind(repo);
-      jest.spyOn(world.ds.getRepository(Driver).constructor.prototype, 'findOne').mockImplementation(async function (this: any, opts: any) {
-        return opts?.where?.id === d.driverId ? stale : realFindOne(opts);
+      // `findOne` lives on the SHARED Repository prototype: only the Driver repository's lookup of THIS driver is made stale; every other
+      // repository (e.g. the staff-user lookup behind authentication) must still run the real method on its own `this`.
+      const proto = world.ds.getRepository(Driver).constructor.prototype;
+      const realFindOne = proto.findOne;
+      jest.spyOn(proto, 'findOne').mockImplementation(async function (this: any, opts: any) {
+        return this?.metadata?.target === Driver && opts?.where?.id === d.driverId ? stale : realFindOne.call(this, opts);
       });
       expectData(await world.api('patch', `/admin/drivers/${d.driverId}/commission-rate`, { token: superAdmin.accessToken, body: { commissionRateBasisPoints: 1234 } }));
       jest.restoreAllMocks();
@@ -125,7 +127,7 @@ describe('E2E — operational completion', () => {
       expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: d.accessToken, body: { status: 'READY_FOR_PICKUP' } }));
 
       const row = await rowOf(order.orderNumber);
-      expect(row).toMatchObject({ status: 'READY_FOR_PICKUP', driver: null, openDispatchAlert: null, released: { byRole: 'DRIVER', at: expect.any(String) } });
+      expect(row).toMatchObject({ status: 'READY_FOR_PICKUP', driver: null, openDispatchAlert: { reason: 'AUTO_ASSIGN_DISABLED' }, released: { byRole: 'DRIVER', at: expect.any(String) } });
       expect((await rowOf(untouched.orderNumber)).released).toBeNull();
       expect((await summary()).releasedAwaitingManualAssignment).toBe(before + 1);
       const releasedOnly = expectData<any[]>(await world.api('get', '/admin/control-tower/deliveries?releasedOnly=true&limit=100', { token: superAdmin.accessToken }));
@@ -399,7 +401,7 @@ describe('E2E — operational completion', () => {
         const [segment] = await world.ds.query('SELECT id FROM order_vendor_segments WHERE order_id = $1', [order.id]);
 
         const [cancel, manual] = await Promise.all([
-          world.api('patch', `/vendor/orders/segments/${segment.id}/status`, { token: vendor.manager.accessToken, body: { status: 'CANCELLED' } }),
+          world.api('patch', `/vendor/orders/segments/${segment.id}/status`, { token: vendor.manager.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } }),
           assign(order.id, d1.driverId),
         ]);
 

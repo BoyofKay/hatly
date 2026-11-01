@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hatly_customer/core/localization/l10n/app_localizations.dart';
 import 'package:hatly_customer/core/theme/hatly_theme.dart';
+import 'package:hatly_customer/features/auth/presentation/auth_gate.dart';
 
 /// Widget-test harness: real Hatly theme (light or dark), real localisations,
 /// Arabic (RTL) by default. google_fonts is switched off so nothing tries to
@@ -16,7 +17,9 @@ Widget hatlyTestApp(
 }) {
   HatlyTypography.useGoogleFonts = false;
   return ProviderScope(
-    overrides: overrides,
+    // Widget tests exercise the signed-in customer unless a test says otherwise (pass its own `isSignedInProvider` override
+    // — it comes later in the list and wins).
+    overrides: [isSignedInProvider.overrideWithValue(true), ...overrides],
     child: MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: HatlyTheme.light(),

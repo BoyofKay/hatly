@@ -35,7 +35,9 @@ class CheckoutItemsSummary extends StatelessWidget {
                     const SizedBox(height: HatlySpacing.xs),
                     for (final item in group.items)
                       _ItemRow(
-                          item: item, isAdHocService: group.isAdHocService),
+                          item: item,
+                          isAdHocService: group.isAdHocService,
+                          isDeliveryOnly: group.isDeliveryOnly),
                   ],
                 ),
               ),
@@ -47,10 +49,14 @@ class CheckoutItemsSummary extends StatelessWidget {
 }
 
 class _ItemRow extends StatelessWidget {
-  const _ItemRow({required this.item, required this.isAdHocService});
+  const _ItemRow(
+      {required this.item,
+      required this.isAdHocService,
+      this.isDeliveryOnly = false});
 
   final CartItem item;
   final bool isAdHocService;
+  final bool isDeliveryOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +85,15 @@ class _ItemRow extends StatelessWidget {
               ],
             ),
           ),
-          if (item.lineTotalMinor != null)
+          if (isDeliveryOnly)
+            // Wasally: there is no item price — the delivery fee is the whole charge (shown below in the totals).
+            Flexible(
+              child: Text(l10n.hatlyServiceDeliveryOnly,
+                  key: const Key('checkout-item-delivery-only'),
+                  textAlign: TextAlign.end,
+                  style: context.type.caption),
+            )
+          else if (item.lineTotalMinor != null)
             LtrText(formatMinorUnits(item.lineTotalMinor!, context),
                 style: context.type.small.copyWith(color: p.textPrimary))
           else if (isCustomRequest)
@@ -101,9 +115,13 @@ class _ItemRow extends StatelessWidget {
 
 /// The server's totals: subtotal, discount, delivery fee, wallet, total and what is still due.
 class CheckoutTotals extends StatelessWidget {
-  const CheckoutTotals({super.key, required this.quote});
+  const CheckoutTotals(
+      {super.key, required this.quote, this.deliveryOnly = false});
 
   final CheckoutQuote quote;
+
+  /// Wasally: no merchandise, so no subtotal line — just the delivery fee and the total.
+  final bool deliveryOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -131,11 +149,14 @@ class CheckoutTotals extends StatelessWidget {
         children: [
           // Pending Hatly Service price: the server's subtotal is 0 only because nothing is priced yet — shown as the pending state,
           // never as a zero that would read as free.
-          quote.hasPendingPricing
-              ? row(l10n.checkoutSubtotalLabel, l10n.hatlyServicePricePending,
-                  ltr: false, valueKey: const Key('checkout-subtotal-pending'))
-              : row(l10n.checkoutSubtotalLabel,
-                  formatMinorUnits(summary.subtotalMinor, context)),
+          if (deliveryOnly)
+            const SizedBox.shrink()
+          else if (quote.hasPendingPricing)
+            row(l10n.checkoutSubtotalLabel, l10n.hatlyServicePricePending,
+                ltr: false, valueKey: const Key('checkout-subtotal-pending'))
+          else
+            row(l10n.checkoutSubtotalLabel,
+                formatMinorUnits(summary.subtotalMinor, context)),
           if (summary.discountMinor > 0)
             row(l10n.orderDiscountLabel,
                 '-${formatMinorUnits(summary.discountMinor, context)}',

@@ -29,7 +29,8 @@ class HatlyServiceEntryCard extends StatelessWidget {
           const EdgeInsets.symmetric(horizontal: HatlySpacing.screenPadding),
       child: Semantics(
         button: true,
-        label: '${l10n.hatlyServiceEntryTitle}. ${l10n.hatlyServiceEntrySubtitle}',
+        label:
+            '${l10n.hatlyServiceEntryTitle}. ${l10n.hatlyServiceEntrySubtitle}',
         excludeSemantics: true,
         child: InkWell(
           key: const Key('home-hatly-service-entry'),

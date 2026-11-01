@@ -1,0 +1,5 @@
+First release of Hatly in Belbeis.
+• Browse nearby stores, order, and choose your delivery area from the list.
+• Request items a store doesn't list, or ask Hatly to buy or deliver something for you.
+• Pay cash on delivery or by manual transfer; use your wallet balance and Hatly Points.
+• Follow every step of your order in the app's notifications. The app is in Arabic.

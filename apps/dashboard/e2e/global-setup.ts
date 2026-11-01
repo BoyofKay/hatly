@@ -21,6 +21,7 @@ import {
   VENDOR_B_STORAGE_STATE,
   SUPER_ADMIN_STORAGE_STATE,
   FIXTURE_FILE,
+  TOKENS_FILE,
   Fixtures,
   FixtureOrder,
 } from './env';
@@ -64,18 +65,44 @@ async function ensureVendorManager(superAdminToken: string, phone: string, fullN
   }
 }
 
-function storageStateFor(accessToken: string, refreshToken: string) {
+/**
+ * A browser session exactly as the dashboard gets one: a REAL `auth/dashboard/login`, whose HttpOnly cookies become the Playwright
+ * storage state (plus the non-secret profile the page keeps in localStorage). No token is ever written into the browser state.
+ */
+async function dashboardStorageState(phone: string, password: string) {
+  const res = await api.post('/auth/dashboard/login', { phone, password });
+  if (res.status !== 200) throw new Error(`[global-setup] Dashboard login failed for ${phone}: HTTP ${res.status} ${JSON.stringify(res.data)}`);
+  const host = new URL(API_BASE_URL).hostname;
+  const cookies = ((res.headers['set-cookie'] ?? []) as string[]).map((line) => {
+    const [pair, ...attrs] = line.split(';').map((p) => p.trim());
+    const i = pair.indexOf('=');
+    const attr = (name: string) => attrs.find((a) => a.toLowerCase().startsWith(`${name.toLowerCase()}=`))?.split('=')[1];
+    return {
+      name: pair.slice(0, i),
+      value: decodeURIComponent(pair.slice(i + 1)),
+      domain: host,
+      path: attr('Path') ?? '/',
+      expires: Math.floor(Date.now() / 1000) + Number(attr('Max-Age') ?? 3600),
+      httpOnly: attrs.some((a) => a.toLowerCase() === 'httponly'),
+      secure: attrs.some((a) => a.toLowerCase() === 'secure'),
+      sameSite: 'Strict' as const,
+    };
+  });
+  const { user, csrfToken } = res.data.data as { user: { id: string; role: string; phone: string; fullName: string | null }; csrfToken: string };
   return {
-    cookies: [],
+    cookies,
     origins: [
       {
         origin: DASHBOARD_BASE_URL,
         localStorage: [
-          { name: 'hatly_dashboard_token', value: accessToken },
-          { name: 'hatly_dashboard_refresh_token', value: refreshToken },
+          { name: 'hatly_dashboard_user', value: JSON.stringify({ sub: user.id, role: user.role, phone: user.phone, fullName: user.fullName }) },
+          // The Vendor area is Arabic-first by default; the browser specs assert the English wording, so their sessions start in English.
+          { name: 'hatly_dashboard_locale', value: 'en' },
         ],
       },
     ],
+    // Not part of Playwright's format (ignored by it) — kept so a spec can read the CSRF token without a round trip.
+    csrfToken,
   };
 }
 
@@ -164,11 +191,13 @@ export default async function globalSetup(_config: FullConfig) {
   const vendorB = await loginPassword(VENDOR_B_PHONE, VENDOR_B_PASSWORD);
   if (!vendorA || !vendorB) throw new Error('[global-setup] A Vendor Manager fixture account exists but could not log in.');
 
-  writeFileSync(VENDOR_A_STORAGE_STATE, JSON.stringify(storageStateFor(vendorA.accessToken, vendorA.refreshToken), null, 2));
-  writeFileSync(VENDOR_B_STORAGE_STATE, JSON.stringify(storageStateFor(vendorB.accessToken, vendorB.refreshToken), null, 2));
+  // Bearer tokens for the Node-side helpers (read from tokens.json, never from a browser state).
+  writeFileSync(TOKENS_FILE, JSON.stringify({ superAdmin: superAdmin.accessToken, vendorA: vendorA.accessToken, vendorB: vendorB.accessToken }, null, 2));
+  writeFileSync(VENDOR_A_STORAGE_STATE, JSON.stringify(await dashboardStorageState(VENDOR_A_PHONE, VENDOR_A_PASSWORD), null, 2));
+  writeFileSync(VENDOR_B_STORAGE_STATE, JSON.stringify(await dashboardStorageState(VENDOR_B_PHONE, VENDOR_B_PASSWORD), null, 2));
   // M3a (Launch-Readiness Gap Audit) — the SUPER_ADMIN session above was already required for
   // provisioning; persisting its own storageState too is the smallest possible admin-auth fixture.
-  writeFileSync(SUPER_ADMIN_STORAGE_STATE, JSON.stringify(storageStateFor(superAdmin.accessToken, superAdmin.refreshToken), null, 2));
+  writeFileSync(SUPER_ADMIN_STORAGE_STATE, JSON.stringify(await dashboardStorageState(SUPER_ADMIN_PHONE, SUPER_ADMIN_PASSWORD), null, 2));
 
   const customerApi = await registerFixtureCustomer();
   const vendorAOrders = [

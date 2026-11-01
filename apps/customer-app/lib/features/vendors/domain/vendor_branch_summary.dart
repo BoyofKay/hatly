@@ -18,6 +18,7 @@ class VendorBranchSummary {
     required this.longitude,
     required this.isOpen,
     required this.openingHours,
+    this.allowsCustomRequests = false,
   });
 
   final String id;
@@ -31,6 +32,10 @@ class VendorBranchSummary {
   /// Day key ('mon'..'sun') -> {open, close} in 24h "HH:mm", matching
   /// the backend's `opening_hours` jsonb shape.
   final Map<String, OpeningHoursRange> openingHours;
+
+  /// The server's rule for this branch's sector (admin setting, off by default): may a customer send a custom
+  /// (free-text / photo) request here? The app only mirrors it — the cart endpoint enforces it.
+  final bool allowsCustomRequests;
 }
 
 class OpeningHoursRange {

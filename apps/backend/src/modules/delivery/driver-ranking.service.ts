@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Driver } from './entities/driver.entity';
@@ -6,9 +6,9 @@ import { Order } from '../orders/entities/order.entity';
 import { VendorBranch } from '../vendors/entities/vendor-branch.entity';
 import { CartGroupType } from '../cart/cart-group-type.enum';
 import { AdHocServiceType } from '../cart/ad-hoc-service-type.enum';
-import { MAP_PROVIDER, MapProvider, GeoPoint } from '../location/map-provider.interface';
+import { MAP_PROVIDER, MapProvider, GeoPoint, isMapsDisabled } from '../location/map-provider.interface';
 import { BusinessConfigService } from '../business-config/business-config.service';
-import { ServiceAreaResolverService } from '../service-areas/service-area-resolver.service';
+import { ServiceAreaResolverService, haversineDistanceMeters } from '../service-areas/service-area-resolver.service';
 
 /**
  * CONFIRMED BUSINESS DECISIONS implemented here:
@@ -35,6 +35,8 @@ import { ServiceAreaResolverService } from '../service-areas/service-area-resolv
  */
 @Injectable()
 export class DriverRankingService {
+  private readonly logger = new Logger(DriverRankingService.name);
+
   constructor(
     @InjectRepository(Driver) private readonly driversRepository: Repository<Driver>,
     @InjectRepository(VendorBranch) private readonly vendorBranchesRepository: Repository<VendorBranch>,
@@ -92,6 +94,8 @@ export class DriverRankingService {
     const maxBicycleDistanceMeters = await this.businessConfigService.getMaxBicyclePickupDistanceMeters();
 
     const withDistance: Array<{ driverId: string; distanceMeters: number }> = [];
+    const straightLine = isMapsDisabled(this.mapProvider);
+    let bicyclesExcluded = 0;
     for (const driver of eligibleDrivers) {
       if (driver.lastLatitude == null || driver.lastLongitude == null) {
         continue; // no known location — cannot rank
@@ -113,14 +117,25 @@ export class DriverRankingService {
       }
 
       let distanceMeters: number;
-      try {
-        const result = await this.mapProvider.distanceAndEta(
-          { latitude: driver.lastLatitude, longitude: driver.lastLongitude },
-          firstPickupPoint,
-        );
-        distanceMeters = result.distanceMeters;
-      } catch {
-        continue; // can't compute distance for this driver — skip, don't fabricate one
+      if (straightLine) {
+        // PD-009 G (Maps disabled): rank by straight-line distance — an ordering heuristic only, never a price or an estimate shown
+        // to anyone. The bicycle limit is a ROAD-distance rule that cannot be verified without Maps, so bicycles are not auto-ranked
+        // (fail closed, like an unset limit); an admin with OVERRIDE_DISPATCH can still assign one deliberately.
+        if (isBicycle) {
+          bicyclesExcluded++;
+          continue;
+        }
+        distanceMeters = haversineDistanceMeters(driver.lastLatitude, driver.lastLongitude, firstPickupPoint.latitude, firstPickupPoint.longitude);
+      } else {
+        try {
+          const result = await this.mapProvider.distanceAndEta(
+            { latitude: driver.lastLatitude, longitude: driver.lastLongitude },
+            firstPickupPoint,
+          );
+          distanceMeters = result.distanceMeters;
+        } catch {
+          continue; // can't compute distance for this driver — skip, don't fabricate one
+        }
       }
 
       if (isBicycle && maxBicycleDistanceMeters !== null && distanceMeters > maxBicycleDistanceMeters) {
@@ -131,6 +146,11 @@ export class DriverRankingService {
     }
 
     withDistance.sort((a, b) => a.distanceMeters - b.distanceMeters);
+    if (straightLine) {
+      this.logger.log(
+        `dispatch ranking basis=STRAIGHT_LINE (Maps disabled): order ${order.id} — ${withDistance.length} candidate(s), ${bicyclesExcluded} bicycle driver(s) not auto-ranked`,
+      );
+    }
     return withDistance.map((d) => d.driverId);
   }
 

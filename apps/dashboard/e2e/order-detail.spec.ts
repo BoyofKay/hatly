@@ -61,7 +61,7 @@ test.describe('Vendor order detail — critical path', () => {
       await confirmButton.dblclick();
 
       await expect(page.getByText('Your items — status: CONFIRMED')).toBeVisible();
-      await expect(page.locator('.rounded.border.border-red-200')).toHaveCount(0); // no error banner ever appeared — the duplicate tap was absorbed, not surfaced as a failure
+      await expect(page.locator('.rounded-xl.border.border-red-200')).toHaveCount(0); // no error banner ever appeared — the duplicate tap was absorbed, not surfaced as a failure
     },
   );
 

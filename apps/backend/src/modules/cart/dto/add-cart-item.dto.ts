@@ -26,6 +26,7 @@ export class AddCartItemDto {
   @IsOptional()
   @IsInt()
   @Min(1)
+  @Max(100_000) // whole grams only (IsInt) and a 100 kg sanity ceiling — not a business rule, like the quantity ceiling above
   requestedWeightGrams?: number;
 
   @IsOptional()

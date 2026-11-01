@@ -23,6 +23,20 @@ class ProductOptionGroup extends StatelessWidget {
   final ValueChanged<String> onToggle;
   final bool showError;
 
+  /// "Choose 2 to 4" / "Choose at least 2" / "Choose up to 3" — only when the group has limits beyond the plain required /
+  /// single-choice cases (those are already obvious from the radio buttons and the "required" badge).
+  String? _limitsHint(AppLocalizations l10n) {
+    if (!option.allowsMultiple) return null;
+    final min = option.effectiveMin;
+    final max = option.effectiveMax;
+    if (max != null && min > 0 && min != max) {
+      return l10n.optionChooseBetween(min, max);
+    }
+    if (max != null) return l10n.optionChooseUpTo(max);
+    if (min > 1) return l10n.optionChooseAtLeast(min);
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -62,6 +76,13 @@ class ProductOptionGroup extends StatelessWidget {
               ],
             ],
           ),
+          if (_limitsHint(l10n) != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(_limitsHint(l10n)!,
+                  key: Key('option-limits-${option.id}'),
+                  style: context.type.caption.copyWith(color: p.textMuted)),
+            ),
           for (final value in option.values)
             _ValueRow(
               option: option,
@@ -70,7 +91,29 @@ class ProductOptionGroup extends StatelessWidget {
                   isArabic && value.nameAr != null ? value.nameAr! : value.name,
               deltaMinor: value.priceDeltaMinor,
               selected: selected.contains(value.id),
+              // At the maximum, the values not yet chosen are visibly unavailable (the model also refuses the tap).
+              atMax: option.allowsMultiple &&
+                  option.effectiveMax != null &&
+                  selected.length >= option.effectiveMax! &&
+                  !selected.contains(value.id),
               onTap: () => onToggle(value.id),
+            ),
+          if (showError &&
+              selected.isNotEmpty &&
+              selected.length < option.effectiveMin)
+            Padding(
+              padding: const EdgeInsets.only(top: HatlySpacing.xs),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline_rounded, size: 16, color: p.urgent),
+                  const SizedBox(width: HatlySpacing.xs),
+                  Flexible(
+                    child: Text(l10n.optionMinError(option.effectiveMin),
+                        key: Key('option-min-error-${option.id}'),
+                        style: context.type.small.copyWith(color: p.urgent)),
+                  ),
+                ],
+              ),
             ),
           if (showError && option.isRequired && selected.isEmpty)
             Padding(
@@ -94,6 +137,7 @@ class ProductOptionGroup extends StatelessWidget {
 
 class _ValueRow extends StatelessWidget {
   const _ValueRow({
+    this.atMax = false,
     required this.option,
     required this.valueId,
     required this.name,
@@ -107,6 +151,7 @@ class _ValueRow extends StatelessWidget {
   final String name;
   final int deltaMinor;
   final bool selected;
+  final bool atMax;
   final VoidCallback onTap;
 
   @override
@@ -127,30 +172,35 @@ class _ValueRow extends StatelessWidget {
       inMutuallyExclusiveGroup: !multi,
       button: true,
       onTap: onTap,
+      enabled: !atMax,
       label: deltaMinor != 0
-          ? '$name، +${formatMinorUnits(deltaMinor, context)}'
+          ? '$name، ${deltaMinor > 0 ? '+' : ''}${formatMinorUnits(deltaMinor, context)}'
           : name,
       excludeSemantics: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(HatlyRadius.chip),
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: HatlyTouch.minTarget),
-          child: Row(
-            children: [
-              Icon(icon, size: 24, color: selected ? p.accent : p.textMuted),
-              const SizedBox(width: HatlySpacing.ms),
-              // The price delta sits right after the name, so it clearly belongs to this option.
-              Flexible(
-                child: Text(name,
-                    style: context.type.small.copyWith(color: p.textPrimary)),
-              ),
-              if (deltaMinor != 0) ...[
-                const SizedBox(width: HatlySpacing.sm),
-                LtrText('+${formatMinorUnits(deltaMinor, context)}',
-                    style: context.type.small.copyWith(color: p.textMuted)),
+      child: Opacity(
+        opacity: atMax ? 0.45 : 1,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(HatlyRadius.chip),
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: HatlyTouch.minTarget),
+            child: Row(
+              children: [
+                Icon(icon, size: 24, color: selected ? p.accent : p.textMuted),
+                const SizedBox(width: HatlySpacing.ms),
+                // The price delta sits right after the name, so it clearly belongs to this option.
+                Flexible(
+                  child: Text(name,
+                      style: context.type.small.copyWith(color: p.textPrimary)),
+                ),
+                if (deltaMinor != 0) ...[
+                  const SizedBox(width: HatlySpacing.sm),
+                  LtrText(
+                      '${deltaMinor > 0 ? '+' : ''}${formatMinorUnits(deltaMinor, context)}',
+                      style: context.type.small.copyWith(color: p.textMuted)),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

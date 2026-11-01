@@ -190,3 +190,33 @@ Cart hatlyServiceCart(
       hasUnpricedItems: true,
       readyForCheckout: ready,
     );
+
+/// A cart holding ONE Wasally ("وصّلي لمكان", DELIVER_TO_PLACE) request: it buys nothing, so it has no item price at all and
+/// nothing is "unpriced" — the delivery fee is the whole charge.
+Cart wasallyCart({bool ready = true}) => Cart(
+      id: 'cart-wasally',
+      fulfillmentType: 'DELIVERY',
+      groups: const [
+        CartGroup(
+          id: 'g-wasally',
+          groupType: 'AD_HOC_SERVICE',
+          adHocPlaceName: 'بيت ماما',
+          adHocServiceType: 'DELIVER_TO_PLACE',
+          adHocDestinationLatitude: 30.3,
+          adHocDestinationLongitude: 31.45,
+          items: [
+            CartItem(
+              id: 'w-1',
+              quantity: 1,
+              isAvailable: true,
+              selectedOptionValues: [],
+              imageUrls: [],
+              freeTextDescription: 'مفتاح البيت',
+            ),
+          ],
+        ),
+      ],
+      subtotalMinor: 0,
+      hasUnpricedItems: false,
+      readyForCheckout: ready,
+    );

@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Hatly Customer</string>
+	<string>Hatly</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -28,6 +28,10 @@
 	<true/>
 	<!-- "Use my current location" in the address picker (production-readiness slice) — shown only when the app actually
 	     asks for location, with or without the interactive map enabled. See core/location/device_location_service.dart. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Hatly needs access to your photos so you can attach a picture to a custom request or a Hatly Service order.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Hatly can use your camera to take a picture for a custom request or a Hatly Service order.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Hatly uses your location to find your delivery address and check that Hatly delivers there.</string>
 	<!-- Google Maps SDK key (production-readiness slice — see docs/PRODUCT_DECISIONS.md "Google Maps key architecture").

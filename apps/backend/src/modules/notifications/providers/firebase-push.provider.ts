@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as admin from 'firebase-admin';
+import { App, cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getMessaging } from 'firebase-admin/messaging';
 import { PushNotificationProvider, PushSendResult } from '../push-provider.interface';
 import { RequestContextService } from '../../../common/request-context/request-context.service';
 import { logBusinessEvent } from '../../../common/logging/log-business-event';
@@ -23,11 +24,15 @@ import { BusinessEvent } from '../../../common/logging/business-events';
  * handle that (log-and-continue, per this chunk's explicit "push
  * failure must never break the assignment" requirement), never this
  * class.
+ *
+ * Security milestone: uses the MODULAR Admin API (`firebase-admin/app`, `firebase-admin/messaging`). The namespaced API this used
+ * before (`admin.apps`, `admin.credential.cert`, `admin.messaging(app)`) was removed in firebase-admin 14 — the release that drops the
+ * vulnerable `node-forge` dependency — while the modular API exists unchanged from v11 through v14, so the same code runs on both.
  */
 @Injectable()
 export class FirebasePushNotificationProvider implements PushNotificationProvider, OnModuleInit {
   private readonly logger = new Logger(FirebasePushNotificationProvider.name);
-  private app: admin.app.App | null = null;
+  private app: App | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -59,15 +64,16 @@ export class FirebasePushNotificationProvider implements PushNotificationProvide
       return;
     }
 
-    if (admin.apps.length > 0) {
+    const existing = getApps();
+    if (existing.length > 0) {
       // Reuse an already-initialized app rather than initializing a
       // second one — CONFIRMED "no duplicate Firebase initialization".
-      this.app = admin.apps[0] as admin.app.App;
+      this.app = existing[0];
       return;
     }
 
-    this.app = admin.initializeApp({
-      credential: admin.credential.cert({
+    this.app = initializeApp({
+      credential: cert({
         projectId,
         clientEmail,
         // Env vars commonly escape real newlines as literal "\n" —
@@ -75,6 +81,10 @@ export class FirebasePushNotificationProvider implements PushNotificationProvide
         privateKey: privateKey.replace(/\\n/g, '\n'),
       }),
     });
+  }
+
+  isConfigured(): boolean {
+    return this.app !== null;
   }
 
   async sendToTokens(params: {
@@ -88,7 +98,7 @@ export class FirebasePushNotificationProvider implements PushNotificationProvide
     }
 
     try {
-      const response = await admin.messaging(this.app).sendEachForMulticast({
+      const response = await getMessaging(this.app).sendEachForMulticast({
         tokens: params.tokens,
         notification: { title: params.title, body: params.body },
         data: params.data,

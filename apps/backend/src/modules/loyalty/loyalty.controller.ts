@@ -7,6 +7,7 @@ import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-
 import { LoyaltyService } from './loyalty.service';
 import { ConvertPointsToWalletDto } from './dto/convert-points-to-wallet.dto';
 import { ListLoyaltyTransactionsQueryDto } from './dto/list-loyalty-transactions-query.dto';
+import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
 
 /**
  * Points -> Wallet Conversion (Chunk D) + Loyalty Balance/History
@@ -49,6 +50,7 @@ export class LoyaltyController {
     };
   }
 
+  @Throttled(RateLimitPolicies.loyaltyConvert)
   @Post('convert')
   async convert(@CurrentUser() user: AuthenticatedUser, @Body() dto: ConvertPointsToWalletDto) {
     const result = await this.loyaltyService.convertPointsToWallet(user.id, dto.points, dto.idempotencyKey);

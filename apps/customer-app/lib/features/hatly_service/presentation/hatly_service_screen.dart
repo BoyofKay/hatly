@@ -8,12 +8,15 @@ import '../../../core/theme/hatly_theme.dart';
 import '../../../shared_widgets/hatly_error_banner.dart';
 import '../../../shared_widgets/hatly_primary_button.dart';
 import '../../../shared_widgets/hatly_surface.dart';
-import '../../addresses/presentation/address_pin_picker.dart';
 import '../../cart/data/cart_providers.dart';
 import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_error_messages.dart';
 import '../../uploads/data/uploads_providers.dart';
+import '../data/hatly_service_api.dart';
 import '../domain/hatly_service_type.dart';
+import '../domain/route_endpoint.dart';
+import 'widgets/route_endpoint_sheet.dart';
+import 'widgets/route_summary.dart';
 
 /// Standalone Hatly Service — the customer-facing creation UI for an
 /// AD_HOC_SERVICE cart item. CONFIRMED distinct from, and never
@@ -52,10 +55,23 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
   final _placeNameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final List<XFile> _images = [];
-  double? _pickupLat;
-  double? _pickupLng;
-  double? _destinationLat;
-  double? _destinationLng;
+  // The route ends the CUSTOMER chose (PD-012). Null = "use the service default", which the server resolves again at quote and order time:
+  //   هاتلي من مكان (Hatly):   origin = chosen, else Hatly's default start;   destination = chosen, else Hatly's default destination
+  //   وصّلي لمكان (Wasally):   origin = ALWAYS chosen (never assumed to be home);   destination = chosen, else Wasally's default destination
+  // The customer's own address is never an end unless they pick it as one.
+  RouteEndpoint? _originChoice;
+  RouteEndpoint? _destinationChoice;
+
+  RouteEndpoint? _effectiveOrigin(RouteDefaults d) =>
+      _originChoice ?? (_serviceType == HatlyServiceType.buyFromPlace ? d.hatlyOrigin : null);
+
+  RouteEndpoint? _effectiveDestination(RouteDefaults d) =>
+      _destinationChoice ??
+      switch (_serviceType) {
+        HatlyServiceType.buyFromPlace => d.hatlyDestination,
+        HatlyServiceType.deliverToPlace => d.wasallyDestination,
+        _ => null,
+      };
 
   bool _isSubmitting = false;
   String? _errorMessage;
@@ -82,21 +98,16 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
     return null;
   }
 
-  /// Hatly Service location rule: the place the customer chooses is REQUIRED for
-  /// both types — BUY_FROM_PLACE's pickup and DELIVER_TO_PLACE's destination —
-  /// matching the backend contract exactly (`CheckoutPlannerService
-  /// .resolveAdHocLocations` rejects a missing one; no Hatly default location is
-  /// ever substituted). Gating it here keeps the customer from reaching Submit
-  /// without one; the matching `cart_error_messages.dart` /
-  /// `checkout_error_messages.dart` mappings remain as defensive fallbacks.
-  bool get _isValid => _existingGroupIdCache != null
+  /// A new request needs a type, a place name, a description and BOTH route ends resolved (the customer's choice or the service's
+  /// configured default). Wasally's origin has no default, so it is always the customer's. The server re-resolves and validates the
+  /// route at quote and order time; gating here only keeps the customer from reaching Submit without a usable route.
+  bool _isValid(RouteDefaults defaults) => _existingGroupIdCache != null
       ? _descriptionController.text.trim().isNotEmpty
       : _serviceType != null &&
           _placeNameController.text.trim().isNotEmpty &&
           _descriptionController.text.trim().isNotEmpty &&
-          (_serviceType == HatlyServiceType.deliverToPlace
-              ? (_destinationLat != null && _destinationLng != null)
-              : (_pickupLat != null && _pickupLng != null));
+          _effectiveOrigin(defaults) != null &&
+          _effectiveDestination(defaults) != null;
 
   String? _existingGroupIdCache;
 
@@ -119,8 +130,8 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
 
   void _removeImage(int index) => setState(() => _images.removeAt(index));
 
-  void _goToReview() {
-    if (!_isValid) return;
+  void _goToReview(RouteDefaults defaults) {
+    if (!_isValid(defaults)) return;
     setState(() {
       _phase = _Phase.review;
       _errorMessage = null;
@@ -157,12 +168,13 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
                     ? _placeNameController.text.trim()
                     : null,
                 adHocServiceType: existingGroupId == null ? _serviceType : null,
-                pickupLatitude: existingGroupId == null ? _pickupLat : null,
-                pickupLongitude: existingGroupId == null ? _pickupLng : null,
-                destinationLatitude:
-                    existingGroupId == null ? _destinationLat : null,
-                destinationLongitude:
-                    existingGroupId == null ? _destinationLng : null,
+                // Only what the customer chose is sent; an end left on "default" stays null and the server resolves it.
+                pickupLatitude: existingGroupId == null ? _originChoice?.latitude : null,
+                pickupLongitude: existingGroupId == null ? _originChoice?.longitude : null,
+                pickupLabel: existingGroupId == null ? _originChoice?.label : null,
+                destinationLatitude: existingGroupId == null ? _destinationChoice?.latitude : null,
+                destinationLongitude: existingGroupId == null ? _destinationChoice?.longitude : null,
+                destinationLabel: existingGroupId == null ? _destinationChoice?.label : null,
                 freeTextDescription: _descriptionController.text.trim(),
                 quantity: 1,
                 imageUrls: imageUrls.isEmpty ? null : imageUrls,
@@ -186,11 +198,62 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
     }
   }
 
+  /// The ends in effect for the request being edited: an existing cart group's own (its customer-chosen ends, else the service default)
+  /// or the new request's choices. Never the customer's address.
+  ({RouteEndpoint? origin, RouteEndpoint? destination}) _routeFor(CartGroup? existing, RouteDefaults d) {
+    if (existing == null) return (origin: _effectiveOrigin(d), destination: _effectiveDestination(d));
+    final isBuy = existing.adHocServiceType == HatlyServiceType.buyFromPlace;
+    RouteEndpoint? chosen(double? lat, double? lng, String? label) => lat == null || lng == null
+        ? null
+        : RouteEndpoint(latitude: lat, longitude: lng, label: label ?? '', source: RouteEndpointSource.customer);
+    return (
+      origin: chosen(existing.adHocPickupLatitude, existing.adHocPickupLongitude, existing.adHocPickupLabel) ?? (isBuy ? d.hatlyOrigin : null),
+      destination: chosen(existing.adHocDestinationLatitude, existing.adHocDestinationLongitude, existing.adHocDestinationLabel) ??
+          (isBuy ? d.hatlyDestination : d.wasallyDestination),
+    );
+  }
+
+  Future<void> _editEndpoint({required bool isOrigin, required CartGroup? existing, required RouteDefaults defaults}) async {
+    final type = existing?.adHocServiceType ?? _serviceType;
+    final isBuy = type == HatlyServiceType.buyFromPlace;
+    final route = _routeFor(existing, defaults);
+    final choice = await showRouteEndpointSheet(
+      context,
+      isOrigin: isOrigin,
+      current: isOrigin ? route.origin : route.destination,
+      defaultEndpoint: isOrigin ? (isBuy ? defaults.hatlyOrigin : null) : (isBuy ? defaults.hatlyDestination : defaults.wasallyDestination),
+    );
+    if (choice == null || !mounted) return;
+    if (existing != null) {
+      // The request is already in the cart: store the new end there (each end independently; "default" clears the customer's choice).
+      final error = await ref.read(cartControllerProvider.notifier).updateAdHocRoute(
+            origin: isOrigin ? choice.endpoint : null,
+            clearOrigin: isOrigin && choice.useDefault,
+            destination: isOrigin ? null : choice.endpoint,
+            clearDestination: !isOrigin && choice.useDefault,
+          );
+      if (!mounted) return;
+      setState(() => _errorMessage = error == null ? null : localizedCartErrorMessage(context, error));
+      return;
+    }
+    setState(() {
+      if (isOrigin) {
+        _originChoice = choice.useDefault ? null : choice.endpoint;
+      } else {
+        _destinationChoice = choice.useDefault ? null : choice.endpoint;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final existingGroup = _existingGroup(ref);
     _existingGroupIdCache = existingGroup?.id;
+    // While the defaults load (or if they cannot be read) nothing is configured: the customer simply chooses the ends themselves.
+    final defaults = ref.watch(routeDefaultsProvider).valueOrNull ?? RouteDefaults.none;
+    final route = _routeFor(existingGroup, defaults);
+    final isBuy = (existingGroup?.adHocServiceType ?? _serviceType) == HatlyServiceType.buyFromPlace;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.hatlyServiceScreenTitle)),
@@ -200,27 +263,29 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
                 key: const ValueKey('hatly-service-form'),
                 existingGroup: existingGroup,
                 serviceType: _serviceType,
-                onServiceTypeChanged: (t) => setState(() => _serviceType = t),
+                onServiceTypeChanged: (t) => setState(() {
+                  // The two services have different defaults and rules, so a choice made for the other one is dropped.
+                  if (t != _serviceType) {
+                    _originChoice = null;
+                    _destinationChoice = null;
+                  }
+                  _serviceType = t;
+                }),
                 placeNameController: _placeNameController,
                 descriptionController: _descriptionController,
                 images: _images,
                 onPickImage: _pickImage,
                 onRemoveImage: _removeImage,
-                pickupLat: _pickupLat,
-                pickupLng: _pickupLng,
-                onPickupChanged: (lat, lng) => setState(() {
-                  _pickupLat = lat;
-                  _pickupLng = lng;
-                }),
-                destinationLat: _destinationLat,
-                destinationLng: _destinationLng,
-                onDestinationChanged: (lat, lng) => setState(() {
-                  _destinationLat = lat;
-                  _destinationLng = lng;
-                }),
+                origin: route.origin,
+                destination: route.destination,
+                originHint: isBuy ? l10n.routeDefaultMissingHint : l10n.routeOriginRequiredHint,
+                destinationHint: l10n.routeDefaultMissingHint,
+                onEditOrigin: () => _editEndpoint(isOrigin: true, existing: existingGroup, defaults: defaults),
+                onEditDestination: () => _editEndpoint(isOrigin: false, existing: existingGroup, defaults: defaults),
+                errorMessage: _errorMessage,
                 onChanged: () => setState(() {}),
-                isValid: _isValid,
-                onContinue: _goToReview,
+                isValid: _isValid(defaults),
+                onContinue: () => _goToReview(defaults),
               )
             : _ReviewPhase(
                 key: const ValueKey('hatly-service-review'),
@@ -229,10 +294,8 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
                 placeName: _placeNameController.text.trim(),
                 description: _descriptionController.text.trim(),
                 images: _images,
-                pickupLat: _pickupLat,
-                pickupLng: _pickupLng,
-                destinationLat: _destinationLat,
-                destinationLng: _destinationLng,
+                origin: route.origin,
+                destination: route.destination,
                 isSubmitting: _isSubmitting,
                 errorMessage: _errorMessage,
                 onEdit: _backToForm,
@@ -242,8 +305,6 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
     );
   }
 }
-
-typedef _PinChanged = void Function(double lat, double lng);
 
 class _FormPhase extends StatelessWidget {
   const _FormPhase({
@@ -256,12 +317,13 @@ class _FormPhase extends StatelessWidget {
     required this.images,
     required this.onPickImage,
     required this.onRemoveImage,
-    required this.pickupLat,
-    required this.pickupLng,
-    required this.onPickupChanged,
-    required this.destinationLat,
-    required this.destinationLng,
-    required this.onDestinationChanged,
+    required this.origin,
+    required this.destination,
+    required this.originHint,
+    required this.destinationHint,
+    required this.onEditOrigin,
+    required this.onEditDestination,
+    required this.errorMessage,
     required this.onChanged,
     required this.isValid,
     required this.onContinue,
@@ -275,12 +337,13 @@ class _FormPhase extends StatelessWidget {
   final List<XFile> images;
   final VoidCallback onPickImage;
   final ValueChanged<int> onRemoveImage;
-  final double? pickupLat;
-  final double? pickupLng;
-  final _PinChanged onPickupChanged;
-  final double? destinationLat;
-  final double? destinationLng;
-  final _PinChanged onDestinationChanged;
+  final RouteEndpoint? origin;
+  final RouteEndpoint? destination;
+  final String originHint;
+  final String destinationHint;
+  final VoidCallback onEditOrigin;
+  final VoidCallback onEditDestination;
+  final String? errorMessage;
   final VoidCallback onChanged;
   final bool isValid;
   final VoidCallback onContinue;
@@ -427,38 +490,30 @@ class _FormPhase extends StatelessWidget {
             ],
           ),
         ),
-        if (!addingToExisting) ...[
+        if (effectiveType != null) ...[
           const SizedBox(height: HatlySpacing.lg),
+          // The route (PD-012): origin → destination, each end the customer's choice or the service's configured default, each
+          // changeable on its own. Shown for a request already in the cart too — its ends are edited in place.
           HatlySection(
-            title: effectiveType == HatlyServiceType.deliverToPlace
-                ? l10n.hatlyServiceLocationDestinationTitle
-                : l10n.hatlyServiceLocationPickupTitle,
+            title: l10n.routeSectionTitle,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                    effectiveType == HatlyServiceType.deliverToPlace
-                        ? l10n.hatlyServiceLocationDestinationHint
-                        : l10n.hatlyServiceLocationPickupHint,
-                    style: context.type.small),
+                Text(l10n.routeDirectionNote, style: context.type.small),
                 const SizedBox(height: HatlySpacing.sm),
-                if (serviceType == HatlyServiceType.buyFromPlace)
-                  AddressPinPicker(
-                    key: const Key('hatly-service-pickup-picker'),
-                    latitude: pickupLat,
-                    longitude: pickupLng,
-                    onChanged: onPickupChanged,
-                  )
-                else if (serviceType == HatlyServiceType.deliverToPlace)
-                  AddressPinPicker(
-                    key: const Key('hatly-service-destination-picker'),
-                    latitude: destinationLat,
-                    longitude: destinationLng,
-                    onChanged: onDestinationChanged,
-                  )
-                else
-                  Text(l10n.hatlyServiceTypeSectionTitle,
-                      style: context.type.caption),
+                RouteSummary(
+                  key: const Key('hatly-service-route'),
+                  origin: origin,
+                  destination: destination,
+                  originHint: originHint,
+                  destinationHint: destinationHint,
+                  onChangeOrigin: onEditOrigin,
+                  onChangeDestination: onEditDestination,
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: HatlySpacing.sm),
+                  HatlyErrorBanner(key: const Key('hatly-service-route-error'), message: errorMessage!),
+                ],
               ],
             ),
           ),
@@ -542,10 +597,8 @@ class _ReviewPhase extends StatelessWidget {
     required this.placeName,
     required this.description,
     required this.images,
-    required this.pickupLat,
-    required this.pickupLng,
-    required this.destinationLat,
-    required this.destinationLng,
+    required this.origin,
+    required this.destination,
     required this.isSubmitting,
     required this.errorMessage,
     required this.onEdit,
@@ -557,10 +610,8 @@ class _ReviewPhase extends StatelessWidget {
   final String placeName;
   final String description;
   final List<XFile> images;
-  final double? pickupLat;
-  final double? pickupLng;
-  final double? destinationLat;
-  final double? destinationLng;
+  final RouteEndpoint? origin;
+  final RouteEndpoint? destination;
   final bool isSubmitting;
   final String? errorMessage;
   final VoidCallback onEdit;
@@ -583,9 +634,6 @@ class _ReviewPhase extends StatelessWidget {
     final addingToExisting = existingGroup != null;
     final effectiveType =
         addingToExisting ? existingGroup!.adHocServiceType : serviceType;
-    final hasPickup = pickupLat != null && pickupLng != null;
-    final hasDestination = destinationLat != null && destinationLng != null;
-    final hasLocation = hasPickup || hasDestination;
 
     return ListView(
       padding: const EdgeInsets.all(HatlySpacing.md),
@@ -628,14 +676,15 @@ class _ReviewPhase extends StatelessWidget {
                         .toList(),
                   ),
                 ],
-                if (!addingToExisting) ...[
+                if (effectiveType != null) ...[
                   const SizedBox(height: HatlySpacing.sm),
-                  _reviewRow(
-                    context,
-                    l10n.hatlyServiceReviewLocationLabel,
-                    hasLocation
-                        ? l10n.hatlyServiceReviewLocationSet
-                        : l10n.hatlyServiceReviewLocationRequired,
+                  Text(l10n.routeSectionTitle, style: context.type.caption),
+                  const SizedBox(height: HatlySpacing.xs),
+                  // The route exactly as it will be requested — resolved ends, read only, nothing hidden.
+                  RouteSummary(
+                    key: const Key('hatly-service-review-route'),
+                    origin: origin,
+                    destination: destination,
                   ),
                 ],
               ],

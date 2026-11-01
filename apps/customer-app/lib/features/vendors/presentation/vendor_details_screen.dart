@@ -6,7 +6,8 @@ import '../../../core/theme/hatly_theme.dart';
 import '../../../shared_widgets/filter_action_button.dart';
 import '../../../shared_widgets/hatly_loading_view.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
-import '../../../shared_widgets/hatly_image.dart';
+import '../../../shared_widgets/hatly_soft_image.dart';
+import '../../../shared_widgets/hatly_rating_inline.dart';
 import '../../../shared_widgets/availability_badge.dart';
 import '../../../shared_widgets/cart_summary_bar.dart';
 import '../../../shared_widgets/ltr_text.dart';
@@ -21,6 +22,9 @@ import '../data/vendor_providers.dart';
 import '../domain/vendor_branch_summary.dart';
 import '../domain/vendor_details.dart';
 import '../../cart/presentation/widgets/cart_icon_button.dart';
+import '../../auth/presentation/auth_gate.dart';
+import '../../home/presentation/widgets/home_promo_actions.dart'
+    show handleQuickAdd;
 import '../../favorites/data/favorites_providers.dart';
 import 'widgets/custom_request_action.dart';
 
@@ -159,7 +163,22 @@ class _VendorDetailsContent extends ConsumerWidget {
         SliverToBoxAdapter(
             child: _VendorHeader(details: details, vendorName: vendorName)),
         SliverToBoxAdapter(child: _BranchInfoSection(branch: details.branch)),
-        const SliverToBoxAdapter(child: Divider(height: 32)),
+        // Visual UX (reference comparison): the menu search comes straight after the vendor/branch
+        // info, then the menu sections, directly above the products they filter.
+        const SliverToBoxAdapter(child: SizedBox(height: HatlySpacing.sm)),
+        SliverToBoxAdapter(
+          child: _ProductSearchAndSortBar(
+            searchQuery: searchQuery,
+            onSearchChanged: onSearchChanged,
+            sortOption: sortOption,
+            onSortChanged: onSortChanged,
+            filters: filters,
+            onFiltersChanged: onFiltersChanged,
+            minAvailablePriceMinor: minAvailablePriceMinor,
+            maxAvailablePriceMinor: maxAvailablePriceMinor,
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: HatlySpacing.sm)),
         SliverToBoxAdapter(
           child: categoriesAsync.when(
             loading: () => const SizedBox(height: 44),
@@ -172,18 +191,6 @@ class _VendorDetailsContent extends ConsumerWidget {
               selectedCategoryId: selectedCategoryId,
               onCategorySelected: onCategorySelected,
             ),
-          ),
-        ),
-        SliverToBoxAdapter(
-          child: _ProductSearchAndSortBar(
-            searchQuery: searchQuery,
-            onSearchChanged: onSearchChanged,
-            sortOption: sortOption,
-            onSortChanged: onSortChanged,
-            filters: filters,
-            onFiltersChanged: onFiltersChanged,
-            minAvailablePriceMinor: minAvailablePriceMinor,
-            maxAvailablePriceMinor: maxAvailablePriceMinor,
           ),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 8)),
@@ -232,6 +239,10 @@ class _VendorDetailsContent extends ConsumerWidget {
                     return ProductListTile(
                       product: product,
                       onTap: () => context.push('/products/${product.id}'),
+                      // Same one-tap add as Home (one unit via the cart controller; hands off to the product
+                      // page when the backend needs an option/weight choice or the cart is another branch's).
+                      onQuickAdd: () =>
+                          handleQuickAdd(context, ref, product.id),
                     );
                   },
                   childCount: products.length,
@@ -240,13 +251,16 @@ class _VendorDetailsContent extends ConsumerWidget {
             );
           },
         ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Center(
-                child: CustomRequestAction(vendorBranchId: details.branch.id)),
+        // Only where the server allows it (the branch's sector setting; the cart endpoint enforces the same rule).
+        if (details.branch.allowsCustomRequests)
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Center(
+                  child:
+                      CustomRequestAction(vendorBranchId: details.branch.id)),
+            ),
           ),
-        ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
@@ -264,47 +278,76 @@ class _VendorHeader extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final p = context.palette;
 
+    const logoSize = 72.0;
+    // Image-first header: a wide cover, the logo overlapping its lower edge, then the name, the rating and the offer badge.
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-          HatlySpacing.md, HatlySpacing.ms, HatlySpacing.md, 0),
-      child: Row(
+          HatlySpacing.md, HatlySpacing.sm, HatlySpacing.md, 0),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          HatlyImage(
-              url: details.vendor.logoUrl,
-              width: 84,
-              height: 84,
-              shape: HatlyImageShape.circular),
-          const SizedBox(width: HatlySpacing.ms),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (details.hasPromotion) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: HatlySpacing.sm, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: HatlyColors.primaryOrange,
-                      borderRadius: BorderRadius.circular(HatlyRadius.chip),
-                    ),
-                    child: Text(
-                      l10n.promotionBadge,
-                      // Polish pass: was hardcoded white-on-orange (2.6:1,
-                      // fails accessibility) — `p.accentOn` is the correct
-                      // dark ink (7:1) for a new badge like this.
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelLarge
-                          ?.copyWith(color: p.accentOn),
-                    ),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              HatlySoftImage(
+                url: details.vendor.logoUrl,
+                width: double.infinity,
+                height: 140,
+                radius: HatlyRadius.card,
+                placeholderIcon: Icons.storefront_outlined,
+                placeholderIconSize: 44,
+              ),
+              PositionedDirectional(
+                bottom: -(logoSize / 2),
+                start: HatlySpacing.md,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration:
+                      BoxDecoration(color: p.surface, shape: BoxShape.circle),
+                  child: HatlySoftImage(
+                    url: details.vendor.logoUrl,
+                    width: logoSize,
+                    height: logoSize,
+                    circular: true,
+                    placeholderIcon: Icons.store_outlined,
+                    placeholderIconSize: 30,
                   ),
-                  const SizedBox(height: HatlySpacing.xs),
-                ],
-                Text(vendorName, style: Theme.of(context).textTheme.titleLarge),
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: logoSize / 2 + HatlySpacing.sm),
+          Wrap(
+            spacing: HatlySpacing.sm,
+            runSpacing: HatlySpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(vendorName, style: Theme.of(context).textTheme.titleLarge),
+              if (details.hasPromotion)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: HatlySpacing.sm, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: HatlyColors.primaryOrange,
+                    borderRadius: BorderRadius.circular(HatlyRadius.chip),
+                  ),
+                  child: Text(
+                    l10n.promotionBadge,
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelLarge
+                        ?.copyWith(color: p.accentOn),
+                  ),
+                ),
+            ],
+          ),
+          if (details.ratingCount > 0) ...[
+            const SizedBox(height: HatlySpacing.xs),
+            HatlyRatingInline(
+                key: const Key('vendor-details-rating'),
+                average: details.ratingAverage,
+                count: details.ratingCount),
+          ],
         ],
       ),
     );
@@ -334,14 +377,15 @@ class _BranchInfoSection extends StatelessWidget {
       // off-white box on a dark screen in Dark Mode. `p.surfaceSoft`/
       // `p.textMuted` are the theme-aware equivalents.
       decoration: BoxDecoration(
-          color: p.surfaceSoft,
+          color: p.surface,
+          border: Border.all(color: p.border),
           borderRadius: BorderRadius.circular(HatlyRadius.card)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.location_on_outlined, size: 18, color: p.textMuted),
+              Icon(Icons.location_on_rounded, size: 18, color: p.accent),
               const SizedBox(width: HatlySpacing.sm),
               Expanded(
                   child: Text(branch.address,
@@ -349,20 +393,22 @@ class _BranchInfoSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: HatlySpacing.sm),
-          Row(
+          // Wrap, not Row: at 320px with large text the hours drop to the next line instead of overflowing.
+          Wrap(
+            spacing: HatlySpacing.sm,
+            runSpacing: HatlySpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               AvailabilityBadge(
                 isOpen: branch.isOpen,
                 openLabel: l10n.vendorOpenNow,
                 closedLabel: l10n.vendorClosed,
               ),
-              if (todayHours != null) ...[
-                const SizedBox(width: HatlySpacing.sm),
+              if (todayHours != null)
                 LtrText(
                   '· ${todayHours.open}-${todayHours.close}',
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
-              ],
             ],
           ),
         ],
@@ -410,61 +456,82 @@ class _ProductSearchAndSortBar extends StatelessWidget {
     // identical to the old constant in Light Mode.
     final p = context.palette;
 
+    final searchField = TextField(
+      onChanged: onSearchChanged,
+      decoration: InputDecoration(
+        hintText: l10n.searchHint,
+        prefixIcon: const Icon(Icons.search, size: 20),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        filled: true,
+        fillColor: p.surfaceSoft,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+    final filterButton = FilterActionButton(
+      key: const Key('product-filter-action'),
+      label: l10n.filterAction,
+      activeCount: filters.activeCount,
+      onTap: () async {
+        final result = await showModalBottomSheet<ProductFilters>(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => ProductFilterSheet(
+            initialFilters: filters,
+            minAvailablePriceMinor: minAvailablePriceMinor,
+            maxAvailablePriceMinor: maxAvailablePriceMinor,
+          ),
+        );
+        if (result != null) onFiltersChanged(result);
+      },
+    );
+    final sortButton = SortMenuButton(
+      value: sortOption,
+      label: l10n.sortNewest,
+      onChanged: onSortChanged,
+      options: [
+        ('newest', l10n.sortNewest),
+        ('highestRated', l10n.sortHighestRated),
+        ('bestSelling', l10n.sortBestSelling),
+        ('price_asc', l10n.sortPriceLowToHigh),
+        ('price_desc', l10n.sortPriceHighToLow),
+        ('offers', l10n.sortOffers),
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              onChanged: onSearchChanged,
-              decoration: InputDecoration(
-                hintText: l10n.searchHint,
-                prefixIcon: const Icon(Icons.search, size: 20),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                filled: true,
-                fillColor: p.surfaceSoft,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide.none,
-                ),
+      child: LayoutBuilder(builder: (context, constraints) {
+        // A narrow screen or large text (320px at 2×) has no room for the field and both labelled
+        // buttons on one line: the buttons then wrap under the field instead of overflowing it.
+        final scale = MediaQuery.textScalerOf(context).scale(1);
+        if (constraints.maxWidth / scale < 300) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              searchField,
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [filterButton, sortButton],
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          FilterActionButton(
-            key: const Key('product-filter-action'),
-            label: l10n.filterAction,
-            activeCount: filters.activeCount,
-            onTap: () async {
-              final result = await showModalBottomSheet<ProductFilters>(
-                context: context,
-                isScrollControlled: true,
-                builder: (_) => ProductFilterSheet(
-                  initialFilters: filters,
-                  minAvailablePriceMinor: minAvailablePriceMinor,
-                  maxAvailablePriceMinor: maxAvailablePriceMinor,
-                ),
-              );
-              if (result != null) onFiltersChanged(result);
-            },
-          ),
-          const SizedBox(width: 8),
-          SortMenuButton(
-            value: sortOption,
-            label: l10n.sortNewest,
-            onChanged: onSortChanged,
-            options: [
-              ('newest', l10n.sortNewest),
-              ('highestRated', l10n.sortHighestRated),
-              ('bestSelling', l10n.sortBestSelling),
-              ('price_asc', l10n.sortPriceLowToHigh),
-              ('price_desc', l10n.sortPriceHighToLow),
-              ('offers', l10n.sortOffers),
             ],
-          ),
-        ],
-      ),
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: searchField),
+            const SizedBox(width: 8),
+            filterButton,
+            const SizedBox(width: 8),
+            sortButton,
+          ],
+        );
+      }),
     );
   }
 }
@@ -576,6 +643,8 @@ class _FavoriteHeartButton extends ConsumerWidget {
       onPressed: isLoading
           ? null
           : () async {
+              // Favourites belong to an account: a guest is sent to sign-in first (nothing is requested).
+              if (!requireSignIn(context, ref)) return;
               final error = isFavorited
                   ? await controller.remove(vendorId)
                   : await controller.add(vendorId);

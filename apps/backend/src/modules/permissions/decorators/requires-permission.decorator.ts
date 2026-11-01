@@ -19,3 +19,12 @@ export const REQUIRED_PERMISSIONS_KEY = 'requiredPermissions';
  */
 export const RequiresPermission = (...permissions: Permission[]) =>
   SetMetadata(REQUIRED_PERMISSIONS_KEY, permissions);
+
+export const ANY_PERMISSIONS_KEY = 'requiredAnyPermissions';
+
+/**
+ * ANY-OF semantics: the caller needs at least ONE of the listed permissions (in addition to everything required by
+ * `@RequiresPermission`). Used by READ routes of the enterprise modules, where a read-only `*_VIEW` grant and the broader `MANAGE_*`
+ * grant must both open the page — so adding the read-only permissions never removes access from anyone who already has `MANAGE_*`.
+ */
+export const RequiresAnyPermission = (...permissions: Permission[]) => SetMetadata(ANY_PERMISSIONS_KEY, permissions);

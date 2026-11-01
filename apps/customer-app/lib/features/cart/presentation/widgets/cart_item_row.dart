@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../shared_widgets/weight_selector.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../../core/utils/money_formatter.dart';
@@ -29,6 +30,7 @@ class CartItemRow extends StatelessWidget {
     this.busy = false,
     this.isCustomRequest = false,
     this.isHatlyService = false,
+    this.isDeliveryOnly = false,
   });
 
   final CartItem item;
@@ -43,6 +45,9 @@ class CartItemRow extends StatelessWidget {
 
   /// The line belongs to a Hatly Service request: its pending price says when it will be confirmed.
   final bool isHatlyService;
+
+  /// Wasally: no item price exists (delivery fee only) — shown as that, not as "price pending".
+  final bool isDeliveryOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -137,7 +142,8 @@ class CartItemRow extends StatelessWidget {
                       _Price(
                           item: item,
                           unit: unit,
-                          isHatlyService: isHatlyService),
+                          isHatlyService: isHatlyService,
+                          isDeliveryOnly: isDeliveryOnly),
                     ],
                   ),
                 ),
@@ -224,6 +230,15 @@ class CartItemRow extends StatelessWidget {
         valueLabel: '${(grams / 1000).toStringAsFixed(2)} kg',
         decreaseTooltip: l10n.quantityDecrease,
         increaseTooltip: l10n.quantityIncrease,
+        valueTapTooltip: l10n.weightEntryTooltip,
+        // Type the weight (e.g. 1 kg) instead of tapping "+" ten times. The same bounds as the product screen; the server re-validates.
+        onValueTap: busy
+            ? null
+            : () async {
+                final typed = await showWeightEntryDialog(context,
+                    initialGrams: grams, maxGrams: maxGrams);
+                if (typed != null && typed != grams) onWeightChanged(typed);
+              },
         onDecrease:
             busy || grams <= 100 ? null : () => onWeightChanged(grams - 100),
         onIncrease: busy || atMax ? null : () => onWeightChanged(grams + 100),
@@ -247,11 +262,15 @@ class CartItemRow extends StatelessWidget {
 
 class _Price extends StatelessWidget {
   const _Price(
-      {required this.item, required this.unit, this.isHatlyService = false});
+      {required this.item,
+      required this.unit,
+      this.isHatlyService = false,
+      this.isDeliveryOnly = false});
 
   final CartItem item;
   final String unit;
   final bool isHatlyService;
+  final bool isDeliveryOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -259,6 +278,10 @@ class _Price extends StatelessWidget {
     final p = context.palette;
     final line = item.lineTotalMinor;
 
+    if (isDeliveryOnly) {
+      return Text(l10n.hatlyServiceDeliveryOnly,
+          key: const Key('cart-item-delivery-only'), style: context.type.small);
+    }
     if (line == null) {
       // The backend uses null for "not priced yet" — never shown as 0 or blank.
       return Text(

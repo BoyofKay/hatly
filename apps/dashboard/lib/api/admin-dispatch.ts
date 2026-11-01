@@ -108,7 +108,8 @@ export interface DispatchAlert {
   orderId: string;
   orderNumber: string | null;
   orderStatus: string | null;
-  reason: 'NO_ELIGIBLE_DRIVER';
+  reason: 'NO_ELIGIBLE_DRIVER' | 'AUTO_ASSIGN_DISABLED' | 'ASSIGNMENT_ERROR' | 'DRIVER_NOT_RESPONDING';
+  detail?: string | null;
   /** Set by the assignment that resolved it. */
   resolvedAt: string | null;
   createdAt: string;

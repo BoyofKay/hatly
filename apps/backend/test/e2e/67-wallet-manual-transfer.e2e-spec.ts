@@ -43,7 +43,7 @@ describe('E2E — wallet + Manual Transfer (PD-001 amended)', () => {
   const credit = (c: Actor, amountMinor: number) =>
     q("INSERT INTO wallet_transactions (customer_id, amount_delta_minor, type, idempotency_key, reason) VALUES ($1, $2, 'ADMIN_CREDIT', $3, 'e2e seed')", [c.id, amountMinor, `e2e-wtm-${c.id}-${seed++}`]);
   const segmentOf = async (orderId: string, v: VendorFixture): Promise<string> => (await q('SELECT id FROM order_vendor_segments WHERE order_id = $1 AND vendor_branch_id = $2', [orderId, v.branchId]))[0].id;
-  const vendorStatus = (v: VendorFixture, segmentId: string, status: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status } });
+  const vendorStatus = (v: VendorFixture, segmentId: string, status: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status, ...(status === 'CANCELLED' ? { reason: 'Out of stock' } : {}) } });
   const cancelCustomer = (c: Actor, id: string) => world.api('post', `/orders/${id}/cancel`, { token: c.accessToken, body: {} });
   const claim = (c: Actor, orderId: string) => world.api('post', `/payments/manual-transfer/orders/${orderId}/claim`, { token: c.accessToken, body: {} });
   const approve = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/approve`, { token: reviewer.accessToken });

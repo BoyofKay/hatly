@@ -1,5 +1,8 @@
+import { Optional } from '@nestjs/common';
+import { AdminAuditAction, AdminAuditService } from '../audit/admin-audit.service';
 import { Body, Controller, Delete, Get, NotFoundException, Param, ParseEnumPipe, Post, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
@@ -8,6 +11,7 @@ import { PermissionsService } from './permissions.service';
 import { GrantPermissionDto } from './dto/grant-permission.dto';
 import { Permission } from './permission.enum';
 import { UsersService } from '../users/users.service';
+import { ExplicitlyAudited } from '../audit/admin-mutation-audit.interceptor';
 
 /**
  * Granting/revoking permissions is gated by ROLE (@Roles(SUPER_ADMIN)),
@@ -29,6 +33,7 @@ export class AdminPermissionsController {
   constructor(
     private readonly permissionsService: PermissionsService,
     private readonly usersService: UsersService,
+    @Optional() private readonly audit?: AdminAuditService,
   ) {}
 
   @Get()
@@ -39,16 +44,20 @@ export class AdminPermissionsController {
   }
 
   @Post()
+  @ExplicitlyAudited()
   async grant(@Param('userId') userId: string, @Body() dto: GrantPermissionDto, @CurrentUser() actor: AuthenticatedUser) {
     await this.assertUserExistsAndIsAdmin(userId);
     const grant = await this.permissionsService.grant(userId, dto.permission, actor.id);
+    await this.audit?.record({ actorUserId: actor.id, actorRole: actor.role, action: AdminAuditAction.PERMISSION_GRANTED, targetType: 'user', targetId: userId, metadata: { permission: dto.permission } });
     return { data: grant };
   }
 
   @Delete(':permission')
-  async revoke(@Param('userId') userId: string, @Param('permission', new ParseEnumPipe(Permission)) permission: Permission) {
+  @ExplicitlyAudited()
+  async revoke(@Param('userId') userId: string, @Param('permission', new ParseEnumPipe(Permission)) permission: Permission, @CurrentUser() actor: AuthenticatedUser) {
     await this.assertUserExistsAndIsAdmin(userId);
     await this.permissionsService.revoke(userId, permission);
+    await this.audit?.record({ actorUserId: actor.id, actorRole: actor.role, action: AdminAuditAction.PERMISSION_REVOKED, targetType: 'user', targetId: userId, metadata: { permission } });
     return { message: 'Permission revoked.' };
   }
 
@@ -130,7 +139,9 @@ export class AdminPermissionCatalogController {
 export class AdminMePermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
+  /** Read on every dashboard page load (it drives which links are shown), so it gets a higher per-route limit; the per-client aggregate limit still applies. */
   @Get('permissions')
+  @Throttle({ default: { limit: 300, ttl: 60_000 } })
   async mine(@CurrentUser() user: AuthenticatedUser) {
     const isSuperAdmin = user.role === Role.SUPER_ADMIN;
     const permissions = isSuperAdmin ? Object.values(Permission) : await this.permissionsService.listPermissions(user.id);

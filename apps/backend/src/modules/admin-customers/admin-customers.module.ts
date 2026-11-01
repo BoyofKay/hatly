@@ -6,6 +6,7 @@ import { AdminCustomersService } from './admin-customers.service';
 import { AddressesModule } from '../addresses/addresses.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { OrdersModule } from '../orders/orders.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 /**
  * M3c (Launch-Readiness Gap Audit, G-10) — its own small module, not
@@ -16,7 +17,7 @@ import { OrdersModule } from '../orders/orders.module';
  * from their own existing modules rather than duplicating any query.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([User]), AddressesModule, WalletModule, OrdersModule],
+  imports: [TypeOrmModule.forFeature([User]), AddressesModule, WalletModule, OrdersModule, PermissionsModule],
   controllers: [AdminCustomersController],
   providers: [AdminCustomersService],
 })

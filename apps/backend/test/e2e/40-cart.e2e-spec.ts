@@ -221,7 +221,67 @@ describe('E2E — cart', () => {
     });
   });
 
+  describe('weighted products — quantities in whole grams, exact totals, invalid weights refused', () => {
+    // 200.00 EGP/kg (see `weighed`). Totals are integer minor units: price × grams / 1000, rounded once.
+    it.each([
+      [100, 2000],
+      [250, 5000],
+      [333, 6660],
+      [1000, 20000],
+      [1250, 25000],
+      [3000, 60000],
+    ])('%i g of a 200.00/kg product costs %i minor units, in the cart and (identically) at the order', async (grams, expected) => {
+      const c = await s.customer();
+      const view = expectData<any>(await world.api('post', '/cart/items', { token: c.accessToken, body: { productId: weighed.id, quantity: 1, requestedWeightGrams: grams } }), 201);
+      expect(view.groups[0].items[0]).toMatchObject({ requestedWeightGrams: grams, lineTotalMinor: expected });
+      expect(Number.isInteger(view.groups[0].items[0].lineTotalMinor)).toBe(true);
+    });
+
+    it('a fractional-cent result is rounded once, deterministically (no floating-point drift): 1 g of 99.99/kg and 1 kg multiples', async () => {
+      const v = await s.vendor({ name: 'Rounding Vendor', serviceAreaId: (await s.serviceArea({ radiusMeters: 50000 })).id, lat: 30.421, lng: 31.561 });
+      const odd = await s.product(v, { priceMinor: 9999, pricingUnit: 'WEIGHT' });
+      const c = await s.customer();
+      for (const [grams, expected] of [[1, 10], [333, 3330], [1000, 9999], [2000, 19998], [1500, 14999]] as Array<[number, number]>) {
+        await world.api('delete', '/cart', { token: c.accessToken });
+        const view = expectData<any>(await world.api('post', '/cart/items', { token: c.accessToken, body: { productId: odd.id, quantity: 1, requestedWeightGrams: grams } }), 201);
+        expect({ grams, total: view.groups[0].items[0].lineTotalMinor }).toEqual({ grams, total: expected });
+      }
+    });
+
+    it.each([
+      ['zero', 0],
+      ['negative', -500],
+      ['fractional grams', 1.5],
+      ['a string', '1000'],
+      ['not a number', null],
+      ['above the 100 kg sanity ceiling', 100001],
+    ])('an invalid weight (%s) is refused with a 400 and nothing is added', async (_label, grams) => {
+      const c = await s.customer();
+      const res = await world.api('post', '/cart/items', { token: c.accessToken, body: { productId: weighed.id, quantity: 1, requestedWeightGrams: grams } });
+      expect(res.status).toBe(400);
+      const cart = expectData<any>(await world.api('get', '/cart', { token: c.accessToken }));
+      expect(cart.groups).toEqual([]);
+    });
+
+    it('updating a weighted line applies the same validation', async () => {
+      const c = await s.customer();
+      const added = expectData<any>(await world.api('post', '/cart/items', { token: c.accessToken, body: { productId: weighed.id, quantity: 1, requestedWeightGrams: 500 } }), 201);
+      const itemId = added.groups[0].items[0].id;
+      for (const bad of [0, -1, 2.5, 100001]) {
+        expect({ bad, status: (await world.api('patch', `/cart/items/${itemId}`, { token: c.accessToken, body: { requestedWeightGrams: bad } })).status }).toEqual({ bad, status: 400 });
+      }
+      const ok = expectData<any>(await world.api('patch', `/cart/items/${itemId}`, { token: c.accessToken, body: { requestedWeightGrams: 1000 } }));
+      expect(ok.groups[0].items[0]).toMatchObject({ requestedWeightGrams: 1000, lineTotalMinor: 20000 });
+    });
+  });
+
   describe('vendor custom items (pharmacy-style free text)', () => {
+    beforeAll(async () => {
+      // Custom requests are an admin setting of the vendor's SECTOR (off by default); these vendors are in a sector that allows them.
+      await s.allowCustomRequests(v1);
+      await s.allowCustomRequests(v2);
+    });
+
     it('attach to an existing vendor group, are unpriced (0 in the subtotal, cart flagged), and need text or an image', async () => {
       const base = await s.addToCart(customer, piece1.id, 1);
       const groupId = base.groups[0].id;

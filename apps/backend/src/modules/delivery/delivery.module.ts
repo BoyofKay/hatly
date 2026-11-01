@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Driver } from './entities/driver.entity';
 import { Delivery } from './entities/delivery.entity';
+import { DispatchAttempt } from './entities/dispatch-attempt.entity';
 import { DispatchAlert } from './entities/dispatch-alert.entity';
 import { ProofOfDelivery } from './entities/proof-of-delivery.entity';
 import { OrderItem } from '../orders/entities/order-item.entity';
@@ -15,6 +16,7 @@ import { ProofOfDeliveryService } from './proof-of-delivery.service';
 import { DriverProfileService } from './driver-profile.service';
 import { DriverDeliveriesService } from './driver-deliveries.service';
 import { DriverPurchaseService } from './driver-purchase.service';
+import { DriverEarningsService } from './driver-earnings.service';
 import { DriverWeightRecordService } from './driver-weight-record.service';
 import { DriverRankingService } from './driver-ranking.service';
 import { AutomaticDispatchService } from './automatic-dispatch.service';
@@ -34,7 +36,7 @@ import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Driver, Delivery, DispatchAlert, ProofOfDelivery, OrderItem, Order, VendorBranch]),
+    TypeOrmModule.forFeature([Driver, Delivery, DispatchAlert, DispatchAttempt, ProofOfDelivery, OrderItem, Order, VendorBranch]),
     ServiceAreasModule,
     // PHASE 4 DISPATCH addition: forwardRef — see OrdersModule's own
     // comment for why this mutual dependency is genuine, not accidental.
@@ -62,6 +64,7 @@ import { UploadsModule } from '../uploads/uploads.module';
     DriverDeliveriesService,
     DriverPurchaseService,
     DriverWeightRecordService,
+    DriverEarningsService,
     DriverRankingService,
     AutomaticDispatchService,
     AdminDispatchService,

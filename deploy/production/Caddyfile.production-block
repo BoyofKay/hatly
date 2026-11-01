@@ -1,0 +1,22 @@
+
+# --- PRODUCTION, Stage 3: live apps behind Cloudflare (Full strict). Replaces the Stage 1 "coming soon" block. ---
+# Only Cloudflare may reach these names (ranges from https://www.cloudflare.com/ips-v4 and /ips-v6, fetched 2026-10-23; checked by
+# deploy/production/cloudflare-ranges-check.sh). Anything else gets 403, so CF-Connecting-IP — which Cloudflare always overwrites — is the real
+# client address, and it REPLACES X-Forwarded-For: the backend trusts exactly one hop (TRUST_PROXY=1) and sees the true client IP.
+hatly.dev, www.hatly.dev, admin.hatly.dev, api.hatly.dev {
+	tls /data/tls/hatly-origin-exact/origin.pem /data/tls/hatly-origin-exact/origin-key.pem
+	@not_cloudflare not remote_ip 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+	@api host api.hatly.dev
+	@dashboard not host api.hatly.dev
+	header @dashboard Strict-Transport-Security "max-age=15552000"
+	route {
+		respond @not_cloudflare "Forbidden" 403
+		encode zstd gzip
+		reverse_proxy @api hatly-prod-backend:3000 {
+			header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+		}
+		reverse_proxy hatly-prod-dashboard:3001 {
+			header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
+		}
+	}
+}

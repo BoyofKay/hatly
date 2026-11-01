@@ -1,11 +1,17 @@
 'use client';
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { CATALOGS, MessageKey } from './messages';
 
 export type Locale = 'en' | 'ar';
 
 const STORAGE_KEY = 'hatly_dashboard_locale';
+export const LOCALE_CHANGED_EVENT = 'hatly-dashboard-locale-changed';
+
+/** The remembered language (English when none) — for components that sit outside an I18nProvider. */
+export function readStoredLocale(): Locale {
+  return readInitialLocale();
+}
 
 function readInitialLocale(): Locale {
   if (typeof window === 'undefined') return 'en';
@@ -36,6 +42,17 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   // The Admin layout renders nothing until the client-side session check has run, so this never renders on the server.
   const [locale, setLocaleState] = useState<Locale>(readInitialLocale);
 
+  // The Admin shell owns the language switch: follow it (same storage key + change event), so a page never needs a switch of its own.
+  useEffect(() => {
+    const follow = () => setLocaleState(readInitialLocale());
+    window.addEventListener(LOCALE_CHANGED_EVENT, follow);
+    window.addEventListener('storage', follow);
+    return () => {
+      window.removeEventListener(LOCALE_CHANGED_EVENT, follow);
+      window.removeEventListener('storage', follow);
+    };
+  }, []);
+
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
     try {
@@ -43,6 +60,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* the choice just isn't remembered */
     }
+    // The admin layout's banner lives outside this provider: tell it the language changed.
+    window.dispatchEvent(new Event(LOCALE_CHANGED_EVENT));
   }, []);
 
   const value = useMemo<I18n>(() => {

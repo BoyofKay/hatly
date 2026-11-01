@@ -31,7 +31,10 @@ class ProductFilters {
   static const empty = ProductFilters();
 
   bool get isEmpty =>
-      !availableOnly && !hasOffers && minPriceMinor == null && maxPriceMinor == null;
+      !availableOnly &&
+      !hasOffers &&
+      minPriceMinor == null &&
+      maxPriceMinor == null;
 
   int get activeCount =>
       (availableOnly ? 1 : 0) +
@@ -47,8 +50,10 @@ class ProductFilters {
     return ProductFilters(
       availableOnly: availableOnly ?? this.availableOnly,
       hasOffers: hasOffers ?? this.hasOffers,
-      minPriceMinor: minPriceMinor == _unset ? this.minPriceMinor : minPriceMinor as int?,
-      maxPriceMinor: maxPriceMinor == _unset ? this.maxPriceMinor : maxPriceMinor as int?,
+      minPriceMinor:
+          minPriceMinor == _unset ? this.minPriceMinor : minPriceMinor as int?,
+      maxPriceMinor:
+          maxPriceMinor == _unset ? this.maxPriceMinor : maxPriceMinor as int?,
     );
   }
 
@@ -61,7 +66,8 @@ class ProductFilters {
       other.maxPriceMinor == maxPriceMinor;
 
   @override
-  int get hashCode => Object.hash(availableOnly, hasOffers, minPriceMinor, maxPriceMinor);
+  int get hashCode =>
+      Object.hash(availableOnly, hasOffers, minPriceMinor, maxPriceMinor);
 }
 
 const _unset = Object();

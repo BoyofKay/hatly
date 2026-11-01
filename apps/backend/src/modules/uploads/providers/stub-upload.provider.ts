@@ -28,4 +28,9 @@ export class StubUploadProvider implements UploadProvider {
     const safeName = params.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
     return { url: `stub-upload://${randomUUID()}/${safeName}` };
   }
+
+  /** Nothing was ever stored. */
+  async remove(storedUrl: string): Promise<boolean> {
+    return typeof storedUrl === 'string' && storedUrl.startsWith('stub-upload://');
+  }
 }

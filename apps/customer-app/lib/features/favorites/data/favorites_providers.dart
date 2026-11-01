@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
+import '../../auth/presentation/auth_gate.dart';
 import 'favorites_api.dart';
 import '../domain/favorite_vendor.dart';
 
@@ -29,8 +30,12 @@ final favoritesApiProvider =
 /// architecture already standardizes on it (CartController does not).
 class FavoritesController
     extends StateNotifier<AsyncValue<List<FavoriteVendor>>> {
-  FavoritesController(this._api) : super(const AsyncValue.loading()) {
-    refresh();
+  /// [signedIn] false = a guest: no favourites, no request (the hearts ask the guest to sign in when tapped).
+  FavoritesController(this._api, {bool signedIn = true})
+      : super(signedIn
+            ? const AsyncValue.loading()
+            : const AsyncValue.data(<FavoriteVendor>[])) {
+    if (signedIn) refresh();
   }
 
   final FavoritesApi _api;
@@ -99,5 +104,6 @@ class FavoritesController
 
 final favoritesControllerProvider = StateNotifierProvider<FavoritesController,
     AsyncValue<List<FavoriteVendor>>>((ref) {
-  return FavoritesController(ref.watch(favoritesApiProvider));
+  return FavoritesController(ref.watch(favoritesApiProvider),
+      signedIn: ref.watch(isSignedInProvider));
 });

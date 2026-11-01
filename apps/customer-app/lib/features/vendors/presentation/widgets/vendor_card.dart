@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
-import '../../../../shared_widgets/hatly_card.dart';
-import '../../../../shared_widgets/hatly_image.dart';
+import '../../../../shared_widgets/hatly_badge.dart';
+import '../../../../shared_widgets/hatly_soft_image.dart';
 import '../../../../shared_widgets/availability_badge.dart';
+import '../../../../shared_widgets/hatly_rating_inline.dart';
+import '../../../auth/presentation/auth_gate.dart';
 import '../../../favorites/data/favorites_providers.dart';
 import '../../domain/vendor.dart';
 
@@ -17,12 +19,11 @@ import '../../domain/vendor.dart';
 /// this legacy card: the ETA/fee values are hardcoded `0` placeholders in
 /// ApiVendorRepository._toVendor (they were being shown as if real).
 ///
-/// UPDATE: customer-facing vendor ratings are now an APPROVED product
-/// requirement (the earlier "ratings/reviews are prohibited" rule no longer
-/// applies). `ratingAverage`/`ratingCount` are real backend values, and the
-/// redesigned Home/Explore card (`VendorCoverCard`) shows them. This legacy
-/// card is used by the Vendor List screen, which is outside the Explore task,
-/// so it is intentionally left as-is until that screen is redesigned.
+/// Customer-facing vendor ratings are an APPROVED product requirement and
+/// `ratingAverage`/`ratingCount` are real backend values, so this card shows
+/// them (only when the vendor has at least one rating) next to the open/closed
+/// badge — the trust signal a sector listing is scanned for. ETA / delivery fee
+/// stay hidden: they are still `0` placeholders (see above).
 class VendorCard extends StatelessWidget {
   const VendorCard(
       {super.key, required this.vendor, required this.onTap, this.width});
@@ -42,37 +43,115 @@ class VendorCard extends StatelessWidget {
     final displayName =
         isArabic && vendor.nameAr != null ? vendor.nameAr! : vendor.name;
 
-    final card = Opacity(
-      opacity: vendor.isOpen ? 1.0 : 0.55,
-      child: HatlyCard(
-        onTap: onTap,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _VendorLogo(
-                logoUrl: vendor.logoUrl, hasPromotion: vendor.hasPromotion),
-            const SizedBox(width: HatlySpacing.ms),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    final p = context.palette;
+    const logoSize = 52.0;
+    // Image-first: the cover leads, the logo overlaps its lower edge, the heart and the offer badge sit ON the cover. Closed vendors stay
+    // visible but muted (the cover only — the name and status must stay readable).
+    final card = DecoratedBox(
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: BorderRadius.circular(HatlyRadius.card),
+        boxShadow: HatlyShadows.soft(p),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(HatlyRadius.card),
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  Text(
-                    displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Opacity(
+                    opacity: vendor.isOpen ? 1.0 : 0.55,
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(HatlyRadius.card)),
+                      child: HatlySoftImage(
+                        url: vendor.coverImageUrl ?? vendor.logoUrl,
+                        width: double.infinity,
+                        height: 108,
+                        radius: 0,
+                        placeholderIcon: Icons.storefront_outlined,
+                        placeholderIconSize: 40,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: HatlySpacing.xs),
-                  AvailabilityBadge(
-                    isOpen: vendor.isOpen,
-                    openLabel: l10n.vendorOpenNow,
-                    closedLabel: l10n.vendorClosed,
+                  if (vendor.hasPromotion)
+                    PositionedDirectional(
+                      top: HatlySpacing.sm,
+                      start: HatlySpacing.sm,
+                      child: HatlyBadge(
+                          kind: HatlyBadgeKind.offer, label: l10n.badgeOffer),
+                    ),
+                  PositionedDirectional(
+                    top: 2,
+                    end: 2,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                          color: p.surface.withValues(alpha: 0.92),
+                          shape: BoxShape.circle),
+                      child: _FavoriteHeartButton(vendorId: vendor.id),
+                    ),
+                  ),
+                  PositionedDirectional(
+                    bottom: -(logoSize / 2),
+                    start: HatlySpacing.md,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                          color: p.surface, shape: BoxShape.circle),
+                      child: HatlySoftImage(
+                        url: vendor.logoUrl,
+                        width: logoSize,
+                        height: logoSize,
+                        circular: true,
+                        placeholderIcon: Icons.store_outlined,
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
-            _FavoriteHeartButton(vendorId: vendor.id),
-          ],
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                    HatlySpacing.md,
+                    logoSize / 2 + HatlySpacing.sm,
+                    HatlySpacing.md,
+                    HatlySpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.type.title,
+                    ),
+                    const SizedBox(height: HatlySpacing.xs),
+                    Wrap(
+                      spacing: HatlySpacing.ms,
+                      runSpacing: HatlySpacing.xs,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (vendor.ratingCount > 0)
+                          HatlyRatingInline(
+                              key: Key('vendor-card-rating-${vendor.id}'),
+                              average: vendor.ratingAverage,
+                              count: vendor.ratingCount),
+                        AvailabilityBadge(
+                          isOpen: vendor.isOpen,
+                          openLabel: l10n.vendorOpenNow,
+                          closedLabel: l10n.vendorClosed,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -128,6 +207,8 @@ class _FavoriteHeartButton extends ConsumerWidget {
       onPressed: isLoading
           ? null
           : () async {
+              // Favourites belong to an account: a guest is sent to sign-in first (nothing is requested).
+              if (!requireSignIn(context, ref)) return;
               final error = isFavorited
                   ? await controller.remove(vendorId)
                   : await controller.add(vendorId);
@@ -143,42 +224,6 @@ class _FavoriteHeartButton extends ConsumerWidget {
                 );
               }
             },
-    );
-  }
-}
-
-class _VendorLogo extends StatelessWidget {
-  const _VendorLogo({required this.logoUrl, required this.hasPromotion});
-
-  final String? logoUrl;
-  final bool hasPromotion;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        HatlyImage(
-            url: logoUrl,
-            width: 64,
-            height: 64,
-            shape: HatlyImageShape.circular),
-        if (hasPromotion)
-          // Polish pass: was a fixed physical `right:` offset — the sibling
-          // `VendorCoverCard`'s equivalent badge already uses `PositionedDirectional`
-          // so it mirrors correctly under RTL; this one didn't.
-          PositionedDirectional(
-            top: -6,
-            end: -6,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                  color: HatlyColors.primaryOrange, shape: BoxShape.circle),
-              child: const Icon(Icons.local_offer,
-                  size: 12, color: HatlyColors.surfaceWhite),
-            ),
-          ),
-      ],
     );
   }
 }

@@ -19,7 +19,24 @@ export interface ControlTowerSummary {
     failedDeliveriesUnresolved: number;
     readyForCustomerPickup: number;
   };
+  /** Order operations facts (the navigation counter and the banner are built from these). */
+  operations?: OperationsFacts;
   drivers: { approved: number; onlineAndAvailable: number; onlineBusy: number; offline: number; pendingVerification: number } | null;
+}
+
+export type DispatchAlertReason = 'NO_ELIGIBLE_DRIVER' | 'AUTO_ASSIGN_DISABLED' | 'ASSIGNMENT_ERROR' | 'DRIVER_NOT_RESPONDING';
+export const DISPATCH_ALERT_REASONS: DispatchAlertReason[] = ['NO_ELIGIBLE_DRIVER', 'AUTO_ASSIGN_DISABLED', 'ASSIGNMENT_ERROR', 'DRIVER_NOT_RESPONDING'];
+
+/** Mirrors `AdminControlTowerService` `operations` — counts only; every number is computed by the backend. */
+export interface OperationsFacts {
+  pendingAcceptanceAlertMinutes: number;
+  pendingAcceptance: number;
+  pendingAcceptanceOverdue: number;
+  preparationOverdue: number;
+  openDispatchAlerts: Record<DispatchAlertReason, number>;
+  refundsToSend: number;
+  partiallyRejectedActiveOrders: number;
+  actionRequired: number;
 }
 
 export interface ControlTowerDeliveryRow {

@@ -23,7 +23,7 @@ function zone(overrides: Partial<any> = {}) {
 function buildHarness(seed: { addresses?: any[]; zones?: any[] } = {}) {
   const addresses = new Map((seed.addresses ?? []).map((a) => [a.id, a]));
   const zones = new Map((seed.zones ?? [zone()]).map((z) => [z.id, z]));
-  const zonesRepository = { findOne: async (opts: any) => zones.get(opts.where.id) ?? null };
+  const zonesRepository = { findOne: async (opts: any) => zones.get(opts.where.id) ?? null, find: async () => [...zones.values()] };
 
   const repository = {
     create: (data: any) => ({ ...data }),
@@ -47,8 +47,20 @@ function buildHarness(seed: { addresses?: any[]; zones?: any[] } = {}) {
     },
   };
 
-  const service = new AddressesService(repository as any, zonesRepository as any);
-  return { service, addresses };
+  const serviceAreasRepository = { count: jest.fn(async () => 1) };
+  const resolver = { resolveForPoint: jest.fn(async () => ({ id: 'area-1' })) };
+  const deliveryFee = { roadDistancePricingAvailable: true };
+  const businessConfig = { get: jest.fn(async (_k: string, d: unknown) => (configValues.has(_k) ? configValues.get(_k) : d)) };
+  const configValues = new Map<string, unknown>();
+  const service = new AddressesService(
+    repository as any,
+    zonesRepository as any,
+    serviceAreasRepository as any,
+    resolver as any,
+    deliveryFee as any,
+    businessConfig as any,
+  );
+  return { service, addresses, resolver, deliveryFee, configValues, serviceAreasRepository, zonesRepository };
 }
 
 function baseDto(overrides: Partial<any> = {}) {
@@ -231,5 +243,99 @@ describe('AddressesService — Delivery Zones (PD-009)', () => {
     const a = await service.create('customer-1', baseDto());
     a.deliveryZone = zone({ isActive: false }) as any;
     expect(service.toView(a)).toMatchObject({ zoneStatus: 'UNAVAILABLE', deliveryZoneId: 'zone-1' });
+  });
+});
+
+describe('AddressesService — the two alternative methods (GPS / MANUAL)', () => {
+  const codeOf = (e: any) => e.getResponse().details.code;
+  const gps = (overrides: Partial<any> = {}) => ({ mode: 'GPS', latitude: 30.42, longitude: 31.56, ...overrides }) as any;
+  const manual = (overrides: Partial<any> = {}) => ({ mode: 'MANUAL', line1: 'شارع المنشية', deliveryZoneId: 'zone-1', ...overrides }) as any;
+
+  it('GPS: saved from the coordinates alone — no zone, no typed text; the zone area names stay empty; the status is OK (nothing to re-select)', async () => {
+    const { service } = buildHarness();
+    const a = await service.create('customer-1', gps());
+    expect(a).toMatchObject({ mode: 'GPS', line1: '', latitude: 30.42, longitude: 31.56, deliveryZoneId: null, governorate: null, city: null });
+    expect(service.toView(a)).toMatchObject({ mode: 'GPS', zoneStatus: 'OK', deliveryZone: null });
+  });
+
+  it('GPS is rejected with a clear code outside configured coverage, and nothing is saved', async () => {
+    const { service, resolver, addresses } = buildHarness();
+    resolver.resolveForPoint.mockResolvedValueOnce(null as any);
+    expect(codeOf(await service.create('customer-1', gps()).catch((e) => e))).toBe('ADDRESS_OUT_OF_SERVICE_AREA');
+    expect(addresses.size).toBe(0);
+  });
+
+  it('GPS reports DISTANCE_PRICING_UNAVAILABLE when the road-distance provider is off — never saved, never a zone fallback', async () => {
+    const { service, deliveryFee, addresses } = buildHarness();
+    (deliveryFee as any).roadDistancePricingAvailable = false;
+    expect(codeOf(await service.create('customer-1', gps()).catch((e) => e))).toBe('DISTANCE_PRICING_UNAVAILABLE');
+    expect(addresses.size).toBe(0);
+  });
+
+  it('GPS needs both coordinates, a plausible Egyptian point, and does not accept a zone', async () => {
+    const { service } = buildHarness();
+    expect(codeOf(await service.create('customer-1', gps({ longitude: undefined })).catch((e) => e))).toBe('INVALID_DELIVERY_ADDRESS');
+    expect(codeOf(await service.create('customer-1', gps({ latitude: 48.8, longitude: 2.3 })).catch((e) => e))).toBe('INVALID_DELIVERY_LOCATION');
+    const zoneError = await service.create('customer-1', gps({ deliveryZoneId: 'zone-1' })).catch((e) => e);
+    expect(zoneError.getResponse().details).toMatchObject({ code: 'INVALID_DELIVERY_ADDRESS', field: 'deliveryZoneId' });
+  });
+
+  it('MANUAL: the zone and the written address are required and NO coordinates are stored or accepted', async () => {
+    const { service, resolver, addresses } = buildHarness();
+    const a = await service.create('customer-1', manual());
+    expect(a).toMatchObject({ mode: 'MANUAL', line1: 'شارع المنشية', latitude: null, longitude: null, deliveryZoneId: 'zone-1', city: 'بلبيس' });
+    expect(resolver.resolveForPoint).not.toHaveBeenCalled(); // no coverage / location logic for the manual method
+    const withPin = await service.create('customer-1', manual({ latitude: 30.4, longitude: 31.5 })).catch((e) => e);
+    expect(withPin.getResponse().details).toMatchObject({ code: 'INVALID_DELIVERY_ADDRESS', field: 'location' });
+    expect(addresses.size).toBe(1);
+  });
+
+  it('MANUAL with an inactive or unknown zone is refused (no fallback to GPS or another zone)', async () => {
+    const { service } = buildHarness({ zones: [zone({ isActive: false })] });
+    expect(codeOf(await service.create('customer-1', manual()).catch((e) => e))).toBe('DELIVERY_ZONE_UNAVAILABLE');
+  });
+
+  it('switching MANUAL → GPS is explicit and clears the zone, area names and typed text', async () => {
+    const { service } = buildHarness();
+    const a = await service.create('customer-1', manual({ landmark: 'جنب الجامع', floor: '3' }));
+    const switched = await service.update('customer-1', a.id, gps());
+    expect(switched).toMatchObject({ mode: 'GPS', latitude: 30.42, longitude: 31.56, line1: '', deliveryZoneId: null, governorate: null, city: null, landmark: null, floor: null });
+  });
+
+  it('switching GPS → MANUAL clears the coordinates and requires a zone and text (nothing is mixed)', async () => {
+    const { service } = buildHarness();
+    const a = await service.create('customer-1', gps());
+    expect(codeOf(await service.update('customer-1', a.id, { mode: 'MANUAL', line1: 'x' } as any).catch((e) => e))).toBe('ADDRESS_ZONE_REQUIRED');
+    expect(codeOf(await service.update('customer-1', a.id, { mode: 'MANUAL', deliveryZoneId: 'zone-1' } as any).catch((e) => e))).toBe('INVALID_DELIVERY_ADDRESS');
+    const switched = await service.update('customer-1', a.id, { mode: 'MANUAL', deliveryZoneId: 'zone-1', line1: 'شارع جديد' } as any);
+    expect(switched).toMatchObject({ mode: 'MANUAL', latitude: null, longitude: null, deliveryZoneId: 'zone-1', line1: 'شارع جديد' });
+  });
+
+  it('editing keeps the saved method: a GPS address cannot take a zone, a MANUAL address cannot take coordinates', async () => {
+    const { service } = buildHarness();
+    const g = await service.create('customer-1', gps());
+    expect((await service.update('customer-1', g.id, { deliveryZoneId: 'zone-1' }).catch((e) => e)).getResponse().details.code).toBe('INVALID_DELIVERY_ADDRESS');
+    await expect(service.update('customer-1', g.id, { latitude: 30.43, longitude: 31.57, label: 'Home' })).resolves.toMatchObject({ mode: 'GPS', latitude: 30.43, label: 'Home' });
+    const m = await service.create('customer-1', manual());
+    expect((await service.update('customer-1', m.id, { latitude: 30.4, longitude: 31.5 }).catch((e) => e)).getResponse().details.code).toBe('INVALID_DELIVERY_ADDRESS');
+    await expect(service.update('customer-1', m.id, { line1: 'Edited' })).resolves.toMatchObject({ mode: 'MANUAL', line1: 'Edited' });
+  });
+
+  it('a legacy address (no mode) is untouched: same rules as before, mode stays null until the customer picks one', async () => {
+    const { service } = buildHarness();
+    const a = await service.create('customer-1', baseDto());
+    expect(service.toView(a)).toMatchObject({ mode: null, zoneStatus: 'OK' });
+  });
+
+  it('capabilities: GPS is available only with Maps on, the Admin rate and minimum set, and a service area; manual needs an active zone', async () => {
+    const h = buildHarness();
+    expect(await h.service.capabilities()).toEqual({ manual: { available: true }, gps: { available: false, reason: 'PRICING_NOT_CONFIGURED' } });
+    h.configValues.set('REGISTERED_VENDOR_PRICE_PER_100M_MINOR', 100);
+    h.configValues.set('REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR', 1500);
+    expect((await h.service.capabilities()).gps).toEqual({ available: true, reason: null });
+    h.serviceAreasRepository.count.mockResolvedValueOnce(0);
+    expect((await h.service.capabilities()).gps.reason).toBe('NO_SERVICE_AREA');
+    (h.deliveryFee as any).roadDistancePricingAvailable = false;
+    expect((await h.service.capabilities()).gps).toEqual({ available: false, reason: 'MAPS_DISABLED' });
   });
 });

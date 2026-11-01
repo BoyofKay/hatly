@@ -6,6 +6,7 @@ import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
 import { Role } from '../../../common/enums/role.enum';
 import { MAP_PROVIDER, MapProvider } from '../../location/map-provider.interface';
+import { RateLimitPolicies, Throttled } from '../../../common/throttling/rate-limit-policies';
 
 class ReverseGeocodeQuery {
   @Type(() => Number)
@@ -36,6 +37,7 @@ class SearchQuery {
 export class GeoController {
   constructor(@Inject(MAP_PROVIDER) private readonly mapProvider: MapProvider) {}
 
+  @Throttled(RateLimitPolicies.geoLookup)
   @Get('reverse')
   async reverse(@Query() query: ReverseGeocodeQuery) {
     try {
@@ -46,6 +48,7 @@ export class GeoController {
     }
   }
 
+  @Throttled(RateLimitPolicies.geoLookup)
   @Get('search')
   async search(@Query() query: SearchQuery) {
     try {

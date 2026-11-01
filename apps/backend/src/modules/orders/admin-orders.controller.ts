@@ -1,13 +1,18 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { RequiresPermission } from '../permissions/decorators/requires-permission.decorator';
 import { Permission } from '../permissions/permission.enum';
+import { PermissionsService } from '../permissions/permissions.service';
+import { maskName, maskPhone } from '../admin-platform/common/platform-sql';
 import { AdminOrdersService } from './admin-orders.service';
 import { SearchAdminOrdersQueryDto } from './dto/search-admin-orders-query.dto';
 import { PriceCustomItemDto } from './dto/price-custom-item.dto';
 import { AdHocPurchaseRecordService } from './ad-hoc-purchase-record.service';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+import { Role } from '../../common/enums/role.enum';
+import { OrderVendorSegmentStateMachineService } from './order-vendor-segment-state-machine.service';
+import { UpdateSegmentStatusDto } from './dto/update-segment-status.dto';
 
 /**
  * Admin Order Detail View (Chunk 2a). Read-only, general-purpose —
@@ -24,7 +29,15 @@ export class AdminOrdersController {
   constructor(
     private readonly adminOrdersService: AdminOrdersService,
     private readonly adHocPurchaseRecordService: AdHocPurchaseRecordService,
+    private readonly segmentStateMachine: OrderVendorSegmentStateMachineService,
+    private readonly permissionsService: PermissionsService,
   ) {}
+
+  /** Customer name / phone are masked unless the caller holds VIEW_CUSTOMER_PII (SUPER_ADMIN always does). */
+  private async maskCustomer<T extends { customer?: { fullName?: string | null; phone?: string | null } | null }>(user: AuthenticatedUser, row: T): Promise<T> {
+    if (!row.customer || (await this.permissionsService.actorHolds(user, Permission.VIEW_CUSTOMER_PII))) return row;
+    return { ...row, customer: { ...row.customer, fullName: maskName(row.customer.fullName ?? null), phone: maskPhone(row.customer.phone ?? null) } } as T;
+  }
 
   /**
    * M3b (Launch-Readiness Gap Audit, G-04) — Admin Order Search/browse.
@@ -35,11 +48,37 @@ export class AdminOrdersController {
    * doesn't matter here the way this controller's own top comment
    * warns about for `:id` vs. a sibling module's static segment.
    */
+  /**
+   * Hatly operations handle a segment ON THE VENDOR'S BEHALF — accept (CONFIRMED), reject (CANCELLED + a required reason), PREPARING,
+   * READY_FOR_PICKUP — for any branch and for Hatly/Wasally service segments. This is the SAME transition implementation the vendor
+   * endpoint uses (state table, payment gate, partial-cancellation money, readiness, dispatch); the only difference is the actor, which
+   * the segment history records with `onBehalfOfVendor = true`. Requires MANAGE_ORDER_FULFILMENT (SUPER_ADMIN always passes).
+   */
+  @Patch('segments/:segmentId/status')
+  @RequiresPermission(Permission.MANAGE_ORDER_FULFILMENT)
+  async updateSegmentStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('segmentId') segmentId: string,
+    @Body() dto: UpdateSegmentStatusDto,
+  ) {
+    const segment = await this.segmentStateMachine.transition({
+      segmentId,
+      to: dto.status,
+      actorUserId: user.id,
+      actorRole: user.role as Role,
+      expectedReadyAt: dto.expectedReadyAt ? new Date(dto.expectedReadyAt) : undefined,
+      reason: dto.reason,
+    });
+    return { data: segment };
+  }
+
   @Get()
   @RequiresPermission(Permission.VIEW_ORDERS)
-  async search(@Query() query: SearchAdminOrdersQueryDto) {
+  async search(@CurrentUser() user: AuthenticatedUser, @Query() query: SearchAdminOrdersQueryDto) {
     const result = await this.adminOrdersService.search(query);
-    return { data: result.data, meta: { page: result.page, limit: result.limit, total: result.total } };
+    const pii = await this.permissionsService.actorHolds(user, Permission.VIEW_CUSTOMER_PII);
+    const data = pii ? result.data : await Promise.all(result.data.map((row) => this.maskCustomer(user, row)));
+    return { data, meta: { page: result.page, limit: result.limit, total: result.total } };
   }
 
   // The id is constrained to a UUID-shaped segment. Without it `:id` also matches the static
@@ -49,16 +88,16 @@ export class AdminOrdersController {
   // with a 500 ("invalid input syntax for type uuid"). Non-UUID segments now fall through.
   @Get(':id([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})')
   @RequiresPermission(Permission.VIEW_ORDERS)
-  async getOne(@Param('id') id: string) {
-    const data = await this.adminOrdersService.getOne(id);
+  async getOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    const data = await this.maskCustomer(user, await this.adminOrdersService.getOne(id));
     return { data };
   }
 
   /** The same detail view, looked up by the customer-facing order number (`HT-100234`) — the reference support actually has. */
   @Get('by-number/:orderNumber')
   @RequiresPermission(Permission.VIEW_ORDERS)
-  async getOneByOrderNumber(@Param('orderNumber') orderNumber: string) {
-    const data = await this.adminOrdersService.getOneByIdOrOrderNumber(orderNumber);
+  async getOneByOrderNumber(@CurrentUser() user: AuthenticatedUser, @Param('orderNumber') orderNumber: string) {
+    const data = await this.maskCustomer(user, await this.adminOrdersService.getOneByIdOrOrderNumber(orderNumber));
     return { data };
   }
 

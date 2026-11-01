@@ -9,7 +9,8 @@ void main() {
     });
 
     test('activeCount counts each independently active filter', () {
-      const filters = VendorFilters(openNow: true, hasOffers: true, minRating: 4);
+      const filters =
+          VendorFilters(openNow: true, hasOffers: true, minRating: 4);
       expect(filters.activeCount, 3);
       expect(filters.isEmpty, isFalse);
     });
@@ -22,7 +23,9 @@ void main() {
       expect(updated.minRating, isNull);
     });
 
-    test('copyWith accepts a plain int literal for minRating without crashing (real UI call shape)', () {
+    test(
+        'copyWith accepts a plain int literal for minRating without crashing (real UI call shape)',
+        () {
       // Regression: `copyWith` used to do a bare `minRating as double?`, which
       // throws at runtime for an int literal like `copyWith(minRating: 4)` —
       // exactly how the filter sheet's rating chips call it.

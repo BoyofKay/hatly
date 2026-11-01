@@ -1,15 +1,16 @@
-import * as admin from 'firebase-admin';
+import * as app from 'firebase-admin/app';
+import * as messaging from 'firebase-admin/messaging';
 import { FirebasePushNotificationProvider } from './firebase-push.provider';
 
-jest.mock('firebase-admin', () => {
-  const mockApp = { name: 'mock-app' };
-  return {
-    apps: [] as any[],
-    initializeApp: jest.fn(() => mockApp),
-    credential: { cert: jest.fn((c: any) => c) },
-    messaging: jest.fn(),
-  };
-});
+// The MODULAR API (works unchanged on firebase-admin 12 and 14). `mockApps` is what getApps() returns.
+const mockApps: any[] = [];
+jest.mock('firebase-admin/app', () => ({
+  getApps: jest.fn(() => mockApps),
+  initializeApp: jest.fn(() => ({ name: 'mock-app' })),
+  cert: jest.fn((c: any) => c),
+}));
+jest.mock('firebase-admin/messaging', () => ({ getMessaging: jest.fn() }));
+const admin = { initializeApp: app.initializeApp, messaging: messaging.getMessaging };
 
 function buildProvider(config: Record<string, string | undefined>) {
   const configService = { get: jest.fn((key: string) => config[key]) };
@@ -19,7 +20,7 @@ function buildProvider(config: Record<string, string | undefined>) {
 
 describe('FirebasePushNotificationProvider', () => {
   beforeEach(() => {
-    (admin as any).apps = [];
+    mockApps.length = 0;
     jest.clearAllMocks();
   });
 
@@ -32,7 +33,7 @@ describe('FirebasePushNotificationProvider', () => {
   });
 
   it('CRITICAL: never initializes a second Firebase app if one already exists', () => {
-    (admin as any).apps = [{ name: 'existing-app' }];
+    mockApps.push({ name: 'existing-app' });
     const provider = buildProvider({
       'fcm.projectId': 'p',
       'fcm.clientEmail': 'e',
@@ -40,6 +41,13 @@ describe('FirebasePushNotificationProvider', () => {
     });
     provider.onModuleInit();
     expect(admin.initializeApp).not.toHaveBeenCalled();
+  });
+
+  it('initializes ONE app from the configured service account (escaped newlines restored) when none exists', () => {
+    const provider = buildProvider({ 'fcm.projectId': 'p', 'fcm.clientEmail': 'e', 'fcm.privateKey': 'line1\\nline2' });
+    provider.onModuleInit();
+    expect(app.cert).toHaveBeenCalledWith({ projectId: 'p', clientEmail: 'e', privateKey: 'line1\nline2' });
+    expect(admin.initializeApp).toHaveBeenCalledTimes(1);
   });
 
   it('reports success when Firebase accepts the message', async () => {

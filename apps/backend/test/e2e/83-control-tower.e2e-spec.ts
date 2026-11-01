@@ -255,14 +255,15 @@ describe('E2E — Admin Control Tower & operational dispatch', () => {
       const d1 = await s.driver({ ...near });
       const assigned = await assignedTo(d1);
       await world.ds.query("UPDATE deliveries SET accept_deadline_at = NOW() - INTERVAL '1 minute' WHERE order_id = $1", [assigned.id]);
-      await readyOrder(); // waiting, no alert (automatic dispatch off)
+      await readyOrder(); // waiting; automatic dispatch is off, so it is never silent: an open AUTO_ASSIGN_DISABLED alert
 
       const forViewer = expectData<any>(await api(viewer, 'get', '/admin/control-tower/summary'));
       expect(forViewer.drivers).toBeNull();
       expect(forViewer.automaticDispatchEnabled).toBe(false);
       expect(forViewer.ordersByStatus.ASSIGNED_TO_DRIVER).toBeGreaterThanOrEqual(1);
       expect(forViewer.attention.assignedPastAcceptDeadline).toBeGreaterThanOrEqual(1);
-      expect(forViewer.attention.awaitingWithoutAlert).toBeGreaterThanOrEqual(1);
+      expect(forViewer.attention.awaitingWithOpenNoDriverAlert).toBeGreaterThanOrEqual(1);
+      expect(forViewer.operations.openDispatchAlerts.AUTO_ASSIGN_DISABLED).toBeGreaterThanOrEqual(1);
       expect(forViewer.attention.awaitingAssignment).toBe(forViewer.attention.awaitingWithOpenNoDriverAlert + forViewer.attention.awaitingWithoutAlert);
 
       const forDispatcher = expectData<any>(await api(dispatcher, 'get', '/admin/control-tower/summary'));

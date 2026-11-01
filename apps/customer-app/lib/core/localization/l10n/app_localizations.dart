@@ -329,7 +329,7 @@ abstract class AppLocalizations {
   /// No description provided for @passwordSetupSectionSubtitle.
   ///
   /// In ar, this message translates to:
-  /// **'عيّن كلمة مرور لتتمكن من تسجيل الدخول أيضًا بدون رمز عبر رسالة نصية.'**
+  /// **'غيّر كلمة المرور التي تسجّل بها الدخول.'**
   String get passwordSetupSectionSubtitle;
 
   /// No description provided for @passwordSetupSaveButton.
@@ -421,6 +421,72 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'تعذر إرسال رمز التحقق حاليًا. برجاء المحاولة لاحقًا'**
   String get errorSmsProviderUnavailable;
+
+  /// No description provided for @passwordTooShort.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور يجب ألا تقل عن 8 أحرف'**
+  String get passwordTooShort;
+
+  /// No description provided for @passwordConfirmLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'تأكيد كلمة المرور'**
+  String get passwordConfirmLabel;
+
+  /// No description provided for @passwordMismatch.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمتا المرور غير متطابقتين'**
+  String get passwordMismatch;
+
+  /// No description provided for @errorInvalidCredentials.
+  ///
+  /// In ar, this message translates to:
+  /// **'رقم الهاتف أو كلمة المرور غير صحيحة'**
+  String get errorInvalidCredentials;
+
+  /// No description provided for @errorRegistrationUnavailable.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعذر إكمال التسجيل. إذا كان لديك حساب بالفعل فسجّل الدخول.'**
+  String get errorRegistrationUnavailable;
+
+  /// No description provided for @errorTooManyFailedLogins.
+  ///
+  /// In ar, this message translates to:
+  /// **'محاولات تسجيل دخول فاشلة كثيرة. حاول مرة أخرى بعد قليل'**
+  String get errorTooManyFailedLogins;
+
+  /// No description provided for @errorInvalidInput.
+  ///
+  /// In ar, this message translates to:
+  /// **'تحقق من البيانات المدخلة وحاول مرة أخرى'**
+  String get errorInvalidInput;
+
+  /// No description provided for @errorPhoneVerificationUnavailable.
+  ///
+  /// In ar, this message translates to:
+  /// **'التحقق من الهاتف غير متاح حاليًا'**
+  String get errorPhoneVerificationUnavailable;
+
+  /// No description provided for @profileCurrentPasswordLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور الحالية'**
+  String get profileCurrentPasswordLabel;
+
+  /// No description provided for @errorCurrentPasswordRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل كلمة المرور الحالية لتغييرها'**
+  String get errorCurrentPasswordRequired;
+
+  /// No description provided for @errorCurrentPasswordInvalid.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور الحالية غير صحيحة'**
+  String get errorCurrentPasswordInvalid;
 
   /// No description provided for @homeComingSoon.
   ///
@@ -737,13 +803,13 @@ abstract class AppLocalizations {
   /// No description provided for @customRequestSheetTitle.
   ///
   /// In ar, this message translates to:
-  /// **'اطلب صنفًا مخصصًا'**
+  /// **'اطلب صنفًا غير موجود في القائمة'**
   String get customRequestSheetTitle;
 
   /// No description provided for @customRequestSheetSubtitle.
   ///
   /// In ar, this message translates to:
-  /// **'صف ما تحتاجه و/أو أضف صورة — سنرسلها إلى المتجر.'**
+  /// **'صف ما تحتاجه و/أو أضف صورة. سيُضاف إلى سلتك ويصل إلى المتجر مع طلبك، ويؤكد المتجر توفر الصنف ويحدد سعره، وسيظهر لك المبلغ النهائي بعد ذلك.'**
   String get customRequestSheetSubtitle;
 
   /// No description provided for @customRequestTextHint.
@@ -1412,12 +1478,6 @@ abstract class AppLocalizations {
   /// **'العروض'**
   String get homeSectionOffers;
 
-  /// No description provided for @homeSectionPopularNew.
-  ///
-  /// In ar, this message translates to:
-  /// **'الأكثر طلبًا والجديد'**
-  String get homeSectionPopularNew;
-
   /// No description provided for @homeFavoritesShortcut.
   ///
   /// In ar, this message translates to:
@@ -2072,6 +2132,24 @@ abstract class AppLocalizations {
   /// **'اختر وسيلة الدفع الإلكتروني'**
   String get checkoutChooseElectronicMethod;
 
+  /// No description provided for @checkoutElectronicMethodHeading.
+  ///
+  /// In ar, this message translates to:
+  /// **'وسيلة الدفع الإلكتروني'**
+  String get checkoutElectronicMethodHeading;
+
+  /// No description provided for @checkoutElectronicMethodUnavailable.
+  ///
+  /// In ar, this message translates to:
+  /// **'وسيلة الدفع هذه غير متاحة حاليًا، اختر وسيلة أخرى'**
+  String get checkoutElectronicMethodUnavailable;
+
+  /// No description provided for @checkoutCannotConfirmYet.
+  ///
+  /// In ar, this message translates to:
+  /// **'لم نتمكن من تأكيد الطلب بعد. راجع اختياراتك وحاول مرة أخرى'**
+  String get checkoutCannotConfirmYet;
+
   /// No description provided for @checkoutNoElectronicMethods.
   ///
   /// In ar, this message translates to:
@@ -2317,6 +2395,12 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'تعذّر حساب رسوم التوصيل الآن. حاول مرة أخرى بعد قليل.'**
   String get checkoutBlockerFeeUnavailable;
+
+  /// No description provided for @checkoutBlockerGpsUnavailable.
+  ///
+  /// In ar, this message translates to:
+  /// **'التوصيل إلى موقع GPS غير متاح حاليًا. اختر عنوانًا بمنطقة توصيل أو أضف عنوانًا جديدًا.'**
+  String get checkoutBlockerGpsUnavailable;
 
   /// No description provided for @checkoutBlockerInvalidAddress.
   ///
@@ -2603,7 +2687,7 @@ abstract class AppLocalizations {
   /// No description provided for @addressSearchNoResult.
   ///
   /// In ar, this message translates to:
-  /// **'لم نجد هذا العنوان. جرّب صياغة أخرى أو استخدم موقعك الحالي.'**
+  /// **'لم نجد هذا العنوان. البحث عن العناوين غير متاح دائمًا — يمكنك كتابة عنوانك في التفاصيل أعلاه وحفظه بدون موقع على الخريطة، أو استخدام موقعك الحالي.'**
   String get addressSearchNoResult;
 
   /// No description provided for @addressLocationUnavailable.
@@ -3371,7 +3455,7 @@ abstract class AppLocalizations {
   /// No description provided for @addressZonesEmpty.
   ///
   /// In ar, this message translates to:
-  /// **'مفيش مناطق توصيل متاحة دلوقتي.'**
+  /// **'لا توجد مناطق توصيل متاحة بعد، لذلك لا يمكن حفظ عنوان الآن. حاول مرة أخرى لاحقًا.'**
   String get addressZonesEmpty;
 
   /// No description provided for @addressDetailedLabel.
@@ -3440,12 +3524,6 @@ abstract class AppLocalizations {
   /// **'رسوم التوصيل حسب المنطقة: {area}'**
   String checkoutDeliveryZonePricing(String area);
 
-  /// No description provided for @checkoutHatlyServiceFeeFormula.
-  ///
-  /// In ar, this message translates to:
-  /// **'رسوم توصيل منطقتك {zoneFee} × {multiplier}'**
-  String checkoutHatlyServiceFeeFormula(String zoneFee, String multiplier);
-
   /// No description provided for @addressZoneAutoSelected.
   ///
   /// In ar, this message translates to:
@@ -3457,6 +3535,966 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'مفيش مناطق توصيل متاحة في المدينة دي دلوقتي.'**
   String get addressCityNoZones;
+
+  /// No description provided for @guestSignInTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'سجّل الدخول للمتابعة'**
+  String get guestSignInTitle;
+
+  /// No description provided for @guestSignInBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'أنشئ حسابًا أو سجّل الدخول لاستخدام السلة والطلبات والملف الشخصي.'**
+  String get guestSignInBody;
+
+  /// No description provided for @guestSignInAction.
+  ///
+  /// In ar, this message translates to:
+  /// **'تسجيل الدخول أو إنشاء حساب'**
+  String get guestSignInAction;
+
+  /// No description provided for @guestBrowseAction.
+  ///
+  /// In ar, this message translates to:
+  /// **'تصفح بدون حساب'**
+  String get guestBrowseAction;
+
+  /// No description provided for @weightEntryTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل الوزن'**
+  String get weightEntryTitle;
+
+  /// No description provided for @weightEntryHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'مثال: 1.5'**
+  String get weightEntryHint;
+
+  /// No description provided for @weightEntryConfirm.
+  ///
+  /// In ar, this message translates to:
+  /// **'تأكيد الوزن'**
+  String get weightEntryConfirm;
+
+  /// No description provided for @weightEntryTooltip.
+  ///
+  /// In ar, this message translates to:
+  /// **'اكتب الوزن'**
+  String get weightEntryTooltip;
+
+  /// No description provided for @weightEntryInvalid.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل وزنًا بين {min} و{max}'**
+  String weightEntryInvalid(String min, String max);
+
+  /// No description provided for @weightGramsShort.
+  ///
+  /// In ar, this message translates to:
+  /// **'{grams} جم'**
+  String weightGramsShort(int grams);
+
+  /// No description provided for @weightKgShort.
+  ///
+  /// In ar, this message translates to:
+  /// **'{kg} كجم'**
+  String weightKgShort(String kg);
+
+  /// No description provided for @addressPickerHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر عنوانًا محفوظًا'**
+  String get addressPickerHint;
+
+  /// No description provided for @addressPickerNoPin.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا يوجد موقع على الخريطة — أضفه من عناويني'**
+  String get addressPickerNoPin;
+
+  /// No description provided for @addressPickerNeedsPin.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذا العنوان بلا موقع على الخريطة فلا يمكن استخدامه هنا. أضف له موقعًا أولًا.'**
+  String get addressPickerNeedsPin;
+
+  /// No description provided for @hatlyServiceRouteBuy.
+  ///
+  /// In ar, this message translates to:
+  /// **'هاتلي تشتري من {place} وتوصّل إلى عنوان التوصيل الخاص بك'**
+  String hatlyServiceRouteBuy(String place);
+
+  /// No description provided for @hatlyServiceRouteDeliver.
+  ///
+  /// In ar, this message translates to:
+  /// **'هاتلي تستلم من عنوان التوصيل الخاص بك وتوصّل إلى {place}'**
+  String hatlyServiceRouteDeliver(String place);
+
+  /// No description provided for @hatlyServiceRoutePlaceUnset.
+  ///
+  /// In ar, this message translates to:
+  /// **'المكان الذي تختاره'**
+  String get hatlyServiceRoutePlaceUnset;
+
+  /// No description provided for @hatlyServiceDeliveryOnly.
+  ///
+  /// In ar, this message translates to:
+  /// **'رسوم التوصيل فقط'**
+  String get hatlyServiceDeliveryOnly;
+
+  /// No description provided for @homeSectionMostOrdered.
+  ///
+  /// In ar, this message translates to:
+  /// **'الأكثر طلبًا'**
+  String get homeSectionMostOrdered;
+
+  /// No description provided for @homeSectionNew.
+  ///
+  /// In ar, this message translates to:
+  /// **'الجديد'**
+  String get homeSectionNew;
+
+  /// No description provided for @homeSeeAllOffersTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'العروض'**
+  String get homeSeeAllOffersTitle;
+
+  /// No description provided for @homeSeeAllEmpty.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا يوجد شيء هنا بعد'**
+  String get homeSeeAllEmpty;
+
+  /// No description provided for @notificationsTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإشعارات'**
+  String get notificationsTitle;
+
+  /// No description provided for @notificationsEmptyTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا توجد إشعارات بعد'**
+  String get notificationsEmptyTitle;
+
+  /// No description provided for @notificationsEmptyBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'سنخبرك هنا بكل تحديث على طلباتك.'**
+  String get notificationsEmptyBody;
+
+  /// No description provided for @notificationsLoadError.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعذّر تحميل الإشعارات'**
+  String get notificationsLoadError;
+
+  /// No description provided for @notificationsMarkAllRead.
+  ///
+  /// In ar, this message translates to:
+  /// **'تحديد الكل كمقروء'**
+  String get notificationsMarkAllRead;
+
+  /// No description provided for @notificationsBellLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإشعارات'**
+  String get notificationsBellLabel;
+
+  /// No description provided for @notificationsBellLabelUnread.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإشعارات، {count} غير مقروء'**
+  String notificationsBellLabelUnread(int count);
+
+  /// No description provided for @notificationsUnread.
+  ///
+  /// In ar, this message translates to:
+  /// **'غير مقروء'**
+  String get notificationsUnread;
+
+  /// No description provided for @notificationOrderPlacedTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم استلام طلبك'**
+  String get notificationOrderPlacedTitle;
+
+  /// No description provided for @notificationOrderPlacedBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'استلمنا طلبك رقم {orderNumber}.'**
+  String notificationOrderPlacedBody(String orderNumber);
+
+  /// No description provided for @notificationOrderConfirmedTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم تأكيد طلبك'**
+  String get notificationOrderConfirmedTitle;
+
+  /// No description provided for @notificationOrderConfirmedBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم تأكيد طلبك رقم {orderNumber}.'**
+  String notificationOrderConfirmedBody(String orderNumber);
+
+  /// No description provided for @notificationOrderPreparingTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'جارٍ تجهيز طلبك'**
+  String get notificationOrderPreparingTitle;
+
+  /// No description provided for @notificationOrderPreparingBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'بدأ تجهيز طلبك رقم {orderNumber}.'**
+  String notificationOrderPreparingBody(String orderNumber);
+
+  /// No description provided for @notificationOrderReadyForPickupTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلبك جاهز للاستلام'**
+  String get notificationOrderReadyForPickupTitle;
+
+  /// No description provided for @notificationOrderReadyForPickupBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلبك رقم {orderNumber} جاهز، يمكنك استلامه من الفرع.'**
+  String notificationOrderReadyForPickupBody(String orderNumber);
+
+  /// No description provided for @notificationOrderOnTheWayTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلبك في الطريق'**
+  String get notificationOrderOnTheWayTitle;
+
+  /// No description provided for @notificationOrderOnTheWayBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلبك رقم {orderNumber} في الطريق إليك.'**
+  String notificationOrderOnTheWayBody(String orderNumber);
+
+  /// No description provided for @notificationOrderDeliveredTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم توصيل طلبك'**
+  String get notificationOrderDeliveredTitle;
+
+  /// No description provided for @notificationOrderDeliveredBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم توصيل طلبك رقم {orderNumber}.'**
+  String notificationOrderDeliveredBody(String orderNumber);
+
+  /// No description provided for @notificationOrderCollectedTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم استلام طلبك'**
+  String get notificationOrderCollectedTitle;
+
+  /// No description provided for @notificationOrderCollectedBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم استلام طلبك رقم {orderNumber}.'**
+  String notificationOrderCollectedBody(String orderNumber);
+
+  /// No description provided for @notificationOrderCancelledTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم إلغاء طلبك'**
+  String get notificationOrderCancelledTitle;
+
+  /// No description provided for @notificationOrderCancelledBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم إلغاء طلبك رقم {orderNumber}.'**
+  String notificationOrderCancelledBody(String orderNumber);
+
+  /// No description provided for @notificationOrderFailedDeliveryTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعذّر توصيل طلبك'**
+  String get notificationOrderFailedDeliveryTitle;
+
+  /// No description provided for @notificationOrderFailedDeliveryBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'لم نتمكن من توصيل طلبك رقم {orderNumber}.'**
+  String notificationOrderFailedDeliveryBody(String orderNumber);
+
+  /// No description provided for @customRequestEntryHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'اكتب الصنف أو أضف صورة، وسيتأكد المتجر منه ويحدد سعره.'**
+  String get customRequestEntryHint;
+
+  /// No description provided for @customRequestAdded.
+  ///
+  /// In ar, this message translates to:
+  /// **'تمت الإضافة إلى سلتك — سيؤكد المتجر توفر الصنف ويحدد سعره.'**
+  String get customRequestAdded;
+
+  /// No description provided for @cartErrorCustomRequestsUnavailable.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذا المتجر لا يقبل الطلبات المخصصة.'**
+  String get cartErrorCustomRequestsUnavailable;
+
+  /// No description provided for @optionChooseBetween.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر من {min} إلى {max}'**
+  String optionChooseBetween(int min, int max);
+
+  /// No description provided for @optionChooseAtLeast.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر {min} على الأقل'**
+  String optionChooseAtLeast(int min);
+
+  /// No description provided for @optionChooseUpTo.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر حتى {max}'**
+  String optionChooseUpTo(int max);
+
+  /// No description provided for @optionMinError.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر {min} على الأقل'**
+  String optionMinError(int min);
+
+  /// No description provided for @optionMaxReached.
+  ///
+  /// In ar, this message translates to:
+  /// **'يمكنك اختيار {max} كحد أقصى'**
+  String optionMaxReached(int max);
+
+  /// No description provided for @cartErrorOptionLimit.
+  ///
+  /// In ar, this message translates to:
+  /// **'أحد الاختيارات خارج ما يسمح به هذا المنتج — راجع اختياراتك.'**
+  String get cartErrorOptionLimit;
+
+  /// No description provided for @deleteAccountAction.
+  ///
+  /// In ar, this message translates to:
+  /// **'حذف حسابي'**
+  String get deleteAccountAction;
+
+  /// No description provided for @deleteAccountTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'حذف الحساب نهائيًا'**
+  String get deleteAccountTitle;
+
+  /// No description provided for @deleteAccountExplanation.
+  ///
+  /// In ar, this message translates to:
+  /// **'سيتم حذف بياناتك الشخصية (الاسم ورقم الهاتف والعناوين المحفوظة والإشعارات والمفضلة وسلة التسوق). تبقى سجلات الطلبات والمدفوعات المنتهية بدون أي بيانات تعرّف بك، لأن المتاجر والسائقين وهاتلي يحتاجونها للمحاسبة. ستفقد نقاط هاتلي. لا يمكن التراجع عن هذا الإجراء.'**
+  String get deleteAccountExplanation;
+
+  /// No description provided for @deleteAccountRequirements.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا يمكن حذف الحساب أثناء وجود طلب قيد التنفيذ أو رصيد في محفظة هاتلي.'**
+  String get deleteAccountRequirements;
+
+  /// No description provided for @deleteAccountPasswordHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل كلمة المرور للتأكيد'**
+  String get deleteAccountPasswordHint;
+
+  /// No description provided for @deleteAccountConfirm.
+  ///
+  /// In ar, this message translates to:
+  /// **'حذف الحساب'**
+  String get deleteAccountConfirm;
+
+  /// No description provided for @deleteAccountCancel.
+  ///
+  /// In ar, this message translates to:
+  /// **'إلغاء'**
+  String get deleteAccountCancel;
+
+  /// No description provided for @deleteAccountPasswordRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'أدخل كلمة المرور لتأكيد الحذف'**
+  String get deleteAccountPasswordRequired;
+
+  /// No description provided for @deleteAccountErrorPassword.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور غير صحيحة'**
+  String get deleteAccountErrorPassword;
+
+  /// No description provided for @deleteAccountErrorActiveOrders.
+  ///
+  /// In ar, this message translates to:
+  /// **'لديك طلب قيد التنفيذ. يمكنك حذف حسابك بعد انتهائه.'**
+  String get deleteAccountErrorActiveOrders;
+
+  /// No description provided for @deleteAccountErrorWalletBalance.
+  ///
+  /// In ar, this message translates to:
+  /// **'محفظة هاتلي ليست فارغة. تواصل مع دعم هاتلي لتسويتها قبل حذف الحساب.'**
+  String get deleteAccountErrorWalletBalance;
+
+  /// No description provided for @deleteAccountErrorGeneric.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعذّر حذف الحساب. حاول مرة أخرى.'**
+  String get deleteAccountErrorGeneric;
+
+  /// No description provided for @homeNoStoresTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا توجد متاجر متاحة بعد'**
+  String get homeNoStoresTitle;
+
+  /// No description provided for @homeNoStoresBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'ستظهر المتاجر والأقسام هنا بمجرد توفرها في منطقتك. تفقّد التطبيق مرة أخرى قريبًا.'**
+  String get homeNoStoresBody;
+
+  /// No description provided for @phoneEgyptOnly.
+  ///
+  /// In ar, this message translates to:
+  /// **'هاتلي تقبل حاليًا أرقام الموبايل المصرية فقط (+20).'**
+  String get phoneEgyptOnly;
+
+  /// No description provided for @addressMapLocationSaved.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم حفظ الموقع على الخريطة'**
+  String get addressMapLocationSaved;
+
+  /// No description provided for @addressTextOnly.
+  ///
+  /// In ar, this message translates to:
+  /// **'عنوان نصي فقط — بدون موقع على الخريطة'**
+  String get addressTextOnly;
+
+  /// No description provided for @addressMethodTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'إزاي عايز تضيف عنوانك؟'**
+  String get addressMethodTitle;
+
+  /// No description provided for @addressMethodSubtitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختار طريقة واحدة بس — مش محتاج الاتنين.'**
+  String get addressMethodSubtitle;
+
+  /// No description provided for @addressMethodGpsTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'استخدم موقعي الحالي (GPS)'**
+  String get addressMethodGpsTitle;
+
+  /// No description provided for @addressMethodGpsHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'بنقرأ موقعك ونحسب التوصيل على حسب مسافة الطريق. مش محتاج تختار منطقة ولا تكتب عنوان.'**
+  String get addressMethodGpsHint;
+
+  /// No description provided for @addressMethodManualTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'هكتب عنواني بنفسي'**
+  String get addressMethodManualTitle;
+
+  /// No description provided for @addressMethodManualHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختار منطقتك واكتب عنوانك بالتفصيل. التوصيل بسعر المنطقة الثابت. مفيش طلب لموقعك.'**
+  String get addressMethodManualHint;
+
+  /// No description provided for @addressMethodGpsUnavailable.
+  ///
+  /// In ar, this message translates to:
+  /// **'التوصيل بالموقع (GPS) مش متاح دلوقتي. اكتب عنوانك بنفسك.'**
+  String get addressMethodGpsUnavailable;
+
+  /// No description provided for @addressChangeMethod.
+  ///
+  /// In ar, this message translates to:
+  /// **'تغيير طريقة العنوان'**
+  String get addressChangeMethod;
+
+  /// No description provided for @addressChangeMethodTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تغيير طريقة العنوان؟'**
+  String get addressChangeMethodTitle;
+
+  /// No description provided for @addressChangeMethodDiscardsGps.
+  ///
+  /// In ar, this message translates to:
+  /// **'هيتم مسح الموقع اللي اتحدد.'**
+  String get addressChangeMethodDiscardsGps;
+
+  /// No description provided for @addressChangeMethodDiscardsManual.
+  ///
+  /// In ar, this message translates to:
+  /// **'هيتم مسح المنطقة المختارة والعنوان اللي كتبته.'**
+  String get addressChangeMethodDiscardsManual;
+
+  /// No description provided for @addressChangeMethodConfirm.
+  ///
+  /// In ar, this message translates to:
+  /// **'غيّر الطريقة'**
+  String get addressChangeMethodConfirm;
+
+  /// No description provided for @addressGpsJourneyTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'موقعك'**
+  String get addressGpsJourneyTitle;
+
+  /// No description provided for @addressGpsHelp.
+  ///
+  /// In ar, this message translates to:
+  /// **'اضغط على الزر لمشاركة موقعك الحالي. مش محتاج تختار منطقة ولا تكتب عنوان.'**
+  String get addressGpsHelp;
+
+  /// No description provided for @addressGpsDetected.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم تحديد موقعك'**
+  String get addressGpsDetected;
+
+  /// No description provided for @addressGpsFeeNote.
+  ///
+  /// In ar, this message translates to:
+  /// **'سعر التوصيل بيتحسب عند إتمام الطلب من مسافة الطريق. أي مبلغ يظهر قبل كده هو تقدير فقط.'**
+  String get addressGpsFeeNote;
+
+  /// No description provided for @addressGpsNeedLocation.
+  ///
+  /// In ar, this message translates to:
+  /// **'شارك موقعك الأول عشان تكمّل.'**
+  String get addressGpsNeedLocation;
+
+  /// No description provided for @addressGpsOutsideCoverage.
+  ///
+  /// In ar, this message translates to:
+  /// **'هاتلي لا توصّل للموقع ده لسه.'**
+  String get addressGpsOutsideCoverage;
+
+  /// No description provided for @addressGpsInvalidLocation.
+  ///
+  /// In ar, this message translates to:
+  /// **'مقدرناش نستخدم الموقع ده. جرّب تاني.'**
+  String get addressGpsInvalidLocation;
+
+  /// No description provided for @addressGpsSaved.
+  ///
+  /// In ar, this message translates to:
+  /// **'موقع GPS'**
+  String get addressGpsSaved;
+
+  /// No description provided for @addressManualJourneyTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'عنوان مكتوب'**
+  String get addressManualJourneyTitle;
+
+  /// No description provided for @addressGpsJourneyBadge.
+  ///
+  /// In ar, this message translates to:
+  /// **'طريقة GPS'**
+  String get addressGpsJourneyBadge;
+
+  /// No description provided for @addressManualJourneyBadge.
+  ///
+  /// In ar, this message translates to:
+  /// **'طريقة العنوان المكتوب'**
+  String get addressManualJourneyBadge;
+
+  /// No description provided for @addressMethodsLoading.
+  ///
+  /// In ar, this message translates to:
+  /// **'بنجهّز طرق العنوان…'**
+  String get addressMethodsLoading;
+
+  /// No description provided for @routeSectionTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'مسار الطلب'**
+  String get routeSectionTitle;
+
+  /// No description provided for @routeFromLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'من'**
+  String get routeFromLabel;
+
+  /// No description provided for @routeToLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'إلى'**
+  String get routeToLabel;
+
+  /// No description provided for @routeBadgeDefault.
+  ///
+  /// In ar, this message translates to:
+  /// **'افتراضي'**
+  String get routeBadgeDefault;
+
+  /// No description provided for @routeBadgeChosen.
+  ///
+  /// In ar, this message translates to:
+  /// **'من اختيارك'**
+  String get routeBadgeChosen;
+
+  /// No description provided for @routeChange.
+  ///
+  /// In ar, this message translates to:
+  /// **'تغيير'**
+  String get routeChange;
+
+  /// No description provided for @routeChoose.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختيار'**
+  String get routeChoose;
+
+  /// No description provided for @routeNotSet.
+  ///
+  /// In ar, this message translates to:
+  /// **'لم يُحدد بعد'**
+  String get routeNotSet;
+
+  /// No description provided for @routeDefaultMissingHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا توجد نقطة افتراضية حاليًا — اختر نقطة.'**
+  String get routeDefaultMissingHint;
+
+  /// No description provided for @routeOriginRequiredHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر المكان اللي هيتم الاستلام منه.'**
+  String get routeOriginRequiredHint;
+
+  /// No description provided for @routeSheetTitleOrigin.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر نقطة البداية'**
+  String get routeSheetTitleOrigin;
+
+  /// No description provided for @routeSheetTitleDestination.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر الوجهة'**
+  String get routeSheetTitleDestination;
+
+  /// No description provided for @routeSheetPointSection.
+  ///
+  /// In ar, this message translates to:
+  /// **'موقعك الحالي أو نقطة على الخريطة'**
+  String get routeSheetPointSection;
+
+  /// No description provided for @routeSheetSavedSection.
+  ///
+  /// In ar, this message translates to:
+  /// **'من عناويني المحفوظة'**
+  String get routeSheetSavedSection;
+
+  /// No description provided for @routeNameThisPlace.
+  ///
+  /// In ar, this message translates to:
+  /// **'سمّ المكان (اختياري)'**
+  String get routeNameThisPlace;
+
+  /// No description provided for @routeNameThisPlaceHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'مثال: بيت ماما'**
+  String get routeNameThisPlaceHint;
+
+  /// No description provided for @routeUseDefault.
+  ///
+  /// In ar, this message translates to:
+  /// **'استخدام النقطة الافتراضية'**
+  String get routeUseDefault;
+
+  /// No description provided for @routeConfirmPoint.
+  ///
+  /// In ar, this message translates to:
+  /// **'تأكيد هذه النقطة'**
+  String get routeConfirmPoint;
+
+  /// No description provided for @routeCurrentLocationLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'موقعي الحالي'**
+  String get routeCurrentLocationLabel;
+
+  /// No description provided for @routeSelectedPointLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'نقطة محددة'**
+  String get routeSelectedPointLabel;
+
+  /// No description provided for @routeDirectionNote.
+  ///
+  /// In ar, this message translates to:
+  /// **'الاتجاه: من النقطة الأولى إلى الثانية.'**
+  String get routeDirectionNote;
+
+  /// No description provided for @routeOrderSectionTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'مسار الطلب'**
+  String get routeOrderSectionTitle;
+
+  /// No description provided for @cartErrorAdHocOriginRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر مكان الاستلام لهذا الطلب قبل إضافته للسلة.'**
+  String get cartErrorAdHocOriginRequired;
+
+  /// No description provided for @checkoutBlockerAdHocOriginRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلب وصّلي لمكان ده من غير نقطة استلام. اختر نقطة الاستلام وأضفه تاني.'**
+  String get checkoutBlockerAdHocOriginRequired;
+
+  /// No description provided for @checkoutBlockerHatlyDefaultPickupMissing.
+  ///
+  /// In ar, this message translates to:
+  /// **'نقطة البداية الافتراضية لهاتلي لسه متظبطتش. اختر نقطة بداية لطلبك.'**
+  String get checkoutBlockerHatlyDefaultPickupMissing;
+
+  /// No description provided for @checkoutBlockerHatlyDefaultDestinationMissing.
+  ///
+  /// In ar, this message translates to:
+  /// **'الوجهة الافتراضية لهاتلي لسه متظبطتش. اختر وجهة لطلبك.'**
+  String get checkoutBlockerHatlyDefaultDestinationMissing;
+
+  /// No description provided for @checkoutBlockerWasallyDefaultDestinationMissing.
+  ///
+  /// In ar, this message translates to:
+  /// **'الوجهة الافتراضية لوصّلي لسه متظبطتش. اختر وجهة لطلبك.'**
+  String get checkoutBlockerWasallyDefaultDestinationMissing;
+
+  /// No description provided for @orderPartCancelledTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم إلغاء جزء من طلبك'**
+  String get orderPartCancelledTitle;
+
+  /// No description provided for @orderPartCancelledBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعذّر على {rejected} من {total} بائعين تجهيز جزئهم. يستمر باقي طلبك.'**
+  String orderPartCancelledBody(int rejected, int total);
+
+  /// No description provided for @orderPartCancelledNoCharge.
+  ///
+  /// In ar, this message translates to:
+  /// **'لن يتم تحصيل مبلغ الجزء الملغي منك.'**
+  String get orderPartCancelledNoCharge;
+
+  /// No description provided for @orderRejectionReasonLine.
+  ///
+  /// In ar, this message translates to:
+  /// **'السبب: {reason}'**
+  String orderRejectionReasonLine(String reason);
+
+  /// No description provided for @orderRefundWalletLine.
+  ///
+  /// In ar, this message translates to:
+  /// **'تمت إعادة {amount} إلى محفظتك.'**
+  String orderRefundWalletLine(String amount);
+
+  /// No description provided for @orderRefundTransferPendingLine.
+  ///
+  /// In ar, this message translates to:
+  /// **'سيعيد لك هاتلي مبلغ {amount}. سنحدّث الحالة عند إرساله.'**
+  String orderRefundTransferPendingLine(String amount);
+
+  /// No description provided for @orderRefundTransferSentLine.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم إرسال {amount} إليك.'**
+  String orderRefundTransferSentLine(String amount);
+
+  /// No description provided for @orderRefundReviewLine.
+  ///
+  /// In ar, this message translates to:
+  /// **'سيتم تسوية {amount} بعد مراجعة دفعتك.'**
+  String orderRefundReviewLine(String amount);
+
+  /// No description provided for @notificationOrderPartCancelledTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم إلغاء جزء من طلبك'**
+  String get notificationOrderPartCancelledTitle;
+
+  /// No description provided for @notificationOrderPartCancelledBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعذّر على أحد البائعين تجهيز جزئه من الطلب رقم {orderNumber}. يستمر باقي طلبك.'**
+  String notificationOrderPartCancelledBody(String orderNumber);
+
+  /// No description provided for @itemUnavailableTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'بعض المنتجات غير متوفرة'**
+  String get itemUnavailableTitle;
+
+  /// No description provided for @itemUnavailableBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا يمكن تجهيز هذه المنتجات. اختر كيف تريد المتابعة — لن يتغير شيء حتى تقرر.'**
+  String get itemUnavailableBody;
+
+  /// No description provided for @itemUnavailableContinue.
+  ///
+  /// In ar, this message translates to:
+  /// **'المتابعة بدونها'**
+  String get itemUnavailableContinue;
+
+  /// No description provided for @itemUnavailableCancel.
+  ///
+  /// In ar, this message translates to:
+  /// **'إلغاء الطلب كاملًا'**
+  String get itemUnavailableCancel;
+
+  /// No description provided for @itemUnavailableCancelConfirmTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'إلغاء الطلب كاملًا؟'**
+  String get itemUnavailableCancelConfirmTitle;
+
+  /// No description provided for @itemUnavailableCancelConfirmBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'سنحوّل طلبك إلى فريقنا لإلغاء هذا الطلب. تُرد المبالغ المدفوعة مسبقًا وفق قواعدنا المعتادة.'**
+  String get itemUnavailableCancelConfirmBody;
+
+  /// No description provided for @itemUnavailableCancelConfirmAction.
+  ///
+  /// In ar, this message translates to:
+  /// **'نعم، ألغِ الطلب'**
+  String get itemUnavailableCancelConfirmAction;
+
+  /// No description provided for @itemUnavailableKeepOrder.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإبقاء على الطلب'**
+  String get itemUnavailableKeepOrder;
+
+  /// No description provided for @itemUnavailableCancelRequested.
+  ///
+  /// In ar, this message translates to:
+  /// **'استلمنا طلب الإلغاء. سيعالجه فريقنا ويتواصل معك عند الحاجة.'**
+  String get itemUnavailableCancelRequested;
+
+  /// No description provided for @itemUnavailableTeamContact.
+  ///
+  /// In ar, this message translates to:
+  /// **'سيتواصل معك فريقنا بخصوص هذا الطلب.'**
+  String get itemUnavailableTeamContact;
+
+  /// No description provided for @itemUnavailableDone.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم — يستمر طلبك بدون هذه المنتجات.'**
+  String get itemUnavailableDone;
+
+  /// No description provided for @itemUnavailableError.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعذّر إرسال إجابتك. حاول مرة أخرى.'**
+  String get itemUnavailableError;
+
+  /// No description provided for @orderRemovedItemsTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'تمت إزالتها من طلبك'**
+  String get orderRemovedItemsTitle;
+
+  /// No description provided for @notificationItemUnavailableTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'منتج في طلبك غير متوفر'**
+  String get notificationItemUnavailableTitle;
+
+  /// No description provided for @notificationItemUnavailableBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'افتح الطلب رقم {orderNumber} للمتابعة بدون المنتج أو لإلغاء الطلب.'**
+  String notificationItemUnavailableBody(String orderNumber);
+
+  /// No description provided for @cartCompatTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا يمكن إضافة هذا المنتج الآن'**
+  String get cartCompatTitle;
+
+  /// No description provided for @cartCompatMultiVendorDisabled.
+  ///
+  /// In ar, this message translates to:
+  /// **'الطلب من أكثر من متجر غير متاح حاليًا. أكمل طلبك الحالي أو أفرغ السلة لتطلب من متجر آخر.'**
+  String get cartCompatMultiVendorDisabled;
+
+  /// No description provided for @cartCompatBranchPickupDisabled.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذا المتجر لا يوفّر الاستلام من الفرع.'**
+  String get cartCompatBranchPickupDisabled;
+
+  /// No description provided for @cartCompatSwitchToDelivery.
+  ///
+  /// In ar, this message translates to:
+  /// **'التحويل إلى التوصيل وإضافة المنتج'**
+  String get cartCompatSwitchToDelivery;
+
+  /// No description provided for @cartCompatStartNewCart.
+  ///
+  /// In ar, this message translates to:
+  /// **'إفراغ السلة وإضافة المنتج'**
+  String get cartCompatStartNewCart;
+
+  /// No description provided for @cartCompatKeepCart.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإبقاء على سلتي'**
+  String get cartCompatKeepCart;
+
+  /// No description provided for @cartCompatOk.
+  ///
+  /// In ar, this message translates to:
+  /// **'حسنًا'**
+  String get cartCompatOk;
+
+  /// No description provided for @addressOpenLocationSettings.
+  ///
+  /// In ar, this message translates to:
+  /// **'فتح إعدادات الموقع'**
+  String get addressOpenLocationSettings;
+
+  /// No description provided for @weightInlineLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'أو اكتب الوزن بالكيلوغرام'**
+  String get weightInlineLabel;
+
+  /// No description provided for @weightEstimateNote.
+  ///
+  /// In ar, this message translates to:
+  /// **'التقدير: {price} — يُحدَّد السعر النهائي حسب الوزن الفعلي عند التجهيز.'**
+  String weightEstimateNote(String price);
 }
 
 class _AppLocalizationsDelegate

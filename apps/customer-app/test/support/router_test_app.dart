@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hatly_customer/core/localization/l10n/app_localizations.dart';
 import 'package:hatly_customer/core/theme/hatly_theme.dart';
+import 'package:hatly_customer/features/auth/presentation/auth_gate.dart';
 
 /// Widget-test harness with a real [GoRouter] (so navigation is observable), the real Hatly theme
 /// (light/dark), real localisations (Arabic by default) and Riverpod overrides. google_fonts is off.
@@ -21,7 +22,9 @@ Widget hatlyRouterApp({
   final router_ =
       router ?? GoRouter(initialLocation: initialLocation, routes: routes);
   return ProviderScope(
-    overrides: overrides,
+    // Widget tests exercise the signed-in customer unless a test says otherwise (pass its own `isSignedInProvider` override
+    // — it comes later in the list and wins).
+    overrides: [isSignedInProvider.overrideWithValue(true), ...overrides],
     child: MaterialApp.router(
       debugShowCheckedModeBanner: false,
       routerConfig: router_,

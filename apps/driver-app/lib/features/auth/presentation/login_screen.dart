@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import '../../../core/localization/bilingual.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/providers.dart';
 import '../data/driver_auth_api.dart';
@@ -37,16 +38,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      final api = DriverAuthApi(ref.read(apiClientProvider), ref.read(tokenStorageProvider));
-      await api.login(phone: _phoneController.text.trim(), password: _passwordController.text);
+      final api = DriverAuthApi(
+          ref.read(apiClientProvider), ref.read(tokenStorageProvider));
+      await api.login(
+          phone: _phoneController.text.trim(),
+          password: _passwordController.text);
       ref.read(authStateProvider.notifier).setAuthenticated(true);
     } on DioException catch (error) {
-      final message = error.response?.data is Map ? (error.response?.data as Map)['message'] : null;
+      final message = error.response?.data is Map
+          ? (error.response?.data as Map)['message']
+          : null;
       setState(() {
-        _error = (message as String?) ?? 'Invalid credentials. Please try again.';
+        _error = (message as String?) ??
+            context.t('Invalid credentials. Please try again.',
+                'بيانات الدخول غير صحيحة. حاول مرة أخرى.');
       });
     } catch (_) {
-      setState(() => _error = 'Something went wrong. Please check your connection.');
+      setState(() => _error = context.t(
+          'Something went wrong. Please check your connection.',
+          'حدث خطأ. تحقق من اتصالك بالإنترنت.'));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -64,8 +74,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Hatly Driver',
+                // The supplied Hatly logo, bundled unchanged (assets/images/hatly-logo.jpg — the same file the Customer app uses).
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Image.asset(
+                      'assets/images/hatly-logo.jpg',
+                      key: const Key('hatly-logo'),
+                      width: 96,
+                      height: 96,
+                      cacheWidth: 288,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) =>
+                          const SizedBox(width: 96, height: 96),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  context.t('Hatly Driver', 'سائق هاتلي'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
@@ -73,13 +100,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Phone number', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                      labelText: context.t('Phone number', 'رقم الهاتف'),
+                      border: const OutlineInputBorder()),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _passwordController,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                      labelText: context.t('Password', 'كلمة المرور'),
+                      border: const OutlineInputBorder()),
                   onSubmitted: (_) => _handleLogin(),
                 ),
                 if (_error != null) ...[
@@ -93,9 +124,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ? const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
-                      : const Text('Login'),
+                      : Text(context.t('Login', 'تسجيل الدخول')),
                 ),
               ],
             ),

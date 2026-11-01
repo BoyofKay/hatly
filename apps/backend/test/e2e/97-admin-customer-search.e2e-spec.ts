@@ -14,11 +14,13 @@ describe('E2E — Admin Customer Management', () => {
   let world: World;
   let s: Scenario;
   let viewer: Actor;
+  let piiViewer: Actor;
 
   beforeAll(async () => {
     world = await bootWorld();
     s = new Scenario(world);
     viewer = await s.admin([Permission.VIEW_CUSTOMERS], 'Customer Viewer');
+    piiViewer = await s.admin([Permission.VIEW_CUSTOMERS, Permission.VIEW_CUSTOMER_PII], 'Customer PII Viewer');
   });
   afterAll(async () => {
     await world.close();
@@ -27,10 +29,16 @@ describe('E2E — Admin Customer Management', () => {
   it('an authorized admin can search for a real customer by phone, with the real {data, meta} envelope, and never sees a password hash', async () => {
     const customer = await s.customer('Customer Search E2E Customer');
 
-    const res = await world.api('get', `/admin/customers?search=${encodeURIComponent(customer.phone)}`, { token: viewer.accessToken });
+    const res = await world.api('get', `/admin/customers?search=${encodeURIComponent(customer.phone)}`, { token: piiViewer.accessToken });
 
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual([expect.objectContaining({ id: customer.id, phone: customer.phone })]);
+
+    // Without VIEW_CUSTOMER_PII the same search finds the customer but never returns the raw phone number or full name.
+    const masked = await world.api('get', `/admin/customers?search=${encodeURIComponent(customer.phone)}`, { token: viewer.accessToken });
+    expect(masked.body.data[0].id).toBe(customer.id);
+    expect(masked.body.data[0].phone).not.toBe(customer.phone);
+    expect(masked.body.data[0].phone).toContain('•');
     expect(res.body.data[0].passwordHash).toBeUndefined();
     expect(res.body.meta).toEqual({ page: 1, limit: 20, total: 1 });
   });

@@ -52,6 +52,9 @@ abstract class VendorRepository {
   /// vendor/branch listing shape, just filtered (CONFIRMED navigation
   /// decision: Sector -> Vendors/Stores -> Vendor/Branch -> Products).
   ///
+  /// [deliveryZoneId] is for a MANUAL address (no coordinates): the server narrows the listing to the branches of the zone's service area
+  /// (a zone outside every active area is correctly empty — never an unfiltered fallback). Ignored by the server when coordinates are sent.
+  ///
   /// Filters V1: [openNow]/[hasOffers]/[minRating] — all OPTIONAL, all
   /// real backend data (`VendorBranch.isOpen`, real active `Offer`
   /// existence, real `ratingSumStars/ratingCount`). Omitting all three
@@ -64,6 +67,7 @@ abstract class VendorRepository {
     int limit = 20,
     double? latitude,
     double? longitude,
+    String? deliveryZoneId,
     String? subcategoryId,
     bool? openNow,
     bool? hasOffers,

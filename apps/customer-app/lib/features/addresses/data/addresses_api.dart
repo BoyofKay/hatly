@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
 import '../domain/delivery_zone.dart';
 import '../domain/saved_address.dart';
 
@@ -23,6 +24,20 @@ class AddressesApi {
       (dio) => dio.post('/addresses', data: input.toJson()),
       (data) => SavedAddress.fromJson(data['data'] as Map<String, dynamic>),
     );
+  }
+
+  /// `GET /addresses/capabilities` — which of the two address methods can be offered right now. A backend that predates the methods
+  /// answers 404: the app then keeps the legacy single form and offers no GPS.
+  Future<AddressCapabilities> getCapabilities() async {
+    try {
+      return await _client.request(
+        (dio) => dio.get('/addresses/capabilities'),
+        (data) => AddressCapabilities.fromJson(data['data'] as Map<String, dynamic>),
+      );
+    } on ApiException catch (e) {
+      if (e.code == 'NOT_FOUND' || e.statusCode == 404) return AddressCapabilities.legacyBackend;
+      rethrow;
+    }
   }
 
   /// `GET /delivery-zones` — the active zones the customer can choose from (PD-009). Never hardcoded in the app.

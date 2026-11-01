@@ -6,17 +6,21 @@ import {
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
+import { StaffAlertsService } from '../notifications/staff-alerts.service';
+import { Permission } from '../permissions/permission.enum';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { Order } from '../orders/entities/order.entity';
 import { OrderStatus } from '../orders/order-status.enum';
 import { Role } from '../../common/enums/role.enum';
 import { Delivery } from './entities/delivery.entity';
-import { DispatchAlert } from './entities/dispatch-alert.entity';
+import { DispatchAlert, DispatchAlertReason } from './entities/dispatch-alert.entity';
+import { DispatchAttempt, DispatchAttemptOutcome } from './entities/dispatch-attempt.entity';
 import { FulfillmentType } from '../cart/fulfillment-type.enum';
 import { DriverRankingService } from './driver-ranking.service';
 import { DeliveryAssignmentService, OrderNotAssignableException } from './delivery-assignment.service';
@@ -62,6 +66,11 @@ import { BusinessEvent } from '../../common/logging/business-events';
 export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AutomaticDispatchService.name);
 
+  /** Unanswered assignment offers in a row before operations are told the driver(s) are not responding (approved initial threshold). */
+  static readonly MAX_UNANSWERED_ATTEMPTS = 3;
+  /** A still-open automatic-dispatch alert is retried at most this often (no retry storm; the sweep tick may be much faster). */
+  static readonly ALERT_RETRY_INTERVAL_MS = 60_000;
+
   /** Same NX+PX mutual-exclusion pattern DeliveryAssignmentService already uses for per-driver locks — here it serializes the WHOLE sweep, so an overlapping tick (a slow previous run, or more than one app instance) can never process the same expired delivery twice. */
   private static readonly SWEEP_LOCK_KEY = 'dispatch-timeout-sweep-lock';
 
@@ -73,6 +82,7 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @InjectRepository(Order) private readonly ordersRepository: Repository<Order>,
     @InjectRepository(DispatchAlert) private readonly dispatchAlertsRepository: Repository<DispatchAlert>,
+    @InjectRepository(DispatchAttempt) private readonly dispatchAttemptsRepository: Repository<DispatchAttempt>,
     private readonly driverRankingService: DriverRankingService,
     private readonly deliveryAssignmentService: DeliveryAssignmentService,
     private readonly businessConfigService: BusinessConfigService,
@@ -81,6 +91,8 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
     private readonly orderStateMachine: OrderStateMachineService,
     private readonly configService: ConfigService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    // Staff inbox (Operations notification centre). Optional so unit tests that build this service by hand keep working unchanged.
+    @Optional() private readonly staffAlerts?: StaffAlertsService,
   ) {}
 
   private get sweepIntervalMs(): number {
@@ -109,9 +121,11 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
     }
     this.sweepTimer = setInterval(() => {
       if (this.shuttingDown) return; // never start new work once shutdown has begun (Dispatch Hardening)
-      this.inFlightSweep = this.reassignTimedOutDeliveries().catch((error) => {
-        this.logger.error(`Unexpected error during timeout-driven reassignment sweep: ${(error as Error).message}`);
-      });
+      this.inFlightSweep = this.reassignTimedOutDeliveries()
+        .then(() => this.retryOpenAlerts())
+        .catch((error) => {
+          this.logger.error(`Unexpected error during timeout-driven reassignment sweep: ${(error as Error).message}`);
+        });
     }, this.sweepIntervalMs);
     this.sweepTimer.unref?.();
   }
@@ -157,33 +171,39 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
    */
   async attemptAutomaticDispatch(orderId: string, options: { excludeDriverIds?: string[] } = {}): Promise<void> {
     const isEnabled = await this.businessConfigService.isAutomaticDispatchEnabled();
-    if (!isEnabled) {
-      return;
-    }
-
     const order = await this.ordersRepository.findOne({ where: { id: orderId }, relations: { segments: true } });
     if (!order) return;
     // A PICKUP order is collected by the customer (PD-006.C): never dispatched, and not a "no eligible driver" situation.
     if (order.fulfillmentType !== FulfillmentType.DELIVERY) return;
+    // Only an order that is actually waiting for a driver is dispatchable (cancelled / already assigned: nothing to do, no alert).
+    if (order.status !== OrderStatus.READY_FOR_PICKUP) return;
 
-    const excluded = new Set(options.excludeDriverIds ?? []);
-    const candidateDriverIds = (await this.driverRankingService.rankCandidates(order)).filter((id) => !excluded.has(id));
-
-    if (candidateDriverIds.length === 0) {
-      // Ranking itself produced nothing — distinct from
-      // DeliveryAssignmentService's own `dispatch.assignment_failed`
-      // (which means candidates existed but every one of them was
-      // unavailable/lost the lock race); no assignment attempt was
-      // even made here.
-      logBusinessEvent(this.logger, 'warn', BusinessEvent.DISPATCH_NO_ELIGIBLE_DRIVER, () => this.requestContextService.getCorrelationId(), {
-        orderId,
-      });
-      await this.raiseAlert(orderId);
+    if (!isEnabled) {
+      // Never silent: the order waits for the manual fallback and operations are told so (resolved once a driver is assigned).
+      await this.recordAttempt(orderId, 'AUTO_ASSIGN_DISABLED', null, 'Automatic assignment is switched off.');
+      await this.raiseAlert(orderId, 'AUTO_ASSIGN_DISABLED', 'Automatic assignment is switched off — assign a driver manually.');
       return;
     }
+    // Automatic assignment is on: an earlier "switched off" alert no longer describes the situation.
+    await this.resolveAlerts(orderId, ['AUTO_ASSIGN_DISABLED']);
 
     try {
-      await this.deliveryAssignmentService.assignDriver({ orderId, candidateDriverIds });
+      const excluded = new Set(options.excludeDriverIds ?? []);
+      const candidateDriverIds = (await this.driverRankingService.rankCandidates(order)).filter((id) => !excluded.has(id));
+
+      if (candidateDriverIds.length === 0) {
+        // Ranking itself produced nothing — distinct from DeliveryAssignmentService's own `dispatch.assignment_failed` (candidates existed
+        // but every one of them was unavailable/lost the lock race); no assignment attempt was even made here.
+        logBusinessEvent(this.logger, 'warn', BusinessEvent.DISPATCH_NO_ELIGIBLE_DRIVER, () => this.requestContextService.getCorrelationId(), {
+          orderId,
+        });
+        await this.recordAttempt(orderId, 'NO_ELIGIBLE_DRIVER', null, 'No online, available driver could be ranked for this order.');
+        await this.raiseAlert(orderId, 'NO_ELIGIBLE_DRIVER', 'No eligible driver is online and available.');
+        return;
+      }
+
+      const delivery = await this.deliveryAssignmentService.assignDriver({ orderId, candidateDriverIds });
+      await this.recordAttempt(orderId, 'ASSIGNED', delivery.driverId ?? null, null);
     } catch (error) {
       if (error instanceof OrderNotAssignableException) {
         // The order is no longer waiting for a driver (an admin assigned it, or it was cancelled) — nothing to do, and
@@ -191,14 +211,56 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
         return;
       }
       if (error instanceof ConflictException) {
-        // Every ranked candidate was unavailable by the time the lock
-        // was attempted (a real race, not a ranking mistake) — same
+        // Every ranked candidate was unavailable by the time the lock was attempted (a real race, not a ranking mistake) — same
         // outcome as "no eligible driver."
-        await this.raiseAlert(orderId);
+        await this.recordAttempt(orderId, 'NO_ELIGIBLE_DRIVER', null, 'Every ranked driver became unavailable before the assignment.');
+        await this.raiseAlert(orderId, 'NO_ELIGIBLE_DRIVER', 'Every ranked driver became unavailable before the assignment.');
         return;
       }
-      throw error;
+      // Anything else is an infrastructure/programming failure: never swallowed silently and never allowed to fail the caller (the
+      // business transition that led here has already committed) — it is logged, persisted and raised to operations.
+      await this.recordAssignmentError(orderId, error);
     }
+  }
+
+  /** Persists an unexpected dispatch failure: log (with the error), an attempt row, and ONE open ASSIGNMENT_ERROR alert. Never throws. */
+  async recordAssignmentError(orderId: string, error: unknown): Promise<void> {
+    const message = error instanceof Error ? error.message : String(error);
+    this.logger.error(`Automatic dispatch failed for order ${orderId}: ${message}`);
+    try {
+      await this.recordAttempt(orderId, 'ASSIGNMENT_ERROR', null, message);
+      await this.raiseAlert(orderId, 'ASSIGNMENT_ERROR', `Automatic assignment failed: ${message}`.slice(0, 480));
+    } catch (inner) {
+      this.logger.error(`Could not persist the dispatch failure of order ${orderId}: ${inner instanceof Error ? inner.message : String(inner)}`);
+    }
+  }
+
+  /**
+   * Bounded retry of automatic dispatch for orders that still carry an open NO_ELIGIBLE_DRIVER / ASSIGNMENT_ERROR /
+   * AUTO_ASSIGN_DISABLED alert: a driver may have come online, a transient error may have passed, or automatic assignment may have
+   * been switched back on. At most once per alert per ALERT_RETRY_INTERVAL_MS, a limited batch per tick; DRIVER_NOT_RESPONDING alerts are
+   * NEVER retried automatically (an unresponsive driver needs a person). A successful assignment resolves the alert.
+   */
+  async retryOpenAlerts(): Promise<{ retried: number }> {
+    if (!(await this.businessConfigService.isAutomaticDispatchEnabled())) return { retried: 0 };
+    const cutoff = new Date(Date.now() - AutomaticDispatchService.ALERT_RETRY_INTERVAL_MS);
+    const alerts = await this.dispatchAlertsRepository
+      .createQueryBuilder('alert')
+      .where('alert.resolved_at IS NULL')
+      .andWhere('alert.deleted_at IS NULL')
+      .andWhere('alert.reason IN (:...reasons)', { reasons: ['NO_ELIGIBLE_DRIVER', 'ASSIGNMENT_ERROR', 'AUTO_ASSIGN_DISABLED'] })
+      .andWhere('alert.updated_at < :cutoff', { cutoff })
+      .orderBy('alert.updated_at', 'ASC')
+      .limit(this.sweepBatchLimit)
+      .getMany();
+    let retried = 0;
+    for (const alert of alerts) {
+      // Touch first so a slow or failing attempt cannot be retried again before the interval has passed.
+      await this.dispatchAlertsRepository.update({ id: alert.id }, { updatedAt: new Date() });
+      await this.attemptAutomaticDispatch(alert.orderId);
+      retried++;
+    }
+    return { retried };
   }
 
   /**
@@ -211,6 +273,9 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
    */
   async redispatchAfterDriverRelease(orderId: string, releasingDriverId: string): Promise<void> {
     try {
+      // The driver ACTED (handed the order back) — that is an answer, so the unanswered streak starts over.
+      await this.deliveriesRepository.update({ orderId }, { consecutiveUnanswered: 0 });
+      await this.recordAttempt(orderId, 'DRIVER_RELEASED', releasingDriverId, 'The driver handed the order back.');
       await this.attemptAutomaticDispatch(orderId, { excludeDriverIds: [releasingDriverId] });
     } catch (error) {
       this.logger.error(`Redispatch after driver release failed for order ${orderId}: ${(error as Error).message}`);
@@ -297,6 +362,20 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
           previousDriverId: released.previousDriverId,
         });
 
+        await this.recordAttempt(released.orderId, 'DRIVER_TIMED_OUT', released.previousDriverId, `Unanswered offer ${released.unanswered} of ${AutomaticDispatchService.MAX_UNANSWERED_ATTEMPTS}.`);
+
+        if (released.unanswered >= AutomaticDispatchService.MAX_UNANSWERED_ATTEMPTS) {
+          // Stop cycling: the order stays released (READY_FOR_PICKUP) with a visible alert until an admin assigns a driver.
+          await this.recordAttempt(released.orderId, 'DRIVER_NOT_RESPONDING', released.previousDriverId, null);
+          await this.raiseAlert(
+            released.orderId,
+            'DRIVER_NOT_RESPONDING',
+            `${released.unanswered} assignment offers in a row went unanswered — assign a driver manually.`,
+          );
+          result.alerted++;
+          continue;
+        }
+
         const order = await this.ordersRepository.findOne({ where: { id: released.orderId }, relations: { segments: true } });
         if (!order) continue; // structurally shouldn't happen (the Order row backing an existing Delivery), never assumed away
 
@@ -305,13 +384,15 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
           logBusinessEvent(this.logger, 'warn', BusinessEvent.DISPATCH_NO_ELIGIBLE_DRIVER, () => this.requestContextService.getCorrelationId(), {
             orderId: released.orderId,
           });
-          await this.raiseAlert(released.orderId);
+          await this.recordAttempt(released.orderId, 'NO_ELIGIBLE_DRIVER', null, 'No driver could be ranked after a timeout.');
+          await this.raiseAlert(released.orderId, 'NO_ELIGIBLE_DRIVER', 'No eligible driver is online and available.');
           result.alerted++;
           continue;
         }
 
         try {
-          await this.deliveryAssignmentService.assignDriver({ orderId: released.orderId, candidateDriverIds });
+          const reassigned = await this.deliveryAssignmentService.assignDriver({ orderId: released.orderId, candidateDriverIds });
+          await this.recordAttempt(released.orderId, 'ASSIGNED', reassigned.driverId ?? null, 'Re-offered after a timeout.');
           result.reassigned++;
         } catch (error) {
           if (error instanceof OrderNotAssignableException) {
@@ -320,11 +401,15 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
             continue;
           }
           if (error instanceof ConflictException) {
-            await this.raiseAlert(released.orderId);
+            await this.recordAttempt(released.orderId, 'NO_ELIGIBLE_DRIVER', null, 'Every ranked driver became unavailable before the assignment.');
+            await this.raiseAlert(released.orderId, 'NO_ELIGIBLE_DRIVER', 'Every ranked driver became unavailable before the assignment.');
             result.alerted++;
             continue;
           }
-          throw error;
+          // Not swallowed and not allowed to abort the rest of the batch: persisted and raised to operations.
+          await this.recordAssignmentError(released.orderId, error);
+          result.alerted++;
+          continue;
         }
       }
     } finally {
@@ -422,7 +507,7 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
    * `customer-order-cancellation.service.ts`'s own comment on why it locks order before payment) — so
    * the fix here is the same: always Order before Delivery, matching every other concurrent path.
    */
-  private async releaseIfStillExpired(deliveryId: string): Promise<{ orderId: string; previousDriverId: string | null } | null> {
+  private async releaseIfStillExpired(deliveryId: string): Promise<{ orderId: string; previousDriverId: string | null; unanswered: number } | null> {
     const outcome = await this.deliveriesRepository.manager.transaction(async (manager) => {
       // An UNLOCKED peek just to learn which Order this Delivery belongs to (a Delivery id alone
       // doesn't say) — never itself a source of stale data, since the fields that actually matter
@@ -447,7 +532,10 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
           to: OrderStatus.READY_FOR_PICKUP,
           actorRole: Role.ADMIN, // system-initiated release, same convention already used for READY_FOR_PICKUP→ASSIGNED_TO_DRIVER
         });
-        return { orderId: delivery.orderId, previousDriverId: delivery.driverId ?? null, afterCommit };
+        // One more offer that nobody answered (same transaction, delivery row already locked).
+        delivery.consecutiveUnanswered = (delivery.consecutiveUnanswered ?? 0) + 1;
+        await manager.save(delivery);
+        return { orderId: delivery.orderId, previousDriverId: delivery.driverId ?? null, afterCommit, unanswered: delivery.consecutiveUnanswered };
       } catch (error) {
         if (error instanceof BadRequestException) {
           // The order already left ASSIGNED_TO_DRIVER (picked up, cancelled, or already released by
@@ -471,12 +559,48 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
     // `transition()` (= `applyTransition` + `runAfterCommit` together) for the identical
     // transition, rather than silently diverging from it.
     await outcome.afterCommit();
-    return { orderId: outcome.orderId, previousDriverId: outcome.previousDriverId };
+    return { orderId: outcome.orderId, previousDriverId: outcome.previousDriverId, unanswered: outcome.unanswered };
   }
 
-  private async raiseAlert(orderId: string): Promise<void> {
-    await this.dispatchAlertsRepository.save(
-      this.dispatchAlertsRepository.create({ orderId, reason: 'NO_ELIGIBLE_DRIVER' }),
-    );
+  /** ONE open alert per (order, reason): repeating the same situation refreshes it instead of stacking duplicates. */
+  private async raiseAlert(orderId: string, reason: DispatchAlertReason, detail: string): Promise<void> {
+    const open = await this.dispatchAlertsRepository.findOne({ where: { orderId, reason, resolvedAt: IsNull() } });
+    if (open) {
+      await this.dispatchAlertsRepository.update({ id: open.id }, { detail, updatedAt: new Date() });
+      return;
+    }
+    let created: DispatchAlert;
+    try {
+      created = await this.dispatchAlertsRepository.save(this.dispatchAlertsRepository.create({ orderId, reason, detail }));
+    } catch (error) {
+      // A concurrent attempt created the same open alert first (partial unique index) — exactly what we wanted.
+      if ((error as { code?: string }).code !== '23505') throw error;
+      return;
+    }
+    // Only a NEW open alert tells Operations (a refreshed one already did); never fails the dispatch path.
+    if (this.staffAlerts) {
+      const manager = this.dispatchAlertsRepository.manager;
+      const [order] = await manager.query(`SELECT order_number FROM orders WHERE id = $1`, [orderId]);
+      if (order) {
+        await this.staffAlerts.alert(manager, {
+          eventKey: `dispatch-alert:${created.id}`, category: 'OPS_DISPATCH_NEEDED', requiredAction: 'ASSIGN_DRIVER', note: reason,
+          recipients: await this.staffAlerts.recipientsHolding(manager, [Permission.ASSIGN_REASSIGN_ORDERS, Permission.OVERRIDE_DISPATCH]),
+          orderId, orderNumber: order.order_number,
+        });
+      }
+    }
+  }
+
+  private async resolveAlerts(orderId: string, reasons: DispatchAlertReason[]): Promise<void> {
+    await this.dispatchAlertsRepository
+      .createQueryBuilder()
+      .update(DispatchAlert)
+      .set({ resolvedAt: () => 'now()' })
+      .where('order_id = :orderId AND resolved_at IS NULL AND reason IN (:...reasons)', { orderId, reasons })
+      .execute();
+  }
+
+  private async recordAttempt(orderId: string, outcome: DispatchAttemptOutcome, driverId: string | null, detail: string | null): Promise<void> {
+    await this.dispatchAttemptsRepository.insert({ orderId, outcome, driverId, detail: detail ? detail.slice(0, 500) : null });
   }
 }

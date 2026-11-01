@@ -1,3 +1,8 @@
+import { REPORTING_TIMEZONE } from '../admin-platform/common/platform-sql';
+import { isUUID } from 'class-validator';
+import { HatlyFundedDiscountSummary, loadHatlyFundedDiscountSummary, loadRefundSummary, OrderRefundSummary } from './order-refund-summary';
+import { loadSegmentHistory, SegmentHistoryEntry } from './order-segment-history';
+import { FrozenRoute, readFrozenRoute } from './frozen-route';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Order } from './entities/order.entity';
@@ -43,6 +48,10 @@ export interface AdminOrderListItemView {
   segmentCount: number;
   /** At least one Hatly Service request of this order has no confirmed price yet. An ordinary zero-value order is never pending. */
   hasPendingHatlyServicePricing: boolean;
+  /** Names of the vendors that have a part in this order (workspace list: who is preparing it). Never customer data. */
+  vendorNames: string[];
+  /** The driver on the order while one is on record (assigned … delivered); null while it waits for a driver. */
+  driver: { id: string; fullName: string } | null;
 }
 
 export interface AdminOrderSearchResult {
@@ -53,10 +62,18 @@ export interface AdminOrderSearchResult {
 }
 
 export interface SearchAdminOrdersParams {
+  vendorBranchId?: string;
+  /** Africa/Cairo calendar dates (YYYY-MM-DD, inclusive). */
+  from?: string;
+  to?: string;
+  minTotalMinor?: number;
+  maxTotalMinor?: number;
   page?: number;
   limit?: number;
   search?: string;
   status?: OrderStatus;
+  /** Any of these statuses (queue views). */
+  statuses?: OrderStatus[];
   dateFrom?: string;
   dateTo?: string;
   paymentStatus?: PaymentStatus;
@@ -101,9 +118,17 @@ export interface AdminOrderSegmentView {
   /** Hatly Service (AD_HOC_SERVICE) request details, snapshotted at order creation; null for every other segment. */
   hatlyService: AdminHatlyServiceView | null;
   items: AdminOrderItemView[];
+  /** Items taken off the order because they were unavailable (PD-016), with the amount that left the order. */
+  removedItems: Array<{ id: string; productNameSnapshot: string | null; quantity: number; removedAmountMinor: number | null; removedAt: Date; exceptionId: string | null }>;
+  vendorName: string | null;
+  branchName: string | null;
+  /** Oldest first: who moved this segment, when, whether Hatly operations acted for the vendor, and the rejection reason. */
+  history: SegmentHistoryEntry[];
+  /** The reason given when this segment was rejected, if it was. */
+  rejectionReason: string | null;
 }
 
-/** BUY_FROM_PLACE: origin = the customer-named place (`pickup*`), destination = the order's delivery address. DELIVER_TO_PLACE: origin = the delivery address, destination = the customer-named place (`destination*`). */
+/** The route is origin (`pickup*`) → destination (`destination*`), each the customer's choice or the service default (PD-012); `route` carries the labels and sources frozen at checkout (absent on an order placed before PD-012). */
 export interface AdminHatlyServiceView {
   serviceType: string | null;
   placeName: string | null;
@@ -111,6 +136,7 @@ export interface AdminHatlyServiceView {
   pickupLongitude: number | null;
   destinationLatitude: number | null;
   destinationLongitude: number | null;
+  route: FrozenRoute | null;
 }
 
 export interface AdminOrderCustomerView {
@@ -150,7 +176,13 @@ export interface AdminOrderDetailView {
     reassignmentCount: number;
   } | null;
   /** "No eligible driver" alerts raised for this order, newest first, with when (if ever) an assignment resolved them. */
-  dispatchAlerts: Array<{ id: string; reason: string; createdAt: Date; resolvedAt: Date | null }>;
+  dispatchAlerts: Array<{ id: string; reason: string; detail: string | null; createdAt: Date; resolvedAt: Date | null }>;
+  /** What the dispatcher tried, newest first (last 20): assigned / no driver / disabled / error / timed out / not responding / handed back. */
+  dispatchAttempts: Array<{ outcome: string; driverId: string | null; detail: string | null; at: string }>;
+  /** What has been given back so far (wallet credits, Manual Transfer refund obligations and whether they were really sent). */
+  refundSummary: OrderRefundSummary;
+  /** PD-015: the Hatly-funded promotional cost, recorded minus restored (informational). */
+  hatlyFundedDiscount: HatlyFundedDiscountSummary;
   customerId: string;
   fulfillmentType: string;
   paymentMethod: string;
@@ -225,6 +257,8 @@ export class AdminOrdersService {
       }
       return this.getOne(order.id);
     }
+    // Neither an order number nor a UUID: unknown (it used to reach PostgreSQL as a uuid cast and answer 500).
+    if (!isUUID(idOrOrderNumber)) throw new NotFoundException('Order not found.');
     return this.getOne(idOrOrderNumber);
   }
 
@@ -259,9 +293,14 @@ export class AdminOrdersService {
     // A delivery row keeps the driver it was RELEASED from (timeout / driver release back to READY_FOR_PICKUP): that driver
     // is only "the order's driver" while on it or once they finished it (Control Tower milestone fix).
     const driverOnRecord = DRIVER_OF_RECORD_STATUSES.includes(order.status);
-    const [timeline, dispatchAlerts] = await Promise.all([
+    const query = (sql: string, params?: unknown[]) => this.dataSource.query(sql, params);
+    const [timeline, dispatchAlerts, segmentHistory, refundSummary, attemptRows, hatlyFundedDiscount] = await Promise.all([
       loadOrderTimeline(this.dataSource.getRepository(OrderStatusEvent), orderId),
       this.dataSource.getRepository(DispatchAlert).find({ where: { orderId }, order: { createdAt: 'DESC' } }),
+      loadSegmentHistory(query, orderId, 'FULL'),
+      loadRefundSummary(query, orderId),
+      query('SELECT outcome, driver_id, detail, created_at FROM dispatch_attempts WHERE order_id = $1 ORDER BY created_at DESC LIMIT 20', [orderId]),
+      loadHatlyFundedDiscountSummary(query, orderId),
     ]);
 
     let driver: AdminOrderDriverView | null = null;
@@ -324,13 +363,20 @@ export class AdminOrdersService {
             reassignmentCount: delivery.reassignmentCount ?? 0,
           }
         : null,
-      dispatchAlerts: dispatchAlerts.map((a) => ({ id: a.id, reason: a.reason, createdAt: (a as any).createdAt, resolvedAt: a.resolvedAt ?? null })),
+      dispatchAlerts: dispatchAlerts.map((a) => ({ id: a.id, reason: a.reason, detail: a.detail ?? null, createdAt: (a as any).createdAt, resolvedAt: a.resolvedAt ?? null })),
+      dispatchAttempts: attemptRows.map((r: any) => ({ outcome: r.outcome, driverId: r.driver_id ?? null, detail: r.detail ?? null, at: new Date(r.created_at).toISOString() })),
+      refundSummary,
+      hatlyFundedDiscount,
       segments: segments.map((segment) => ({
         id: segment.id,
         groupType: segment.groupType,
         vendorBranchId: segment.vendorBranchId ?? null,
         status: segment.status,
         subtotalMinor: segment.subtotalMinor ?? null,
+        vendorName: segment.vendorNameSnapshot ?? null,
+        branchName: segment.branchNameSnapshot ?? null,
+        history: segmentHistory.get(segment.id) ?? [],
+        rejectionReason: [...(segmentHistory.get(segment.id) ?? [])].reverse().find((e) => e.toStatus === 'CANCELLED')?.reason ?? null,
         hatlyService:
           segment.groupType === CartGroupType.AD_HOC_SERVICE
             ? {
@@ -340,10 +386,14 @@ export class AdminOrdersService {
                 pickupLongitude: segment.adHocPickupLongitudeSnapshot ?? null,
                 destinationLatitude: segment.adHocDestinationLatitudeSnapshot ?? null,
                 destinationLongitude: segment.adHocDestinationLongitudeSnapshot ?? null,
+                route: readFrozenRoute(order.deliveryFeeBreakdownSnapshot),
               }
             : null,
+        removedItems: items
+          .filter((item) => item.orderVendorSegmentId === segment.id && item.removedAt)
+          .map((item) => ({ id: item.id, productNameSnapshot: item.productNameSnapshot ?? null, quantity: item.quantity, removedAmountMinor: item.removedAmountMinor == null ? null : Number(item.removedAmountMinor), removedAt: item.removedAt!, exceptionId: item.removalExceptionId ?? null })),
         items: items
-          .filter((item) => item.orderVendorSegmentId === segment.id)
+          .filter((item) => item.orderVendorSegmentId === segment.id && !item.removedAt)
           .map((item) => ({
             id: item.id,
             productId: item.productId ?? null,
@@ -425,9 +475,17 @@ export class AdminOrdersService {
         paymentMethod: params.paymentMethod,
       });
     if (params.status) qb.andWhere('o.status = :status', { status: params.status });
+    if (params.statuses?.length) qb.andWhere('o.status IN (:...statusList)', { statusList: params.statuses });
     if (params.fulfillmentType) qb.andWhere('o.fulfillment_type = :fulfillmentType', { fulfillmentType: params.fulfillmentType });
     if (params.dateFrom) qb.andWhere('o.created_at >= :dateFrom', { dateFrom: params.dateFrom });
     if (params.dateTo) qb.andWhere('o.created_at <= :dateTo', { dateTo: params.dateTo });
+    if (params.vendorBranchId) {
+      qb.andWhere('EXISTS (SELECT 1 FROM order_vendor_segments f_seg WHERE f_seg.order_id = o.id AND f_seg.vendor_branch_id = :filterBranchId)', { filterBranchId: params.vendorBranchId });
+    }
+    if (params.from) qb.andWhere(`o.created_at >= ((:cairoFrom)::date)::timestamp AT TIME ZONE '${REPORTING_TIMEZONE}'`, { cairoFrom: params.from });
+    if (params.to) qb.andWhere(`o.created_at < (((:cairoTo)::date + 1))::timestamp AT TIME ZONE '${REPORTING_TIMEZONE}'`, { cairoTo: params.to });
+    if (params.minTotalMinor !== undefined) qb.andWhere('o.total_minor >= :minTotal', { minTotal: params.minTotalMinor });
+    if (params.maxTotalMinor !== undefined) qb.andWhere('o.total_minor <= :maxTotal', { maxTotal: params.maxTotalMinor });
     if (params.customerId)
       qb.andWhere('o.customer_id = :customerId', {
         customerId: params.customerId,
@@ -453,10 +511,16 @@ export class AdminOrdersService {
     const [orders, total] = await qb.getManyAndCount();
     const orderIds = orders.map((o) => o.id);
 
-    const [payments, segmentCounts, pendingHatlyServiceOrderIds] =
+    const [payments, segmentCounts, pendingHatlyServiceOrderIds, vendorNamesByOrder, driverByOrder] =
       orderIds.length > 0
-        ? await Promise.all([this.paymentsByOrderId(orderIds), this.segmentCountsByOrderId(orderIds), this.pendingHatlyServiceOrderIds(orderIds)])
-        : [new Map<string, Payment>(), new Map<string, number>(), new Set<string>()];
+        ? await Promise.all([
+            this.paymentsByOrderId(orderIds),
+            this.segmentCountsByOrderId(orderIds),
+            this.pendingHatlyServiceOrderIds(orderIds),
+            this.vendorNamesByOrderId(orderIds),
+            this.driversByOrderId(orderIds),
+          ])
+        : [new Map<string, Payment>(), new Map<string, number>(), new Set<string>(), new Map<string, string[]>(), new Map<string, { id: string; fullName: string }>()];
 
     return {
       data: orders.map((order) => ({
@@ -477,11 +541,40 @@ export class AdminOrdersService {
           : null,
         segmentCount: segmentCounts.get(order.id) ?? 0,
         hasPendingHatlyServicePricing: pendingHatlyServiceOrderIds.has(order.id),
+        vendorNames: vendorNamesByOrder.get(order.id) ?? [],
+        driver: DRIVER_OF_RECORD_STATUSES.includes(order.status) ? driverByOrder.get(order.id) ?? null : null,
       })),
       page,
       limit,
       total,
     };
+  }
+
+  /** The vendor names of each order's parts (catalogue segments only — a Hatly Service request has no vendor). */
+  private async vendorNamesByOrderId(orderIds: string[]): Promise<Map<string, string[]>> {
+    const rows: Array<{ order_id: string; name: string }> = await this.dataSource.query(
+      `SELECT DISTINCT s.order_id, ven.name
+         FROM order_vendor_segments s
+         JOIN vendor_branches vb ON vb.id = s.vendor_branch_id
+         JOIN vendors ven ON ven.id = vb.vendor_id
+        WHERE s.order_id = ANY($1::uuid[]) AND s.deleted_at IS NULL
+        ORDER BY s.order_id, ven.name`,
+      [orderIds],
+    );
+    const byOrder = new Map<string, string[]>();
+    for (const r of rows) byOrder.set(r.order_id, [...(byOrder.get(r.order_id) ?? []), r.name]);
+    return byOrder;
+  }
+
+  /** The driver named on each order's delivery row (the caller only shows it for statuses where that driver is really on the order). */
+  private async driversByOrderId(orderIds: string[]): Promise<Map<string, { id: string; fullName: string }>> {
+    const rows: Array<{ order_id: string; driver_id: string; full_name: string }> = await this.dataSource.query(
+      `SELECT d.order_id, d.driver_id, u.full_name
+         FROM deliveries d JOIN drivers dr ON dr.id = d.driver_id JOIN users u ON u.id = dr.user_id
+        WHERE d.order_id = ANY($1::uuid[]) AND d.deleted_at IS NULL`,
+      [orderIds],
+    );
+    return new Map(rows.map((r) => [r.order_id, { id: r.driver_id, fullName: r.full_name }]));
   }
 
   /**

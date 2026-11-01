@@ -59,6 +59,12 @@ export enum Permission {
    */
   MANAGE_OFFERS = 'MANAGE_OFFERS',
   /**
+   * Home promotional banners (2026-10-28). Admin-only content on the customer Home carousel; Vendors/Vendor Staff never manage
+   * them. Nothing existing fits: MANAGE_OFFERS prices and activates discounts, this publishes marketing images — a person who
+   * runs offers is not automatically someone who should control what every customer sees first. SUPER_ADMIN bypasses as usual.
+   */
+  MANAGE_HOME_BANNERS = 'MANAGE_HOME_BANNERS',
+  /**
    * Phase G addition (Marketplace Sector Taxonomy). Admin-only —
    * Vendors/Vendor Staff never manage sectors or their own branch's
    * sector assignment (no Vendor-facing endpoint or permission exists
@@ -134,4 +140,54 @@ export enum Permission {
    * none is gated here.
    */
   VIEW_CUSTOMERS = 'VIEW_CUSTOMERS',
+  /**
+   * Launch-readiness G-11. Read-only access to the append-only admin audit log (who did what, to which object, from which address).
+   * The log holds client addresses and the names of changed fields, so — like VIEW_CUSTOMERS — it is its own capability: an admin
+   * who runs settlements is not automatically someone who should browse the security trail. SUPER_ADMIN bypasses as usual.
+   */
+  VIEW_AUDIT_LOG = 'VIEW_AUDIT_LOG',
+
+  /**
+   * Hatly operations acting ON A VENDOR'S BEHALF on order segments: accept, reject (with a reason), mark preparing, mark ready — for any branch
+   * and for Hatly/Wasally service segments. Deliberately NOT implied by any other permission; SUPER_ADMIN always passes (PermissionsGuard).
+   * Every such action is stored in the segment history with the actor and `onBehalfOfVendor = true`.
+   */
+  MANAGE_ORDER_FULFILMENT = 'MANAGE_ORDER_FULFILMENT',
+
+  // ---- Enterprise Admin Panel (2026-10-30). Same flat style; names follow the approved specification (docs/admin-revamp, MS §9.2). ----
+  /** Sensitive financial figures (ledger, revenue, liabilities, customer wallet balances). Read-only; money MOVEMENT has its own permissions. */
+  VIEW_FINANCIALS = 'VIEW_FINANCIALS',
+  /** Unmasked customer phone / email / address. Every reveal is audited. */
+  VIEW_CUSTOMER_PII = 'VIEW_CUSTOMER_PII',
+  VENDORS_VIEW = 'VENDORS_VIEW',
+  CATALOG_VIEW = 'CATALOG_VIEW',
+  FLEET_VIEW = 'FLEET_VIEW',
+  MARKETING_VIEW = 'MARKETING_VIEW',
+  CONFIG_VIEW = 'CONFIG_VIEW',
+  MEDIA_VIEW = 'MEDIA_VIEW',
+  VIEW_SYSTEM_HEALTH = 'VIEW_SYSTEM_HEALTH',
+  /** Block / unblock customers and keep staff notes about them. */
+  MANAGE_CUSTOMERS = 'MANAGE_CUSTOMERS',
+  MANAGE_MEDIA = 'MANAGE_MEDIA',
+  MEDIA_DELETE = 'MEDIA_DELETE',
+  MANAGE_CAMPAIGNS = 'MANAGE_CAMPAIGNS',
+  CAMPAIGN_APPROVE = 'CAMPAIGN_APPROVE',
+  MANAGE_BROADCASTS = 'MANAGE_BROADCASTS',
+  BROADCAST_APPROVE = 'BROADCAST_APPROVE',
+  /** Records a payment against a CLOSED settlement period (B5). Distinct from closing the period. */
+  MANAGE_SETTLEMENT_PAYMENTS = 'MANAGE_SETTLEMENT_PAYMENTS',
+  /** Authorises a settlement payment that exceeds the amount due (B5 — authorised overpayment). */
+  APPROVE_SETTLEMENT_OVERPAYMENT = 'APPROVE_SETTLEMENT_OVERPAYMENT',
+  MANAGE_SYSTEM_JOBS = 'MANAGE_SYSTEM_JOBS',
+  MODERATE_REVIEWS = 'MODERATE_REVIEWS',
+  /** Second approver for customer wallet adjustments above the configured threshold (creator is never the approver). */
+  WALLET_ADJUST_APPROVE = 'WALLET_ADJUST_APPROVE',
+  ORDERS_EXPORT = 'ORDERS_EXPORT',
+  CUSTOMERS_EXPORT = 'CUSTOMERS_EXPORT',
+  FINANCE_EXPORT = 'FINANCE_EXPORT',
+  CATALOG_EXPORT = 'CATALOG_EXPORT',
+  FLEET_EXPORT = 'FLEET_EXPORT',
+  MARKETING_EXPORT = 'MARKETING_EXPORT',
+  AUDIT_EXPORT = 'AUDIT_EXPORT',
+  REPORTS_EXPORT = 'REPORTS_EXPORT',
 }

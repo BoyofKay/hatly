@@ -46,7 +46,7 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
   const claim = (c: Actor, orderId: string) => world.api('post', `/payments/manual-transfer/orders/${orderId}/claim`, { token: c.accessToken, body: {} });
   const approve = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/approve`, { token: reviewer.accessToken });
   const reject = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/reject`, { token: reviewer.accessToken, body: { reason: 'no' } });
-  const vendorStatus = (v: VendorFixture, segmentId: string, status: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status } });
+  const vendorStatus = (v: VendorFixture, segmentId: string, status: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status, ...(status === 'CANCELLED' ? { reason: 'Out of stock' } : {}) } });
   const adminStatus = (orderId: string, status: string) => world.api('patch', `/orders/${orderId}/status`, { token: superAdmin.accessToken, body: { status } });
   const segmentOf = async (orderId: string, v: VendorFixture): Promise<string> =>
     (await world.ds.query('SELECT id FROM order_vendor_segments WHERE order_id = $1 AND vendor_branch_id = $2', [orderId, v.branchId]))[0].id;

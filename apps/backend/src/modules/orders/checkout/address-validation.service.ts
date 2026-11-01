@@ -9,9 +9,7 @@ import { DeliveryZone, toDeliveryZoneSummary } from '../../delivery-zones/entiti
 import { DeliveryAddressSnapshot } from '../entities/order.entity';
 import { AddressEligibility, ResolvedDeliveryZone } from './checkout-plan';
 
-// A coarse sanity box around Egypt: catches swapped or nonsensical coordinates. Serviceability is the SERVICE AREA's job.
-const EGYPT_LAT = { min: 21.9, max: 31.7 };
-const EGYPT_LNG = { min: 24.6, max: 36.9 };
+import { AddressMode, isPointInEgypt } from '../../addresses/address-mode';
 
 const OPTIONAL_TEXT_FIELDS = [
   'label',
@@ -49,15 +47,18 @@ export class AddressValidationService {
 
   /** Trims, drops empty optional fields, and rejects a malformed address outright (400 INVALID_DELIVERY_ADDRESS). */
   normalize(
-    input: Partial<Omit<DeliveryAddressSnapshot, 'latitude' | 'longitude' | 'deliveryZoneId' | 'deliveryZone'>> & {
+    input: Partial<Omit<DeliveryAddressSnapshot, 'latitude' | 'longitude' | 'deliveryZoneId' | 'deliveryZone' | 'mode'>> & {
+      mode?: AddressMode | null;
       line1?: string;
       latitude?: number | null;
       longitude?: number | null;
       deliveryZoneId?: string | null;
     },
   ): DeliveryAddressSnapshot {
+    const mode = input.mode ?? undefined;
     const line1 = typeof input.line1 === 'string' ? input.line1.trim() : '';
-    if (line1.length < 1) {
+    // A GPS address is its coordinates: it needs no typed text. Every other address must describe where to deliver.
+    if (mode !== AddressMode.GPS && line1.length < 1) {
       throw new BadRequestException({
         message: 'The delivery address must describe where to deliver.',
         details: { code: 'INVALID_DELIVERY_ADDRESS', field: 'line1' },
@@ -71,12 +72,26 @@ export class AddressValidationService {
         details: { code: 'INVALID_DELIVERY_ADDRESS', field: 'location' },
       });
     }
+    if (mode === AddressMode.GPS && !hasLat) {
+      throw new BadRequestException({
+        message: 'A GPS address needs the map location.',
+        details: { code: 'INVALID_DELIVERY_ADDRESS', field: 'location' },
+      });
+    }
+    if (mode === AddressMode.MANUAL && hasLat) {
+      throw new BadRequestException({
+        message: 'A manually entered address does not use a map location.',
+        details: { code: 'INVALID_DELIVERY_ADDRESS', field: 'location' },
+      });
+    }
     const snapshot: DeliveryAddressSnapshot = { line1 };
+    if (mode) snapshot.mode = mode;
     if (hasLat) {
       snapshot.latitude = Number(input.latitude);
       snapshot.longitude = Number(input.longitude);
     }
-    if (typeof input.deliveryZoneId === 'string' && input.deliveryZoneId.length > 0) snapshot.deliveryZoneId = input.deliveryZoneId;
+    // A GPS address never carries a zone (its fee is the road distance); a stray id is dropped, not trusted.
+    if (mode !== AddressMode.GPS && typeof input.deliveryZoneId === 'string' && input.deliveryZoneId.length > 0) snapshot.deliveryZoneId = input.deliveryZoneId;
     for (const field of OPTIONAL_TEXT_FIELDS) {
       const value = input[field];
       if (typeof value === 'string' && value.trim().length > 0) snapshot[field] = value.trim();
@@ -91,6 +106,7 @@ export class AddressValidationService {
       throw new NotFoundException({ message: 'Address not found.', details: { code: 'ADDRESS_NOT_FOUND' } });
     }
     return this.normalize({
+      mode: address.mode ?? undefined,
       line1: address.line1,
       latitude: address.latitude,
       longitude: address.longitude,
@@ -139,6 +155,17 @@ export class AddressValidationService {
 
     if (!address) return blocked('ADDRESS_REQUIRED', 'Choose a delivery address.');
 
+    // GPS METHOD: the coordinates are the address. Serviceability is the existing service-area coverage; the price is the road distance
+    // (never a zone fee, and never "the one zone of that area"). It is decided here, before any zone is looked at.
+    if (address.mode === AddressMode.GPS) {
+      if (!hasPin(address) || !isPointInEgypt(address.latitude!, address.longitude!)) {
+        return blocked('INVALID_DELIVERY_LOCATION', 'The selected location is not valid.');
+      }
+      const gpsArea = await this.serviceAreaResolver.resolveForPoint(address.latitude!, address.longitude!);
+      if (!gpsArea) return blocked('ADDRESS_OUT_OF_SERVICE_AREA', 'Hatly does not deliver to this location yet.');
+      return this.finishEligibility(branches, gpsArea.id, 'DISTANCE', null);
+    }
+
     let zone: ResolvedDeliveryZone | null = null;
     let zoneServiceAreaId: string | null = null;
     if (address.deliveryZoneId) {
@@ -152,13 +179,12 @@ export class AddressValidationService {
 
     let serviceAreaId: string;
     let pricingSource: 'DISTANCE' | 'DELIVERY_ZONE';
-    if (hasPin(address)) {
-      const inEgypt =
-        address.latitude! >= EGYPT_LAT.min && address.latitude! <= EGYPT_LAT.max && address.longitude! >= EGYPT_LNG.min && address.longitude! <= EGYPT_LNG.max;
-      if (!inEgypt) return blocked('INVALID_DELIVERY_LOCATION', 'The selected location is not valid.');
+    if (hasPin(address) && !isPointInEgypt(address.latitude!, address.longitude!)) {
+      return blocked('INVALID_DELIVERY_LOCATION', 'The selected location is not valid.');
     }
 
-    if (options.zoneAuthoritative) {
+    // MANUAL METHOD: the selected zone is the boundary and its fixed fee the base fee — a pin (there should be none) is never priced.
+    if (options.zoneAuthoritative || address.mode === AddressMode.MANUAL) {
       if (!zone) return blocked('ADDRESS_ZONE_REQUIRED', 'Choose the delivery area (zone) of this address.');
       serviceAreaId = zoneServiceAreaId!;
       pricingSource = 'DELIVERY_ZONE';
@@ -173,6 +199,16 @@ export class AddressValidationService {
       pricingSource = 'DELIVERY_ZONE';
     }
 
+    return this.finishEligibility(branches, serviceAreaId, pricingSource, zone);
+  }
+
+  /** Every vendor branch in the cart must deliver, and belong to the same service area as the address. */
+  private finishEligibility(
+    branches: VendorBranch[],
+    serviceAreaId: string,
+    pricingSource: 'DISTANCE' | 'DELIVERY_ZONE',
+    zone: ResolvedDeliveryZone | null,
+  ): AddressEligibility {
     const perVendor = branches.map((b) => {
       if (b.deliveryEnabled === false) return { vendorBranchId: b.id, deliverable: false, code: 'VENDOR_DOES_NOT_DELIVER' };
       if (b.serviceAreaId && b.serviceAreaId !== serviceAreaId) return { vendorBranchId: b.id, deliverable: false, code: 'VENDOR_OUTSIDE_DELIVERY_AREA' };

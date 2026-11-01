@@ -98,6 +98,44 @@ bool _confirmEnabled(WidgetTester tester) =>
         .onPressed !=
     null;
 
+/// What `POST /checkout/quote` returns for a Wasally request (no product): NOT pending, subtotal 0, a definite total = the
+/// delivery fee, amount due = the fee, and the ordinary payment options (Pay at Delivery, transfer, wallet).
+Map<String, dynamic> wasallyQuoteJson({int fee = 2250}) {
+  final q = quoteJson(subtotal: 0, fee: fee);
+  q['hasPendingPricing'] = false;
+  q['summary'] = {
+    'subtotalMinor': 0,
+    'discountMinor': 0,
+    'deliveryFeeMinor': fee,
+    'totalMinor': fee,
+    'walletAppliedMinor': 0,
+    'amountDueMinor': fee,
+  };
+  q['vendors'] = [
+    {
+      'vendorBranchId': null,
+      'name': 'بيت ماما',
+      'subtotalMinor': 0,
+      'discountMinor': 0,
+      'itemCount': 1,
+      'preparationMinutes': null,
+      'couponApplied': false
+    },
+  ];
+  q['payment'] = {
+    'selected': {'method': 'COD', 'electronicMethod': null},
+    'awaitsPaymentApproval': false,
+    'wallet': {'balanceMinor': 5000, 'appliedMinor': 0, 'available': true},
+    'options': {
+      'cod': true,
+      'payAtDelivery': true,
+      'manualTransfer': {'available': true, 'reason': null},
+      'electronicMethods': ['INSTAPAY', 'VODAFONE_CASH'],
+    },
+  };
+  return q;
+}
+
 void main() {
   group('CheckoutQuote model', () {
     test('the pending flag is read explicitly and defaults to false', () {
@@ -302,5 +340,66 @@ void main() {
         find.text(
             'The price will be confirmed while your order is being prepared'),
         findsWidgets);
+  });
+
+  group('Wasally (DELIVER_TO_PLACE): the delivery fee is the whole price', () {
+    testWidgets(
+        'no item price, no "pending", no subtotal line; the total IS the final delivery fee (22.50), never a "15 × 1.5" calculation',
+        (tester) async {
+      final h = _Harness()
+        ..cartApi.cart = wasallyCart()
+        ..checkout.respond = (_) => wasallyQuoteJson();
+      await _pump(tester, harness: h);
+
+      expect(
+          find.byKey(const Key('checkout-item-delivery-only')), findsOneWidget);
+      expect(find.text('رسوم التوصيل فقط'), findsWidgets);
+      expect(
+          find.byKey(const Key('checkout-item-price-pending')), findsNothing);
+      expect(find.byKey(const Key('checkout-subtotal-pending')), findsNothing);
+      expect(find.text('سيتم تأكيد السعر أثناء تجهيز الطلب'), findsNothing);
+      expect(find.text('المجموع الفرعي'), findsNothing,
+          reason: 'there is no merchandise subtotal to show');
+      expect(find.text('22.50 ج.م'), findsWidgets);
+      expect(find.byKey(const Key('checkout-total')), findsOneWidget);
+      expect(
+          tester
+                  .widget<Text>(find
+                      .descendant(
+                          of: find.byKey(const Key('checkout-total')),
+                          matching: find.byType(Text))
+                      .first)
+                  .data ??
+              '',
+          contains('22.50'));
+      expect(find.textContaining('×'), findsNothing);
+      expect(_confirmEnabled(tester), isTrue);
+    });
+
+    testWidgets(
+        'the same payment choices as an ordinary order are offered (Pay at Delivery and Manual Transfer are not hidden)',
+        (tester) async {
+      final h = _Harness()
+        ..cartApi.cart = wasallyCart()
+        ..checkout.respond = (_) => wasallyQuoteJson();
+      await _pump(tester, harness: h);
+      expect(find.textContaining('تحويل'), findsWidgets);
+      expect(find.textContaining('سيتم تأكيد السعر'), findsNothing);
+    });
+
+    testWidgets(
+        'Hatly (BUY_FROM_PLACE) is unchanged: its price is pending, the subtotal line shows the pending state',
+        (tester) async {
+      final h = _Harness()
+        ..cartApi.cart = hatlyServiceCart()
+        ..checkout.respond = (_) => pendingQuoteJson();
+      await _pump(tester, harness: h);
+      expect(
+          find.byKey(const Key('checkout-item-price-pending')), findsOneWidget);
+      expect(
+          find.byKey(const Key('checkout-item-delivery-only')), findsNothing);
+      expect(
+          find.byKey(const Key('checkout-subtotal-pending')), findsOneWidget);
+    });
   });
 }

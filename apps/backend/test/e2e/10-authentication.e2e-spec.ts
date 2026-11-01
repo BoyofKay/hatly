@@ -3,6 +3,7 @@
  * UnifonicSmsProvider with only the network edge faked), driver/vendor/admin/customer password
  * login, role separation, session validity, token rotation, and correlation ids.
  */
+import { createHash } from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import { bootWorld, World } from './support/world';
 import { Scenario, decodeJwt, expectData, nextPhone, DEFAULT_PASSWORD } from './support/actors';
@@ -30,186 +31,554 @@ describe('E2E — authentication', () => {
 
   const bare = (phone: string) => phone.replace(/^\+/, '');
 
-  describe('customer OTP (register → verify)', () => {
-    it('registers a new customer, sends ONE real-provider SMS, and never stores the code in plaintext', async () => {
+  // ---------------------------------------------------------------------------------------------------------------------
+  // THE CUSTOMER AUTH CONTRACT: every account has a password; sign-in is phone + password; OTP only VERIFIES a phone, for the
+  // signed-in customer, while CUSTOMER_OTP_ENABLED is on.
+  // ---------------------------------------------------------------------------------------------------------------------
+
+  const registerBody = (phone: string, password: unknown = DEFAULT_PASSWORD, fullName = 'Contract Customer', code?: string) => ({
+    phone,
+    fullName,
+    password,
+    ...(code ? { code } : {}),
+  });
+  const requestCode = (phone: string) => world.api('post', '/auth/customer/register/request-code', { body: { phone } });
+  /** The first step of registration while OTP is on, as the app does it: ask for a code, read it from the (faked) SMS edge. */
+  const codeFor = async (phone: string) => {
+    expect((await requestCode(phone)).status).toBe(200);
+    return boundary.lastOtpFor(phone);
+  };
+  const register = (body: Record<string, unknown>) => world.api('post', '/auth/customer/password/register', { body });
+  const passwordLogin = (phone: string, password: string) => world.api('post', '/auth/customer/password/login', { body: { phone, password } });
+  const passwordHashOf = async (phone: string) => (await world.ds.query('SELECT password_hash FROM users WHERE phone = $1', [phone]))[0]?.password_hash ?? null;
+  const userCount = async () => Number((await world.ds.query('SELECT count(*)::int AS n FROM users'))[0].n);
+  const plantValidOtp = async (phone: string, code = '424242') => {
+    await world.redis.set(`otp:${phone}`, JSON.stringify({ codeHash: createHash('sha256').update(code).digest('hex'), attempts: 0 }), 'EX', 300);
+    return code;
+  };
+
+  describe('every customer account has a password', () => {
+    beforeAll(async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+    });
+    afterEach(async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+    });
+
+    it('registration WITHOUT a password (missing, empty, null, wrong type, too short) is rejected and creates NO account', async () => {
+      const before = await userCount();
+      for (const password of [undefined, '', null, 12345678, 'short', 'seven77']) {
+        const res = await register({ phone: nextPhone(), fullName: 'No Password', ...(password === undefined ? {} : { password }) }); // `undefined` = the key is absent
+        expect({ password, status: res.status }).toEqual({ password, status: 400 });
+      }
+      expect(await userCount()).toBe(before);
+    });
+
+    it('OTP OFF: registration creates the account WITH a bcrypt hash, a CUSTOMER role (never anything privileged) and a session — no SMS, and the phone stays UNVERIFIED', async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', false);
       const phone = nextPhone();
-      const res = await world.api('post', '/auth/register', { body: { phone, fullName: 'Otp Customer' } });
+      const res = await register(registerBody(phone));
+      expect(res.status).toBe(200);
+      expect(decodeJwt(res.body.data.accessToken)).toMatchObject({ role: Role.CUSTOMER, phone });
+      expect(await passwordHashOf(phone)).toMatch(/^\$2[aby]\$/);
+      expect((await world.ds.getRepository(User).findOneByOrFail({ phone })).isPhoneVerified).toBe(false);
+      expect(boundary.sms).toHaveLength(0);
+
+      // a privilege-escalation attempt through the body is rejected outright
+      const before = await userCount();
+      expect((await register({ ...registerBody(nextPhone()), role: 'SUPER_ADMIN' })).status).toBe(400);
+      expect(await userCount()).toBe(before);
+    });
+
+    it('INVARIANT: no customer row in the database exists without a password hash', async () => {
+      const rows = await world.ds.query("SELECT phone FROM users WHERE role = 'CUSTOMER' AND (password_hash IS NULL OR password_hash = '')");
+      expect(rows).toEqual([]);
+    });
+
+    it('registering a phone that already has an account is a generic 401 and changes NOTHING (password, name, verification)', async () => {
+      const customer = await s.customer('Existing Owner');
+      const hash = await passwordHashOf(customer.phone);
+      await s.setConfig('CUSTOMER_OTP_ENABLED', false);
+      const again = await register(registerBody(customer.phone, 'Attacker-Pass-1!', 'Attacker Name'));
+      expect(again.status).toBe(401);
+      expect(again.body.error.code).toBe('UNAUTHORIZED');
+      expect(await passwordHashOf(customer.phone)).toBe(hash);
+      expect((await world.ds.getRepository(User).findOneByOrFail({ phone: customer.phone })).fullName).toBe('Existing Owner');
+      expectData(await passwordLogin(customer.phone, DEFAULT_PASSWORD));
+      expect((await passwordLogin(customer.phone, 'Attacker-Pass-1!')).status).toBe(401);
+    });
+
+    it('five simultaneous registrations of one phone: exactly one account is created, the others get the generic refusal (never a 500)', async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', false);
+      const phone = nextPhone();
+      const results = await Promise.all(['A', 'B', 'C', 'D', 'E'].map((x) => register(registerBody(phone, `Racer-Pass-${x}-1!`, `Racer ${x}`))));
+      expect(results.filter((r) => r.status === 200)).toHaveLength(1);
+      expect(results.filter((r) => r.status === 401)).toHaveLength(4);
+      expect(await world.ds.getRepository(User).countBy({ phone })).toBe(1);
+    });
+
+    it('GUESTS have no account: anonymous browsing and refused anonymous cart/checkout calls never create a user', async () => {
+      const before = await userCount();
+      for (const path of ['/sectors', '/vendors', '/products', '/search?q=a']) {
+        expect((await world.api('get', path)).status).toBeLessThan(500);
+      }
+      for (const [method, path] of [['get', '/cart'], ['post', '/cart/items'], ['post', '/checkout/quote'], ['post', '/orders']] as const) {
+        expect({ path, status: (await world.api(method, path, { body: {} })).status }).toEqual({ path, status: 401 });
+      }
+      expect(await userCount()).toBe(before);
+    });
+
+    it('the existing flow stays coherent: a guest who must check out registers WITH a password, then signs in with phone + password', async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+      const phone = nextPhone();
+      const registered = expectData<{ accessToken: string }>(await register(registerBody(phone, DEFAULT_PASSWORD, 'Checkout Guest', await codeFor(phone))));
+      expect((await world.api('get', '/cart', { token: registered.accessToken })).status).toBe(200); // the new account can use the cart
+      expectData(await passwordLogin(phone, DEFAULT_PASSWORD));
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------------------------------
+  // PHONE OWNERSHIP IS PROVEN BEFORE THE ACCOUNT EXISTS (no phone squatting) while CUSTOMER_OTP_ENABLED is on.
+  // ---------------------------------------------------------------------------------------------------------------------
+
+  describe('registration proves phone ownership first (OTP ON) — nobody can register a number they do not hold', () => {
+    beforeAll(async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+    });
+    afterEach(async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+    });
+
+    it('request code -> register with it: ONE SMS to that phone; the account is created with a password AND a VERIFIED phone, and a session; the code is stored hashed', async () => {
+      const phone = nextPhone();
+      const res = await requestCode(phone);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ message: 'If eligible, a verification code has been sent.' });
+      expect(boundary.sms).toHaveLength(1);
+      expect(boundary.sms[0].to).toBe(bare(phone));
+      expect(await world.redis.get(`otp:${phone}`)).not.toContain(boundary.sms[0].code!);
+      expect(await world.ds.getRepository(User).countBy({ phone })).toBe(0); // asking for a code creates nothing
+
+      const registered = await register(registerBody(phone, DEFAULT_PASSWORD, 'Proven Owner', boundary.sms[0].code!));
+      expect(registered.status).toBe(200);
+      expect(decodeJwt(registered.body.data.accessToken)).toMatchObject({ role: Role.CUSTOMER, phone });
+      expect(await passwordHashOf(phone)).toMatch(/^\$2[aby]\$/);
+      expect((await world.ds.getRepository(User).findOneByOrFail({ phone })).isPhoneVerified).toBe(true);
+      expectData(await passwordLogin(phone, DEFAULT_PASSWORD)); // normal sign-in is still phone + password
+    });
+
+    it('the session issued at registration is a real one: its refresh token rotates once (the jti stored before the insert belongs to the new account id)', async () => {
+      const phone = nextPhone();
+      const registered = expectData<{ accessToken: string; refreshToken: string }>(await register(registerBody(phone, DEFAULT_PASSWORD, 'Refresher', await codeFor(phone))));
+      const refreshed = await world.api('post', '/auth/refresh', { body: { refreshToken: registered.refreshToken } });
+      expect(refreshed.status).toBe(200);
+      expect(decodeJwt(refreshed.body.data.accessToken).sub).toBe(decodeJwt(registered.accessToken).sub);
+      expect((await world.api('post', '/auth/refresh', { body: { refreshToken: registered.refreshToken } })).status).toBe(401); // single use
+    });
+
+    it('CRITICAL (squatting): registering a phone WITHOUT its code is refused — 400 PHONE_VERIFICATION_REQUIRED, no account, no password stored', async () => {
+      const phone = nextPhone();
+      const before = await userCount();
+      for (const body of [registerBody(phone), registerBody(phone, DEFAULT_PASSWORD, 'Squatter', '')]) {
+        const res = await register(body);
+        expect(res.status).toBe(400);
+      }
+      const res = await register(registerBody(phone));
+      expect(res.body.error.details).toMatchObject({ code: 'PHONE_VERIFICATION_REQUIRED' });
+      expect(await userCount()).toBe(before);
+      expect(await world.ds.getRepository(User).countBy({ phone })).toBe(0);
+    });
+
+    it('CRITICAL (squatting): a wrong code, a code for ANOTHER phone, or a made-up code never creates the account — and the real owner can still register afterwards', async () => {
+      const victim = nextPhone();
+      const attackerOwn = nextPhone();
+      await requestCode(victim);
+      const victimCode = boundary.lastOtpFor(victim);
+      const attackerCode = await codeFor(attackerOwn);
+
+      const before = await userCount();
+      const wrong = victimCode === '111111' ? '222222' : '111111';
+      for (const code of [wrong, attackerCode]) {
+        const res = await register(registerBody(victim, 'Squatter-Pass-1!', 'Squatter', code));
+        expect({ code, status: res.status }).toEqual({ code, status: 401 });
+      }
+      expect(await userCount()).toBe(before);
+      expect(await world.ds.getRepository(User).countBy({ phone: victim })).toBe(0);
+
+      // the legitimate owner (holder of the SMS) is NOT locked out by the squatting attempts
+      const owner = await register(registerBody(victim, DEFAULT_PASSWORD, 'Real Owner', victimCode));
+      expect(owner.status).toBe(200);
+      expectData(await passwordLogin(victim, DEFAULT_PASSWORD));
+      expect((await passwordLogin(victim, 'Squatter-Pass-1!')).status).toBe(401);
+    });
+
+    it('a code is single-use and brute force is capped: a used code is dead; five wrong guesses kill the code even for the right value', async () => {
+      const used = nextPhone();
+      const usedCode = await codeFor(used);
+      expect((await register(registerBody(used, DEFAULT_PASSWORD, 'Once', usedCode))).status).toBe(200);
+      const again = await register(registerBody(used, 'Replay-Pass-1!', 'Replay', usedCode));
+      expect(again.status).toBe(401); // the code is gone AND the phone now has an account: one generic refusal
+      expect(await world.ds.getRepository(User).countBy({ phone: used })).toBe(1);
+
+      const guessed = nextPhone();
+      const guessedCode = await codeFor(guessed);
+      const wrong = guessedCode === '000000' ? '000001' : '000000';
+      for (let i = 0; i < 5; i += 1) expect((await register(registerBody(guessed, DEFAULT_PASSWORD, 'Guess', wrong))).status).toBe(401);
+      expect((await register(registerBody(guessed, DEFAULT_PASSWORD, 'Guess', guessedCode))).status).toBe(401); // locked out: request a new code
+      expect(await world.ds.getRepository(User).countBy({ phone: guessed })).toBe(0);
+    });
+
+    it('a malformed code or a client-supplied "verified" flag is rejected at the edge — the server alone decides verification', async () => {
+      const phone = nextPhone();
+      const before = await userCount();
+      for (const extra of [{ code: '12345' }, { code: 'abcdef' }, { code: 123456 }, { isPhoneVerified: true }, { phoneVerified: true }, { verified: true }]) {
+        const res = await register({ ...registerBody(phone), ...extra });
+        expect({ extra, status: res.status }).toEqual({ extra, status: 400 });
+      }
+      expect(await userCount()).toBe(before);
+    });
+
+    it('requesting a code for a phone that ALREADY has an account sends nothing and answers exactly like a fresh phone (no enumeration)', async () => {
+      const existing = await s.customer('Already Here');
+      boundary.reset();
+      const fresh = await requestCode(nextPhone());
+      const sentForFresh = boundary.sms.length;
+      boundary.reset();
+      const known = await requestCode(existing.phone);
+      expect(known.status).toBe(fresh.status);
+      expect(known.body).toEqual(fresh.body);
+      expect(sentForFresh).toBe(1);
+      expect(boundary.sms).toHaveLength(0);
+      expect(await world.redis.get(`otp:${existing.phone}`)).toBeNull();
+    });
+
+    it('OTP can never overwrite a password: a VALID code for an existing customer is refused at registration and the password is untouched', async () => {
+      const customer = await s.customer('Has Password');
+      const hash = await passwordHashOf(customer.phone);
+      const code = await plantValidOtp(customer.phone);
+      const res = await register(registerBody(customer.phone, 'Takeover-Pass-1!', 'Takeover', code));
+      expect(res.status).toBe(401);
+      expect(await passwordHashOf(customer.phone)).toBe(hash);
+      expectData(await passwordLogin(customer.phone, DEFAULT_PASSWORD));
+      expect((await passwordLogin(customer.phone, 'Takeover-Pass-1!')).status).toBe(401);
+    });
+
+    it('SMS provider down: the request answers like any other (fail closed — no code is stored, nothing can be verified) and registering is impossible until a code exists', async () => {
+      const phone = nextPhone();
+      boundary.smsOutage = true;
+      const res = await requestCode(phone);
+      expect(res.status).toBe(200);
+      expect(await world.redis.get(`otp:${phone}`)).toBeNull();
+      expect((await register(registerBody(phone, DEFAULT_PASSWORD, 'No Code', '123456'))).status).toBe(401);
+      expect(await world.ds.getRepository(User).countBy({ phone })).toBe(0);
+      boundary.smsOutage = false;
+      const code = await codeFor(phone); // recovers by itself: the failed attempt left no cooldown behind
+      expect((await register(registerBody(phone, DEFAULT_PASSWORD, 'Now Ok', code))).status).toBe(200);
+    });
+
+    it('request-code validates its input: no phone / an invalid phone / extra fields -> 400 and nothing is sent', async () => {
+      for (const body of [{}, { phone: '12345' }, { phone: nextPhone(), isPhoneVerified: true }]) {
+        expect({ body, status: (await world.api('post', '/auth/customer/register/request-code', { body })).status }).toEqual({ body, status: 400 });
+      }
+      expect(boundary.sms).toHaveLength(0);
+    });
+  });
+
+  describe('OTP OFF: registration does not fabricate verification and does not require SMS', () => {
+    afterEach(async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+    });
+
+    it('request-code answers 400 CUSTOMER_OTP_DISABLED and sends nothing; registration with a password alone works and the phone stays unverified', async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', false);
+      const phone = nextPhone();
+      const asked = await requestCode(phone);
+      expect(asked.status).toBe(400);
+      expect(asked.body.error.details).toMatchObject({ code: 'CUSTOMER_OTP_DISABLED' });
+      expect(boundary.sms).toHaveLength(0);
+      expect(await world.redis.get(`otp:${phone}`)).toBeNull();
+
+      expect((await register(registerBody(phone))).status).toBe(200);
+      expect((await world.ds.getRepository(User).findOneByOrFail({ phone })).isPhoneVerified).toBe(false);
+      expect(boundary.sms).toHaveLength(0);
+    });
+
+    it('a code supplied anyway is ignored, never trusted: even a REAL pending code does not make the phone verified', async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+      const phone = nextPhone();
+      const code = await codeFor(phone);
+      await s.setConfig('CUSTOMER_OTP_ENABLED', false);
+      expect((await register(registerBody(phone, DEFAULT_PASSWORD, 'Toggled', code))).status).toBe(200);
+      expect((await world.ds.getRepository(User).findOneByOrFail({ phone })).isPhoneVerified).toBe(false);
+    });
+
+    it('the Admin turning OTP ON again later: the unverified account signs in normally and can verify through the authenticated flow', async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', false);
+      const phone = nextPhone();
+      expect((await register(registerBody(phone))).status).toBe(200);
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+      const login = expectData<{ accessToken: string }>(await passwordLogin(phone, DEFAULT_PASSWORD));
+      boundary.reset();
+      expect((await world.api('post', '/auth/customer/verify-phone/request', { token: login.accessToken })).status).toBe(200);
+      expect((await world.api('post', '/auth/customer/verify-phone/confirm', { token: login.accessToken, body: { code: boundary.lastOtpFor(phone) } })).status).toBe(200);
+      expect((await world.ds.getRepository(User).findOneByOrFail({ phone })).isPhoneVerified).toBe(true);
+    });
+  });
+
+  describe('legacy OTP registration and sign-in are retired — a one-time code is not a way in', () => {
+    afterEach(async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+    });
+
+    it('POST /auth/register with OTP ON: 410 LEGACY_OTP_REGISTRATION_RETIRED — no account, no SMS, no code, no session', async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+      const phone = nextPhone();
+      const res = await world.api('post', '/auth/register', { body: { phone, fullName: 'Legacy App' } });
+      expect(res.status).toBe(410);
+      expect(res.body.error.details).toEqual({ code: 'LEGACY_OTP_REGISTRATION_RETIRED' });
+      expect(JSON.stringify(res.body)).not.toMatch(/accessToken|refreshToken/);
+      expect(await world.ds.getRepository(User).countBy({ phone })).toBe(0);
+      expect(boundary.sms).toHaveLength(0);
+      expect(await world.redis.get(`otp:${phone}`)).toBeNull();
+    });
+
+    it('POST /auth/register with OTP OFF: the CUSTOMER_OTP_DISABLED answer older apps use to fall back to the password form (they keep working)', async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', false);
+      const phone = nextPhone();
+      const res = await world.api('post', '/auth/register', { body: { phone, fullName: 'Legacy App' } });
+      expect(res.status).toBe(400);
+      expect(res.body.error.details).toEqual({ code: 'CUSTOMER_OTP_DISABLED' });
+      expect(await world.ds.getRepository(User).countBy({ phone })).toBe(0);
+      expect(boundary.sms).toHaveLength(0);
+    });
+
+    it('the legacy register route still validates its body, and the removed OTP sign-in / code-exchange / claim routes no longer exist', async () => {
+      expect((await world.api('post', '/auth/register', { body: { phone: '12345', fullName: 'X Y' } })).status).toBe(400);
+      expect((await world.api('post', '/auth/register', { body: { phone: nextPhone() } })).status).toBe(400);
+      expect((await world.api('post', '/auth/register', { body: { phone: nextPhone(), fullName: 'Ok Name', role: 'SUPER_ADMIN' } })).status).toBe(400);
+      for (const path of ['/auth/login', '/auth/otp/verify', '/auth/customer/password/claim', '/auth/customer/password/claim/request']) {
+        expect({ path, status: (await world.api('post', path, { body: { phone: nextPhone(), code: '123456', password: 'Whatever-1!' } })).status }).toEqual({ path, status: 404 });
+      }
+      expect(boundary.sms).toHaveLength(0);
+    });
+
+    it('OTP ALONE can never attach, replace or create a password — a valid code in Redis changes nothing on any route', async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+      const customer = await s.customer('Has Password');
+      const hash = await passwordHashOf(customer.phone);
+      const code = await plantValidOtp(customer.phone);
+
+      for (const [path, body] of [
+        ['/auth/register', { phone: customer.phone, fullName: 'Takeover' }],
+        ['/auth/customer/password/register', { phone: customer.phone, fullName: 'Takeover', password: 'Takeover-Pass-1!', code }],
+        ['/auth/customer/password/login', { phone: customer.phone, password: code }],
+        ['/auth/otp/verify', { phone: customer.phone, code }],
+        ['/auth/customer/password/claim', { phone: customer.phone, code, password: 'Takeover-Pass-1!' }],
+      ] as const) {
+        const res = await world.api('post', path, { body });
+        expect({ path, ok: res.status === 200 && !!res.body?.data?.accessToken && path !== '/auth/customer/password/register' }).toEqual({ path, ok: false });
+      }
+      expect(await passwordHashOf(customer.phone)).toBe(hash);
+      expectData(await passwordLogin(customer.phone, DEFAULT_PASSWORD));
+      // ...and the authenticated change still wants the current password, not a code
+      expect((await world.api('patch', '/auth/customer/password', { token: customer.accessToken, body: { password: 'Takeover-Pass-1!', currentPassword: code } })).status).toBe(403);
+      expect(await passwordHashOf(customer.phone)).toBe(hash);
+    });
+  });
+
+  describe('phone verification by OTP (signed-in customer, CUSTOMER_OTP_ENABLED on)', () => {
+    beforeAll(async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+    });
+    afterEach(async () => {
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+      boundary.smsOutage = false;
+    });
+    const requestCode = (token: string) => world.api('post', '/auth/customer/verify-phone/request', { token });
+    const confirm = (token: string, code: string) => world.api('post', '/auth/customer/verify-phone/confirm', { token, body: { code } });
+    const verified = async (phone: string) => (await world.ds.getRepository(User).findOneByOrFail({ phone })).isPhoneVerified;
+
+    it('the signed-in customer gets ONE real-provider SMS to their OWN phone; the code is stored only as a hash with a TTL and a resend cooldown', async () => {
+      const c = await s.unverifiedCustomer('Verify Me');
+      boundary.reset();
+      const res = await requestCode(c.accessToken);
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ message: 'If eligible, a verification code has been sent.' });
 
       expect(boundary.sms).toHaveLength(1);
-      expect(boundary.sms[0].to).toBe(bare(phone)); // Unifonic wants the number without '+'
+      expect(boundary.sms[0].to).toBe(bare(c.phone)); // Unifonic wants the number without '+'
       expect(boundary.sms[0].code).toMatch(/^\d{6}$/);
       expect(boundary.sms[0].body).toContain('Hatly verification code');
-
-      const stored = await world.redis.get(`otp:${phone}`);
-      expect(stored).not.toBeNull();
+      const stored = await world.redis.get(`otp:${c.phone}`);
       expect(stored).not.toContain(boundary.sms[0].code!); // sha256 hash only
       expect(JSON.parse(stored!)).toEqual({ codeHash: expect.stringMatching(/^[0-9a-f]{64}$/), attempts: 0 });
-      const ttl = await world.redis.ttl(`otp:${phone}`);
+      const ttl = await world.redis.ttl(`otp:${c.phone}`);
       expect(ttl).toBeGreaterThan(290);
       expect(ttl).toBeLessThanOrEqual(300);
-      expect(await world.redis.ttl(`otp-cooldown:${phone}`)).toBeLessThanOrEqual(60);
-
-      const user = await world.ds.getRepository(User).findOneByOrFail({ phone });
-      expect(user.role).toBe(Role.CUSTOMER);
-      expect(user.isPhoneVerified).toBe(false);
+      expect(await world.redis.ttl(`otp-cooldown:${c.phone}`)).toBeLessThanOrEqual(60);
+      expect(await verified(c.phone)).toBe(false); // sending a code proves nothing
     });
 
-    it('verifies with the real code: issues an access+refresh pair, marks the phone verified, consumes the code', async () => {
-      const phone = nextPhone();
-      await world.api('post', '/auth/register', { body: { phone, fullName: 'Verify Me' } });
-      const code = boundary.lastOtpFor(phone);
+    it('a correct code verifies the phone — and issues NO tokens; the code is consumed and cannot be replayed', async () => {
+      const c = await s.unverifiedCustomer('Verify Me 2');
+      boundary.reset();
+      await requestCode(c.accessToken);
+      const code = boundary.lastOtpFor(c.phone);
 
-      const res = await world.api('post', '/auth/otp/verify', { body: { phone, code } });
-      const tokens = expectData<{ accessToken: string; refreshToken: string }>(res);
-      const access = decodeJwt(tokens.accessToken);
-      expect(access).toMatchObject({ role: Role.CUSTOMER, phone });
-      expect(access.exp - access.iat).toBe(15 * 60);
-      expect(decodeJwt(tokens.refreshToken).jti).toBeDefined();
+      const res = await confirm(c.accessToken, code);
+      expect(res.status).toBe(200);
+      expect(Object.keys(res.body)).toEqual(['message']); // verification is not authentication
+      expect(await verified(c.phone)).toBe(true);
+      expect(expectData(await world.api('get', '/auth/customer/me', { token: c.accessToken }))).toEqual({ isPhoneVerified: true, phoneVerificationAvailable: true });
+      expect(await world.redis.get(`otp:${c.phone}`)).toBeNull();
 
-      const me = await world.api('get', '/auth/customer/me', { token: tokens.accessToken });
-      expect(expectData(me)).toEqual({ isPhoneVerified: true });
-
-      // single use
-      const replay = await world.api('post', '/auth/otp/verify', { body: { phone, code } });
+      const replay = await confirm(c.accessToken, code);
       expect(replay.status).toBe(401);
-      expect(await world.redis.get(`otp:${phone}`)).toBeNull();
     });
 
-    it('a wrong code is rejected and counted; a correct code still works afterwards (within the attempt budget)', async () => {
-      const phone = nextPhone();
-      await world.api('post', '/auth/register', { body: { phone, fullName: 'Typo Customer' } });
-      const code = boundary.lastOtpFor(phone);
-      const wrong = code === '000000' ? '111111' : '000000';
+    it('a phone is NEVER verified without proof: no code requested, a wrong code, an expired code, and another account\'s code all leave it unverified', async () => {
+      const a = await s.unverifiedCustomer('Proof A');
+      const b = await s.unverifiedCustomer('Proof B');
+      boundary.reset();
 
-      const bad = await world.api('post', '/auth/otp/verify', { body: { phone, code: wrong } });
-      expect(bad.status).toBe(401);
-      expect(bad.body.error.message).toBe('Invalid code.');
-      expect(JSON.parse((await world.redis.get(`otp:${phone}`))!).attempts).toBe(1);
-
-      expectData(await world.api('post', '/auth/otp/verify', { body: { phone, code } }));
-    });
-
-    it('locks the code out after the maximum wrong attempts — even the correct code is then refused', async () => {
-      const phone = nextPhone();
-      await world.api('post', '/auth/register', { body: { phone, fullName: 'Brute Force' } });
-      const code = boundary.lastOtpFor(phone);
-      const wrong = code === '000000' ? '111111' : '000000';
-
-      for (let i = 0; i < 5; i += 1) {
-        expect((await world.api('post', '/auth/otp/verify', { body: { phone, code: wrong } })).status).toBe(401);
-      }
-      const locked = await world.api('post', '/auth/otp/verify', { body: { phone, code } });
-      expect(locked.status).toBe(401);
-      expect(locked.body.error.message).toBe('Too many attempts. Request a new code.');
-      expect(await world.redis.get(`otp:${phone}`)).toBeNull();
-      // and it stays refused: the record is gone
-      expect((await world.api('post', '/auth/otp/verify', { body: { phone, code } })).status).toBe(401);
-    });
-
-    it('an expired code (Redis TTL elapsed) is refused', async () => {
-      const phone = nextPhone();
-      await world.api('post', '/auth/register', { body: { phone, fullName: 'Slow Customer' } });
-      const code = boundary.lastOtpFor(phone);
-      await world.redis.pexpire(`otp:${phone}`, 50); // real Redis expiry, not a mock
+      expect((await confirm(a.accessToken, '123456')).status).toBe(401); // nothing was ever requested
+      await requestCode(a.accessToken);
+      const codeA = boundary.lastOtpFor(a.phone);
+      const wrong = codeA === '000000' ? '111111' : '000000';
+      expect((await confirm(a.accessToken, wrong)).status).toBe(401);
+      expect((await confirm(b.accessToken, codeA)).status).toBe(401); // A's code cannot verify B
+      await world.redis.pexpire(`otp:${a.phone}`, 50);
       await new Promise((r) => setTimeout(r, 120));
-      const res = await world.api('post', '/auth/otp/verify', { body: { phone, code } });
-      expect(res.status).toBe(401);
-      expect(res.body.error.message).toBe('Invalid or expired code.');
+      expect((await confirm(a.accessToken, codeA)).status).toBe(401); // expired (real Redis TTL)
+
+      expect(await verified(a.phone)).toBe(false);
+      expect(await verified(b.phone)).toBe(false);
+    });
+
+    it('a wrong code is counted and the right one still works within the attempt budget; the code locks out after the maximum wrong attempts', async () => {
+      const c = await s.unverifiedCustomer('Budget');
+      boundary.reset();
+      await requestCode(c.accessToken);
+      const code = boundary.lastOtpFor(c.phone);
+      const wrong = code === '000000' ? '111111' : '000000';
+
+      expect((await confirm(c.accessToken, wrong)).status).toBe(401);
+      expect(JSON.parse((await world.redis.get(`otp:${c.phone}`))!).attempts).toBe(1);
+      expect((await confirm(c.accessToken, code)).status).toBe(200); // still within the budget
+
+      const d = await s.unverifiedCustomer('Lockout');
+      boundary.reset();
+      await requestCode(d.accessToken);
+      const codeD = boundary.lastOtpFor(d.phone);
+      const wrongD = codeD === '000000' ? '111111' : '000000';
+      for (let i = 0; i < 5; i += 1) expect((await confirm(d.accessToken, wrongD)).status).toBe(401);
+      const locked = await confirm(d.accessToken, codeD);
+      expect(locked.status).toBe(401); // even the correct code is refused now
+      expect(await verified(d.phone)).toBe(false);
     });
 
     it('enforces the resend cooldown (no second SMS) and allows a new code once it lapses; the new code supersedes the old', async () => {
-      const phone = nextPhone();
-      await world.api('post', '/auth/register', { body: { phone, fullName: 'Impatient' } });
-      const first = boundary.lastOtpFor(phone);
-
-      const again = await world.api('post', '/auth/login', { body: { phone } });
-      expect(again.status).toBe(200); // same neutral response, no signal to the caller
+      const c = await s.unverifiedCustomer('Impatient');
+      boundary.reset();
+      await requestCode(c.accessToken);
+      const first = boundary.lastOtpFor(c.phone);
+      expect((await requestCode(c.accessToken)).status).toBe(200); // same neutral answer, no signal
       expect(boundary.sms).toHaveLength(1);
 
-      await world.redis.del(`otp-cooldown:${phone}`); // the 60s cooldown lapsing
-      await world.api('post', '/auth/login', { body: { phone } });
+      await world.redis.del(`otp-cooldown:${c.phone}`); // the 60s cooldown lapsing
+      await requestCode(c.accessToken);
       expect(boundary.sms).toHaveLength(2);
-      const second = boundary.lastOtpFor(phone);
-      if (second !== first) {
-        expect((await world.api('post', '/auth/otp/verify', { body: { phone, code: first } })).status).toBe(401);
-      }
-      expectData(await world.api('post', '/auth/otp/verify', { body: { phone, code: second } }));
+      const second = boundary.lastOtpFor(c.phone);
+      if (second !== first) expect((await confirm(c.accessToken, first)).status).toBe(401);
+      expect((await confirm(c.accessToken, second)).status).toBe(200);
     });
 
-    it('login for an unknown phone is indistinguishable from a known one and sends NO SMS (no enumeration)', async () => {
-      const known = nextPhone();
-      await world.api('post', '/auth/register', { body: { phone: known, fullName: 'Known' } });
-      await world.redis.del(`otp-cooldown:${known}`);
+    it('an SMS provider outage fails closed with a clear non-sensitive error (the caller is signed in and asking about their own phone), and no usable code is left behind', async () => {
+      const c = await s.unverifiedCustomer('Outage');
       boundary.reset();
-
-      const knownRes = await world.api('post', '/auth/login', { body: { phone: known } });
-      const unknownRes = await world.api('post', '/auth/login', { body: { phone: nextPhone() } });
-      expect(unknownRes.status).toBe(knownRes.status);
-      expect(unknownRes.body).toEqual(knownRes.body);
-      expect(boundary.sms).toHaveLength(1); // only the known phone was texted
-    });
-
-    it('an SMS provider outage fails closed: 400 SMS_PROVIDER_UNAVAILABLE, no usable code is left behind', async () => {
-      const phone = nextPhone();
       boundary.smsOutage = true;
-      const res = await world.api('post', '/auth/register', { body: { phone, fullName: 'Outage Customer' } });
+      const res = await requestCode(c.accessToken);
       expect(res.status).toBe(400);
       expect(res.body.error.details).toEqual({ code: 'SMS_PROVIDER_UNAVAILABLE' });
-      expect(res.body.error.message).not.toMatch(/unifonic|503|appsid/i); // no provider internals leak
-      expect(await world.redis.get(`otp:${phone}`)).toBeNull();
-      expect(await world.redis.get(`otp-cooldown:${phone}`)).toBeNull();
-      expect((await world.api('post', '/auth/otp/verify', { body: { phone, code: '123456' } })).status).toBe(401);
-      boundary.smsOutage = false;
+      expect(res.body.error.message).not.toMatch(/unifonic|503|appsid/i);
+      expect(await world.redis.get(`otp:${c.phone}`)).toBeNull();
+      expect(await world.redis.get(`otp-cooldown:${c.phone}`)).toBeNull();
+      expect(await verified(c.phone)).toBe(false);
     });
 
-    it('is gated by CUSTOMER_OTP_ENABLED: when off, register is refused before any OTP/SMS work', async () => {
+    it('with CUSTOMER_OTP_ENABLED OFF no SMS is needed or sent: the verification request is refused, the account works with phone + password, and the phone stays unverified', async () => {
+      const c = await s.unverifiedCustomer('Otp Off');
       await s.setConfig('CUSTOMER_OTP_ENABLED', false);
-      const res = await world.api('post', '/auth/register', { body: { phone: nextPhone(), fullName: 'No Otp' } });
+      boundary.reset();
+
+      const res = await requestCode(c.accessToken);
       expect(res.status).toBe(400);
       expect(res.body.error.details).toEqual({ code: 'CUSTOMER_OTP_DISABLED' });
       expect(boundary.sms).toHaveLength(0);
-      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
+      expect(await world.redis.get(`otp:${c.phone}`)).toBeNull();
+
+      expectData(await passwordLogin(c.phone, DEFAULT_PASSWORD)); // password sign-in and the existing session are untouched
+      // OTP off: the phone is NOT verified (nothing proved it), and the app is told verification is not possible right now — so it
+      // shows no "verify your phone" prompt that could not be followed.
+      expect(expectData(await world.api('get', '/auth/customer/me', { token: c.accessToken }))).toEqual({ isPhoneVerified: false, phoneVerificationAvailable: false });
+      expect(await verified(c.phone)).toBe(false);
+
+      await s.setConfig('CUSTOMER_OTP_ENABLED', true); // and verification works once the Admin turns OTP back on
+      boundary.reset();
+      expect((await requestCode(c.accessToken)).status).toBe(200);
+      expect((await confirm(c.accessToken, boundary.lastOtpFor(c.phone))).status).toBe(200);
+      expect(await verified(c.phone)).toBe(true);
     });
 
-    it('toggling CUSTOMER_OTP_ENABLED never invalidates an existing password or session: a password account created ' +
-      'while OTP is OFF logs in exactly the same once OTP is turned back ON', async () => {
-      await s.setConfig('CUSTOMER_OTP_ENABLED', false);
-      const customer = await s.customer('Survives Otp Toggle');
-      const loginWhileOff = expectData<{ accessToken: string }>(
-        await world.api('post', '/auth/customer/password/login', { body: { phone: customer.phone, password: DEFAULT_PASSWORD } }),
-      );
-      expect(decodeJwt(loginWhileOff.accessToken)).toMatchObject({ sub: customer.id, role: Role.CUSTOMER });
+    it('needs a session and validates its input: anonymous callers are refused, and a malformed code is a 400', async () => {
+      const c = await s.unverifiedCustomer('Edge');
+      expect((await world.api('post', '/auth/customer/verify-phone/request')).status).toBe(401);
+      expect((await world.api('post', '/auth/customer/verify-phone/confirm', { body: { code: '123456' } })).status).toBe(401);
+      expect((await world.api('get', '/auth/customer/me')).status).toBe(401);
+      expect((await world.api('post', '/auth/customer/verify-phone/confirm', { token: c.accessToken, body: {} })).status).toBe(400);
+    });
+  });
 
-      await s.setConfig('CUSTOMER_OTP_ENABLED', true);
-      // Same phone, same password, no re-registration — the flag never touched the stored hash or the session store.
-      const loginAfterReenable = expectData<{ accessToken: string }>(
-        await world.api('post', '/auth/customer/password/login', { body: { phone: customer.phone, password: DEFAULT_PASSWORD } }),
-      );
-      expect(decodeJwt(loginAfterReenable.accessToken)).toMatchObject({ sub: customer.id, role: Role.CUSTOMER });
+  describe('authenticated password change needs more than a session', () => {
+    const change = (token: string | undefined, body: Record<string, unknown>) => world.api('patch', '/auth/customer/password', { token, body });
+    const passwordLogin = (phone: string, password: string) => world.api('post', '/auth/customer/password/login', { body: { phone, password } });
+
+    it('a stolen/left-open session cannot change an existing password: no current password -> 400, wrong current -> 403, and the password is untouched', async () => {
+      const customer = await s.customer('Session Only');
+      const noCurrent = await change(customer.accessToken, { password: 'Hijacked-Pass-1!' });
+      expect(noCurrent.status).toBe(400);
+      expect(noCurrent.body.error.details).toEqual({ code: 'CURRENT_PASSWORD_REQUIRED' });
+      const wrong = await change(customer.accessToken, { password: 'Hijacked-Pass-1!', currentPassword: 'not-the-password' });
+      expect(wrong.status).toBe(403);
+      expect(wrong.body.error.details).toEqual({ code: 'CURRENT_PASSWORD_INVALID' });
+
+      expectData(await passwordLogin(customer.phone, DEFAULT_PASSWORD));
+      expect((await passwordLogin(customer.phone, 'Hijacked-Pass-1!')).status).toBe(401);
     });
 
-    it('validates input at the HTTP edge (bad phone, missing name, unknown property)', async () => {
-      const badPhone = await world.api('post', '/auth/register', { body: { phone: '12345', fullName: 'X Y' } });
-      expect(badPhone.status).toBe(400);
-      expect((await world.api('post', '/auth/register', { body: { phone: nextPhone() } })).status).toBe(400);
-      expect((await world.api('post', '/auth/register', { body: { phone: nextPhone(), fullName: 'Ok Name', role: 'SUPER_ADMIN' } })).status).toBe(400);
-      expect(boundary.sms).toHaveLength(0);
+    it('with the correct current password the change works; the old password stops working and the new one signs in', async () => {
+      const customer = await s.customer('Legit Change');
+      expect((await change(customer.accessToken, { password: 'Brand-New-Pass-1!', currentPassword: DEFAULT_PASSWORD })).status).toBe(200);
+      expect((await passwordLogin(customer.phone, DEFAULT_PASSWORD)).status).toBe(401);
+      expectData(await passwordLogin(customer.phone, 'Brand-New-Pass-1!'));
     });
 
-    it('POST /auth/login validates its body (an empty body was a 500) and sends nothing for a rejected request', async () => {
-      for (const body of [{}, { phone: '' }, { phone: 12345 }, { phone: 'not-a-phone' }, { phone: nextPhone(), extra: 1 }]) {
-        const res = await world.api('post', '/auth/login', { body });
-        expect({ body, status: res.status }).toEqual({ body, status: 400 });
+    it('guessing the current password is brake-limited per account, exactly like sign-in (a locked account refuses even the right password)', async () => {
+      const customer = await s.customer('Brute Force Change');
+      let last = 0;
+      for (let i = 0; i < 12 && last !== 429; i += 1) {
+        last = (await change(customer.accessToken, { password: 'Hijacked-Pass-1!', currentPassword: `guess-${i}-xxxxxxx` })).status;
       }
-      expect(boundary.sms).toHaveLength(0);
+      expect(last).toBe(429);
+      expect((await change(customer.accessToken, { password: 'Hijacked-Pass-1!', currentPassword: DEFAULT_PASSWORD })).status).toBe(429);
+      await world.redis.del(...(await world.redis.keys('*login*')).filter((k) => k.includes(customer.phone))); // unlock for later tests
+      expectData(await passwordLogin(customer.phone, DEFAULT_PASSWORD));
     });
 
-    it('the OTP flow can never mint a privileged session: a customer who registers via OTP is only ever a CUSTOMER', async () => {
-      const phone = nextPhone();
-      await world.api('post', '/auth/register', { body: { phone, fullName: 'Sneaky', role: 'ADMIN' } });
-      expect(await world.ds.getRepository(User).count({ where: { phone } })).toBe(0); // rejected outright
+    it('the new password still has to meet the minimum length, and an anonymous caller is refused', async () => {
+      const customer = await s.customer('Short Pass');
+      expect((await change(customer.accessToken, { password: 'short', currentPassword: DEFAULT_PASSWORD })).status).toBe(400);
+      expect((await change(undefined, { password: 'Anonymous-Pass-1!', currentPassword: DEFAULT_PASSWORD })).status).toBe(401);
     });
   });
 

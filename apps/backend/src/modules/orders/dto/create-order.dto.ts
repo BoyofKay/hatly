@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsIn, IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsBoolean, IsEnum, IsIn, IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { AddressMode } from '../../addresses/address-mode';
 import { ElectronicPaymentMethod } from '../../payments/electronic-payment-method.enum';
 import { ORDER_PAYMENT_METHODS, OrderPaymentMethod } from '../order-payment-method';
 
@@ -14,9 +15,16 @@ export class DeliveryAddressDto {
   @MaxLength(100)
   label?: string;
 
+  /** How the address was identified. Omitted = a legacy address (original rules: written address required). */
+  @IsOptional()
+  @IsEnum(AddressMode)
+  mode?: AddressMode;
+
+  /** Required for MANUAL and legacy addresses; a GPS address is its coordinates and needs no typed text. */
+  @ValidateIf((o: DeliveryAddressDto) => o.mode !== AddressMode.GPS)
   @IsString()
   @MaxLength(255)
-  line1: string;
+  line1?: string;
 
   /** PD-009: optional map pin (both or neither). Without one, `deliveryZoneId` locates the address. */
   @IsOptional()

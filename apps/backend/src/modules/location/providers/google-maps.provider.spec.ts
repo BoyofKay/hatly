@@ -1,4 +1,4 @@
-import { GoogleMapsProvider } from './google-maps.provider';
+import { GoogleMapsProvider, MAPS_REQUEST_TIMEOUT_MS } from './google-maps.provider';
 
 function buildProvider(apiKey: string | undefined = 'test-api-key') {
   const configService = {
@@ -128,6 +128,23 @@ describe('GoogleMapsProvider', () => {
     const { provider } = buildProvider();
 
     await expect(provider.distanceAndEta(from, to)).rejects.toThrow();
+  });
+
+  it('every provider call is bounded: fetch gets an abort signal, and a timeout fails closed with a "timeout" category (never hangs)', async () => {
+    const seen: Array<AbortSignal | undefined> = [];
+    (global as any).fetch = jest.fn(async (_url: string, init?: { signal?: AbortSignal }) => {
+      seen.push(init?.signal);
+      const error = new Error('The operation was aborted due to timeout');
+      error.name = 'TimeoutError';
+      throw error;
+    });
+    const { provider } = buildProvider();
+    await expect(provider.distanceAndEta(from, to)).rejects.toThrow(/did not answer in time/);
+    await expect(provider.geocode('Abu Naseeb')).rejects.toThrow(/did not answer in time/);
+    await expect(provider.reverseGeocode(from)).rejects.toThrow(/did not answer in time/);
+    expect(seen).toHaveLength(3);
+    for (const signal of seen) expect(signal).toBeInstanceOf(AbortSignal);
+    expect(MAPS_REQUEST_TIMEOUT_MS).toBeLessThanOrEqual(10_000);
   });
 
   it('fails closed when no API key is configured — never silently proceeds', async () => {

@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, HttpException, HttpStatus, InternalServerErrorException, Logger, NotFoundException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
-import { HttpExceptionFilter } from './http-exception.filter';
+import { HttpExceptionFilter, securityEventFor } from './http-exception.filter';
 import { RequestContextService } from '../request-context/request-context.service';
 
 function buildHost(overrides: { method?: string; url?: string } = {}) {
@@ -267,5 +267,36 @@ describe('HttpExceptionFilter', () => {
         expect(JSON.stringify(body)).not.toMatch(/hatly|10\.0\.3\.7|password/);
       }
     });
+  });
+});
+
+describe('HttpExceptionFilter — security monitoring events', () => {
+  it('classifies refused requests: 401 auth_failed, 403 access_denied, 429 rate_limited, 400/409 on money routes financial_rejected', () => {
+    expect(securityEventFor(401, '/api/v1/auth/password/login', 'POST')).toBe('security.auth_failed');
+    expect(securityEventFor(403, '/api/v1/admin/offers', 'POST')).toBe('security.access_denied');
+    expect(securityEventFor(429, '/api/v1/search', 'GET')).toBe('security.rate_limited');
+    expect(securityEventFor(409, '/api/v1/admin/manual-transfer-payments/:paymentId/refund', 'POST')).toBe('security.financial_rejected');
+    expect(securityEventFor(400, '/api/v1/customer/loyalty/convert', 'POST')).toBe('security.financial_rejected');
+    expect(securityEventFor(400, '/api/v1/cart/items', 'POST')).toBeNull(); // ordinary validation stays quiet
+    expect(securityEventFor(404, '/api/v1/orders/:id', 'GET')).toBeNull();
+  });
+
+  it('logs ONE structured WARN line with route template, user and code — never the body, query, token or phone', () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const { filter } = buildFilter('corr-sec');
+    const { host, req } = buildHost({ method: 'POST', url: '/api/v1/admin/offers?phone=%2B201000000000' });
+    req.route = { path: '/api/v1/admin/offers' };
+    req.user = { id: 'admin-7', role: 'ADMIN' };
+    req.ip = '203.0.113.9';
+    req.body = { password: 'hunter2', token: 'secret-token' };
+    req.headers = { authorization: 'Bearer secret-token' };
+    filter.catch(new HttpException('Forbidden', 403), host);
+    expect(warn).toHaveBeenCalledTimes(1);
+    const line = warn.mock.calls[0][0] as string;
+    expect(JSON.parse(line)).toMatchObject({ event: 'security.access_denied', correlationId: 'corr-sec', method: 'POST', route: '/api/v1/admin/offers', status: 403, userId: 'admin-7', role: 'ADMIN', ip: '203.0.113.9' });
+    expect(line).not.toContain('hunter2');
+    expect(line).not.toContain('secret-token');
+    expect(line).not.toContain('201000000000');
+    warn.mockRestore();
   });
 });

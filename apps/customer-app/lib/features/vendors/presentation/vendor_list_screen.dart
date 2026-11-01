@@ -72,6 +72,8 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
       // contract is preserved end-to-end into this key.
       latitude: ref.watch(homeActiveAddressProvider).valueOrNull?.latitude,
       longitude: ref.watch(homeActiveAddressProvider).valueOrNull?.longitude,
+      deliveryZoneId:
+          ref.watch(homeActiveAddressProvider).valueOrNull?.deliveryZoneId,
       subcategoryId: _selectedSubcategoryId,
       openNow: _filters.openNow,
       hasOffers: _filters.hasOffers,
@@ -113,7 +115,8 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
                     final result = await showModalBottomSheet<VendorFilters>(
                       context: context,
                       isScrollControlled: true,
-                      builder: (_) => VendorFilterSheet(initialFilters: _filters),
+                      builder: (_) =>
+                          VendorFilterSheet(initialFilters: _filters),
                     );
                     // A null result means Cancel/dismiss — the previous active
                     // filter state is left completely untouched.

@@ -28,7 +28,12 @@ class ApiClient {
       required this.tokenStorage,
       this.onSessionExpired}) {
     _dio = Dio(BaseOptions(
-        baseUrl: baseUrl, connectTimeout: const Duration(seconds: 10)));
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        // Dio's receive timeout is IDLE time between pieces of the response, not the total duration. Without one, a connection that
+        // opens and then stalls (a slow or filtered route from abroad, a half-dead mobile link) leaves a screen on its loading
+        // spinner forever with no error and no retry; with it the failure surfaces as the normal NETWORK_ERROR + "Retry".
+        receiveTimeout: const Duration(seconds: 30)));
 
     _dio.interceptors.add(
       InterceptorsWrapper(

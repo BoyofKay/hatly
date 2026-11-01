@@ -1,7 +1,9 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
 import '../domain/order_summary.dart';
 import '../domain/order_details.dart';
 import '../domain/order_tracking.dart';
+import '../domain/item_unavailability.dart';
 import '../../checkout/data/checkout_api.dart';
 
 /// Calls the real `/orders` endpoints implemented in this same phase
@@ -35,6 +37,30 @@ class OrdersApi {
     return _client.request(
       (dio) => dio.get('/orders/$orderId'),
       (data) => OrderDetails.fromJson(data['data'] as Map<String, dynamic>),
+    );
+  }
+
+  /// `GET /orders/:id/item-unavailability` — the open question about unavailable items, or null when there is none (an older server answers 404).
+  Future<ItemUnavailability?> getItemUnavailability(String orderId) async {
+    try {
+      return await _client.request(
+        (dio) => dio.get('/orders/$orderId/item-unavailability'),
+        (data) {
+          final raw = data['data'];
+          return raw is Map<String, dynamic> ? ItemUnavailability.fromJson(raw) : null;
+        },
+      );
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
+  }
+
+  /// The customer's one answer: `CONTINUE_WITHOUT` or `CANCEL_ORDER`. The server records it; a cancel request is carried out by Hatly staff.
+  Future<void> respondToItemUnavailability(String orderId, String exceptionId, String decision) {
+    return _client.request<void>(
+      (dio) => dio.post('/orders/$orderId/item-unavailability/$exceptionId/respond', data: {'decision': decision}),
+      (data) {},
     );
   }
 

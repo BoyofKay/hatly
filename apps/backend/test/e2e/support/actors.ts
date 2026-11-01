@@ -12,6 +12,7 @@ import { Role } from '../../../src/common/enums/role.enum';
 import { Permission } from '../../../src/modules/permissions/permission.enum';
 import { User } from '../../../src/modules/users/entities/user.entity';
 import { World } from './world';
+import { boundary } from './external-boundary';
 
 export const PNG_1X1_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
 
@@ -115,11 +116,19 @@ export class Scenario {
 
   // ---------- customers ----------
 
-  /** Customer registered through the real password-registration endpoint (no OTP needed). */
+  /**
+   * Customer registered through the real registration endpoints, exactly as the app does: while CUSTOMER_OTP_ENABLED is on, a
+   * code is requested first (the faked Unifonic edge captures the SMS) and sent with the registration; with OTP off the
+   * request-code route answers 400 and the registration goes ahead with the password alone.
+   */
   async customer(fullName = 'E2E Customer'): Promise<Actor> {
     const phone = nextPhone();
+    const requested = await this.world.api('post', '/auth/customer/register/request-code', { body: { phone } });
+    const code = requested.status === 200 ? boundary.lastOtpFor(phone) : undefined;
     const tokens = expectData<{ accessToken: string; refreshToken: string }>(
-      await this.world.api('post', '/auth/customer/password/register', { body: { phone, fullName, password: DEFAULT_PASSWORD } }),
+      await this.world.api('post', '/auth/customer/password/register', {
+        body: { phone, fullName, password: DEFAULT_PASSWORD, ...(code ? { code } : {}) },
+      }),
     );
     return {
       id: decodeJwt(tokens.accessToken).sub,
@@ -130,6 +139,19 @@ export class Scenario {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     };
+  }
+
+  /**
+   * A customer whose phone is NOT verified — what registering while CUSTOMER_OTP_ENABLED is off produces (no SMS, no proof). The
+   * setting is switched off for the registration only and left ON afterwards (the suite default).
+   */
+  async unverifiedCustomer(fullName = 'E2E Unverified Customer'): Promise<Actor> {
+    await this.setConfig('CUSTOMER_OTP_ENABLED', false);
+    try {
+      return await this.customer(fullName);
+    } finally {
+      await this.setConfig('CUSTOMER_OTP_ENABLED', true);
+    }
   }
 
   // ---------- business configuration & geography (over HTTP as SUPER_ADMIN) ----------
@@ -243,11 +265,18 @@ export class Scenario {
   }
 
   /** Creates an active marketplace sector and assigns the branch to it (needed for marketplace listing). */
-  async sector(name = 'Restaurants'): Promise<{ id: string }> {
+  async sector(name = 'Restaurants', extra: Record<string, unknown> = {}): Promise<{ id: string }> {
     const superAdmin = await this.superAdmin();
     const slug = `sector-${nextPhone().slice(-6)}-${Math.floor(Math.random() * 1e6)}`;
-    const sector = expectData(await this.world.api('post', '/admin/sectors', { token: superAdmin.accessToken, body: { name, slug } }), 201);
+    const sector = expectData(await this.world.api('post', '/admin/sectors', { token: superAdmin.accessToken, body: { name, slug, ...extra } }), 201);
     return { id: sector.id };
+  }
+
+  /** Puts the vendor's branch in a sector whose admin setting allows customer custom requests ("لا تجد ما تبحث عنه؟"). */
+  async allowCustomRequests(vendor: VendorFixture): Promise<{ id: string }> {
+    const sector = await this.sector('Pharmacy', { customRequestsEnabled: true });
+    await this.assignSector(vendor, sector.id);
+    return sector;
   }
 
   async assignSector(vendor: VendorFixture, sectorId: string): Promise<void> {

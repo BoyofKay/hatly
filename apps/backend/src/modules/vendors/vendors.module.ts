@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { UploadsModule } from '../uploads/uploads.module';
 import { Vendor } from './entities/vendor.entity';
 import { VendorBranch } from './entities/vendor-branch.entity';
 import { VendorStaff } from './entities/vendor-staff.entity';
@@ -21,7 +22,7 @@ import { VendorBranchesController } from './vendor-branches.controller';
  * admin-vendors.service.ts.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Vendor, VendorBranch, VendorStaff, ServiceArea])],
+  imports: [TypeOrmModule.forFeature([Vendor, VendorBranch, VendorStaff, ServiceArea]), UploadsModule],
   controllers: [
     AdminVendorStaffController,
     AdminVendorsController,
@@ -29,6 +30,6 @@ import { VendorBranchesController } from './vendor-branches.controller';
     VendorBranchesController,
   ],
   providers: [VendorStaffService, VendorStaffAuthorizationService, AdminVendorsService],
-  exports: [TypeOrmModule, VendorStaffAuthorizationService],
+  exports: [TypeOrmModule, VendorStaffAuthorizationService, VendorStaffService],
 })
 export class VendorsModule {}

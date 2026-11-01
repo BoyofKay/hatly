@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hatly_customer/core/network/api_client.dart';
+import 'package:hatly_customer/core/network/api_exception.dart';
 import 'package:hatly_customer/core/storage/token_storage.dart';
 
 /// Overrides only the persistence methods `ApiClient` actually calls — never touches the real
@@ -75,6 +76,17 @@ class FakeAdapter implements HttpClientAdapter {
           headers: {Headers.contentTypeHeader: [Headers.jsonContentType]});
     }
     return ResponseBody.fromString('{"error":{"code":"UNAUTHORIZED"}}', 401);
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+/// A server that accepts the connection and then never answers — what Dio reports as a receive timeout.
+class _StalledAdapter implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(RequestOptions options, Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async {
+    throw DioException.receiveTimeout(timeout: options.receiveTimeout ?? const Duration(seconds: 30), requestOptions: options);
   }
 
   @override
@@ -154,6 +166,25 @@ void main() {
       // means an auth-endpoint 401 is never itself used to trigger ANOTHER refresh attempt.
       expect(response.statusCode, 200);
       expect(adapter.refreshCalls, hasLength(1)); // this call itself, not a second nested refresh
+    });
+  });
+
+  group('timeouts: a stalled connection must end in an error the screen can retry, never an endless spinner', () {
+    test('the client has BOTH a connect and an idle-receive timeout', () {
+      expect(client.dio.options.connectTimeout, const Duration(seconds: 10));
+      expect(client.dio.options.receiveTimeout, const Duration(seconds: 30));
+    });
+
+    test('a receive timeout surfaces as the app\'s NETWORK_ERROR (which every screen already offers to retry)', () async {
+      client.dio.httpClientAdapter = _StalledAdapter();
+      Object? caught;
+      try {
+        await client.request((dio) => dio.get('/sectors'), (data) => data);
+      } catch (e) {
+        caught = e;
+      }
+      expect(caught, isA<ApiException>());
+      expect((caught as ApiException).code, 'NETWORK_ERROR');
     });
   });
 }

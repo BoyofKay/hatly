@@ -21,8 +21,8 @@ test.describe('Admin Settlement — vendor branch close', () => {
     await page.goto('/settlement');
     await page.getByRole('combobox').first().selectOption(VENDOR_A_BRANCH_ID);
 
-    page.once('dialog', (dialog) => dialog.dismiss());
     await page.getByRole('button', { name: 'Close Period' }).first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
 
     // The handler's confirm-check is synchronous and runs before any network call — no wait needed
     // beyond the click itself having been dispatched and processed.
@@ -36,10 +36,10 @@ test.describe('Admin Settlement — vendor branch close', () => {
     await page.goto('/settlement');
     await page.getByRole('combobox').first().selectOption(VENDOR_A_BRANCH_ID);
 
-    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Close Period' }).first().click();
     const [response] = await Promise.all([
       page.waitForResponse((res) => res.url().includes('/admin/settlement/vendor-branches/') && res.url().endsWith('/close')),
-      page.getByRole('button', { name: 'Close Period' }).first().click(),
+      page.getByRole('dialog').getByRole('button', { name: 'Close Period' }).click(),
     ]);
 
     // Whatever the backend answered (200 with a real period, or a 400 "no new activity"/config-not-set

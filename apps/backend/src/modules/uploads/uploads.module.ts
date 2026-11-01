@@ -36,6 +36,6 @@ import { buildS3UploadProvider } from './providers/s3-upload.settings';
         config.get<string>('storage.driver') === 's3' ? buildS3UploadProvider(config) : local,
     },
   ],
-  exports: [UploadsService],
+  exports: [UploadsService, UPLOAD_PROVIDER],
 })
 export class UploadsModule {}

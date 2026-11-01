@@ -20,7 +20,8 @@ void main() {
     return result;
   }
 
-  testWidgets('SMS_PROVIDER_UNAVAILABLE gets its own specific message, not the generic fallback',
+  testWidgets(
+      'SMS_PROVIDER_UNAVAILABLE gets its own specific message, not the generic fallback',
       (tester) async {
     final smsMessage = await messageFor(tester, 'SMS_PROVIDER_UNAVAILABLE');
     final genericMessage = await messageFor(tester, 'SOME_UNMAPPED_CODE');
@@ -36,12 +37,71 @@ void main() {
     final sms = await messageFor(tester, 'SMS_PROVIDER_UNAVAILABLE');
 
     final messages = {network, badRequest, unauthorized, tooMany, sms};
-    expect(messages.length, 5, reason: 'each known code must map to its own distinct string');
+    expect(messages.length, 5,
+        reason: 'each known code must map to its own distinct string');
   });
 
-  testWidgets('an unrecognized or null code falls back to the generic message', (tester) async {
-    final unmapped = await messageFor(tester, 'SOMETHING_NEW_THE_APP_DOES_NOT_KNOW');
+  testWidgets('an unrecognized or null code falls back to the generic message',
+      (tester) async {
+    final unmapped =
+        await messageFor(tester, 'SOMETHING_NEW_THE_APP_DOES_NOT_KNOW');
     final nullCode = await messageFor(tester, null);
     expect(unmapped, equals(nullCode));
+  });
+
+  testWidgets(
+      'CUSTOMER_OTP_DISABLED (verification switched off by the Admin) gets its own specific message',
+      (tester) async {
+    final disabled = await messageFor(tester, 'CUSTOMER_OTP_DISABLED');
+    final generic = await messageFor(tester, 'SOME_UNMAPPED_CODE');
+    expect(disabled, isNot(equals(generic)));
+    expect(disabled, contains('التحقق من الهاتف'));
+  });
+
+  group('sign-in / registration form errors (localizedPasswordAuthError)', () {
+    Future<String> formMessage(WidgetTester tester, String? code,
+        {required bool registering}) async {
+      late String result;
+      await tester.pumpWidget(hatlyTestApp(Builder(builder: (context) {
+        result =
+            localizedPasswordAuthError(context, code, registering: registering);
+        return const SizedBox.shrink();
+      })));
+      return result;
+    }
+
+    testWidgets(
+        'UNAUTHORIZED means "wrong credentials" when signing in but "registration refused" when registering — never "wrong OTP"',
+        (tester) async {
+      final login =
+          await formMessage(tester, 'UNAUTHORIZED', registering: false);
+      final register =
+          await formMessage(tester, 'UNAUTHORIZED', registering: true);
+      final otp = await messageFor(tester, 'UNAUTHORIZED');
+      expect({login, register, otp}.length, 3);
+      expect(login, 'رقم الهاتف أو كلمة المرور غير صحيحة');
+      expect(register, contains('تعذر إكمال التسجيل'));
+    });
+
+    testWidgets(
+        'every known code has its own distinct message; unknown codes fall back to the generic one',
+        (tester) async {
+      final messages = <String>{};
+      for (final code in [
+        'NETWORK_ERROR',
+        'UNAUTHORIZED',
+        'TOO_MANY_FAILED_LOGINS',
+        'TOO_MANY_REQUESTS',
+        'BAD_REQUEST',
+      ]) {
+        messages.add(await formMessage(tester, code, registering: false));
+      }
+      expect(messages.length, 5);
+
+      final generic = await messageFor(tester, null);
+      expect(
+          await formMessage(tester, 'WHATEVER', registering: false), generic);
+      expect(await formMessage(tester, null, registering: true), generic);
+    });
   });
 }

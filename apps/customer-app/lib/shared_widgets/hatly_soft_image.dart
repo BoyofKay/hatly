@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../core/media/media_url.dart';
 import '../core/theme/hatly_theme.dart';
 
-/// Soft Image Container: radius 16 by default, a soft neutral fill while
-/// loading / when there is no image, and a quiet line icon — never a coloured
-/// icon card standing in for a photo. Theme-aware (light + dark).
+/// Soft Image Container: radius 16 by default. While loading / when there is no
+/// image it shows a warm, brand-tinted surface (a faint orange wash with the
+/// category glyph in a soft orange) instead of a cold grey box, so a catalogue
+/// without photos still reads as Hatly. Theme-aware (light + dark).
 class HatlySoftImage extends StatelessWidget {
   const HatlySoftImage({
     super.key,
@@ -39,10 +40,18 @@ class HatlySoftImage extends StatelessWidget {
     Widget placeholder() => Container(
           width: width,
           height: height,
-          color: p.surfaceSoft,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: AlignmentDirectional.topStart,
+              end: AlignmentDirectional.bottomEnd,
+              colors: Theme.of(context).brightness == Brightness.dark
+                  ? [p.accentSoft, p.surfaceSoft]
+                  : const [Color(0xFFFFF3E8), Color(0xFFFFE6D1)],
+            ),
+          ),
           alignment: Alignment.center,
           child: Icon(placeholderIcon,
-              color: p.textMuted.withValues(alpha: 0.7),
+              color: p.accent.withValues(alpha: 0.5),
               size: placeholderIconSize),
         );
 

@@ -21,6 +21,12 @@ export class AddressesController {
     return { data: this.addressesService.toView(address) };
   }
 
+  /** Which address methods the customer app may offer right now (GPS needs Maps + pricing configured; manual needs an active zone). */
+  @Get('capabilities')
+  async capabilities() {
+    return { data: await this.addressesService.capabilities() };
+  }
+
   @Get()
   async list(@CurrentUser() user: AuthenticatedUser) {
     const addresses = await this.addressesService.listForCustomer(user.id);

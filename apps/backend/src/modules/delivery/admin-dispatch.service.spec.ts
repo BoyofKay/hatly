@@ -11,7 +11,7 @@ function buildHarness(opts: {
   const ordersRepository = {
     findOne: jest.fn(async () => ({ id: 'order-1', status: opts.status ?? 'READY_FOR_PICKUP', fulfillmentType: opts.fulfillmentType ?? 'DELIVERY', segments: [] })),
   };
-  const deliveriesRepository = { findOne: jest.fn(), save: jest.fn() };
+  const deliveriesRepository = { findOne: jest.fn(), save: jest.fn(), update: jest.fn(async () => undefined) };
   const driverRankingService = {
     rankCandidates: jest.fn(async () => opts.rankedCandidateIds ?? []),
     isDriverEligibleForOrder: jest.fn(async (_order: any, driverId: string) =>

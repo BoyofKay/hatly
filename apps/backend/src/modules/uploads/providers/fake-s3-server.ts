@@ -58,6 +58,15 @@ export async function startFakeS3(bucket = 'hatly-test'): Promise<FakeS3> {
         return reply(200);
       }
 
+      if (req.method === 'DELETE') {
+        const amzDate = String(req.headers['x-amz-date'] ?? '');
+        const iso = `${amzDate.slice(0, 4)}-${amzDate.slice(4, 6)}-${amzDate.slice(6, 8)}T${amzDate.slice(9, 11)}:${amzDate.slice(11, 13)}:${amzDate.slice(13, 15)}Z`;
+        const expected = signRequestHeaders({ method: 'DELETE', host: String(req.headers.host), rawPathSegments: segments, payload: Buffer.alloc(0), credentials: FAKE_S3_CREDENTIALS, now: new Date(iso) });
+        if (req.headers.authorization !== expected.authorization) return reply(403, Buffer.from('SignatureDoesNotMatch'));
+        state.objects.delete(objectKey);
+        return reply(204);
+      }
+
       if (req.method === 'GET') {
         const q = url.searchParams;
         const amzDate = q.get('X-Amz-Date') ?? '';

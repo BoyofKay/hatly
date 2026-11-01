@@ -1,6 +1,12 @@
-import { IsBoolean, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { IsBoolean, IsEnum, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { AddressMode } from '../address-mode';
 
 export class UpdateAddressDto {
+  /** An explicit method SWITCH (or the first mode of a legacy address): the fields of the other method are cleared. */
+  @IsOptional()
+  @IsEnum(AddressMode)
+  mode?: AddressMode;
+
   @IsOptional()
   @IsString()
   @MaxLength(100)

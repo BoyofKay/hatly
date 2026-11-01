@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../shared_widgets/hatly_surface.dart';
+import '../../hatly_service/presentation/widgets/route_summary.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/localization/l10n/app_localizations.dart';
@@ -182,6 +184,20 @@ class _Content extends ConsumerWidget {
         ],
         CheckoutAddressSection(quote: quote, onPickAddress: onPickAddress),
         const SizedBox(height: HatlySpacing.lg),
+        // Hatly / Wasally: the route exactly as the server resolved it, before the customer confirms (PD-012).
+        if (quote.delivery?.route != null) ...[
+          HatlySection(
+            title: l10n.routeSectionTitle,
+            child: HatlySurface(
+              child: RouteSummary(
+                key: const Key('checkout-route'),
+                origin: quote.delivery!.route!.origin,
+                destination: quote.delivery!.route!.destination,
+              ),
+            ),
+          ),
+          const SizedBox(height: HatlySpacing.lg),
+        ],
         CheckoutDeliverySection(quote: quote),
         if (quote.delivery != null) const SizedBox(height: HatlySpacing.lg),
         if (quote.payment != null) ...[
@@ -213,7 +229,7 @@ class _Content extends ConsumerWidget {
         ),
         const SizedBox(height: HatlySpacing.lg),
         CheckoutItemsSummary(cart: cartItems),
-        CheckoutTotals(quote: quote),
+        CheckoutTotals(quote: quote, deliveryOnly: cartItems.isDeliveryOnly),
         for (final message in blockerMessages) ...[
           const SizedBox(height: HatlySpacing.sm),
           _Banner(
@@ -306,6 +322,11 @@ class _StickyBar extends ConsumerWidget {
           'DELIVERY_ZONE_UNAVAILABLE' => l10n.checkoutAddressZoneUnavailable,
           _ => l10n.checkoutAddressOutOfServiceArea,
         };
+      } else if (quote.hasBlocker('ELECTRONIC_PAYMENT_METHOD_NOT_AVAILABLE')) {
+        hint = l10n.checkoutElectronicMethodUnavailable;
+      } else if (quote.blockers.isNotEmpty) {
+        // Never a silently disabled button: whatever the server refused, say that the order cannot be confirmed yet.
+        hint = l10n.checkoutCannotConfirmYet;
       }
     }
 

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { loadSegmentHistoryForSegments, SegmentHistoryEntry } from './order-segment-history';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { OrderVendorSegment } from './entities/order-vendor-segment.entity';
@@ -60,17 +61,31 @@ export interface VendorOrderSegmentView {
   status: string;
   subtotalMinor: number | null;
   expectedReadyAt: Date | null;
+  /** When the segment was created — the basis of "waiting for acceptance for N minutes". */
+  createdAt: Date;
+  /** Oldest first. `onBehalfOfVendor` marks what Hatly operations did for this branch. */
+  history: SegmentHistoryEntry[];
   items: VendorOrderItemView[];
+  /** Items taken off this order because they were unavailable (PD-016). Kept apart so existing clients never see them as live items. */
+  removedItems: Array<{ id: string; productNameSnapshot: string | null; quantity: number; removedAt: Date }>;
 }
 
 export interface VendorOrderView {
   id: string;
+  /** The customer-facing order number (HT-…), the one the customer quotes — already shown to vendors in their order history. */
+  orderNumber: string;
   status: string; // order-level status — read-only info for the vendor, never written here
   fulfillmentType: string;
   orderNote: string | null;
   paymentMethod: string;
   segments: VendorOrderSegmentView[];
 }
+
+/**
+ * Upper bound on one vendor order list (newest first). The list used to load EVERY segment the vendor's branches ever had, with
+ * their order and items, on each dashboard view — a cost that grows forever with a busy branch. Older orders stay reachable by id.
+ */
+export const VENDOR_ORDERS_LIST_MAX_SEGMENTS = 500;
 
 @Injectable()
 export class VendorOrdersService {
@@ -90,9 +105,10 @@ export class VendorOrdersService {
       where: ownedBranchIds.map((vendorBranchId) => ({ vendorBranchId })),
       relations: { order: true, items: true },
       order: { createdAt: 'DESC' },
+      take: VENDOR_ORDERS_LIST_MAX_SEGMENTS,
     });
 
-    return this.groupSegmentsByOrder(segments);
+    return this.groupSegmentsByOrder(segments, await this.historyFor(segments));
   }
 
   async getForUser(userId: string, orderId: string): Promise<VendorOrderView> {
@@ -113,10 +129,14 @@ export class VendorOrdersService {
       throw new NotFoundException('Order not found.');
     }
 
-    return this.groupSegmentsByOrder(segments)[0];
+    return this.groupSegmentsByOrder(segments, await this.historyFor(segments))[0];
   }
 
-  private groupSegmentsByOrder(segments: OrderVendorSegment[]): VendorOrderView[] {
+  private historyFor(segments: OrderVendorSegment[]) {
+    return loadSegmentHistoryForSegments((sql, params) => this.segmentsRepository.query(sql, params), segments.map((s) => s.id), 'ROLE');
+  }
+
+  private groupSegmentsByOrder(segments: OrderVendorSegment[], history: Map<string, SegmentHistoryEntry[]>): VendorOrderView[] {
     const byOrderId = new Map<string, VendorOrderView>();
 
     for (const segment of segments) {
@@ -124,6 +144,7 @@ export class VendorOrdersService {
       if (!view) {
         view = {
           id: segment.order.id,
+          orderNumber: segment.order.orderNumber,
           status: segment.order.status,
           fulfillmentType: segment.order.fulfillmentType,
           orderNote: segment.order.orderNote ?? null,
@@ -141,7 +162,10 @@ export class VendorOrdersService {
         status: segment.status,
         subtotalMinor: segment.subtotalMinor ?? null,
         expectedReadyAt: segment.expectedReadyAt ?? null,
-        items: (segment.items ?? []).map((item) => ({
+        createdAt: (segment as unknown as { createdAt: Date }).createdAt,
+        history: history.get(segment.id) ?? [],
+        removedItems: (segment.items ?? []).filter((item) => item.removedAt).map((item) => ({ id: item.id, productNameSnapshot: item.productNameSnapshot ?? null, quantity: item.quantity, removedAt: item.removedAt! })),
+        items: (segment.items ?? []).filter((item) => !item.removedAt).map((item) => ({
           id: item.id,
           productId: item.productId ?? null,
           productNameSnapshot: item.productNameSnapshot ?? null,

@@ -3,6 +3,7 @@ import { OrderItem } from './entities/order-item.entity';
 import { Product } from '../products/entities/product.entity';
 import { InventoryMode } from '../products/inventory-mode.enum';
 import { PricingUnit } from '../products/pricing-unit.enum';
+import { setStockContext } from './stock-context';
 
 /**
  * Gives TRACKED catalog stock back for the items of the given order-vendor segments — the exact
@@ -24,10 +25,15 @@ export async function restoreTrackedInventoryForSegments(manager: EntityManager,
 
   for (const item of items) {
     if (!item.productId) continue; // Custom item — never touches inventory.
+    // An item taken off the order as unavailable (PD-016) never gives stock back: the product is not there, and catalogue stock is only
+    // changed by the vendor/admin as a separate, explicit action.
+    if (item.removedAt) continue;
 
     const requestedAmount = item.pricingUnitSnapshot === PricingUnit.WEIGHT ? item.requestedWeightGrams ?? 0 : item.quantity;
     if (requestedAmount <= 0) continue;
 
+    const [seg] = await manager.query(`SELECT order_id FROM order_vendor_segments WHERE id = $1`, [item.orderVendorSegmentId]);
+    await setStockContext(manager, { reason: 'ORDER_CANCELLED', referenceType: 'ORDER', referenceId: seg?.order_id });
     await manager
       .createQueryBuilder()
       .update(Product)

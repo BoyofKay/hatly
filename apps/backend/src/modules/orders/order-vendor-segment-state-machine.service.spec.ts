@@ -17,9 +17,12 @@ function buildHarness(
   siblingSegments: any[] = [{ id: 'segment-2', orderId: 'order-1', status: OrderVendorSegmentStatus.PENDING }],
 ) {
   const stored = { ...segment };
+  const events: any[] = [];
   // Stock-restoration writes (Group 8): one entry per `UPDATE products SET quantity = quantity + amount`.
   const restoredStock: Array<{ productId: string; amount: number }> = [];
   const manager = {
+    // The order id of a segment and the stock-ledger context (a no-op for this fake store).
+    query: async (sql: string) => (sql.includes('order_vendor_segments') ? [{ order_id: stored.orderId }] : [{ set_config: '' }]),
     findOne: async (EntityClass: any, _opts: any) => (EntityClass === Order ? { id: stored.orderId, status: orderStatus } : { ...stored }),
     createQueryBuilder: (EntityClass?: any) => {
       if (EntityClass === OrderItem) {
@@ -66,6 +69,9 @@ function buildHarness(
     // "this segment has no custom items" assumption.
     find: async (EntityClass: any, _opts: any) =>
       EntityClass === OrderVendorSegment ? [{ ...stored }, ...siblingSegments] : items,
+    // Segment history (one row per transition, same transaction) and the savepoint the customer notification writes in.
+    getRepository: () => ({ insert: async (row: any) => void events.push(row) }),
+    transaction: async (cb: any) => cb({ query: async () => [] }),
   };
   const dataSource = { transaction: async (cb: any) => cb(manager) };
   const vendorStaffAuthorizationService = {
@@ -79,7 +85,7 @@ function buildHarness(
   // OrderReadinessService's or AutomaticDispatchService's, which each
   // have their own dedicated spec files.
   const orderReadinessService = { checkAndAdvance: jest.fn(async () => false) };
-  const automaticDispatchService = { attemptAutomaticDispatch: jest.fn(async () => undefined) };
+  const automaticDispatchService = { attemptAutomaticDispatch: jest.fn(async () => undefined), recordAssignmentError: jest.fn(async () => undefined) };
   // The financial consequences of a cancellation have their own dedicated specs (order-segment-cancellation.service.spec.ts,
   // order-state-machine.service.spec.ts) — this file only checks that THIS service routes to them correctly.
   const orderSegmentCancellationService = { applyPartialCancellation: jest.fn(async () => ({})) };
@@ -105,6 +111,7 @@ function buildHarness(
     orderStateMachine,
     afterCommit,
     gate,
+    events,
   };
 }
 
@@ -177,7 +184,7 @@ describe('OrderVendorSegmentStateMachineService', () => {
 
     const result = await service.transition({
       segmentId: 'segment-1',
-      to: OrderVendorSegmentStatus.CANCELLED,
+      to: OrderVendorSegmentStatus.CANCELLED, reason: 'Out of stock',
       actorUserId: 'user-1',
       actorRole: Role.VENDOR_MANAGER,
     });
@@ -407,7 +414,7 @@ describe('OrderVendorSegmentStateMachineService — stock restoration on segment
   const weightItem = { id: 'i2', productId: 'prod-2', quantity: 1, pricingUnitSnapshot: 'WEIGHT', requestedWeightGrams: 750 };
   const customItem = { id: 'i3', productId: null, quantity: 1, pricingUnitSnapshot: null, requestedWeightGrams: null };
   const cancel = (h: ReturnType<typeof buildHarness>) =>
-    h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CANCELLED, actorUserId: 'u1', actorRole: Role.VENDOR });
+    h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CANCELLED, reason: 'Out of stock', actorUserId: 'u1', actorRole: Role.VENDOR });
 
   it('gives back the units (PIECE) and grams (WEIGHT) of the cancelled segment, and nothing for a custom item', async () => {
     const h = buildHarness(baseSegment, ['branch-1'], [pieceItem, weightItem, customItem]);
@@ -441,7 +448,7 @@ describe('OrderVendorSegmentStateMachineService — stock restoration on segment
 
 describe('OrderVendorSegmentStateMachineService — financial routing of a segment cancellation (PD-002)', () => {
   const cancel = (h: ReturnType<typeof buildHarness>, role: Role = Role.VENDOR) =>
-    h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CANCELLED, actorUserId: 'u1', actorRole: role });
+    h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CANCELLED, reason: 'Out of stock', actorUserId: 'u1', actorRole: role });
 
   it('other vendors still active → partial cancellation: totals/refund handled, the ORDER is not cancelled', async () => {
     const h = buildHarness(baseSegment, ['branch-1']);
@@ -495,7 +502,7 @@ describe('OrderVendorSegmentStateMachineService — financial routing of a segme
 
 describe('OrderVendorSegmentStateMachineService — payment gating (PD-006)', () => {
   const move = (h: ReturnType<typeof buildHarness>, to: OrderVendorSegmentStatus) =>
-    h.service.transition({ segmentId: 'segment-1', to, actorUserId: 'u1', actorRole: Role.VENDOR });
+    h.service.transition({ segmentId: 'segment-1', to, actorUserId: 'u1', actorRole: Role.VENDOR, reason: to === OrderVendorSegmentStatus.CANCELLED ? 'Closed today' : undefined });
 
   it('starting PREPARING asks the gate about the PARENT order; a refusal aborts and the segment keeps its status', async () => {
     const h = buildHarness({ ...baseSegment, status: OrderVendorSegmentStatus.CONFIRMED }, ['branch-1']);
@@ -518,5 +525,83 @@ describe('OrderVendorSegmentStateMachineService — payment gating (PD-006)', ()
     const c = buildHarness(baseSegment, ['branch-1']);
     await move(c, OrderVendorSegmentStatus.CANCELLED);
     expect(c.gate.assertFulfilmentMayProceed).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrderVendorSegmentStateMachineService — operations on behalf of the vendor, history, reasons, system transitions', () => {
+  const run = (h: ReturnType<typeof buildHarness>, over: any) =>
+    h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CONFIRMED, actorUserId: 'ops-1', actorRole: Role.ADMIN, ...over });
+
+  it('every transition writes ONE history row (same transaction) with from/to, actor and role; a vendor is not "on behalf"', async () => {
+    const h = buildHarness(baseSegment, ['branch-1']);
+    await h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CONFIRMED, actorUserId: 'u1', actorRole: Role.VENDOR });
+    expect(h.events).toEqual([
+      expect.objectContaining({ segmentId: 'segment-1', orderId: 'order-1', fromStatus: 'PENDING', toStatus: 'CONFIRMED', actorUserId: 'u1', actorRole: 'VENDOR', onBehalfOfVendor: false, reason: null }),
+    ]);
+  });
+
+  it('Hatly operations (ADMIN / SUPER_ADMIN) may move ANY branch\'s segment without owning it — recorded as on behalf of the vendor', async () => {
+    for (const role of [Role.ADMIN, Role.SUPER_ADMIN]) {
+      const h = buildHarness(baseSegment, []); // owns no branch at all
+      await run(h, { actorRole: role });
+      
+      expect(h.events[0]).toMatchObject({ actorRole: role, actorUserId: 'ops-1', onBehalfOfVendor: true, toStatus: 'CONFIRMED' });
+    }
+  });
+
+  it('a vendor still cannot touch another branch\'s segment, and a customer/driver role is refused by the table', async () => {
+    const h = buildHarness(baseSegment, ['other-branch']);
+    await expect(h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CONFIRMED, actorUserId: 'u1', actorRole: Role.VENDOR })).rejects.toThrow(ForbiddenException);
+    const d = buildHarness(baseSegment, ['branch-1']);
+    await expect(d.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CONFIRMED, actorUserId: 'u1', actorRole: Role.DRIVER })).rejects.toThrow(/not allowed/);
+    expect(d.events).toEqual([]);
+  });
+
+  it('a Hatly/Wasally service segment (no branch) is refused to a vendor but may be moved by operations or by the platform itself', async () => {
+    const adHoc = { id: 'segment-1', orderId: 'order-1', vendorBranchId: null, groupType: 'AD_HOC_SERVICE', status: OrderVendorSegmentStatus.PENDING };
+    const v = buildHarness(adHoc, ['branch-1']);
+    await expect(v.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CONFIRMED, actorUserId: 'u1', actorRole: Role.VENDOR })).rejects.toThrow(ForbiddenException);
+    const ops = buildHarness(adHoc, []);
+    await run(ops, {});
+    expect(ops.stored.status).toBe('CONFIRMED');
+    const sys = buildHarness(adHoc, []);
+    await sys.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CONFIRMED, actorUserId: null, actorRole: Role.ADMIN, system: true });
+    expect(sys.events[0]).toMatchObject({ actorUserId: null, actorRole: null, onBehalfOfVendor: false, toStatus: 'CONFIRMED' });
+  });
+
+  it('a service segment can reach READY_FOR_PICKUP even though it carries an unpriced item (the driver\'s purchase record prices it)', async () => {
+    const adHoc = { id: 'segment-1', orderId: 'order-1', vendorBranchId: null, groupType: 'AD_HOC_SERVICE', status: OrderVendorSegmentStatus.PREPARING };
+    const h = buildHarness(adHoc, [], [{ productId: null, actualAmountMinor: null }]);
+    await h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.READY_FOR_PICKUP, actorUserId: null, actorRole: Role.ADMIN, system: true });
+    expect(h.stored.status).toBe('READY_FOR_PICKUP');
+  });
+
+  it('a rejection by a person REQUIRES a reason (blank refused, nothing changes, no history); it is stored with the event', async () => {
+    const h = buildHarness(baseSegment, ['branch-1']);
+    for (const reason of [undefined, '', '   ']) {
+      await expect(h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CANCELLED, actorUserId: 'u1', actorRole: Role.VENDOR, reason })).rejects.toMatchObject({
+        response: { details: { code: 'REJECTION_REASON_REQUIRED' } },
+      });
+    }
+    expect(h.events).toEqual([]);
+    expect(h.stored.status).toBe('PENDING');
+    await h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.CANCELLED, actorUserId: 'u1', actorRole: Role.VENDOR, reason: '  Out of stock  ' });
+    expect(h.events[0]).toMatchObject({ toStatus: 'CANCELLED', reason: 'Out of stock' });
+  });
+
+  it('a dispatch failure AFTER the commit never fails the successful transition: it is recorded as an assignment error for operations', async () => {
+    const h = buildHarness({ ...baseSegment, status: OrderVendorSegmentStatus.PREPARING }, ['branch-1']);
+    h.orderReadinessService.checkAndAdvance.mockResolvedValueOnce(true as never);
+    h.automaticDispatchService.attemptAutomaticDispatch.mockRejectedValueOnce(new Error('redis down') as never);
+    const result = await h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.READY_FOR_PICKUP, actorUserId: 'u1', actorRole: Role.VENDOR });
+    expect(result.status).toBe('READY_FOR_PICKUP');
+    expect(h.automaticDispatchService.recordAssignmentError).toHaveBeenCalledWith('order-1', expect.any(Error));
+  });
+
+  it('a readiness failure after the commit is handled the same way', async () => {
+    const h = buildHarness({ ...baseSegment, status: OrderVendorSegmentStatus.PREPARING }, ['branch-1']);
+    h.orderReadinessService.checkAndAdvance.mockRejectedValueOnce(new Error('boom') as never);
+    await expect(h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.READY_FOR_PICKUP, actorUserId: 'u1', actorRole: Role.VENDOR })).resolves.toBeDefined();
+    expect(h.automaticDispatchService.recordAssignmentError).toHaveBeenCalledTimes(1);
   });
 });

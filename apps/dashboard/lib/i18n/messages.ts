@@ -3,7 +3,10 @@
  * the default; Arabic (RTL) is selectable with the language toggle. `ar` is typed against `en`'s keys, so a string added to one
  * language and forgotten in the other fails the TypeScript build.
  */
+import { opAr, opEn } from './operations-messages';
+
 export const en = {
+  ...opEn,
   // ---- shared
   langToggleLabel: 'Language',
   langEnglish: 'English',
@@ -90,6 +93,9 @@ export const en = {
   hsTo: 'To',
   hsPlaceLocation: '{name} ({lat}, {lng})',
   hsCustomerAddress: 'Customer address: {address}',
+  hsRouteDefault: 'default point',
+  hsRouteCustomer: "customer's choice",
+  hsRoutePoint: '{label} ({lat}, {lng}) — {source}',
   hsQuantity: 'Quantity',
   hsPricePending: 'Price not set yet',
   hsPriceConfirmed: 'Confirmed price',
@@ -250,6 +256,7 @@ export const en = {
 export type MessageKey = keyof typeof en;
 
 export const ar: Record<MessageKey, string> = {
+  ...opAr,
   langToggleLabel: 'اللغة',
   langEnglish: 'English',
   langArabic: 'العربية',
@@ -331,6 +338,9 @@ export const ar: Record<MessageKey, string> = {
   hsTo: 'إلى',
   hsPlaceLocation: '{name} ({lat}, {lng})',
   hsCustomerAddress: 'عنوان العميل: {address}',
+  hsRouteDefault: 'نقطة افتراضية',
+  hsRouteCustomer: 'اختيار العميل',
+  hsRoutePoint: '{label} ({lat}, {lng}) — {source}',
   hsQuantity: 'الكمية',
   hsPricePending: 'السعر لم يتم تحديده',
   hsPriceConfirmed: 'السعر المؤكد',
@@ -357,7 +367,7 @@ export const ar: Record<MessageKey, string> = {
   errNetwork: 'تعذّر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى.',
   errUnknown: 'تعذّر تأكيد السعر. حاول مرة أخرى أو أعد تحميل الطلب.',
   // ---- control tower / dispatch (Control Tower milestone)
-  ctTitle: 'برج التحكم',
+  ctTitle: 'برج المراقبة',
   ctRefresh: 'تحديث',
   ctUpdatedAt: 'آخر تحديث {time}',
   ctLoadFailed: 'تعذّر تحميل لوحة التشغيل.',

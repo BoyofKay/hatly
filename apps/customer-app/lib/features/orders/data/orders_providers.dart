@@ -4,6 +4,8 @@ import 'orders_api.dart';
 import '../domain/order_summary.dart';
 import '../domain/order_details.dart';
 import '../domain/order_tracking.dart';
+import '../domain/item_unavailability.dart';
+import '../../notifications/data/notifications_providers.dart';
 
 final ordersApiProvider =
     Provider<OrdersApi>((ref) => OrdersApi(ref.watch(apiClientProvider)));
@@ -100,8 +102,19 @@ final orderTrackingProvider =
 void invalidateOrderCaches(void Function(ProviderOrFamily) invalidate,
     {String? orderId}) {
   invalidate(orderHistoryControllerProvider);
+  // Placing or cancelling an order is a notification event on the server: the bell must re-read.
+  invalidate(unreadNotificationsCountProvider);
   if (orderId != null) {
     invalidate(orderDetailsProvider(orderId));
     invalidate(orderTrackingProvider(orderId));
   }
 }
+
+/// The open "an item is unavailable" question of an order (PD-016), or null. Never blocks the rest of Order Details: a failure simply shows nothing.
+final itemUnavailabilityProvider = FutureProvider.autoDispose.family<ItemUnavailability?, String>((ref, orderId) async {
+  try {
+    return await ref.watch(ordersApiProvider).getItemUnavailability(orderId);
+  } catch (_) {
+    return null;
+  }
+});

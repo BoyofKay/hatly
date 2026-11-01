@@ -354,14 +354,17 @@ describe('E2E — cash remainder, failed delivery, wallet & loyalty, cancellatio
       await orderThrough(a, 'DELIVERED', 5); // 500 points
       await orderThrough(b, 'DELIVERED', 6); // 600 points
       expectData(await world.api('post', '/customer/loyalty/convert', { token: a.accessToken, body: { points: 500, idempotencyKey: 'shared-key' } }), 201);
+      // Security milestone: client keys are namespaced per customer in the ledgers, so the same key used by B is simply B's OWN
+      // conversion — never a "replay" of A's (no A data in the answer) and never blocked by A's row.
       const collide = await world.api('post', '/customer/loyalty/convert', { token: b.accessToken, body: { points: 500, idempotencyKey: 'shared-key' } });
-      // B must not be told "done" for a conversion that never happened for B, nor be shown A's numbers
-      expect(collide.status).toBe(409);
-      expect(collide.body.error.details).toEqual({ code: 'IDEMPOTENCY_KEY_IN_USE' });
-      expect(await walletBalance(b.id)).toBe(0);
-      expect(await pointsBalance(b.id)).toBe(600);
-      // and B can simply retry with a fresh key
-      expect((await world.api('post', '/customer/loyalty/convert', { token: b.accessToken, body: { points: 500, idempotencyKey: 'b-own-key' } })).status).toBe(201);
+      expect(collide.status).toBe(201);
+      expect(collide.body.data).toMatchObject({ convertedPoints: 500, walletCreditMinor: 500, pointsBalance: 100, walletBalance: 500 });
+      expect(await walletBalance(b.id)).toBe(500);
+      expect(await pointsBalance(b.id)).toBe(100);
+      expect(await walletBalance(a.id)).toBe(500); // A untouched by B's request
+      expect(await pointsBalance(a.id)).toBe(0);
+      // and B's retry of the same key is B's replay: no second conversion
+      expectData(await world.api('post', '/customer/loyalty/convert', { token: b.accessToken, body: { points: 500, idempotencyKey: 'shared-key' } }), 201);
       expect(await walletBalance(b.id)).toBe(500);
     });
 

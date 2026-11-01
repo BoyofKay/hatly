@@ -10,7 +10,7 @@ import 'package:hatly_customer/features/auth/presentation/screens/otp_verify_scr
 
 /// Real OtpFlowController state machine, with the network calls recorded
 /// instead of performed. The screen under test is wired to it exactly as in
-/// the app.
+/// the app. The screen is the code step of a registration (the phone is proven before the account exists).
 class _RecordingFlow extends OtpFlowController {
   _RecordingFlow(super.ref, OtpFlowState initial) {
     state = initial;
@@ -19,17 +19,17 @@ class _RecordingFlow extends OtpFlowController {
   final calls = <String>[];
 
   @override
-  Future<bool> verifyOtp(String code) async {
+  Future<bool> confirmPhoneVerification(String code) async {
     calls.add('verify:$code');
     return true;
   }
 
   @override
-  Future<void> resendOtp() async => calls.add('resend');
+  Future<void> resendVerification() async => calls.add('resend');
 
   @override
-  void changePhoneNumber() {
-    calls.add('changePhone');
+  void skipVerification() {
+    calls.add('skip');
   }
 }
 
@@ -105,7 +105,10 @@ void main() {
     expect(find.text('أدخل رمز التحقق'), findsOneWidget);
     expect(find.textContaining('+2010•••••678'), findsOneWidget);
     expect(find.textContaining('+201012345678'), findsNothing);
-    expect(find.text('تغيير رقم الهاتف'), findsOneWidget);
+    expect(find.text('تغيير رقم الهاتف'),
+        findsOneWidget); // backing out cancels the registration
+    expect(find.text('ليس الآن'),
+        findsNothing); // there is no "continue unverified": no account exists yet
     expect(find.text('إعادة الإرسال خلال 42 ثانية'), findsOneWidget);
     expect(find.text('إعادة إرسال الرمز'), findsNothing);
     final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
@@ -159,7 +162,7 @@ void main() {
   });
 
   testWidgets(
-      'resend: while cooling down there is a timer and no button; at 0 the resend action appears and calls the existing resendOtp',
+      'resend: while cooling down there is a timer and no button; at 0 the resend action appears and calls resendVerification',
       (tester) async {
     await _pump(tester,
         state: const OtpFlowState(
@@ -172,21 +175,30 @@ void main() {
   });
 
   testWidgets(
-      '"change phone number" and the back button both reset the flow and go back (existing behaviour)',
+      '"Change phone number" and the back button both cancel the registration (no account exists to continue into)',
       (tester) async {
     await _pump(tester);
     await tester.tap(find.text('تغيير رقم الهاتف'));
-    await tester.pumpAndSettle();
-    expect(_flow.calls, ['changePhone']);
-    expect(find.text('phone-entry'), findsOneWidget);
+    await tester.pump();
+    expect(_flow.calls, ['skip']);
 
     await _pump(tester);
     await tester.tap(find.byType(BackButton));
-    await tester.pumpAndSettle();
-    expect(_flow.calls, ['changePhone']);
+    await tester.pump();
+    expect(_flow.calls, ['skip']);
   });
 
-  testWidgets('touch targets: resend/change actions are at least 44px tall',
+  testWidgets(
+      'the system back gesture also cancels instead of popping or trapping the customer',
+      (tester) async {
+    await _pump(tester);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(_flow.calls, ['skip']);
+    expect(find.byType(OtpVerifyScreen), findsOneWidget);
+  });
+
+  testWidgets('touch targets: resend/skip actions are at least 44px tall',
       (tester) async {
     await _pump(tester,
         state: const OtpFlowState(

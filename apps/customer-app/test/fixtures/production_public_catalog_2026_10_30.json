@@ -1,0 +1,128 @@
+{
+ "sectors": {
+  "data": [
+   {
+    "id": "750b7e56-5368-4caa-b243-5a933b47cd73",
+    "createdAt": "2026-10-30T13:58:05.137Z",
+    "updatedAt": "2026-10-30T13:58:05.137Z",
+    "deletedAt": null,
+    "name": "Restaurants & Meals",
+    "nameAr": "مطاعم ووجبات",
+    "slug": "restaurants",
+    "sortOrder": 0,
+    "isActive": true,
+    "imageUrl": "/uploads/files/marketplace/sectors/restaurants.webp",
+    "customRequestsEnabled": false
+   },
+   {
+    "id": "8f1033c4-18ec-4cc0-aa6e-264f39ffcc5e",
+    "createdAt": "2026-10-30T13:58:05.151Z",
+    "updatedAt": "2026-10-30T13:58:05.151Z",
+    "deletedAt": null,
+    "name": "Supermarkets & Groceries",
+    "nameAr": "سوبر ماركت وبقالة",
+    "slug": "groceries",
+    "sortOrder": 1,
+    "isActive": true,
+    "imageUrl": "/uploads/files/marketplace/sectors/groceries.webp",
+    "customRequestsEnabled": true
+   },
+   {
+    "id": "ed9adf3e-76bd-48c8-8d74-cc5c734dfc59",
+    "createdAt": "2026-10-30T13:58:05.156Z",
+    "updatedAt": "2026-10-30T13:58:05.156Z",
+    "deletedAt": null,
+    "name": "Fruits & Vegetables",
+    "nameAr": "خضار وفاكهة",
+    "slug": "produce",
+    "sortOrder": 2,
+    "isActive": true,
+    "imageUrl": "/uploads/files/marketplace/sectors/produce.webp",
+    "customRequestsEnabled": false
+   },
+   {
+    "id": "67ad0549-a7ee-4061-9bd0-f60f2e01e18e",
+    "createdAt": "2026-10-30T13:58:05.160Z",
+    "updatedAt": "2026-10-30T13:58:05.160Z",
+    "deletedAt": null,
+    "name": "Pharmacies & Personal Care",
+    "nameAr": "صيدليات وعناية شخصية",
+    "slug": "pharmacy",
+    "sortOrder": 3,
+    "isActive": true,
+    "imageUrl": "/uploads/files/marketplace/sectors/pharmacy.webp",
+    "customRequestsEnabled": true
+   },
+   {
+    "id": "2de90c2f-fb58-4bf8-a8f4-2bf40d928159",
+    "createdAt": "2026-10-30T13:58:05.165Z",
+    "updatedAt": "2026-10-30T13:58:05.165Z",
+    "deletedAt": null,
+    "name": "Sweets & Bakeries",
+    "nameAr": "حلويات ومخبوزات",
+    "slug": "bakery",
+    "sortOrder": 4,
+    "isActive": true,
+    "imageUrl": "/uploads/files/marketplace/sectors/bakery.webp",
+    "customRequestsEnabled": false
+   },
+   {
+    "id": "3485edb8-bd31-42dc-bd79-9d0f9a81d59b",
+    "createdAt": "2026-10-30T13:58:05.170Z",
+    "updatedAt": "2026-10-30T13:58:05.170Z",
+    "deletedAt": null,
+    "name": "Coffee, Spices & Specialty Food",
+    "nameAr": "بن وتوابل ومنتجات خاصة",
+    "slug": "coffee-spices",
+    "sortOrder": 5,
+    "isActive": true,
+    "imageUrl": null,
+    "customRequestsEnabled": false
+   }
+  ]
+ },
+ "home-banners": {
+  "data": [
+   {
+    "id": "fcfaab09-36f8-46d7-8764-609465a40b88",
+    "title": "Order from local restaurants",
+    "titleAr": "اطلب من مطاعم منطقتك",
+    "imageUrl": "/uploads/files/marketplace/banners/discover-restaurants.webp",
+    "actionType": "SECTOR",
+    "actionTargetId": "750b7e56-5368-4caa-b243-5a933b47cd73"
+   },
+   {
+    "id": "d8e12bc2-aa59-4f4b-ba19-7239041d6fa9",
+    "title": "Supermarkets and groceries",
+    "titleAr": "سوبر ماركت وبقالة",
+    "imageUrl": "/uploads/files/marketplace/banners/discover-groceries.webp",
+    "actionType": "SECTOR",
+    "actionTargetId": "8f1033c4-18ec-4cc0-aa6e-264f39ffcc5e"
+   },
+   {
+    "id": "8ff9e740-e2d1-4449-8c2d-90755de6ae97",
+    "title": "Fruit and vegetables",
+    "titleAr": "خضار وفاكهة",
+    "imageUrl": "/uploads/files/marketplace/banners/discover-produce.webp",
+    "actionType": "SECTOR",
+    "actionTargetId": "ed9adf3e-76bd-48c8-8d74-cc5c734dfc59"
+   },
+   {
+    "id": "522cffbd-c8c1-41fc-81b5-67b49c92d94b",
+    "title": "Pharmacies and personal care",
+    "titleAr": "صيدليات وعناية شخصية",
+    "imageUrl": "/uploads/files/marketplace/banners/discover-pharmacy.webp",
+    "actionType": "SECTOR",
+    "actionTargetId": "67ad0549-a7ee-4061-9bd0-f60f2e01e18e"
+   },
+   {
+    "id": "bc62e9b8-01de-440e-8a7f-3fc6d407b8d9",
+    "title": "Sweets and bakeries",
+    "titleAr": "حلويات ومخبوزات",
+    "imageUrl": "/uploads/files/marketplace/banners/discover-bakery.webp",
+    "actionType": "SECTOR",
+    "actionTargetId": "2de90c2f-fb58-4bf8-a8f4-2bf40d928159"
+   }
+  ]
+ }
+}

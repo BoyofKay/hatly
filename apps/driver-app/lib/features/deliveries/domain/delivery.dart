@@ -172,7 +172,12 @@ class DeliveryAddress {
     final lng = number(json['longitude']);
     return DeliveryAddress(
       label: json['label'] as String?,
-      line1: json['line1'] as String,
+      // A GPS address has no written line (the server stores ''): show its coordinates instead of a blank.
+      line1: ((json['line1'] as String?)?.trim().isNotEmpty ?? false)
+          ? json['line1'] as String
+          : (json['latitude'] is num && json['longitude'] is num
+              ? 'GPS ${(json['latitude'] as num).toStringAsFixed(5)}, ${(json['longitude'] as num).toStringAsFixed(5)}'
+              : ''),
       // A half pin is treated as no pin.
       latitude: lat != null && lng != null ? lat : null,
       longitude: lat != null && lng != null ? lng : null,
@@ -194,24 +199,73 @@ class DeliveryAddress {
 /// as a plain English map (matching this screen's own existing convention — no l10n is wired into
 /// this screen's other strings yet) rather than introducing localization for one isolated widget.
 enum DriverFailedDeliveryReason {
-  customerUnreachable('CUSTOMER_UNREACHABLE', 'Customer unreachable'),
-  customerRefused('CUSTOMER_REFUSED', 'Customer refused delivery'),
-  addressNotFound('ADDRESS_NOT_FOUND', 'Address not found'),
-  unsafeLocation('UNSAFE_LOCATION', 'Unsafe location'),
-  vehicleIssue('VEHICLE_ISSUE', 'Vehicle issue'),
-  other('OTHER', 'Other');
+  customerUnreachable('CUSTOMER_UNREACHABLE', 'Customer unreachable', 'لا يمكن الوصول للعميل'),
+  customerRefused('CUSTOMER_REFUSED', 'Customer refused delivery', 'العميل رفض الاستلام'),
+  addressNotFound('ADDRESS_NOT_FOUND', 'Address not found', 'لم أجد العنوان'),
+  unsafeLocation('UNSAFE_LOCATION', 'Unsafe location', 'مكان غير آمن'),
+  vehicleIssue('VEHICLE_ISSUE', 'Vehicle issue', 'عطل في المركبة'),
+  other('OTHER', 'Other', 'سبب آخر');
 
-  const DriverFailedDeliveryReason(this.wireValue, this.label);
+  const DriverFailedDeliveryReason(this.wireValue, this.label, this.labelAr);
 
   /// The exact string the backend's enum expects.
   final String wireValue;
+
+  /// English label (the default in tests and for English users).
   final String label;
+  final String labelAr;
+
+  /// The label in the language of the screen it is shown on.
+  String localized(bool arabic) => arabic ? labelAr : label;
+}
+
+/// One end of a Hatly / Wasally route as the customer's order froze it (PD-012): a point, the label the customer saw, and whether the
+/// customer chose it or it was the service's default. The driver goes to the ORIGIN first, then the DESTINATION.
+class RoutePoint {
+  const RoutePoint({required this.latitude, required this.longitude, required this.label, required this.isDefault});
+
+  final double latitude;
+  final double longitude;
+  final String label;
+  final bool isDefault;
+
+  static RoutePoint? tryParse(Object? json) {
+    if (json is! Map) return null;
+    final lat = json['latitude'];
+    final lng = json['longitude'];
+    if (lat is! num || lng is! num) return null;
+    final label = json['label'];
+    return RoutePoint(
+      latitude: lat.toDouble(),
+      longitude: lng.toDouble(),
+      label: label is String && label.trim().isNotEmpty ? label.trim() : 'GPS ${lat.toStringAsFixed(5)}, ${lng.toStringAsFixed(5)}',
+      isDefault: json['source'] == 'DEFAULT',
+    );
+  }
+}
+
+class ServiceRoute {
+  const ServiceRoute({required this.service, required this.origin, required this.destination});
+
+  /// `HATLY` / `WASALLY` / null.
+  final String? service;
+  final RoutePoint origin;
+  final RoutePoint destination;
+
+  static ServiceRoute? tryParse(Object? json) {
+    if (json is! Map) return null;
+    final origin = RoutePoint.tryParse(json['origin']);
+    final destination = RoutePoint.tryParse(json['destination']);
+    if (origin == null || destination == null) return null;
+    return ServiceRoute(service: json['service'] as String?, origin: origin, destination: destination);
+  }
 }
 
 class Delivery {
   const Delivery({
     required this.id,
     required this.orderId,
+    this.orderNumber,
     required this.orderStatus,
     required this.fulfillmentType,
     this.orderNote,
@@ -220,17 +274,21 @@ class Delivery {
     required this.totalMinor,
     this.amountDueMinor,
     required this.customerName,
-    required this.customerPhone,
+    this.customerPhone,
     required this.deliveryAddress,
     this.assignedAt,
     this.acceptDeadlineAt,
     this.pickedUpAt,
     this.deliveredAt,
     required this.segments,
+    this.serviceRoute,
   });
 
   final String id;
   final String orderId;
+
+  /// The human order number (HT-…). Null only for an older backend that does not send it; the UI then falls back to a short id.
+  final String? orderNumber;
 
   /// The Order-level status — CONFIRMED (locked decision): the Driver
   /// UI only ever writes to this via the approved lifecycle actions
@@ -252,7 +310,10 @@ class Delivery {
   /// Transfer, or a legacy order predating this field).
   final int? amountDueMinor;
   final String customerName;
-  final String customerPhone;
+
+  /// Null when the server withholds it (data minimisation: a completed delivery no longer needs the customer's number). The
+  /// screen then shows no number and no call button — it must never crash on a missing phone.
+  final String? customerPhone;
   final DeliveryAddress deliveryAddress;
   final DateTime? assignedAt;
   final DateTime? acceptDeadlineAt;
@@ -260,13 +321,21 @@ class Delivery {
   final DateTime? deliveredAt;
   final List<DeliverySegment> segments;
 
+  /// Hatly / Wasally orders only: where to go first and where to deliver (the customer's address is then only who to contact). Null for
+  /// every other order and for one placed before PD-012.
+  final ServiceRoute? serviceRoute;
+
   /// Whether this delivery has cash/electronic money still owed to be collected at the door.
+  /// What the driver and customer call this order: its number, or (older backend) a short id.
+  String get displayNumber => orderNumber ?? (orderId.length > 8 ? orderId.substring(0, 8) : orderId);
+
   bool get hasCollectionOnDelivery => paymentMethod == 'COD' || paymentMethod == 'PAY_AT_DELIVERY';
 
   factory Delivery.fromJson(Map<String, dynamic> json) {
     return Delivery(
       id: json['id'] as String,
       orderId: json['orderId'] as String,
+      orderNumber: json['orderNumber'] as String?,
       orderStatus: json['orderStatus'] as String,
       fulfillmentType: json['fulfillmentType'] as String,
       orderNote: json['orderNote'] as String?,
@@ -275,13 +344,14 @@ class Delivery {
       totalMinor: (json['totalMinor'] as num?)?.toInt(),
       amountDueMinor: json['amountDueMinor'] as int?,
       customerName: json['customerName'] as String,
-      customerPhone: json['customerPhone'] as String,
+      customerPhone: (json['customerPhone'] as String?)?.trim().isEmpty ?? true ? null : (json['customerPhone'] as String).trim(),
       deliveryAddress: DeliveryAddress.fromJson(json['deliveryAddress'] as Map<String, dynamic>),
       assignedAt: json['assignedAt'] != null ? DateTime.parse(json['assignedAt'] as String) : null,
       acceptDeadlineAt: json['acceptDeadlineAt'] != null ? DateTime.parse(json['acceptDeadlineAt'] as String) : null,
       pickedUpAt: json['pickedUpAt'] != null ? DateTime.parse(json['pickedUpAt'] as String) : null,
       deliveredAt: json['deliveredAt'] != null ? DateTime.parse(json['deliveredAt'] as String) : null,
       segments: (json['segments'] as List).map((e) => DeliverySegment.fromJson(e as Map<String, dynamic>)).toList(),
+      serviceRoute: ServiceRoute.tryParse(json['serviceRoute']),
     );
   }
 }

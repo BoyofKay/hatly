@@ -4,6 +4,19 @@ import { httpErrorClientStatus, isDependencyUnavailable, resolveHttpStatus } fro
 import { NO_REQUEST_CONTEXT, RequestContextService } from '../request-context/request-context.service';
 import { normalizeCorrelationId } from '../request-context/correlation-id';
 import { ThrottlerException } from '@nestjs/throttler';
+import { logBusinessEvent } from '../logging/log-business-event';
+import { BusinessEvent, BusinessEventName } from '../logging/business-events';
+
+const FINANCIAL_ROUTE = /\/(payments|manual-transfer|refund|wallet|loyalty|settlement|cash-remainder|failed-delivery)/;
+
+/** Which security-monitoring event (if any) a refused request is. Exported for tests. */
+export function securityEventFor(status: number, routeTemplate: string, method: string): BusinessEventName | null {
+  if (status === 401) return BusinessEvent.SECURITY_AUTH_FAILED;
+  if (status === 403) return BusinessEvent.SECURITY_ACCESS_DENIED;
+  if (status === 429) return BusinessEvent.SECURITY_RATE_LIMITED;
+  if ((status === 400 || status === 409) && method !== 'GET' && FINANCIAL_ROUTE.test(routeTemplate)) return BusinessEvent.SECURITY_FINANCIAL_REJECTED;
+  return null;
+}
 
 interface ErrorBody {
   error: {
@@ -106,6 +119,22 @@ export class HttpExceptionFilter implements ExceptionFilter {
         `Unhandled exception [correlationId=${correlationId}] on ${request.method} ${safePath} (status ${status}): ${exception.message}`,
         exception.stack,
       );
+    }
+
+    // Security monitoring: refused auth / access / rate-limit / money requests leave one structured, secret-free WARN line.
+    const event = securityEventFor(status, String((request as any).route?.path ?? safePath), request.method);
+    if (event) {
+      const user = (request as any).user as { id?: string; role?: string } | undefined;
+      const detailCode = details && typeof details === 'object' ? ((details as Record<string, unknown>).code as string | undefined) : undefined;
+      logBusinessEvent(this.logger, 'warn', event, () => correlationId, {
+        method: request.method,
+        route: String((request as any).route?.path ?? safePath).slice(0, 200),
+        status,
+        code: detailCode ?? code,
+        userId: user?.id ?? null,
+        role: user?.role ?? null,
+        ip: request.ip ?? null,
+      });
     }
 
     const body: ErrorBody = {

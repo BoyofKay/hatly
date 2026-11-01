@@ -1,10 +1,16 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { StaffAlertsService } from '../notifications/staff-alerts.service';
+import { AdHocFulfilmentService } from './ad-hoc-fulfilment.service';
+import { recordSegmentEvent } from './segment-events.util';
+import { linkPlacementMovementsToOrder, setStockContext } from './stock-context';
 import { DataSource, EntityManager } from 'typeorm';
 import { Cart, CartStatus } from '../cart/entities/cart.entity';
 import { CartItem } from '../cart/entities/cart-item.entity';
 import { CartGroupType } from '../cart/cart-group-type.enum';
+import { AdHocServiceType } from '../cart/ad-hoc-service-type.enum';
 import { FulfillmentType } from '../cart/fulfillment-type.enum';
 import { Order } from './entities/order.entity';
+import { CustomerNotificationType, recordOrderNotification } from '../notifications/customer-notification-events';
 import { OrderStatus } from './order-status.enum';
 import { OrderVendorSegment } from './entities/order-vendor-segment.entity';
 import { OrderVendorSegmentStatus } from './order-vendor-segment-status.enum';
@@ -54,6 +60,9 @@ export class OrderCreationService {
     private readonly quoteTokenService: CheckoutQuoteTokenService,
     private readonly walletService: WalletService,
     private readonly orderStatusHistoryService: OrderStatusHistoryService,
+    private readonly adHocFulfilmentService: AdHocFulfilmentService,
+    // Staff inbox (vendor notification centre). Optional so unit tests that build this service by hand keep working unchanged.
+    @Optional() private readonly staffAlerts?: StaffAlertsService,
   ) {}
 
   /**
@@ -77,13 +86,14 @@ export class OrderCreationService {
    * the existing transaction boundary rather than introducing a
    * second one).
    */
-  private async enforceAndDecrementInventory(manager: EntityManager, product: Product, item: CartItem): Promise<void> {
+  private async enforceAndDecrementInventory(manager: EntityManager, product: Product, item: CartItem, cartId: string): Promise<void> {
     if (product.inventoryMode !== InventoryMode.TRACKED) {
       return;
     }
 
     const requestedAmount = product.pricingUnit === PricingUnit.WEIGHT ? item.requestedWeightGrams ?? 0 : item.quantity;
 
+    await setStockContext(manager, { reason: 'ORDER_PLACED', referenceType: 'CART', referenceId: cartId, actorRole: 'CUSTOMER' });
     const result = await manager
       .createQueryBuilder()
       .update(Product)
@@ -190,7 +200,7 @@ export class OrderCreationService {
       // 5. Tracked inventory: the atomic, race-safe decrement — the real concurrency guarantee (the cart's "+" max is UX only).
       for (const group of cart.groups) {
         for (const item of group.items) {
-          if (item.productId && item.product) await this.enforceAndDecrementInventory(manager, item.product, item);
+          if (item.productId && item.product) await this.enforceAndDecrementInventory(manager, item.product, item, cart.id);
         }
       }
 
@@ -210,8 +220,27 @@ export class OrderCreationService {
 
       // 6. Write the order and its immutable snapshots.
       const order = await this.persistOrder(manager, customerId, plan, dto);
+      await linkPlacementMovementsToOrder(manager, cart.id, order.id); // the stock ledger rows written above now point at the order
 
       await manager.update(Cart, { id: cart.id }, { status: CartStatus.ORDERED });
+      // Told in the same transaction as the order itself — "order exists" and "customer notified" cannot disagree.
+      await recordOrderNotification(manager, order, CustomerNotificationType.ORDER_PLACED);
+      // The staff of each vendor branch in the order learn of it in the same transaction (only their own branch's part; never customer data).
+      if (this.staffAlerts) {
+        const parts: Array<{ vendor_branch_id: string; status: string }> = await manager.query(
+          `SELECT DISTINCT vendor_branch_id, status FROM order_vendor_segments WHERE order_id = $1 AND group_type = 'CATALOG' AND vendor_branch_id IS NOT NULL`,
+          [order.id],
+        );
+        for (const part of parts) {
+          await this.staffAlerts.alert(manager, {
+            eventKey: `order:${order.id}:new:${part.vendor_branch_id}`, category: 'VENDOR_NEW_ORDER',
+            // A branch on automatic acceptance has already accepted it; the others must accept it.
+            requiredAction: part.status === 'PENDING' ? 'ACCEPT_ORDER' : undefined,
+            recipients: await this.staffAlerts.vendorRecipients(manager, part.vendor_branch_id),
+            orderId: order.id, orderNumber: order.orderNumber, vendorBranchId: part.vendor_branch_id,
+          });
+        }
+      }
 
       const createdOrder = await manager.findOne(Order, { where: { id: order.id }, relations: { segments: { items: true } } });
       return createdOrder!;
@@ -228,6 +257,16 @@ export class OrderCreationService {
     });
 
     await this.offerConsumptionService.recordHatlyFundedDiscountEvent(createdOrder.id, createdOrder.discountMinor);
+
+    // Hatly / Wasally have no vendor to accept them: once the payment gate passes they become ready for dispatch (best effort — a
+    // failure never undoes or fails the placed order; the periodic pass retries).
+    if (createdOrder.segments?.some((seg) => seg.groupType === CartGroupType.AD_HOC_SERVICE)) {
+      try {
+        await this.adHocFulfilmentService.advanceOrder(createdOrder.id);
+      } catch (error) {
+        this.logger.error(`Hatly/Wasally readiness after placing order ${createdOrder.id} failed: ${(error as Error).message}`);
+      }
+    }
 
     return createdOrder;
   }
@@ -348,6 +387,19 @@ export class OrderCreationService {
           couponCodeSnapshot: seg.couponApplied ? plan.coupon.code ?? null : null,
         }),
       );
+
+      // History starts here: the segment was created PENDING, or automatically ACCEPTED because its branch is set to automatic acceptance
+      // (accepted only — preparing and ready remain separate steps).
+      await recordSegmentEvent(manager, {
+        segmentId: segment.id,
+        orderId: order.id,
+        fromStatus: null,
+        toStatus: segment.status,
+        actorUserId: null,
+        actorRole: null,
+        onBehalfOfVendor: false,
+        reason: autoAcceptEnabled ? 'Automatic acceptance (branch setting)' : null,
+      });
       segmentIdByGroupIndex.set(i, segment.id);
 
       for (let j = 0; j < group.items.length; j++) {
@@ -377,7 +429,10 @@ export class OrderCreationService {
             notes: item.notes ?? null,
             freeTextDescriptionSnapshot: item.freeTextDescription ?? null,
             imageUrlsSnapshot: item.imageUrls ?? null,
-            actualAmountMinor: null,
+            // "وصّلي لمكان" buys nothing: its item has no price to confirm later, so it is recorded as priced at 0 (the delivery
+            // fee is the whole charge). That keeps the "custom items still need a final price" gate and the ops price queue away
+            // from it. A "هاتلي من مكان" item stays null = pending until Hatly records the purchase.
+            actualAmountMinor: group.groupType === CartGroupType.AD_HOC_SERVICE && group.adHocServiceType === AdHocServiceType.DELIVER_TO_PLACE ? 0 : null,
             pricingUnitSnapshot: item.product?.pricingUnit ?? null,
             requestedWeightGrams: isWeighted ? item.requestedWeightGrams ?? null : null,
             estimatedAmountMinor: isWeighted ? itemView.lineTotalMinor : null,

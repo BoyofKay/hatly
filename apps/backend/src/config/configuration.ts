@@ -62,6 +62,15 @@ export default () => ({
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
     refreshSecret: process.env.JWT_REFRESH_SECRET,
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '30d',
+    /**
+     * Dashboard (browser) sessions live in HttpOnly cookies. The refresh cookie slides: every refresh re-issues it, so it lapses after this
+     * many seconds of INACTIVITY (default 12 h) however long the refresh token itself would remain valid.
+     */
+    dashboardSessionSeconds: parseInt(process.env.DASHBOARD_SESSION_SECONDS ?? '43200', 10),
+    /** When true, an ADMIN / SUPER_ADMIN without an enabled authenticator can do nothing but enrol one (MfaEnrollmentGuard). Default off. */
+    adminMfaRequired: process.env.DASHBOARD_ADMIN_MFA_REQUIRED === 'true',
+    /** Optional dedicated 32-byte (base64) key for TOTP secrets at rest; otherwise derived (HKDF) from the refresh secret. */
+    mfaEncryptionKey: process.env.MFA_ENCRYPTION_KEY,
   },
 
   otp: {

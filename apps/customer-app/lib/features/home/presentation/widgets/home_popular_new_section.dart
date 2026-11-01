@@ -6,16 +6,18 @@ import '../../../products/presentation/widgets/product_card.dart';
 import '../../domain/home_content.dart';
 import 'home_horizontal_row.dart';
 
-/// "Popular & New": the same [ProductCard] the rest of the app will use, in a
-/// horizontal ~2.5-visible row. Mixed popular/new content — not personalised.
+/// One Home product section ("Most ordered" or "New"): the same [ProductCard] the rest of the app uses, in a horizontal
+/// ~2.5-visible row. Each section holds only the products that satisfy ITS definition (see `home_providers.dart`).
 class HomePopularNewSection extends StatelessWidget {
   const HomePopularNewSection(
       {super.key,
+      required this.title,
       required this.entries,
       required this.onSeeAll,
       required this.onProductTap,
       this.onQuickAdd});
 
+  final String title;
   final List<HomeProductEntry> entries;
   final VoidCallback onSeeAll;
   final ValueChanged<HomeProductEntry> onProductTap;
@@ -32,9 +34,7 @@ class HomePopularNewSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         HatlySectionHeader(
-            title: l10n.homeSectionPopularNew,
-            seeAllLabel: l10n.seeAll,
-            onSeeAll: onSeeAll),
+            title: title, seeAllLabel: l10n.seeAll, onSeeAll: onSeeAll),
         HomeHorizontalRow(
           itemCount: entries.length,
           itemBuilder: (context, i, width) => ProductCard(

@@ -1,4 +1,4 @@
-import { ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConflictException, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { CartService } from './cart.service';
 import { CartPricingService } from './cart-pricing.service';
@@ -51,8 +51,14 @@ function buildHarness(seedProducts: any[], seedBranches: any[]) {
           (c) => c.customerId === opts.where.customerId && c.status === opts.where.status,
         ) ?? null;
       }
+      if (EntityClass === CartVendorGroup) {
+        return [...groups.values()].find((g) => Object.entries(opts.where).every(([k, v]) => g[k] === v)) ?? null;
+      }
       if (EntityClass.name === 'Product') {
         return products.get(opts.where.id) ?? null;
+      }
+      if (EntityClass.name === 'VendorBranch') {
+        return branches.get(opts.where.id) ?? null;
       }
       throw new Error(`unhandled manager.findOne for ${EntityClass.name}`);
     },
@@ -176,8 +182,9 @@ function makeProduct(id: string, vendorBranchId: string) {
   };
 }
 
-function makeBranch(id: string) {
-  return { id, pickupEnabled: true, vendor: { name: `Vendor ${id}`, isActive: true } };
+/** `sector`: the branch's marketplace sector — by default one whose admin setting allows custom requests (most tests are about other things). */
+function makeBranch(id: string, sector: { isActive: boolean; customRequestsEnabled: boolean } | null = { isActive: true, customRequestsEnabled: true }) {
+  return { id, isActive: true, pickupEnabled: true, vendor: { name: `Vendor ${id}`, isActive: true }, marketplaceSector: sector };
 }
 
 describe('CartService', () => {
@@ -375,34 +382,85 @@ describe('CartService', () => {
     expect(view.groups[0].adHocPickupLongitude).toBe(31.2);
   });
 
-  it('rejects a destination coordinate on a BUY_FROM_PLACE group — location must match the service type', async () => {
-    const { service } = buildHarness([], []);
-
-    await expect(
-      service.addAdHocItem('customer-1', {
+  it('PD-012: BOTH service types accept an origin and a destination, each with its own label', async () => {
+    for (const type of [AdHocServiceType.BUY_FROM_PLACE, AdHocServiceType.DELIVER_TO_PLACE]) {
+      const { service } = buildHarness([], []);
+      const view = await service.addAdHocItem('customer-1', {
         adHocPlaceName: 'Corner Pharmacy',
-        adHocServiceType: AdHocServiceType.BUY_FROM_PLACE,
-        destinationLatitude: 30.1,
-        destinationLongitude: 31.2,
-        freeTextDescription: 'Panadol Extra',
+        adHocServiceType: type,
+        pickupLatitude: 30.1,
+        pickupLongitude: 31.2,
+        pickupLabel: '  Current location  ',
+        destinationLatitude: 30.3,
+        destinationLongitude: 31.4,
+        destinationLabel: 'Mama\'s house',
+        freeTextDescription: 'x',
         quantity: 1,
-      }),
-    ).rejects.toThrow(BadRequestException);
+      });
+      expect(view.groups[0]).toMatchObject({
+        adHocPickupLatitude: 30.1,
+        adHocPickupLabel: 'Current location',
+        adHocDestinationLatitude: 30.3,
+        adHocDestinationLongitude: 31.4,
+        adHocDestinationLabel: 'Mama\'s house',
+      });
+    }
   });
 
-  it('rejects a pickup coordinate on a DELIVER_TO_PLACE group — the other direction', async () => {
+  it('PD-012: an end the customer did not choose stays null (the default is resolved at checkout, never stored here)', async () => {
     const { service } = buildHarness([], []);
+    const view = await service.addAdHocItem('customer-1', {
+      adHocPlaceName: 'Corner Pharmacy',
+      adHocServiceType: AdHocServiceType.BUY_FROM_PLACE,
+      freeTextDescription: 'x',
+      quantity: 1,
+    });
+    expect(view.groups[0]).toMatchObject({
+      adHocPickupLatitude: null,
+      adHocPickupLabel: null,
+      adHocDestinationLatitude: null,
+      adHocDestinationLabel: null,
+    });
+  });
 
-    await expect(
-      service.addAdHocItem('customer-1', {
-        adHocPlaceName: 'Some destination',
+  describe('updateAdHocRoute (PD-012)', () => {
+    const start = async () => {
+      const h = buildHarness([], []);
+      await h.service.addAdHocItem('customer-1', {
+        adHocPlaceName: 'Corner Pharmacy',
         adHocServiceType: AdHocServiceType.DELIVER_TO_PLACE,
         pickupLatitude: 30.1,
         pickupLongitude: 31.2,
-        freeTextDescription: 'Deliver this package',
+        pickupLabel: 'Start',
+        freeTextDescription: 'x',
         quantity: 1,
-      }),
-    ).rejects.toThrow(BadRequestException);
+      });
+      return h.service;
+    };
+
+    it('changes each end independently; the other end is left untouched', async () => {
+      const service = await start();
+      const afterDestination = await service.updateAdHocRoute('customer-1', { destination: { latitude: 30.5, longitude: 31.6, label: 'New place' } });
+      expect(afterDestination.groups[0]).toMatchObject({
+        adHocPickupLatitude: 30.1,
+        adHocPickupLabel: 'Start',
+        adHocDestinationLatitude: 30.5,
+        adHocDestinationLabel: 'New place',
+      });
+      const afterOrigin = await service.updateAdHocRoute('customer-1', { origin: { latitude: 30.7, longitude: 31.8 } });
+      expect(afterOrigin.groups[0]).toMatchObject({ adHocPickupLatitude: 30.7, adHocPickupLabel: null, adHocDestinationLatitude: 30.5 });
+    });
+
+    it('null clears an end back to the configured default', async () => {
+      const service = await start();
+      const view = await service.updateAdHocRoute('customer-1', { origin: null });
+      expect(view.groups[0]).toMatchObject({ adHocPickupLatitude: null, adHocPickupLongitude: null, adHocPickupLabel: null });
+    });
+
+    it('is refused when the cart has no Hatly / Wasally request', async () => {
+      const { service } = buildHarness([], []);
+      await expect(service.updateAdHocRoute('customer-1', { origin: null })).rejects.toThrow('There is no Hatly Service request in the cart.');
+    });
   });
 
   it('rejects an incomplete coordinate pair (latitude without longitude)', async () => {
@@ -625,6 +683,35 @@ describe('CartService.addVendorCustomItem — Vendor/Pharmacy Custom Item', () =
 
     expect(view.groups).toHaveLength(1); // still ONE group, never a second/AD_HOC_SERVICE group
     expect(view.groups[0].items).toHaveLength(2); // the product + the custom item, same group
+  });
+
+  describe('per-sector setting (server-enforced)', () => {
+    const request = (service: any, groupId?: string) =>
+      service.addVendorCustomItem('customer-1', groupId ? { cartVendorGroupId: groupId, freeTextDescription: 'x' } : { vendorBranchId: 'branch-1', freeTextDescription: 'x' });
+
+    it.each([
+      ['the sector switch is OFF (the default, e.g. restaurants)', { isActive: true, customRequestsEnabled: false }],
+      ['the sector is inactive', { isActive: false, customRequestsEnabled: true }],
+      ['the branch has no sector', null],
+    ])('refuses (CUSTOM_REQUESTS_NOT_AVAILABLE) when %s — for a new group', async (_name, sector) => {
+      const { service } = buildHarness([makeProduct('p1', 'branch-1')], [makeBranch('branch-1', sector)]);
+      await expect(request(service)).rejects.toMatchObject({ response: { details: { code: 'CUSTOM_REQUESTS_NOT_AVAILABLE' } } });
+      await expect(request(service)).rejects.toThrow(ForbiddenException);
+    });
+
+    it('refuses through an EXISTING group too, and adds nothing to the cart', async () => {
+      const { service } = buildHarness([makeProduct('p1', 'branch-1')], [makeBranch('branch-1', { isActive: true, customRequestsEnabled: false })]);
+      await service.addItem('customer-1', { productId: 'p1', quantity: 1 });
+      const groupId = (await service.getCartView('customer-1')).groups[0].id;
+      await expect(request(service, groupId)).rejects.toThrow(ForbiddenException);
+      expect((await service.getCartView('customer-1')).groups[0].items).toHaveLength(1);
+    });
+
+    it('accepts when the sector switch is ON', async () => {
+      const { service } = buildHarness([], [makeBranch('branch-1')]);
+      const view = await request(service);
+      expect(view.groups[0].items).toHaveLength(1);
+    });
   });
 
   it('CRITICAL: cannot target/create an AD_HOC_SERVICE group — only an existing CATALOG group is accepted', async () => {

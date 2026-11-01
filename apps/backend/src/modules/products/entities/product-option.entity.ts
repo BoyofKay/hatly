@@ -32,6 +32,17 @@ export class ProductOption extends BaseEntity {
   @Column({ name: 'allows_multiple', type: 'boolean', default: false })
   allowsMultiple: boolean;
 
+  /**
+   * Explicit selection limits. The EFFECTIVE rule (see option-selection.ts) also honours the original flags, so a group written before these
+   * columns existed behaves exactly as before: `isRequired` ⇒ at least one; `!allowsMultiple` ⇒ at most one.
+   */
+  @Column({ name: 'min_selections', type: 'int', default: 0 })
+  minSelections: number;
+
+  /** Null = no cap (only meaningful when `allowsMultiple`). */
+  @Column({ name: 'max_selections', type: 'int', nullable: true })
+  maxSelections: number | null;
+
   @OneToMany(() => ProductOptionValue, (value) => value.option)
   values: ProductOptionValue[];
 }

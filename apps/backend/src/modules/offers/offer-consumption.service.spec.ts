@@ -8,6 +8,7 @@ import { OfferConsumption } from './entities/offer-consumption.entity';
 import { DiscountType } from './discount-type.enum';
 import { OfferMechanism } from './offer-mechanism.enum';
 import { PricingUnit } from '../products/pricing-unit.enum';
+import { FinancialEvent } from '../finance/entities/financial-event.entity';
 
 function makeFlashSaleOffer(overrides: Partial<Offer> = {}): Offer {
   const now = new Date();
@@ -70,7 +71,10 @@ function buildHarness(params: {
   offerProducts?: OfferProduct[];
   offerCategories?: OfferCategory[];
   existingConsumptions?: OfferConsumption[];
+  /** false = the order never recorded the original HATLY_FUNDED event (nothing can be compensated). */
+  originalEvent?: boolean;
 }) {
+  const harnessOptions = params;
   const offers = new Map(params.offers.map((o) => [o.id, o]));
   const offerProducts = params.offerProducts ?? [];
   const offerCategories = params.offerCategories ?? [];
@@ -103,6 +107,14 @@ function buildHarness(params: {
       if (EntityClass === Offer) return offers.get(opts.where.id) ?? null;
       throw new Error(`unhandled findOne ${EntityClass.name}`);
     },
+    // PD-015: the compensating event looks up the original (order-level) event, and a flash-sale row finds its item's segment.
+    getRepository: (EntityClass: any) => {
+      if (EntityClass === FinancialEvent) {
+        return { findOne: async () => (harnessOptions.originalEvent === false ? null : { id: 'original-event' }) };
+      }
+      throw new Error(`unhandled getRepository ${EntityClass.name}`);
+    },
+    query: async (_sql: string, params: unknown[]) => ((params[0] as string[]) ?? []).map((id) => ({ id, order_vendor_segment_id: `segment-of-${id}` })),
     count: async (EntityClass: any, opts: any) => {
       const where = opts.where ?? {};
       if (EntityClass === OfferProduct) return offerProducts.filter((r) => matchesWhere(r, where)).length;
@@ -172,9 +184,16 @@ function buildHarness(params: {
   };
 
   const dataSource = { manager };
-  const financialEventService = { record: jest.fn(async () => undefined) };
+  // Mirrors the real FinancialEventService.record: one row per idempotency key, a repeat returns the existing fact.
+  const events = new Map<string, any>();
+  const financialEventService = {
+    record: jest.fn(async (params: any) => {
+      if (!events.has(params.idempotencyKey)) events.set(params.idempotencyKey, { id: `event-${events.size + 1}`, ...params });
+      return events.get(params.idempotencyKey);
+    }),
+  };
   const service = new OfferConsumptionService(dataSource as any, financialEventService as any);
-  return { service, manager, offers, offerProducts, offerCategories, consumptions, financialEventService };
+  return { service, manager, offers, offerProducts, offerCategories, consumptions, financialEventService, events };
 }
 
 function makeProductCandidate(overrides: Partial<OfferCandidateItem> = {}): OfferCandidateItem {
@@ -204,6 +223,50 @@ describe('OfferConsumptionService — FLASH_SALE', () => {
     const plan = plans.get('item-1')!;
     expect(plan.discountPerUnitMinor).toBe(1000); // 3000 - 2000
     expect(plan.discountAmountMinor).toBe(2000); // 2 units * 1000
+  });
+
+  describe('promotional price replaces the BASE price only — paid options are added on top (never absorbed)', () => {
+    const offerFor = () => makeFlashSaleOffer({ specialPriceMinor: 10000 }); // base 150 -> 100
+    const plan = async (candidate: Partial<OfferCandidateItem>, offer = offerFor()) => {
+      const { service, manager } = buildHarness({
+        offers: [offer],
+        offerProducts: [{ id: 'op1', offerId: offer.id, productId: 'product-1' } as OfferProduct],
+      });
+      const { plans } = await service.planFlashSaleForCart(manager as any, { customerId: 'cust-1', items: [makeProductCandidate(candidate)] });
+      return plans.get('item-1');
+    };
+
+    it('base 150, promo base 100, option +20: the discount is 50 per unit, so the unit costs 120 (not 100)', async () => {
+      const p = (await plan({ basePriceMinor: 15000, unitPriceMinor: 17000 }))!;
+      expect(p.discountPerUnitMinor).toBe(5000);
+      expect(17000 - p.discountPerUnitMinor).toBe(12000);
+    });
+
+    it('is identical for a product with no options (base == unit price)', async () => {
+      const p = (await plan({ basePriceMinor: 15000, unitPriceMinor: 15000 }))!;
+      expect(p.discountPerUnitMinor).toBe(5000);
+    });
+
+    it('a negative option does not change the discount either (the discount only ever depends on the base price)', async () => {
+      const p = (await plan({ basePriceMinor: 15000, unitPriceMinor: 14000 }))!;
+      expect(p.discountPerUnitMinor).toBe(5000);
+    });
+
+    it('several units + per-order cap: only the capped units get the promo base; options are paid on every unit', async () => {
+      const p = (await plan({ basePriceMinor: 15000, unitPriceMinor: 17000, quantity: 3 }, makeFlashSaleOffer({ specialPriceMinor: 10000, perOrderLimit: 2 })))!;
+      expect(p.discountedQuantity).toBe(2);
+      expect(p.discountAmountMinor).toBe(10000);
+      expect(3 * 17000 - p.discountAmountMinor).toBe(41000); // 2 x 120 + 1 x 170
+    });
+
+    it('no discount when the special price is not below the BASE price, even though base + options exceeds it', async () => {
+      expect(await plan({ basePriceMinor: 9000, unitPriceMinor: 12000 }, makeFlashSaleOffer({ specialPriceMinor: 10000 }))).toBeUndefined();
+    });
+
+    it('without a base price the whole unit price is used (legacy callers, products with no priced options)', async () => {
+      const p = (await plan({ unitPriceMinor: 15000 }))!;
+      expect(p.discountPerUnitMinor).toBe(5000);
+    });
   });
 
   it('branch-wide targeting: an offer with no OfferProduct/OfferCategory rows matches every product in its branch', async () => {
@@ -864,6 +927,77 @@ describe('OfferConsumptionService.resolveActiveOffersForProducts — Customer Pr
   });
 });
 
+describe('OfferConsumptionService.resolveActiveOffersForProducts — display follows checkout eligibility (Kefta 90 vs 110 bug)', () => {
+  const flashOn = (productId: string, over: Partial<Offer> = {}) => {
+    const offer = makeFlashSaleOffer({ specialPriceMinor: 9000, ...over });
+    return buildHarness({ offers: [offer], offerProducts: [{ id: 'op1', offerId: offer.id, productId } as OfferProduct] });
+  };
+
+  it('a WEIGHT product is never advertised with an offer — checkout never discounts it, so the card must not promise a price it will not charge', async () => {
+    const { service } = flashOn('p-kg');
+    const result = await service.resolveActiveOffersForProducts({
+      vendorBranchId: 'branch-1',
+      products: [{ productId: 'p-kg', categoryId: 'c1', priceMinor: 11000, pricingUnit: PricingUnit.WEIGHT }],
+    });
+    expect(result.size).toBe(0);
+  });
+
+  it('a PIECE product with a real discount is advertised, with the per-order cap checkout will apply', async () => {
+    const { service } = flashOn('p1', { perOrderLimit: 2 });
+    const result = await service.resolveActiveOffersForProducts({
+      vendorBranchId: 'branch-1',
+      products: [{ productId: 'p1', categoryId: 'c1', priceMinor: 11000, pricingUnit: PricingUnit.PIECE }],
+    });
+    expect(result.get('p1')).toEqual({ mechanism: 'FLASH_SALE', specialPriceMinor: 9000, perOrderLimit: 2 });
+  });
+
+  it('no per-order cap: the field is omitted (an unlimited special price)', async () => {
+    const { service } = flashOn('p1');
+    const result = await service.resolveActiveOffersForProducts({
+      vendorBranchId: 'branch-1',
+      products: [{ productId: 'p1', categoryId: 'c1', priceMinor: 11000, pricingUnit: PricingUnit.PIECE }],
+    });
+    expect(result.get('p1')).toEqual({ mechanism: 'FLASH_SALE', specialPriceMinor: 9000 });
+  });
+
+  it.each([
+    ['equal to', 11000],
+    ['above', 12000],
+  ])('a special price %s the product price gives no discount at checkout, so it is not advertised', async (_label, special) => {
+    const { service } = flashOn('p1', { specialPriceMinor: special });
+    const result = await service.resolveActiveOffersForProducts({
+      vendorBranchId: 'branch-1',
+      products: [{ productId: 'p1', categoryId: 'c1', priceMinor: 11000, pricingUnit: PricingUnit.PIECE }],
+    });
+    expect(result.has('p1')).toBe(false);
+  });
+
+  it('a flash sale whose global allocation is used up is not advertised (checkout would reject it)', async () => {
+    const { service } = flashOn('p1', { totalAllocationLimit: 10, consumedUnitsCount: 10 });
+    const result = await service.resolveActiveOffersForProducts({
+      vendorBranchId: 'branch-1',
+      products: [{ productId: 'p1', categoryId: 'c1', priceMinor: 11000, pricingUnit: PricingUnit.PIECE }],
+    });
+    expect(result.has('p1')).toBe(false);
+  });
+
+  it('a window that already ended is not advertised (the dev data had a 90 EGP Kefta flash sale that expired on 12 Oct)', async () => {
+    const now = Date.now();
+    const { service } = flashOn('p1', { startAt: new Date(now - 14 * 86_400_000), endAt: new Date(now - 2 * 86_400_000) });
+    const result = await service.resolveActiveOffersForProducts({
+      vendorBranchId: 'branch-1',
+      products: [{ productId: 'p1', categoryId: 'c1', priceMinor: 11000, pricingUnit: PricingUnit.PIECE }],
+    });
+    expect(result.has('p1')).toBe(false);
+  });
+
+  it('callers that do not know the price/unit keep the previous behaviour (backward compatible)', async () => {
+    const { service } = flashOn('p1');
+    const result = await service.resolveActiveOffersForProducts({ vendorBranchId: 'branch-1', products: [{ productId: 'p1', categoryId: 'c1' }] });
+    expect(result.get('p1')?.mechanism).toBe('FLASH_SALE');
+  });
+});
+
 function makeCoupon(overrides: Partial<Offer> = {}): Offer {
   return makeSubtotalDiscountOffer({ couponCode: 'SAVE10', ...overrides });
 }
@@ -950,5 +1084,129 @@ describe('OfferConsumptionService.reverseFlashSaleConsumptionForOrder — per-it
     expect(h.offers.get(offer.id)!.consumedUnitsCount).toBe(1);
     await h.service.reverseFlashSaleConsumptionForOrder(h.manager as any, 'order-1', []); // nothing to reverse: a no-op
     expect(rows.find((c) => c.orderItemId === 'oi-1').isReversed).toBe(false);
+  });
+});
+
+describe('OfferConsumptionService.reverseSubtotalDiscountConsumptionForOrder — PD-014 discount / coupon restoration', () => {
+  /** A harness with SUBTOTAL_DISCOUNT consumptions (one per segment) already recorded against one offer. */
+  function withSegmentDiscounts(discounts: Array<{ segmentId: string; amount: number }>, offerOverrides: Partial<Offer> = {}) {
+    const offer = makeFlashSaleOffer({
+      mechanism: OfferMechanism.SUBTOTAL_DISCOUNT,
+      couponCode: 'SAVE10',
+      consumedUnitsCount: discounts.length,
+      consumedDiscountMinor: discounts.reduce((s, d) => s + d.amount, 0),
+      ...offerOverrides,
+    } as Partial<Offer>);
+    const h = buildHarness({ offers: [offer] });
+    for (const d of discounts) {
+      const row = {
+        id: randomUUID(),
+        offerId: offer.id,
+        customerId: 'cust-1',
+        orderId: 'order-1',
+        mechanismSnapshot: OfferMechanism.SUBTOTAL_DISCOUNT,
+        orderVendorSegmentId: d.segmentId,
+        quantityConsumed: 1,
+        discountAppliedMinor: d.amount,
+        isReversed: false,
+      };
+      h.consumptions.set(row.id, row);
+    }
+    return { ...h, offer, rows: () => [...h.consumptions.values()] };
+  }
+
+  it('rejecting ONE segment returns exactly that segment\'s discount and one use; the other segment\'s discount stays consumed', async () => {
+    const h = withSegmentDiscounts([{ segmentId: 'seg-A', amount: 1000 }, { segmentId: 'seg-B', amount: 2500 }]);
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1', ['seg-B']);
+    expect(h.rows().find((r) => r.orderVendorSegmentId === 'seg-B')).toMatchObject({ isReversed: true });
+    expect(h.rows().find((r) => r.orderVendorSegmentId === 'seg-A')).toMatchObject({ isReversed: false });
+    expect(h.offers.get(h.offer.id)).toMatchObject({ consumedUnitsCount: 1, consumedDiscountMinor: 1000 });
+  });
+
+  it('the whole order (no segment filter) returns every remaining discount', async () => {
+    const h = withSegmentDiscounts([{ segmentId: 'seg-A', amount: 1000 }, { segmentId: 'seg-B', amount: 2500 }]);
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1');
+    expect(h.rows().every((r) => r.isReversed)).toBe(true);
+    expect(h.offers.get(h.offer.id)).toMatchObject({ consumedUnitsCount: 0, consumedDiscountMinor: 0 });
+  });
+
+  it('exactly once: repeating the reversal, or reversing the order after one segment already went, changes nothing more', async () => {
+    const h = withSegmentDiscounts([{ segmentId: 'seg-A', amount: 1000 }, { segmentId: 'seg-B', amount: 2500 }]);
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1', ['seg-B']);
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1', ['seg-B']);
+    expect(h.offers.get(h.offer.id)).toMatchObject({ consumedUnitsCount: 1, consumedDiscountMinor: 1000 });
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1'); // whole order: only seg-A is left
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1');
+    expect(h.offers.get(h.offer.id)).toMatchObject({ consumedUnitsCount: 0, consumedDiscountMinor: 0 });
+  });
+
+  it('never credits the offer beyond what was consumed (counters floor at 0 even if the cache was already lower)', async () => {
+    const h = withSegmentDiscounts([{ segmentId: 'seg-A', amount: 1000 }], { consumedUnitsCount: 0, consumedDiscountMinor: 300 });
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1');
+    expect(h.offers.get(h.offer.id)).toMatchObject({ consumedUnitsCount: 0, consumedDiscountMinor: 0 });
+  });
+
+  it('flash-sale consumptions of the same order are not touched, and an empty segment list is a no-op', async () => {
+    const h = withSegmentDiscounts([{ segmentId: 'seg-A', amount: 1000 }]);
+    h.consumptions.set('flash', { id: 'flash', offerId: 'other', orderId: 'order-1', mechanismSnapshot: OfferMechanism.FLASH_SALE, orderItemId: 'oi-1', quantityConsumed: 2, discountAppliedMinor: 500, isReversed: false });
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1', []);
+    expect(h.rows().filter((r) => r.isReversed)).toHaveLength(0);
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1');
+    expect(h.consumptions.get('flash')!.isReversed).toBe(false);
+  });
+});
+
+describe('OfferConsumptionService — PD-015 compensating HATLY_FUNDED_OFFER_DISCOUNT_RESTORED events', () => {
+  function segmentDiscounts(discounts: Array<{ segmentId: string; amount: number }>, originalEvent = true) {
+    const offer = makeFlashSaleOffer({ mechanism: OfferMechanism.SUBTOTAL_DISCOUNT, consumedUnitsCount: discounts.length, consumedDiscountMinor: discounts.reduce((a, d) => a + d.amount, 0) } as Partial<Offer>);
+    const h = buildHarness({ offers: [offer], originalEvent });
+    for (const d of discounts) {
+      const row = { id: `c-${d.segmentId}`, offerId: offer.id, customerId: 'cust-1', orderId: 'order-1', mechanismSnapshot: OfferMechanism.SUBTOTAL_DISCOUNT, orderVendorSegmentId: d.segmentId, quantityConsumed: 1, discountAppliedMinor: d.amount, isReversed: false };
+      h.consumptions.set(row.id, row);
+    }
+    return { ...h, offer };
+  }
+
+  it('one compensating event per reversed consumption: positive amount, linked to the original and to the segment, never touching the original', async () => {
+    const h = segmentDiscounts([{ segmentId: 'seg-A', amount: 1000 }, { segmentId: 'seg-B', amount: 2500 }]);
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1', ['seg-B']);
+    expect(h.financialEventService.record).toHaveBeenCalledTimes(1);
+    const [params, manager] = h.financialEventService.record.mock.calls[0] as any[];
+    expect(manager).toBe(h.manager); // inside the caller's transaction
+    expect(params.vendorBranchId).toBeUndefined(); // must not feed settlement's "first vendor activity"
+    expect(params).toMatchObject({
+      type: 'HATLY_FUNDED_OFFER_DISCOUNT_RESTORED',
+      direction: 'INFORMATIONAL',
+      amountMinor: 2500,
+      orderId: 'order-1',
+      orderVendorSegmentId: 'seg-B',
+      relatedEventId: 'original-event',
+      idempotencyKey: 'hatly-funded-offer-discount-restored:c-seg-B',
+    });
+  });
+
+  it('a repeated or later whole-order reversal never compensates the same consumption twice', async () => {
+    const h = segmentDiscounts([{ segmentId: 'seg-A', amount: 1000 }, { segmentId: 'seg-B', amount: 2500 }]);
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1', ['seg-B']);
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1', ['seg-B']);
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1');
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1');
+    expect([...h.events.keys()].sort()).toEqual(['hatly-funded-offer-discount-restored:c-seg-A', 'hatly-funded-offer-discount-restored:c-seg-B']);
+    expect([...h.events.values()].reduce((sum, e) => sum + e.amountMinor, 0)).toBe(3500); // = everything consumed, no more
+  });
+
+  it('a flash-sale consumption is compensated against its ITEM\'s segment', async () => {
+    const offer = makeFlashSaleOffer({ consumedUnitsCount: 2, consumedDiscountMinor: 600 });
+    const h = buildHarness({ offers: [offer] });
+    h.consumptions.set('f1', { id: 'f1', offerId: offer.id, customerId: 'cust-1', orderId: 'order-1', mechanismSnapshot: OfferMechanism.FLASH_SALE, orderItemId: 'item-9', quantityConsumed: 2, discountAppliedMinor: 600, isReversed: false });
+    await h.service.reverseFlashSaleConsumptionForOrder(h.manager as any, 'order-1', ['item-9']);
+    expect(h.events.get('hatly-funded-offer-discount-restored:f1')).toMatchObject({ amountMinor: 600, orderVendorSegmentId: 'segment-of-item-9', relatedEventId: 'original-event' });
+  });
+
+  it('an order that never recorded the original event is not compensated (a restoration without an original would make the net negative)', async () => {
+    const h = segmentDiscounts([{ segmentId: 'seg-A', amount: 1000 }], false);
+    await h.service.reverseSubtotalDiscountConsumptionForOrder(h.manager as any, 'order-1');
+    expect(h.financialEventService.record).not.toHaveBeenCalled();
+    expect(h.consumptions.get('c-seg-A').isReversed).toBe(true); // the entitlement itself is still restored
   });
 });

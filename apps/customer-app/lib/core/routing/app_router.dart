@@ -3,17 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared_widgets/hatly_state_view.dart';
 import '../localization/l10n/app_localizations.dart';
+import '../../features/auth/presentation/auth_gate.dart';
 import '../../features/auth/presentation/session_controller.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/phone_entry_screen.dart';
 import '../../features/auth/presentation/screens/otp_verify_screen.dart';
 import '../../features/shell/presentation/customer_shell.dart';
+import '../../features/home/presentation/home_section_products_screen.dart';
+import '../../features/home/presentation/widgets/home_promo_actions.dart';
 import '../../features/search/presentation/search_screen.dart';
 import '../../features/vendors/presentation/vendor_list_screen.dart';
 import '../../features/vendors/presentation/vendor_details_screen.dart';
 import '../../features/products/presentation/product_details_screen.dart';
 import '../../features/catalog/presentation/catalog_product_details_screen.dart';
 import '../../features/cart/presentation/cart_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/orders/presentation/order_details_screen.dart';
 import '../../features/orders/presentation/order_tracking_screen.dart';
 import '../../features/checkout/presentation/order_success_screen.dart';
@@ -29,17 +33,16 @@ import '../../features/loyalty/presentation/loyalty_screen.dart';
 
 /// Route table for the customer app.
 ///
-/// Redirect logic is entirely driven by [SessionStatus]:
-///  - `checking`        -> splash (shown regardless of target route)
-///  - `unauthenticated` -> phone entry (otp screen is reachable as a
-///                         sub-step of that flow, not independently)
-///  - `authenticated`   -> the shell (or any pushed route on top of it —
-///                         /search, /vendors, /vendors/:id, /products/:id
-///                         all require an authenticated session same as
-///                         the shell)
+/// Redirect logic is entirely driven by [SessionStatus] (there is no second guest/auth mechanism):
+///  - `checking`        -> splash (the requested location is carried in `?from=` so a deep link survives the restore)
+///  - `unauthenticated` -> a GUEST. Public catalog routes (`isPublicGuestPath`: home shell, search, vendors, products) open
+///                         normally and create nothing. Every other route is protected: the guest is sent to
+///                         `/phone?from=<requested route>` and returns there after signing in or registering.
+///                         (`/otp` is a sub-step of `/phone`.)
+///  - `authenticated`   -> the app; the auth screens and splash send the customer to `from` (or home).
 ///
-/// This is the ONLY place auth-based routing decisions are made —
-/// individual screens never redirect themselves.
+/// This is the ONLY place route access is decided — individual screens never redirect themselves. (Actions on a public
+/// screen that need an account use `requireSignIn`, which only *opens* `/phone?from=...`.)
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
@@ -47,20 +50,29 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final status = ref.read(sessionControllerProvider).status;
       final path = state.matchedLocation;
+      final target = state.uri.toString();
+      final from = safeReturnPath(state.uri.queryParameters['from']);
+      final onAuthScreen = path == kSignInPath || path == kOtpPath;
 
       if (status == SessionStatus.checking) {
-        return path == '/splash' ? null : '/splash';
+        if (path == kSplashPath) return null;
+        return target == '/'
+            ? kSplashPath
+            : '$kSplashPath?from=${Uri.encodeQueryComponent(target)}';
       }
 
       if (status == SessionStatus.unauthenticated) {
-        final onAuthFlow = path == '/phone' || path == '/otp';
-        return onAuthFlow ? null : '/phone';
+        // A guest lands where they were headed (or on Home).
+        if (path == kSplashPath) {
+          return from ?? '/';
+        }
+        if (onAuthScreen || isPublicGuestPath(path)) return null;
+        return signInLocation(returnTo: target);
       }
 
       // authenticated
-      final onAuthFlow =
-          path == '/splash' || path == '/phone' || path == '/otp';
-      return onAuthFlow ? '/' : null;
+      if (path == kSplashPath || onAuthScreen) return from ?? '/';
+      return null;
     },
     // Polish pass: go_router's own default error page is unstyled and
     // English-only. A deep link (e.g. from a push notification) can carry
@@ -81,12 +93,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           path: '/splash', builder: (context, state) => const SplashScreen()),
       GoRoute(
           path: '/phone',
-          builder: (context, state) => const PhoneEntryScreen()),
+          builder: (context, state) => PhoneEntryScreen(
+              returnTo: safeReturnPath(state.uri.queryParameters['from']))),
       GoRoute(
           path: '/otp', builder: (context, state) => const OtpVerifyScreen()),
       GoRoute(path: '/', builder: (context, state) => const CustomerShell()),
       GoRoute(
           path: '/search', builder: (context, state) => const SearchScreen()),
+      // "See all" behind a Home section (most-ordered | new | offers) — public, like the catalog it lists.
+      GoRoute(
+        path: '/home/products/:kind',
+        builder: (context, state) {
+          final kind = homeSectionKindFromSlug(state.pathParameters['kind']);
+          return kind == null
+              ? const HomeSectionUnknown()
+              : HomeSectionProductsScreen(kind: kind);
+        },
+      ),
       GoRoute(path: '/cart', builder: (context, state) => const CartScreen()),
       // Standalone Hatly Service — NOT attached to any vendor catalog
       // (see hatly_service_screen.dart's own doc comment for how this
@@ -132,6 +155,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             fromCatalog: state.uri.queryParameters['from'] == 'catalog',
           );
         },
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
         path: '/orders/:id',

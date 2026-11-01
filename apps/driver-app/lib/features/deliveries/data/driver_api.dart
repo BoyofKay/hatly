@@ -1,5 +1,7 @@
 import 'dart:convert';
 import '../../../core/network/api_client.dart';
+import 'package:dio/dio.dart';
+import '../../earnings/domain/earnings.dart';
 import '../domain/delivery.dart';
 
 /// Calls the real backend `driver/*` endpoints exactly. CONFIRMED
@@ -10,6 +12,27 @@ class DriverApi {
 
   final ApiClient _apiClient;
 
+  /// A request that failed because of the connection itself (no response at all, a timeout) — the only kind worth repeating automatically.
+  static bool isTransient(Object error) =>
+      error is DioException &&
+      (error.type == DioExceptionType.connectionError ||
+          error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          error.type == DioExceptionType.receiveTimeout);
+
+  /// Repeats [op] after a short pause when the CONNECTION failed. Used only for reads and for status changes — the server treats a repeated
+  /// status change as a no-op, so repeating can never apply it twice. Weight and purchase amounts are NOT retried this way.
+  Future<T> retryTransient<T>(Future<T> Function() op, {int attempts = 3, Duration pause = const Duration(milliseconds: 800)}) async {
+    for (var i = 1;; i++) {
+      try {
+        return await op();
+      } catch (e) {
+        if (i >= attempts || !isTransient(e)) rethrow;
+        await Future<void>.delayed(pause * i);
+      }
+    }
+  }
+
   Future<void> setOnlineStatus(bool isOnline) async {
     await _apiClient.dio.patch('/driver/online-status', data: {'isOnline': isOnline});
   }
@@ -18,13 +41,29 @@ class DriverApi {
     await _apiClient.dio.patch('/driver/location', data: {'latitude': latitude, 'longitude': longitude});
   }
 
+  Future<DriverEarnings> getEarnings() async {
+    final response = await retryTransient(() => _apiClient.dio.get('/driver/earnings'));
+    return DriverEarnings.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20}) async {
+    final response = await retryTransient(() => _apiClient.dio.get('/driver/transactions', queryParameters: {'page': page, 'limit': limit}));
+    final meta = response.data['meta'] as Map<String, dynamic>;
+    return TransactionsPage(
+      items: (response.data['data'] as List).map((e) => DriverTransaction.fromJson(e as Map<String, dynamic>)).toList(),
+      page: (meta['page'] as num).toInt(),
+      limit: (meta['limit'] as num).toInt(),
+      total: (meta['total'] as num).toInt(),
+    );
+  }
+
   Future<List<Delivery>> listDeliveries() async {
-    final response = await _apiClient.dio.get('/driver/deliveries');
+    final response = await retryTransient(() => _apiClient.dio.get('/driver/deliveries'));
     return (response.data['data'] as List).map((e) => Delivery.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<Delivery> getDelivery(String id) async {
-    final response = await _apiClient.dio.get('/driver/deliveries/$id');
+    final response = await retryTransient(() => _apiClient.dio.get('/driver/deliveries/$id'));
     return Delivery.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
@@ -51,12 +90,12 @@ class DriverApi {
     String? proofPhotoUrl,
     String? recipientName,
   }) async {
-    await _apiClient.dio.patch('/driver/deliveries/$deliveryId/status', data: {
-      'status': status,
-      if (failureReason != null) 'failureReason': failureReason.wireValue,
-      if (proofPhotoUrl != null) 'proofPhotoUrl': proofPhotoUrl,
-      if (recipientName != null) 'recipientName': recipientName,
-    });
+    await retryTransient(() => _apiClient.dio.patch('/driver/deliveries/$deliveryId/status', data: {
+          'status': status,
+          if (failureReason != null) 'failureReason': failureReason.wireValue,
+          if (proofPhotoUrl != null) 'proofPhotoUrl': proofPhotoUrl,
+          if (recipientName != null) 'recipientName': recipientName,
+        }));
   }
 
   Future<void> recordWeight(String orderItemId, int weightGrams) async {

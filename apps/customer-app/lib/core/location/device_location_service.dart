@@ -41,6 +41,9 @@ class LocationUnavailableException implements Exception {
   final LocationUnavailableReason reason;
 
   bool get canOpenSettings => reason == LocationUnavailableReason.permanentlyDenied;
+
+  /// Location services are off at the OS level: the device's location switch (not this app's permission page) is what has to change.
+  bool get canOpenLocationSettings => reason == LocationUnavailableReason.servicesDisabled;
 }
 
 class DeviceLocationService {
@@ -78,8 +81,10 @@ class DeviceLocationService {
     }
 
     try {
+      // A time limit: without one the call can wait forever indoors / with no fix, and the button just spins. A timeout is an
+      // Exception, so it lands in the "could not determine" branch below like any other failed fix.
       final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 15)),
       );
       return DeviceLocationResult(
           latitude: position.latitude, longitude: position.longitude);
@@ -96,4 +101,7 @@ class DeviceLocationService {
   /// Opens the device's own Settings app to this app's page — the only recovery path once permission is
   /// [LocationUnavailableReason.permanentlyDenied] (the OS will not show its own prompt again).
   Future<bool> openAppSettings() => Geolocator.openAppSettings();
+
+  /// Opens the device's location (GPS) switch — the recovery path when [LocationUnavailableReason.servicesDisabled].
+  Future<bool> openLocationSettings() => Geolocator.openLocationSettings();
 }

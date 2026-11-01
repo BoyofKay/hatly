@@ -1,9 +1,11 @@
-import { BadRequestException, ConflictException, ForbiddenException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, forwardRef, Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { CustomerNotificationType, recordOrderNotification } from '../notifications/customer-notification-events';
 import { DataSource } from 'typeorm';
 import { OrderVendorSegment } from './entities/order-vendor-segment.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { Order } from './entities/order.entity';
 import { OrderStatus } from './order-status.enum';
+import { CartGroupType } from '../cart/cart-group-type.enum';
 import { restoreTrackedInventoryForSegments } from './tracked-inventory.util';
 import { OrderVendorSegmentStatus } from './order-vendor-segment-status.enum';
 import { Role } from '../../common/enums/role.enum';
@@ -13,6 +15,8 @@ import { AutomaticDispatchService } from '../delivery/automatic-dispatch.service
 import { OrderStateMachineService } from './order-state-machine.service';
 import { OrderSegmentCancellationService } from './order-segment-cancellation.service';
 import { OrderPaymentGateService } from './order-payment-gate.service';
+import { recordSegmentEvent } from './segment-events.util';
+import { RequestContextService } from '../../common/request-context/request-context.service';
 
 /**
  * The segment-level state machine — mirrors OrderStateMachineService's
@@ -42,17 +46,24 @@ type SegmentTransitionRule = {
   allowedRoles: Role[];
 };
 
+/**
+ * Who may move a segment: the branch's own vendor staff, and Hatly operations ON THE VENDOR'S BEHALF (the HTTP layer additionally requires
+ * the MANAGE_ORDER_FULFILMENT permission for operations; the event history records the actor and the on-behalf flag). One table, one implementation.
+ */
+const SEGMENT_ACTORS: Role[] = [Role.VENDOR, Role.VENDOR_MANAGER, Role.ADMIN, Role.SUPER_ADMIN];
+const OPERATIONS_ROLES: Role[] = [Role.ADMIN, Role.SUPER_ADMIN];
+
 const SEGMENT_TRANSITIONS: SegmentTransitionRule[] = [
-  { from: OrderVendorSegmentStatus.PENDING, to: OrderVendorSegmentStatus.CONFIRMED, allowedRoles: [Role.VENDOR, Role.VENDOR_MANAGER] },
-  { from: OrderVendorSegmentStatus.PENDING, to: OrderVendorSegmentStatus.CANCELLED, allowedRoles: [Role.VENDOR, Role.VENDOR_MANAGER] },
+  { from: OrderVendorSegmentStatus.PENDING, to: OrderVendorSegmentStatus.CONFIRMED, allowedRoles: SEGMENT_ACTORS },
+  { from: OrderVendorSegmentStatus.PENDING, to: OrderVendorSegmentStatus.CANCELLED, allowedRoles: SEGMENT_ACTORS },
 
-  { from: OrderVendorSegmentStatus.CONFIRMED, to: OrderVendorSegmentStatus.PREPARING, allowedRoles: [Role.VENDOR, Role.VENDOR_MANAGER] },
-  { from: OrderVendorSegmentStatus.CONFIRMED, to: OrderVendorSegmentStatus.CANCELLED, allowedRoles: [Role.VENDOR, Role.VENDOR_MANAGER] },
+  { from: OrderVendorSegmentStatus.CONFIRMED, to: OrderVendorSegmentStatus.PREPARING, allowedRoles: SEGMENT_ACTORS },
+  { from: OrderVendorSegmentStatus.CONFIRMED, to: OrderVendorSegmentStatus.CANCELLED, allowedRoles: SEGMENT_ACTORS },
 
-  { from: OrderVendorSegmentStatus.PREPARING, to: OrderVendorSegmentStatus.READY_FOR_PICKUP, allowedRoles: [Role.VENDOR, Role.VENDOR_MANAGER] },
-  { from: OrderVendorSegmentStatus.PREPARING, to: OrderVendorSegmentStatus.CANCELLED, allowedRoles: [Role.VENDOR, Role.VENDOR_MANAGER] },
+  { from: OrderVendorSegmentStatus.PREPARING, to: OrderVendorSegmentStatus.READY_FOR_PICKUP, allowedRoles: SEGMENT_ACTORS },
+  { from: OrderVendorSegmentStatus.PREPARING, to: OrderVendorSegmentStatus.CANCELLED, allowedRoles: SEGMENT_ACTORS },
 
-  { from: OrderVendorSegmentStatus.READY_FOR_PICKUP, to: OrderVendorSegmentStatus.CANCELLED, allowedRoles: [Role.VENDOR, Role.VENDOR_MANAGER] },
+  { from: OrderVendorSegmentStatus.READY_FOR_PICKUP, to: OrderVendorSegmentStatus.CANCELLED, allowedRoles: SEGMENT_ACTORS },
 ];
 
 const SEGMENT_LOCKED_ORDER_STATUSES: OrderStatus[] = [
@@ -75,7 +86,10 @@ export class OrderVendorSegmentStateMachineService {
     private readonly orderStateMachine: OrderStateMachineService,
     private readonly orderSegmentCancellationService: OrderSegmentCancellationService,
     private readonly orderPaymentGateService: OrderPaymentGateService,
+    @Optional() private readonly requestContextService?: RequestContextService,
   ) {}
+
+  private readonly logger = new Logger(OrderVendorSegmentStateMachineService.name);
 
   /**
    * `expectedReadyAt` is accepted here because the field already
@@ -89,10 +103,19 @@ export class OrderVendorSegmentStateMachineService {
   async transition(params: {
     segmentId: string;
     to: OrderVendorSegmentStatus;
-    actorUserId: string;
+    /** Null only for a SYSTEM transition (`system: true`): automatic readiness of a Hatly/Wasally service segment. */
+    actorUserId: string | null;
     actorRole: Role;
     expectedReadyAt?: Date;
+    /** Required (non-blank) for a rejection by a person; stored in the segment history and shown to the customer. */
+    reason?: string;
+    /** A transition made by the platform itself (no person): skips the actor/role/ownership checks, still follows the table and gates. */
+    system?: boolean;
   }): Promise<OrderVendorSegment> {
+    const isOperations = !params.system && OPERATIONS_ROLES.includes(params.actorRole);
+    if (params.to === OrderVendorSegmentStatus.CANCELLED && !params.system && !(params.reason ?? '').trim()) {
+      throw new BadRequestException({ message: 'A reason is required to reject an order segment.', details: { code: 'REJECTION_REASON_REQUIRED' } });
+    }
     // Set only when this call cancelled the order's LAST active segment, which cancels the whole order atomically.
     let afterOrderCancelled: (() => Promise<void>) | undefined;
     let partiallyCancelled = false;
@@ -107,13 +130,15 @@ export class OrderVendorSegmentStateMachineService {
         throw new NotFoundException('Order segment not found.');
       }
 
-      if (!segment.vendorBranchId) {
-        // AD_HOC_SERVICE segments have no VendorBranch — there is no
-        // registered vendor to authorize here at all.
-        throw new ForbiddenException('This segment does not belong to a registered vendor.');
+      if (!params.system && !isOperations) {
+        if (!segment.vendorBranchId) {
+          // AD_HOC_SERVICE segments have no VendorBranch — there is no registered vendor to authorize. Only Hatly operations (or the
+          // platform itself) may move one.
+          throw new ForbiddenException('This segment does not belong to a registered vendor.');
+        }
+        await this.vendorStaffAuthorizationService.assertOwnsBranch(params.actorUserId as string, segment.vendorBranchId);
       }
-
-      await this.vendorStaffAuthorizationService.assertOwnsBranch(params.actorUserId, segment.vendorBranchId);
+      const fromStatus = segment.status;
 
       // A vendor may only work a segment while its order is still in the vendor's hands. Once the
       // order is cancelled, failed, delivered, or physically picked up, moving a segment
@@ -132,7 +157,7 @@ export class OrderVendorSegmentStateMachineService {
       if (!rule) {
         throw new BadRequestException(`Cannot transition segment from ${segment.status} to ${params.to}.`);
       }
-      if (!rule.allowedRoles.includes(params.actorRole)) {
+      if (!params.system && !rule.allowedRoles.includes(params.actorRole)) {
         throw new BadRequestException(`Role ${params.actorRole} is not allowed to perform this transition.`);
       }
 
@@ -151,8 +176,9 @@ export class OrderVendorSegmentStateMachineService {
         await this.orderPaymentGateService.assertFulfilmentMayProceed(manager, parentOrder);
       }
 
-      if (params.to === OrderVendorSegmentStatus.READY_FOR_PICKUP) {
-        const items = await manager.find(OrderItem, { where: { orderVendorSegmentId: segment.id } });
+      // (only a vendor's segment carries vendor custom items; a Hatly/Wasally service segment is priced by the driver's purchase record)
+      if (params.to === OrderVendorSegmentStatus.READY_FOR_PICKUP && segment.groupType !== CartGroupType.AD_HOC_SERVICE) {
+        const items = (await manager.find(OrderItem, { where: { orderVendorSegmentId: segment.id } })).filter((i) => !i.removedAt);
         const stillUnpriced = items.some(
           (i) => (i.productId === null || i.productId === undefined) && i.actualAmountMinor == null,
         );
@@ -164,10 +190,9 @@ export class OrderVendorSegmentStateMachineService {
         }
       }
 
-      // APPROVED, NOT YET IMPLEMENTED (docs/PRODUCT_DECISIONS.md PD-002/PD-003): cancelling a segment must also recompute the
-      // order's money from the remaining segments (drop the segment's subtotal/discounts, release its Flash Sale allocation,
-      // drop the Additional Vendor Fee if one vendor remains, refund the difference) with the Delivery Fee FIXED. Today only
-      // stock is restored here. See docs/IMPACT_AUDIT_POST_GROUP_8.md.
+      // Cancelling (rejecting) a segment recomputes the order's money from the remaining segments (PD-002/PD-003/PD-004): the segment's
+      // subtotal and discounts leave, its Flash Sale allocation is released, the additional-vendor fee drops per rejected vendor, the base
+      // delivery fee stays FIXED, and the difference is refunded or removed from the amount due (OrderSegmentCancellationService).
       if (params.to === OrderVendorSegmentStatus.CANCELLED) {
         const order = await manager.findOne(Order, { where: { id: segment.orderId }, lock: { mode: 'pessimistic_write' } });
         if (order && SEGMENT_LOCKED_ORDER_STATUSES.includes(order.status)) {
@@ -202,9 +227,11 @@ export class OrderVendorSegmentStateMachineService {
             await this.orderSegmentCancellationService.applyPartialCancellation(manager, {
               order,
               cancelledSegment: segment,
-              actorUserId: params.actorUserId,
+              actorUserId: params.actorUserId as string,
             });
             partiallyCancelled = true;
+            // Told in the same transaction (one notification per order): this vendor's part is gone, the rest of the order continues.
+            await recordOrderNotification(manager, { id: order.id, customerId: order.customerId, orderNumber: order.orderNumber }, CustomerNotificationType.ORDER_PART_CANCELLED);
           } else {
             // Last active segment: the whole order is cancelled in the SAME transaction (delivery fee 0, the full
             // paid amount minus anything already refunded, remaining flash-sale allocations returned).
@@ -212,8 +239,8 @@ export class OrderVendorSegmentStateMachineService {
               orderId: order.id,
               to: OrderStatus.CANCELLED,
               actorRole: params.actorRole,
-              actorUserId: params.actorUserId,
-              cancellationReason: 'All vendor segments were cancelled.',
+              actorUserId: params.actorUserId as string,
+              cancellationReason: params.reason?.trim() ? `All vendor segments were cancelled — ${params.reason.trim()}` : 'All vendor segments were cancelled.',
             });
             afterOrderCancelled = cancelled.afterCommit;
           }
@@ -225,7 +252,20 @@ export class OrderVendorSegmentStateMachineService {
         segment.expectedReadyAt = params.expectedReadyAt;
       }
 
-      return manager.save(segment);
+      const saved = await manager.save(segment);
+      // Same transaction as the transition: the history and the state can never disagree.
+      await recordSegmentEvent(manager, {
+        segmentId: segment.id,
+        orderId: segment.orderId,
+        fromStatus,
+        toStatus: params.to,
+        actorUserId: params.system ? null : params.actorUserId,
+        actorRole: params.system ? null : params.actorRole,
+        onBehalfOfVendor: isOperations,
+        reason: params.reason ?? null,
+        correlationRef: this.requestContextService?.getCorrelationId?.() ?? null,
+      });
+      return saved;
     });
 
     // Outside the segment's own transaction, deliberately — the
@@ -240,20 +280,27 @@ export class OrderVendorSegmentStateMachineService {
 
     // The vendor whose segment was cancelled may have been the last one the order was waiting for: if every remaining
     // segment is already READY_FOR_PICKUP, the order moves on (and is dispatched) just as if the last one had become ready.
-    if (partiallyCancelled) {
-      const justBecameFullyReady = await this.orderReadinessService.checkAndAdvance(updatedSegment.orderId);
-      if (justBecameFullyReady) {
-        await this.automaticDispatchService.attemptAutomaticDispatch(updatedSegment.orderId);
-      }
-    }
-
-    if (params.to === OrderVendorSegmentStatus.READY_FOR_PICKUP) {
-      const justBecameFullyReady = await this.orderReadinessService.checkAndAdvance(updatedSegment.orderId);
-      if (justBecameFullyReady) {
-        await this.automaticDispatchService.attemptAutomaticDispatch(updatedSegment.orderId);
-      }
+    if (partiallyCancelled || params.to === OrderVendorSegmentStatus.READY_FOR_PICKUP) {
+      await this.advanceAndDispatch(updatedSegment.orderId);
     }
 
     return updatedSegment;
+  }
+
+  /**
+   * After the segment change has COMMITTED: if every remaining segment is ready the order moves on and automatic dispatch is attempted.
+   * A failure here must never turn the vendor's (or operations') successful transition into a failed request — it is logged, recorded as a
+   * dispatch attempt, and raised to operations as an ASSIGNMENT_ERROR alert; a retry is safe (readiness and dispatch are idempotent).
+   */
+  private async advanceAndDispatch(orderId: string): Promise<void> {
+    try {
+      const justBecameFullyReady = await this.orderReadinessService.checkAndAdvance(orderId);
+      if (justBecameFullyReady) {
+        await this.automaticDispatchService.attemptAutomaticDispatch(orderId);
+      }
+    } catch (error) {
+      this.logger.error(`Readiness/dispatch after a segment change failed for order ${orderId}: ${error instanceof Error ? error.message : String(error)}`);
+      await this.automaticDispatchService.recordAssignmentError(orderId, error);
+    }
   }
 }

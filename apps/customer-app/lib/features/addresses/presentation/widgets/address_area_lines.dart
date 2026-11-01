@@ -49,6 +49,25 @@ class AddressAreaLines extends StatelessWidget {
               ],
             ),
           ),
+        // A typed address and a captured map position are different things: say which this one is (a pin helps the driver, and
+        // Hatly Service needs one for its place).
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Row(
+            key: Key(address.hasPin ? 'address-pinned-${address.id}' : 'address-text-only-${address.id}'),
+            children: [
+              Icon(address.hasPin ? Icons.my_location : Icons.edit_location_alt_outlined, size: 14, color: p.textMuted),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                    address.mode == AddressMode.gps
+                        ? l10n.addressGpsSaved // the GPS method: the location IS the address
+                        : (address.hasPin ? l10n.addressMapLocationSaved : l10n.addressTextOnly),
+                    style: context.type.caption.copyWith(color: p.textMuted)),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

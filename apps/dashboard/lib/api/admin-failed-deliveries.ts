@@ -25,6 +25,37 @@ export interface AdminHatlyService {
   pickupLongitude: number | null;
   destinationLatitude: number | null;
   destinationLongitude: number | null;
+  /** Orders placed from PD-012 on: the route as it was frozen at checkout (origin → destination). Absent for earlier orders. */
+  route?: { origin: AdminRoutePoint; destination: AdminRoutePoint } | null;
+}
+
+export interface AdminRoutePoint {
+  latitude: number;
+  longitude: number;
+  label: string | null;
+  source: 'CUSTOMER' | 'DEFAULT';
+}
+
+export interface AdminSegmentHistoryEntry {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  at: string;
+  onBehalfOfVendor: boolean;
+  /** SYSTEM when the platform itself made the change. */
+  actorRole: string;
+  actorName?: string | null;
+  reason: string | null;
+}
+
+export interface AdminRefundSummary {
+  walletRefundedMinor: number;
+  transferRefundRecordedMinor: number;
+  transferRefundSentMinor: number;
+  pendingRefundMinor: number;
+  totalRefundMinor: number;
+  status: string;
+  transferRefunds: Array<{ id: string; amountMinor: number; recordedAt: string; sentAt: string | null }>;
 }
 
 /** Mirrors the real backend `AdminOrderDetailView` exactly (admin-orders.service.ts, Chunk 2a). Only the shape actually used by this chunk's UI is declared here. */
@@ -66,13 +97,24 @@ export interface AdminOrderDetail {
     reassignmentCount: number;
   } | null;
   /** Control Tower milestone: "no eligible driver" alerts for this order, newest first. */
-  dispatchAlerts?: Array<{ id: string; reason: string; createdAt: string; resolvedAt: string | null }>;
+  dispatchAlerts?: Array<{ id: string; reason: string; detail?: string | null; createdAt: string; resolvedAt: string | null }>;
+  /** Order operations: every automatic assignment attempt and its outcome, newest first. */
+  dispatchAttempts?: Array<{ outcome: string; driverId: string | null; detail: string | null; at: string }>;
+  /** Order operations: what has been given back so far, from the real ledgers. */
+  refundSummary?: AdminRefundSummary;
+  /** PD-015: the Hatly-funded promotional cost, recorded minus restored (informational — not a refund). */
+  hatlyFundedDiscount?: { recordedMinor: number; restoredMinor: number; netMinor: number };
   segments: Array<{
     id: string;
     groupType: string;
     vendorBranchId: string | null;
     status: string;
     subtotalMinor: number | null;
+    vendorName?: string | null;
+    branchName?: string | null;
+    /** Every transition of the segment, oldest first (who, in which role, on whose behalf, and why). */
+    history?: AdminSegmentHistoryEntry[];
+    rejectionReason?: string | null;
     /** Hatly Service request details — present only for an AD_HOC_SERVICE segment. */
     hatlyService?: AdminHatlyService | null;
     items: Array<{

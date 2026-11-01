@@ -23,6 +23,9 @@ export interface VendorBranch {
   isActive: boolean;
   isOpen: boolean;
   marketplaceSectorId: string | null;
+  /** Automatic acceptance (accepted only — never preparing or ready). Per-branch; manual by default. */
+  autoAcceptEnabled?: boolean;
+  preparationTimeMinutes?: number | null;
 }
 
 /** Only `name`/`nameAr`/`logoUrl` — `category`/`commissionPercent` are excluded, per the closed decision. */
@@ -65,6 +68,14 @@ export async function updateVendor(id: string, input: Partial<CreateVendorInput>
   return res.data.data;
 }
 
+/** Multipart, field name "image" (JPEG/PNG/WebP, up to 5 MB) — the same contract as a product / banner image. The API stores the stable `/uploads/files/...` reference as the vendor's `logoUrl`. */
+export async function uploadVendorLogo(id: string, file: File): Promise<Vendor> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await apiClient.post(`/admin/vendors/${id}/logo`, formData);
+  return res.data.data;
+}
+
 export async function activateVendor(id: string): Promise<Vendor> {
   const res = await apiClient.patch(`/admin/vendors/${id}/activate`);
   return res.data.data;
@@ -92,7 +103,7 @@ export async function createVendorBranch(input: CreateVendorBranchInput): Promis
 
 export async function updateVendorBranch(
   id: string,
-  input: Partial<Omit<CreateVendorBranchInput, 'vendorId'>>,
+  input: Partial<Omit<CreateVendorBranchInput, 'vendorId'>> & { preparationTimeMinutes?: number | null },
 ): Promise<VendorBranch> {
   const res = await apiClient.patch(`/admin/vendor-branches/${id}`, input);
   return res.data.data;

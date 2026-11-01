@@ -17,9 +17,32 @@ function coords(lat: number | null, lng: number | null) {
   return lat != null && lng != null ? { lat, lng } : null;
 }
 
-/** Origin/destination of a Hatly Service request by its own semantics — never a Hatly default location. */
+/**
+ * Origin → destination of a Hatly / Wasally request. From PD-012 on the order carries its frozen route (label, coordinates, and whether each end
+ * was the customer's choice or the service default). An order placed before that has no route: it is shown by the earlier semantics (the chosen
+ * place and the customer's own address).
+ */
 export function HatlyServiceRoute({ service, detail }: { service: AdminHatlyService; detail: AdminOrderDetail }) {
   const { t, locale } = useI18n();
+  if (service.route) {
+    const text = (p: NonNullable<AdminHatlyService['route']>['origin']) =>
+      t('hsRoutePoint', {
+        label: p.label ?? t('dash'),
+        lat: p.latitude,
+        lng: p.longitude,
+        source: p.source === 'DEFAULT' ? t('hsRouteDefault') : t('hsRouteCustomer'),
+      });
+    return (
+      <dl className="mt-1 grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-sm" data-testid="hatly-route">
+        <dt className="text-gray-500">{t('hsServiceType')}</dt>
+        <dd>{service.serviceType === 'BUY_FROM_PLACE' ? t('hsTypeBuy') : service.serviceType === 'DELIVER_TO_PLACE' ? t('hsTypeDeliver') : t('dash')}</dd>
+        <dt className="text-gray-500">{t('hsFrom')}</dt>
+        <dd data-testid="hatly-route-origin">{text(service.route.origin)}</dd>
+        <dt className="text-gray-500">{t('hsTo')}</dt>
+        <dd data-testid="hatly-route-destination">{text(service.route.destination)}</dd>
+      </dl>
+    );
+  }
   const address = detail.deliveryAddress;
   const customerAddress = address ? t('hsCustomerAddress', { address: deliveryAddressText(address, locale) }) : t('dash');
   const placeName = service.placeName ?? t('dash');
@@ -156,14 +179,14 @@ export function HatlyServiceItem({
                   disabled={submitting}
                   aria-invalid={error != null && error.startsWith('err')}
                   aria-describedby={`${inputId}-hint`}
-                  className="w-36 rounded border px-2 py-1.5 text-sm disabled:opacity-60"
+                  className="w-36 rounded-lg border px-2 py-1.5 text-sm disabled:opacity-60 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                   dir="ltr"
                 />
               </div>
               <button
                 type="submit"
                 disabled={submitting}
-                className="mt-[18px] rounded bg-hatly-orange px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                className="mt-[18px] rounded-lg bg-hatly-orange px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
               >
                 {submitting ? t('hsConfirming') : t('hsConfirmPrice')}
               </button>

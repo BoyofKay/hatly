@@ -1,3 +1,4 @@
+import { StockActor } from './products.service';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import * as XLSX from 'xlsx';
@@ -305,7 +306,7 @@ export class ProductExcelImportService {
    * authorization or as the set of changes to apply. All-or-nothing:
    * a single `dataSource.transaction` wraps every row's update.
    */
-  async apply(buffer: Buffer, authorize: BranchAuthorizer): Promise<ExcelImportApplyResult> {
+  async apply(buffer: Buffer, authorize: BranchAuthorizer, actor?: StockActor): Promise<ExcelImportApplyResult> {
     const { summary, intents } = await this.validate(buffer, authorize);
     if (summary.status === 'FAILED') {
       throw new BadRequestException({
@@ -336,6 +337,7 @@ export class ProductExcelImportService {
               quantity: intent.quantity,
             } as any,
             manager,
+            actor ? { ...actor, reason: 'IMPORT' } : undefined,
           );
         }
         if (intent.isAvailable !== undefined) {

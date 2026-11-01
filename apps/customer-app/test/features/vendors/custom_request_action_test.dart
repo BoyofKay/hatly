@@ -39,7 +39,7 @@ void main() {
 
     await tester.tap(find.text("Can't find what you're looking for?"));
     await tester.pumpAndSettle();
-    expect(find.text('Request a custom item'), findsOneWidget);
+    expect(find.text("Request an item that isn't listed"), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.add_a_photo_outlined));
     await tester.pump();
@@ -48,7 +48,7 @@ void main() {
     // pending — this disposes _CustomRequestSheetState.
     await tester.tapAt(const Offset(200, 10));
     await tester.pumpAndSettle();
-    expect(find.text('Request a custom item'), findsNothing);
+    expect(find.text("Request an item that isn't listed"), findsNothing);
 
     // The OS picker "returns" only now, after the sheet is already gone.
     gate.complete(XFile('fake/path/photo.jpg'));
@@ -89,6 +89,65 @@ void main() {
         findsOneWidget);
     expect(find.textContaining('A cart cannot contain'), findsNothing);
   });
+
+  testWidgets(
+      'before tapping, the entry says what will happen; the sheet explains the flow (cart → store → price); after adding, the customer is told what happened',
+      (tester) async {
+    final api = _AcceptingCartApi();
+    await tester.pumpWidget(hatlyTestApp(
+      const Scaffold(
+          body: Center(child: CustomRequestAction(vendorBranchId: 'branch-1'))),
+      locale: const Locale('ar'),
+      overrides: [cartApiProvider.overrideWithValue(api)],
+    ));
+    await tester.pumpAndSettle();
+    final ar = lookupAppLocalizations(const Locale('ar'));
+    expect(find.byKey(const Key('custom-request-hint')), findsOneWidget);
+    expect(find.text(ar.customRequestEntryHint), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.help_outline));
+    await tester.pumpAndSettle();
+    expect(find.text(ar.customRequestSheetTitle), findsOneWidget);
+    expect(find.text(ar.customRequestSheetSubtitle), findsOneWidget);
+    await tester.enterText(find.byType(TextField).first, 'بانادول إكسترا');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10nSubmitAr));
+    await tester.pumpAndSettle();
+
+    expect(find.text(ar.customRequestSheetTitle), findsNothing,
+        reason: 'the sheet closes on success');
+    expect(find.text(ar.customRequestAdded), findsOneWidget);
+    expect(api.sent, ['بانادول إكسترا']);
+  });
+
+  testWidgets(
+      'the server refusing a sector that does not allow custom requests is shown localized (never the English backend text) and nothing is claimed as added',
+      (tester) async {
+    final api = _RejectingCartApi(const ApiException(
+      code: 'FORBIDDEN',
+      message: 'Custom requests are not available for this vendor.',
+      details: {'code': 'CUSTOM_REQUESTS_NOT_AVAILABLE'},
+      statusCode: 403,
+    ));
+    await tester.pumpWidget(hatlyTestApp(
+      const Scaffold(
+          body: Center(child: CustomRequestAction(vendorBranchId: 'branch-1'))),
+      locale: const Locale('ar'),
+      overrides: [cartApiProvider.overrideWithValue(api)],
+    ));
+    await tester.pumpAndSettle();
+    final ar = lookupAppLocalizations(const Locale('ar'));
+    await tester.tap(find.byIcon(Icons.help_outline));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'شيء');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10nSubmitAr));
+    await tester.pumpAndSettle();
+    expect(find.text(ar.cartErrorCustomRequestsUnavailable), findsOneWidget);
+    expect(
+        find.textContaining('Custom requests are not available'), findsNothing);
+    expect(find.text(ar.customRequestAdded), findsNothing);
+  });
 }
 
 /// A cart API whose custom-item add is rejected with a fixed backend error.
@@ -107,5 +166,21 @@ class _RejectingCartApi extends FakeCartApi {
   }) async {
     attempts++;
     throw error;
+  }
+}
+
+/// A cart API that accepts the custom item (and records what was sent).
+class _AcceptingCartApi extends FakeCartApi {
+  final sent = <String?>[];
+
+  @override
+  Future<Cart> addVendorCustomItem({
+    String? cartVendorGroupId,
+    String? vendorBranchId,
+    String? freeTextDescription,
+    List<String>? imageUrls,
+  }) async {
+    sent.add(freeTextDescription);
+    return cart;
   }
 }

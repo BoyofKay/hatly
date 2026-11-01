@@ -22,29 +22,44 @@ class HatlySearchBar extends StatelessWidget {
       label: hintText,
       onTap: onTap,
       excludeSemantics: true,
-      child: Material(
-        color: p.surfaceSoft,
-        borderRadius: BorderRadius.circular(HatlyRadius.searchBar),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(HatlyRadius.searchBar),
-          onTap: onTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 48),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: HatlySpacing.md),
-              child: Row(
-                children: [
-                  Icon(Icons.search_rounded, color: p.textMuted, size: 22),
-                  const SizedBox(width: HatlySpacing.ms),
-                  Expanded(
-                    child: Text(
-                      hintText,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.type.body.copyWith(color: p.textMuted),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: p.surface,
+          borderRadius: BorderRadius.circular(HatlyRadius.circular),
+          border: Border.all(color: p.border),
+          boxShadow: HatlyShadows.soft(p),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(HatlyRadius.circular),
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 52),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(
+                    start: HatlySpacing.ms, end: HatlySpacing.md),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                          color: p.accentSoft, shape: BoxShape.circle),
+                      child:
+                          Icon(Icons.search_rounded, color: p.accent, size: 22),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: HatlySpacing.ms),
+                    Expanded(
+                      child: Text(
+                        hintText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.type.body.copyWith(color: p.textMuted),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

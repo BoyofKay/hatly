@@ -76,7 +76,10 @@ export class AdminDispatchService {
     const candidateDriverIds = driverId
       ? await this.resolveNamedDriverCandidate(orderId, driverId, hasOverridePermission)
       : await this.rankForOrder(orderId);
-    return this.deliveryAssignmentService.assignDriver({ orderId, candidateDriverIds });
+    const delivery = await this.deliveryAssignmentService.assignDriver({ orderId, candidateDriverIds });
+    // A person took over: the unanswered-offer streak starts over (the assignment itself resolved every open alert of the order).
+    await this.deliveriesRepository.update({ orderId }, { consecutiveUnanswered: 0 });
+    return delivery;
   }
 
   /**
@@ -90,7 +93,9 @@ export class AdminDispatchService {
   async reassign(orderId: string, newDriverId: string, hasOverridePermission = false, expectedCurrentDriverId?: string): Promise<Delivery> {
     await this.requireStatus(orderId, OrderStatus.ASSIGNED_TO_DRIVER);
     await this.resolveNamedDriverCandidate(orderId, newDriverId, hasOverridePermission);
-    return this.deliveryAssignmentService.reassignDriver({ orderId, newDriverId, expectedCurrentDriverId });
+    const delivery = await this.deliveryAssignmentService.reassignDriver({ orderId, newDriverId, expectedCurrentDriverId });
+    await this.deliveriesRepository.update({ orderId }, { consecutiveUnanswered: 0 });
+    return delivery;
   }
 
   private async requireStatus(orderId: string, expected: OrderStatus): Promise<void> {

@@ -41,19 +41,23 @@ const _navItems = [
 void main() {
   group('HatlySearchBar', () {
     testWidgets(
-        'is a soft filled 12px-radius control without a border, ≥48px tall, and reports taps',
+        'is a white pill with a hairline border and an orange search chip, ≥48px tall, and reports taps',
         (tester) async {
       var taps = 0;
       await tester.pumpWidget(hatlyTestApp(
           HatlySearchBar(hintText: 'بتدور على إيه؟', onTap: () => taps++)));
 
       expect(find.text('بتدور على إيه؟'), findsOneWidget);
-      final material = tester.widget<Material>(find
+      // the pill: fully rounded corners and a visible border
+      final box = tester.widget<DecoratedBox>(find
           .descendant(
-              of: find.byType(HatlySearchBar), matching: find.byType(Material))
+              of: find.byType(HatlySearchBar),
+              matching: find.byType(DecoratedBox))
           .first);
-      expect(material.borderRadius, BorderRadius.circular(12));
-      expect(material.shape, isNull); // no outline shape/border
+      final decoration = box.decoration as BoxDecoration;
+      expect(
+          decoration.borderRadius, BorderRadius.circular(HatlyRadius.circular));
+      expect(decoration.border, isNotNull);
       expect(tester.getSize(find.byType(HatlySearchBar)).height,
           greaterThanOrEqualTo(48));
 

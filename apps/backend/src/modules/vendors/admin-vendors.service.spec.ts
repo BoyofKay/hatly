@@ -33,8 +33,9 @@ function buildHarness(seed: { vendors?: any[]; branches?: any[] } = {}) {
   };
 
   const serviceAreasRepository = { findOne: jest.fn(async () => ({ id: 'default-service-area', isActive: true })) };
-  const service = new AdminVendorsService(vendorsRepository as any, branchesRepository as any, serviceAreasRepository as any);
-  return { service, vendors, branches };
+  const uploads = { upload: jest.fn(async (_b64: string, filename: string) => ({ id: 'u1', url: `/uploads/files/stored-${filename}` })) };
+  const service = new AdminVendorsService(vendorsRepository as any, branchesRepository as any, serviceAreasRepository as any, uploads as any);
+  return { service, vendors, branches, uploads };
 }
 
 function vendorDto(overrides: Partial<any> = {}) {
@@ -228,7 +229,7 @@ describe('AdminVendorsService — VendorBranch ServiceArea assignment (Phase I-B
     };
     const serviceAreasRepository = { findOne: async (o: any) => serviceAreas.get(o.where.id) ?? null };
 
-    const service = new AdminVendorsService(vendorsRepository as any, branchesRepository as any, serviceAreasRepository as any);
+    const service = new AdminVendorsService(vendorsRepository as any, branchesRepository as any, serviceAreasRepository as any, {} as any);
     return { service, branches };
   }
 
@@ -263,5 +264,33 @@ describe('AdminVendorsService — VendorBranch ServiceArea assignment (Phase I-B
     const updated = await service.updateVendorBranch('b1', { name: 'New Name' });
     expect(updated.name).toBe('New Name');
     expect(branches.get('b1').serviceAreaId).toBeNull(); // untouched
+  });
+});
+
+describe('AdminVendorsService.uploadLogo', () => {
+  const png = (over: Partial<{ mimetype: string; size: number }> = {}) => ({ buffer: Buffer.from('bytes'), mimetype: 'image/png', size: 5, ...over });
+
+  it('stores the provider reference as the vendor logo; the stored name comes from the validated type, not the client', async () => {
+    const { service, uploads } = buildHarness({ vendors: [{ id: 'v1', name: 'V', logoUrl: null }] });
+    const result = await service.uploadLogo('v1', png(), 'admin-1');
+    expect(uploads.upload).toHaveBeenCalledWith(Buffer.from('bytes').toString('base64'), 'vendor-logo.png', 'admin-1');
+    expect(result.logoUrl).toBe('/uploads/files/stored-vendor-logo.png');
+  });
+
+  it('refuses an unsupported type or an oversize file BEFORE anything is stored, and keeps the old logo', async () => {
+    const { service, uploads, vendors } = buildHarness({ vendors: [{ id: 'v1', name: 'V', logoUrl: 'https://cdn.example.com/old.png' }] });
+    await expect(service.uploadLogo('v1', png({ mimetype: 'text/plain' }), 'a')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.uploadLogo('v1', png({ size: 5 * 1024 * 1024 + 1 }), 'a')).rejects.toBeInstanceOf(BadRequestException);
+    expect(uploads.upload).not.toHaveBeenCalled();
+    expect(vendors.get('v1').logoUrl).toBe('https://cdn.example.com/old.png');
+  });
+
+  it('a storage failure leaves the old logo untouched; an unknown vendor is 404 and stores nothing', async () => {
+    const { service, uploads, vendors } = buildHarness({ vendors: [{ id: 'v1', name: 'V', logoUrl: null }] });
+    uploads.upload.mockRejectedValueOnce(new Error('disk full'));
+    await expect(service.uploadLogo('v1', png(), 'a')).rejects.toThrow('disk full');
+    expect(vendors.get('v1').logoUrl).toBeNull();
+    await expect(service.uploadLogo('missing', png(), 'a')).rejects.toBeInstanceOf(NotFoundException);
+    expect(uploads.upload).toHaveBeenCalledTimes(1);
   });
 });

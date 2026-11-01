@@ -1,3 +1,4 @@
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Body, Controller, Get, Header, Param, Patch, Post, Query, StreamableFile, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
@@ -74,8 +75,8 @@ export class AdminProductsController {
   @Throttled(RateLimitPolicies.fileImport)
   @RequiresPermission(Permission.MANAGE_CATALOG)
   @UseInterceptors(FileInterceptor('file', { limits: singleFileMultipartLimits(EXCEL_IMPORT_MAX_FILE_SIZE_BYTES) }))
-  async applyImport(@UploadedFile() file: Express.Multer.File) {
-    const result = await this.productExcelImportService.apply(requireUploadedFile(file, 'file').buffer, async () => true);
+  async applyImport(@UploadedFile() file: Express.Multer.File, @CurrentUser() actor: AuthenticatedUser) {
+    const result = await this.productExcelImportService.apply(requireUploadedFile(file, 'file').buffer, async () => true, { userId: actor.id, role: actor.role });
     return { data: result };
   }
 
@@ -88,8 +89,8 @@ export class AdminProductsController {
 
   @Patch(':id')
   @RequiresPermission(Permission.MANAGE_CATALOG)
-  async update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    const product = await this.productsService.adminUpdateProduct(id, dto);
+  async update(@Param('id') id: string, @Body() dto: UpdateProductDto, @CurrentUser() actor: AuthenticatedUser) {
+    const product = await this.productsService.adminUpdateProduct(id, dto, undefined, { userId: actor.id, role: actor.role });
     return { data: product };
   }
 
@@ -114,8 +115,8 @@ export class AdminProductsController {
    */
   @Patch(':id/set-inventory-zero')
   @RequiresPermission(Permission.MANAGE_CATALOG)
-  async setInventoryToZero(@Param('id') id: string) {
-    const product = await this.productsService.adminSetInventoryToZero(id);
+  async setInventoryToZero(@Param('id') id: string, @CurrentUser() actor: AuthenticatedUser) {
+    const product = await this.productsService.adminSetInventoryToZero(id, { userId: actor.id, role: actor.role });
     return { data: product };
   }
 }

@@ -1,6 +1,9 @@
+import { branchIdsUnderClosure, effectiveOpenSql } from '../../common/branch-availability';
+import { setStockContext } from '../orders/stock-context';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, EntityManager } from 'typeorm';
+import { sectorAllowsCustomRequests } from '../sectors/entities/marketplace-sector.entity';
 import { ProductCategory } from './entities/product-category.entity';
 import { Product } from './entities/product.entity';
 import { VendorBranch } from '../vendors/entities/vendor-branch.entity';
@@ -30,6 +33,8 @@ import { UpdateProductDto } from './dto/update-product.dto';
  */
 export interface VendorBranchDetailsView {
   id: string;
+  /** Whether customers may send a custom (free-text / photo) request to this branch — its sector's admin-managed setting. */
+  allowsCustomRequests: boolean;
   address: string;
   latitude: number;
   longitude: number;
@@ -45,11 +50,25 @@ export interface VendorBranchDetailsView {
   };
 }
 
+/**
+ * `sort=bestSelling`'s ORDER BY key (see `getProducts`): the delivered count of the product's own unit. Exported so the Home
+ * aggregation (home-products module) ranks "most ordered" with exactly the same expression instead of a copy.
+ */
+export const PRODUCT_BEST_SELLING_ORDER_SQL = `CASE WHEN product.pricing_unit = '${PricingUnit.WEIGHT}' THEN product.delivered_weight_grams_count ELSE product.delivered_quantity_count END`;
+
 export interface ProductListResult {
   data: Product[];
   page: number;
   limit: number;
   total: number;
+}
+
+/** Who is changing stock, for the stock ledger (see orders/stock-context.ts). */
+export interface StockActor {
+  userId: string;
+  role: string;
+  reason?: 'MANUAL_ADJUSTMENT' | 'IMPORT';
+  note?: string;
 }
 
 @Injectable()
@@ -79,17 +98,19 @@ export class ProductsService {
    * matching the design review's explicit instruction.
    */
   async getBranchDetails(id: string): Promise<VendorBranchDetailsView> {
-    const branch = await this.branchesRepository.findOne({ where: { id }, relations: { vendor: true } });
+    const branch = await this.branchesRepository.findOne({ where: { id }, relations: { vendor: true, marketplaceSector: true } });
     if (!branch) {
       throw new NotFoundException('Vendor branch not found.');
     }
 
     return {
       id: branch.id,
+      // The server's own rule for custom requests (also enforced on the cart endpoint): the app only mirrors it.
+      allowsCustomRequests: sectorAllowsCustomRequests(branch.marketplaceSector),
       address: branch.address,
       latitude: branch.latitude,
       longitude: branch.longitude,
-      isOpen: branch.isOpen,
+      isOpen: branch.isOpen && !(await branchIdsUnderClosure(this.branchesRepository.manager, [branch.id])).has(branch.id),
       openingHours: branch.openingHours,
       ratingAverage: branch.ratingCount > 0 ? branch.ratingSumStars / branch.ratingCount : 0,
       ratingCount: branch.ratingCount,
@@ -226,7 +247,7 @@ export class ProductsService {
       case 'bestSelling':
         qb = qb
           .orderBy(
-            `CASE WHEN product.pricing_unit = '${PricingUnit.WEIGHT}' THEN product.delivered_weight_grams_count ELSE product.delivered_quantity_count END`,
+            PRODUCT_BEST_SELLING_ORDER_SQL,
             'DESC',
           )
           .addOrderBy('product.id', 'ASC');
@@ -275,7 +296,7 @@ export class ProductsService {
     const [catalogIds, rows] = await Promise.all([
       resolvePublicCatalogIds(manager, [product.id]),
       manager.query(
-        `SELECT b.id AS branch_id, b.name AS branch_name, b.is_open, b.rating_count, b.rating_sum_stars,
+        `SELECT b.id AS branch_id, b.name AS branch_name, ${effectiveOpenSql('b')} AS is_open, b.rating_count, b.rating_sum_stars,
                 v.id AS vendor_id, v.name AS vendor_name, v.name_ar AS vendor_name_ar, v.logo_url AS vendor_logo_url
            FROM vendor_branches b JOIN vendors v ON v.id = b.vendor_id
           WHERE b.id = $1`,
@@ -455,7 +476,7 @@ export class ProductsService {
    * (see UpdateProductDto's own comment — an open decision, not
    * decided by this implementation).
    */
-  async adminUpdateProduct(id: string, dto: UpdateProductDto, manager?: EntityManager): Promise<Product> {
+  async adminUpdateProduct(id: string, dto: UpdateProductDto, manager?: EntityManager, actor?: StockActor): Promise<Product> {
     const repo = manager ? manager.getRepository(Product) : this.productsRepository;
     const product = await this.adminGetProduct(id, manager);
 
@@ -481,6 +502,13 @@ export class ProductsService {
     // change it, and a manually-disabled state is never silently
     // overwritten by an inventory update.
 
+    if (actor && (dto.inventoryMode !== undefined || dto.quantity !== undefined)) {
+      // The stock ledger (a trigger on `products`) records who changed the quantity and why — the context is set in the same transaction.
+      return repo.manager.transaction(async (m) => {
+        await setStockContext(m, { reason: actor.reason ?? 'MANUAL_ADJUSTMENT', actorUserId: actor.userId, actorRole: actor.role, note: actor.note });
+        return m.getRepository(Product).save(product);
+      });
+    }
     return repo.save(product);
   }
 
@@ -561,7 +589,7 @@ export class ProductsService {
    * Rejected outright for an OPEN product — there is no "inventory"
    * to zero out for one, and silently no-op'ing would be misleading.
    */
-  async adminSetInventoryToZero(id: string): Promise<Product> {
+  async adminSetInventoryToZero(id: string, actor?: StockActor): Promise<Product> {
     const product = await this.adminGetProduct(id);
     if (product.inventoryMode !== InventoryMode.TRACKED) {
       throw new BadRequestException({
@@ -570,6 +598,12 @@ export class ProductsService {
       });
     }
     product.quantity = 0;
+    if (actor) {
+      return this.productsRepository.manager.transaction(async (m) => {
+        await setStockContext(m, { reason: 'SET_TO_ZERO', actorUserId: actor.userId, actorRole: actor.role });
+        return m.getRepository(Product).save(product);
+      });
+    }
     return this.productsRepository.save(product);
   }
 }
@@ -583,7 +617,7 @@ export class ProductsService {
  * SQL (not TypeORM's own query builder for these tables), so soft-delete (`deleted_at IS NULL`) is
  * spelled out explicitly here rather than relying on TypeORM's automatic scoping.
  */
-function hasActiveOfferForProductSql(): string {
+export function hasActiveOfferForProductSql(): string {
   return `EXISTS (
     SELECT 1 FROM offers o
     WHERE o.vendor_branch_id = product.vendor_branch_id

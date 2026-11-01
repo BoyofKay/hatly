@@ -57,38 +57,26 @@ export enum BusinessConfigKey {
   REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR = 'REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR',
 
   /**
-   * PHASE 3 HATLY-SERVICE-LOCATION addition. Deliberately NOT seeded
-   * with any value — the real office coordinates were never supplied
-   * and must not be invented. Value shape: `{ latitude, longitude,
-   * label }`.
+   * Hatly ("هاتلي من مكان") route defaults (PD-012). Value shape `{ latitude, longitude, label }`, validated on write. Deliberately
+   * NOT seeded: the real locations were never supplied and must not be invented — an unset key means "no default", and a request
+   * that would need it is refused with a clear code (`HATLY_DEFAULT_PICKUP_NOT_CONFIGURED` / `..._DESTINATION_...`).
    *
-   * NO LONGER READ ANYWHERE as a Hatly Service fallback (same status as
-   * HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION below). It used to supply the
-   * pickup of a BUY_FROM_PLACE ("هاتلي من مكان") group when the customer
-   * had not chosen the place's location — which sent the courier to
-   * Hatly's own office to "buy from a place". A BUY_FROM_PLACE request with
-   * no customer-chosen pickup now fails checkout validation instead
-   * (`BUY_FROM_PLACE_PICKUP_REQUIRED`). Kept only so a row an Admin may
-   * already have set is not orphaned. Hatly's own location stays available
-   * for genuine Hatly operational purposes, never as a stand-in for a
-   * customer-supplied place or address.
+   * PICKUP is the Hatly route's ORIGIN: used when the customer has not chosen another origin. It is never used for Wasally, and
+   * never replaces the customer's own address.
    */
   HATLY_SERVICE_DEFAULT_PICKUP_LOCATION = 'HATLY_SERVICE_DEFAULT_PICKUP_LOCATION',
 
   /**
-   * Launch-Readiness Gap Audit fix (Hatly Service location semantics).
-   * NO LONGER READ ANYWHERE — kept only so any row an Admin may already
-   * have set for it in a live database is not orphaned/unexplained.
-   * Originally documented (before this fix) as a fallback DESTINATION
-   * for a DELIVER_TO_PLACE ("وصلي لمكان") group with no customer-
-   * supplied destination — that was the actual bug: silently routing a
-   * customer's DELIVERY to Hatly's own office address misrepresents
-   * where their item actually goes, unlike the pickup-side fallback
-   * above (which never misrepresents a delivery destination). A
-   * DELIVER_TO_PLACE request with no destination now fails checkout
-   * validation instead (`DELIVER_TO_PLACE_DESTINATION_REQUIRED`).
+   * Hatly route DESTINATION default (PD-012): used when the customer has not chosen a destination. Same shape and the same
+   * "never invented, never seeded" rule as the pickup default. Wasally has its OWN key below — the two services never share a default.
    */
   HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION = 'HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION',
+
+  /**
+   * Wasally ("وصّلي لمكان") DESTINATION default (PD-012): used when the customer has not chosen another destination. Wasally's ORIGIN
+   * has no default at all — it is always chosen by the customer (current GPS, saved address, or a map point).
+   */
+  WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION = 'WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION',
 
   /**
    * PHASE 4 DISPATCH addition. Confirmed business decision. true =
@@ -99,6 +87,7 @@ export enum BusinessConfigKey {
    * exactly — no existing vendor workflow changes unless an Admin
    * deliberately flips this.
    */
+  /** RETIRED — nothing reads it. Automatic acceptance is a per-branch setting (`vendor_branches.auto_accept_enabled`). Kept only so the seeded row stays valid. */
   VENDOR_SEGMENT_AUTO_ACCEPT_ENABLED = 'VENDOR_SEGMENT_AUTO_ACCEPT_ENABLED',
 
   /**

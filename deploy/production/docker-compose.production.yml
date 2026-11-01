@@ -1,0 +1,121 @@
+# Hatly PRODUCTION stack — backend, dashboard, PostgreSQL, Redis. Separate from staging in every resource:
+#
+#   project   : hatly-prod                     (containers hatly-prod-<service>-1)
+#   networks  : hatly-prod_internal (private: postgres/redis/backend/dashboard)
+#               hatly-edge (EXTERNAL, created once by deploy/production/stage2-deploy.sh): ONLY backend + dashboard, reachable by the shared
+#               edge Caddy (today the staging Caddy, which owns ports 80/443) under the aliases hatly-prod-backend / hatly-prod-dashboard
+#   volumes   : hatly-prod_pgdata, hatly-prod_redisdata, hatly-prod_uploads (explicit names; `down -v` is never used in production)
+#   ports     : NONE published. Nothing listens on the host; Caddy reaches the apps over hatly-edge. Operators use `docker exec`.
+#   edge      : NO Caddy in this file (only one process can own 80/443; the old /opt/hatly-git compose had one and must never start).
+#
+# Run it ONLY through deploy/production/prod.sh (pins -p hatly-prod, this file and /opt/hatly-prod/.env.production).
+# Images are built from the same reviewed Dockerfiles as staging (Node 22; nested production node_modules; compiled PostCSS). The env file
+# sets NODE_ENV=production, which overrides the backend image's NODE_ENV=staging default.
+name: hatly-prod
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "20m", max-file: "5" }   # bounded logs: a chatty process cannot fill the disk
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PROD_DB_NAME:?set in .env.production}
+      POSTGRES_USER: ${PROD_DB_USER:?set in .env.production}
+      POSTGRES_PASSWORD: ${PROD_DB_PASSWORD:?set in .env.production}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    mem_limit: 1g
+    shm_size: 256m
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes --save 60 1000 --maxmemory 200mb --maxmemory-policy noeviction"]
+    environment:
+      REDIS_PASSWORD: ${PROD_REDIS_PASSWORD:?set in .env.production}
+    volumes:
+      - redisdata:/data
+    networks: [internal]
+    mem_limit: 256m
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Service names are DELIBERATELY not "backend"/"dashboard": Compose registers every service name as a DNS alias on EVERY network the
+  # container joins, and the shared staging Caddy proxies its own sites to `backend:3000` / `dashboard:3001`. On hatly-edge those
+  # generic names made the staging edge resolve to these PRODUCTION containers (found and rolled back 2026-10-25). The container names
+  # stay hatly-prod-backend-1 / hatly-prod-dashboard-1 (scripts and the Caddy block use those / the hatly-prod-* aliases).
+  prod-backend:
+    container_name: hatly-prod-backend-1
+    build:
+      context: ${PROD_SRC_DIR:-../..}
+      dockerfile: deploy/staging/backend.Dockerfile
+    image: hatly-prod-backend:${PROD_RELEASE:?set PROD_RELEASE (prod.sh does)}
+    restart: unless-stopped
+    env_file: ${PROD_ENV_FILE:-/opt/hatly-prod/.env.production}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    volumes:
+      - uploads:/data/uploads
+    networks:
+      internal: {}
+      edge: { aliases: [hatly-prod-backend] }
+    mem_limit: 1g
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/api/v1/health/ready >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  prod-dashboard:
+    container_name: hatly-prod-dashboard-1
+    build:
+      context: ${PROD_SRC_DIR:-../..}
+      dockerfile: deploy/staging/dashboard.Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PROD_PUBLIC_API_URL:?set in .env.production}
+    image: hatly-prod-dashboard:${PROD_RELEASE:?set PROD_RELEASE (prod.sh does)}
+    restart: unless-stopped
+    depends_on:
+      prod-backend: { condition: service_healthy }
+    networks:
+      edge: { aliases: [hatly-prod-dashboard] }
+    mem_limit: 1g
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3001/privacy >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+networks:
+  internal:
+    name: hatly-prod_internal
+  edge:
+    name: hatly-edge
+    external: true
+
+volumes:
+  pgdata:
+    name: hatly-prod_pgdata
+  redisdata:
+    name: hatly-prod_redisdata
+  uploads:
+    name: hatly-prod_uploads

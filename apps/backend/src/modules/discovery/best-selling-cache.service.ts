@@ -61,6 +61,8 @@ export class BestSellingCacheService {
         for (const item of segment.items) {
           // No catalog product at all (an AD_HOC_SERVICE item) — nothing to credit.
           if (!item.productId) continue;
+          // Taken off the order as unavailable (PD-016): nothing was sold.
+          if (item.removedAt) continue;
 
           if (item.pricingUnitSnapshot === PricingUnit.WEIGHT) {
             // Should already be non-null by the time an order reaches

@@ -27,8 +27,10 @@ const group = (id: string, branchId: string, items: any[]) => ({ id, groupType: 
 const cart = (groups: any[], over: any = {}) => ({ id: 'cart-1', customerId: 'c1', fulfillmentType: FulfillmentType.DELIVERY, orderNote: null, groups, ...over });
 const branch = (id: string, over: any = {}) => ({ id, name: `B ${id}`, isActive: true, pickupEnabled: true, deliveryEnabled: true, serviceAreaId: 'area-1', preparationTimeMinutes: null, address: 'x', latitude: 30, longitude: 31, vendor: { name: `V ${id}`, isActive: true }, ...over });
 
-function harness(opts: { branches: any[]; balance?: number; enabled?: string[]; fee?: number; couponResult?: any; subtotalPlan?: any; area?: any; eta?: number; zones?: any[] }) {
+function harness(opts: { branches: any[]; balance?: number; enabled?: string[]; fee?: number; couponResult?: any; subtotalPlan?: any; area?: any; eta?: number; zones?: any[]; serviceDefaults?: Record<string, any> }) {
   const businessConfig = {
+    // PD-012: the configured Hatly / Wasally route defaults (absent = not configured).
+    getServiceLocation: jest.fn(async (key: string) => opts.serviceDefaults?.[key] ?? null),
     getEnabledElectronicPaymentMethods: jest.fn(async () => opts.enabled ?? ALL_METHODS),
     get: jest.fn(async () => 'configured'),
     getRequired: jest.fn(),
@@ -70,7 +72,7 @@ function harness(opts: { branches: any[]; balance?: number; enabled?: string[]; 
   };
   const wallet = { getBalance: jest.fn(async () => opts.balance ?? 0), lockCustomerWallet: jest.fn(async () => undefined) };
   const address = new AddressValidationService({ findOne: async () => null } as any, { findOne: async (o: any) => (opts.zones ?? []).find((z: any) => z.id === o.where.id) ?? null } as any, { resolveForPoint: async () => ('area' in opts ? opts.area : { id: 'area-1' }) } as any);
-  const manager = { find: jest.fn(async (E: any) => (E === VendorBranch ? opts.branches : [])) };
+  const manager = { find: jest.fn(async (E: any) => (E === VendorBranch ? opts.branches : [])), query: jest.fn(async () => []) }; // query: the branch-closure lookup (none active)
   const hatlyPricing = { calculateCharge: jest.fn(async () => ({ chargeMinor: 900 })) };
   const planner = new CheckoutPlannerService(new CartPricingService(), businessConfig as any, deliveryFee as any, hatlyPricing as any, offers as any, address, wallet as any);
   const plan = (c: any, input: Partial<CheckoutInput> = {}) =>
@@ -338,81 +340,112 @@ describe('CheckoutPlannerService — ETA (only from real inputs)', () => {
   });
 });
 
-describe('CheckoutPlannerService — Hatly Service locations (customer-supplied only, never a Hatly default)', () => {
+describe('CheckoutPlannerService — Hatly / Wasally route endpoints (PD-012: customer choice, else the service default, else refused)', () => {
   const adHocItem = { id: 'ai1', productId: null, product: null, quantity: 1, notes: null, freeTextDescription: 'Two croissants', imageUrls: [], selectedOptionValues: [] };
   const adHocCart = (type: 'BUY_FROM_PLACE' | 'DELIVER_TO_PLACE', over: any = {}) =>
-    cart([{ id: 'g1', groupType: CartGroupType.AD_HOC_SERVICE, vendorBranchId: null, adHocPlaceName: 'Corner Bakery', vendorNote: null, adHocServiceType: type, adHocPickupLatitude: null, adHocPickupLongitude: null, adHocDestinationLatitude: null, adHocDestinationLongitude: null, items: [adHocItem], ...over }]);
+    cart([{ id: 'g1', groupType: CartGroupType.AD_HOC_SERVICE, vendorBranchId: null, adHocPlaceName: 'Corner Bakery', vendorNote: null, adHocServiceType: type, adHocPickupLatitude: null, adHocPickupLongitude: null, adHocPickupLabel: null, adHocDestinationLatitude: null, adHocDestinationLongitude: null, adHocDestinationLabel: null, items: [adHocItem], ...over }]);
   const CODE = (e: any) => e?.response?.details?.code;
-  // Every request here comes from an address with an ACTIVE zone (required for Hatly Service), so each test isolates its own rule.
-  const hatlyHarness = () => {
-    const h = harness({ branches: [], zones: [HATLY_ZONE] });
+  const HATLY_START = { latitude: 30.11, longitude: 31.11, label: 'Hatly start' };
+  const HATLY_END = { latitude: 30.22, longitude: 31.22, label: 'Hatly end' };
+  const WASALLY_END = { latitude: 30.33, longitude: 31.33, label: 'Wasally end' };
+  const ALL_DEFAULTS = {
+    HATLY_SERVICE_DEFAULT_PICKUP_LOCATION: HATLY_START,
+    HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION: HATLY_END,
+    WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION: WASALLY_END,
+  };
+  // Every request here comes from an address with an ACTIVE zone (it decides the pricing method), so each test isolates its own rule.
+  const hatlyHarness = (serviceDefaults: Record<string, any> = {}) => {
+    const h = harness({ branches: [], zones: [HATLY_ZONE], serviceDefaults });
     return { ...h, plan: (c: any, input: Partial<CheckoutInput> = {}) => h.plan(c, { address: hatlyAddr, ...input }) };
   };
+  const END = (lat: number, lng: number, label: string | null, source: 'CUSTOMER' | 'DEFAULT') => ({ latitude: lat, longitude: lng, label, source });
 
-  it('BUY_FROM_PLACE with no customer-chosen pickup is rejected (BUY_FROM_PLACE_PICKUP_REQUIRED) — the Hatly default pickup is never read, no charge is computed', async () => {
-    const { plan, businessConfig, hatlyPricing } = hatlyHarness();
-    await expect(plan(adHocCart('BUY_FROM_PLACE'))).rejects.toMatchObject({ response: { details: { code: 'BUY_FROM_PLACE_PICKUP_REQUIRED' } } });
-    expect(businessConfig.getRequired).not.toHaveBeenCalled();
-    expect(hatlyPricing.calculateCharge).not.toHaveBeenCalled();
-  });
-
-  it('DELIVER_TO_PLACE with no customer-chosen destination is rejected (DELIVER_TO_PLACE_DESTINATION_REQUIRED) — the Hatly default destination is never read', async () => {
-    const { plan, businessConfig, hatlyPricing } = hatlyHarness();
-    await expect(plan(adHocCart('DELIVER_TO_PLACE'))).rejects.toMatchObject({ response: { details: { code: 'DELIVER_TO_PLACE_DESTINATION_REQUIRED' } } });
-    expect(businessConfig.getRequired).not.toHaveBeenCalled();
-    expect(hatlyPricing.calculateCharge).not.toHaveBeenCalled();
-  });
-
-  it('a half-supplied coordinate pair counts as missing (never partially defaulted)', async () => {
-    const { plan } = hatlyHarness();
-    await expect(plan(adHocCart('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5 }))).rejects.toMatchObject({ response: { details: { code: 'BUY_FROM_PLACE_PICKUP_REQUIRED' } } });
-    await expect(plan(adHocCart('DELIVER_TO_PLACE', { adHocDestinationLongitude: 31.6 }))).rejects.toMatchObject({ response: { details: { code: 'DELIVER_TO_PLACE_DESTINATION_REQUIRED' } } });
-  });
-
-  it('valid BUY_FROM_PLACE: pickup = the customer\'s chosen place, destination = the customer\'s own delivery address (Hatly config untouched)', async () => {
-    const { plan, businessConfig, hatlyPricing } = hatlyHarness();
-    const result = await plan(adHocCart('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 }));
+  it('Hatly with no choice: origin and destination are BOTH the configured Hatly defaults — never the customer address', async () => {
+    const { plan, hatlyPricing } = hatlyHarness(ALL_DEFAULTS);
+    const result = await plan(adHocCart('BUY_FROM_PLACE'));
     expect(hatlyPricing.calculateCharge).toHaveBeenCalledWith({
       serviceType: 'BUY_FROM_PLACE',
-      resolvedPickup: { latitude: 30.5, longitude: 31.5 },
-      resolvedDestination: null,
+      origin: END(30.11, 31.11, 'Hatly start', 'DEFAULT'),
+      destination: END(30.22, 31.22, 'Hatly end', 'DEFAULT'),
       deliveryZone: expect.objectContaining({ id: 'zone-h', deliveryFeeMinor: 1500 }),
     });
-    expect(result.delivery.adHocLocations).toEqual({ pickupLatitude: 30.5, pickupLongitude: 31.5, destinationLatitude: null, destinationLongitude: null });
-    expect(businessConfig.getRequired).not.toHaveBeenCalled();
+    expect(result.delivery.adHocLocations).toMatchObject({ pickupLatitude: 30.11, destinationLatitude: 30.22 });
+    expect(result.delivery.adHocLocations?.route).toEqual({ origin: END(30.11, 31.11, 'Hatly start', 'DEFAULT'), destination: END(30.22, 31.22, 'Hatly end', 'DEFAULT') });
   });
 
-  it('valid DELIVER_TO_PLACE: origin = the customer\'s own delivery address, destination = the customer\'s chosen place (Hatly config untouched)', async () => {
-    const { plan, businessConfig, hatlyPricing } = hatlyHarness();
-    const result = await plan(adHocCart('DELIVER_TO_PLACE', { adHocDestinationLatitude: 30.55, adHocDestinationLongitude: 31.66 }));
-    expect(hatlyPricing.calculateCharge).toHaveBeenCalledWith({
-      serviceType: 'DELIVER_TO_PLACE',
-      resolvedPickup: null,
-      resolvedDestination: { latitude: 30.55, longitude: 31.66 },
-      deliveryZone: expect.objectContaining({ id: 'zone-h', deliveryFeeMinor: 1500 }),
-    });
-    expect(result.delivery.adHocLocations).toEqual({ pickupLatitude: null, pickupLongitude: null, destinationLatitude: 30.55, destinationLongitude: 31.66 });
-    expect(businessConfig.getRequired).not.toHaveBeenCalled();
+  it('Hatly: each end is independent — a chosen origin keeps the default destination, a chosen destination keeps the default origin', async () => {
+    const { plan } = hatlyHarness(ALL_DEFAULTS);
+    const onlyOrigin = await plan(adHocCart('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5, adHocPickupLabel: 'Chosen' }));
+    expect(onlyOrigin.delivery.adHocLocations?.route).toEqual({ origin: END(30.5, 31.5, 'Chosen', 'CUSTOMER'), destination: END(30.22, 31.22, 'Hatly end', 'DEFAULT') });
+    const onlyDestination = await plan(adHocCart('BUY_FROM_PLACE', { adHocDestinationLatitude: 30.6, adHocDestinationLongitude: 31.6 }));
+    expect(onlyDestination.delivery.adHocLocations?.route).toEqual({ origin: END(30.11, 31.11, 'Hatly start', 'DEFAULT'), destination: END(30.6, 31.6, null, 'CUSTOMER') });
   });
 
-  it('a missing customer address is rejected for an ORDER of either type (DELIVERY_ADDRESS_REQUIRED) and no charge is computed from any default', async () => {
-    const { plan, hatlyPricing, businessConfig } = hatlyHarness();
+  it('Hatly: an unset default is refused with its own code — nothing invented, the customer address is never substituted, nothing priced', async () => {
+    const none = hatlyHarness({});
+    expect(CODE(await none.plan(adHocCart('BUY_FROM_PLACE')).catch((e) => e))).toBe('HATLY_DEFAULT_PICKUP_NOT_CONFIGURED');
+    const noEnd = hatlyHarness({ HATLY_SERVICE_DEFAULT_PICKUP_LOCATION: HATLY_START });
+    expect(CODE(await noEnd.plan(adHocCart('BUY_FROM_PLACE')).catch((e) => e))).toBe('HATLY_DEFAULT_DESTINATION_NOT_CONFIGURED');
+    expect(none.hatlyPricing.calculateCharge).not.toHaveBeenCalled();
+    expect(noEnd.hatlyPricing.calculateCharge).not.toHaveBeenCalled();
+  });
+
+  it('Wasally: the origin is ALWAYS the customer\'s (no default exists, even with every default configured) — never assumed from home', async () => {
+    const { plan, hatlyPricing } = hatlyHarness(ALL_DEFAULTS);
+    expect(CODE(await plan(adHocCart('DELIVER_TO_PLACE')).catch((e) => e))).toBe('DELIVER_TO_PLACE_ORIGIN_REQUIRED');
+    // A half-supplied coordinate pair counts as missing (never partially defaulted).
+    expect(CODE(await plan(adHocCart('DELIVER_TO_PLACE', { adHocPickupLatitude: 30.5 })).catch((e) => e))).toBe('DELIVER_TO_PLACE_ORIGIN_REQUIRED');
+    expect(hatlyPricing.calculateCharge).not.toHaveBeenCalled();
+  });
+
+  it('Wasally: customer origin + no destination → WASALLY\'s own default destination (not Hatly\'s); direction origin → destination', async () => {
+    const { plan, hatlyPricing } = hatlyHarness(ALL_DEFAULTS);
+    const result = await plan(adHocCart('DELIVER_TO_PLACE', { adHocPickupLatitude: 30.45, adHocPickupLongitude: 31.45, adHocPickupLabel: 'Current location' }));
+    expect(hatlyPricing.calculateCharge).toHaveBeenCalledWith(
+      expect.objectContaining({ serviceType: 'DELIVER_TO_PLACE', origin: END(30.45, 31.45, 'Current location', 'CUSTOMER'), destination: END(30.33, 31.33, 'Wasally end', 'DEFAULT') }),
+    );
+    expect(result.delivery.adHocLocations).toMatchObject({ pickupLatitude: 30.45, destinationLatitude: 30.33 });
+  });
+
+  it('Wasally: a customer destination overrides the default; with no Wasally default the Hatly default is NOT borrowed', async () => {
+    const { plan } = hatlyHarness(ALL_DEFAULTS);
+    const overridden = await plan(adHocCart('DELIVER_TO_PLACE', { adHocPickupLatitude: 30.45, adHocPickupLongitude: 31.45, adHocDestinationLatitude: 30.7, adHocDestinationLongitude: 31.7 }));
+    expect(overridden.delivery.adHocLocations?.route?.destination).toEqual(END(30.7, 31.7, null, 'CUSTOMER'));
+    const hatlyOnly = hatlyHarness({ HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION: HATLY_END, HATLY_SERVICE_DEFAULT_PICKUP_LOCATION: HATLY_START });
+    const error = await hatlyOnly.plan(adHocCart('DELIVER_TO_PLACE', { adHocPickupLatitude: 30.45, adHocPickupLongitude: 31.45 })).catch((e) => e);
+    expect(CODE(error)).toBe('WASALLY_DEFAULT_DESTINATION_NOT_CONFIGURED');
+  });
+
+  it('a missing customer address is rejected for an ORDER of either type (DELIVERY_ADDRESS_REQUIRED) and no charge is computed', async () => {
+    const { plan, hatlyPricing } = hatlyHarness(ALL_DEFAULTS);
     for (const c of [
-      adHocCart('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 }),
-      adHocCart('DELIVER_TO_PLACE', { adHocDestinationLatitude: 30.55, adHocDestinationLongitude: 31.66 }),
+      adHocCart('BUY_FROM_PLACE'),
+      adHocCart('DELIVER_TO_PLACE', { adHocPickupLatitude: 30.45, adHocPickupLongitude: 31.45 }),
     ]) {
       const error = await plan(c, { address: null }).catch((e) => e);
       expect(CODE(error)).toBe('DELIVERY_ADDRESS_REQUIRED');
     }
     expect(hatlyPricing.calculateCharge).not.toHaveBeenCalled();
-    expect(businessConfig.getRequired).not.toHaveBeenCalled();
   });
 
-  it('a QUOTE without an address prices nothing (fee unknown) rather than pricing against any Hatly location', async () => {
-    const { plan, hatlyPricing } = hatlyHarness();
-    const result = await plan(adHocCart('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 }), { address: null, mode: 'QUOTE' });
+  it('a QUOTE without an address prices nothing (fee unknown) but still resolves the route to show', async () => {
+    const { plan, hatlyPricing } = hatlyHarness(ALL_DEFAULTS);
+    const result = await plan(adHocCart('BUY_FROM_PLACE'), { address: null, mode: 'QUOTE' });
     expect(result.delivery.feeMinor).toBeNull();
+    expect(result.delivery.adHocLocations?.route?.origin.label).toBe('Hatly start');
     expect(hatlyPricing.calculateCharge).not.toHaveBeenCalled();
+  });
+
+  it('STALE QUOTES: changing either endpoint — or the default it fell back to — changes the quote fingerprint', async () => {
+    const quote = (serviceDefaults: Record<string, any>, over: any = {}) =>
+      hatlyHarness(serviceDefaults).plan(adHocCart('BUY_FROM_PLACE', over), { mode: 'QUOTE' });
+    const base = await quote(ALL_DEFAULTS);
+    const sameAgain = await quote(ALL_DEFAULTS);
+    const newOrigin = await quote(ALL_DEFAULTS, { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 });
+    const newDestination = await quote(ALL_DEFAULTS, { adHocDestinationLatitude: 30.6, adHocDestinationLongitude: 31.6 });
+    const movedDefault = await quote({ ...ALL_DEFAULTS, HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION: { ...HATLY_END, latitude: 30.99 } });
+    expect(sameAgain.inputsHash).toBe(base.inputsHash);
+    expect(new Set([base.inputsHash, newOrigin.inputsHash, newDestination.inputsHash, movedDefault.inputsHash]).size).toBe(4);
   });
 });
 
@@ -424,7 +457,7 @@ describe('CheckoutPlannerService — Delivery Zones (PD-009)', () => {
   const zoneAddr = { line1: 'شارع أبو نصيب جنب جامع الكردي، منزل 15', deliveryZoneId: 'zone-1' };
   const CODE = (e: any) => e?.response?.details?.code;
   const adHoc = (type: string, over: any = {}) =>
-    cart([{ id: 'g1', groupType: CartGroupType.AD_HOC_SERVICE, vendorBranchId: null, adHocPlaceName: 'Pharmacy', adHocServiceType: type, vendorNote: null, items: [item('i1', { id: null }, 1, { productId: null, product: null, freeTextDescription: 'x' })], ...over }]);
+    cart([{ id: 'g1', groupType: CartGroupType.AD_HOC_SERVICE, vendorBranchId: null, adHocPlaceName: 'Pharmacy', adHocServiceType: type, adHocDestinationLatitude: 30.6, adHocDestinationLongitude: 31.6, vendorNote: null, items: [item('i1', { id: null }, 1, { productId: null, product: null, freeTextDescription: 'x' })], ...over }]);
 
   it('a pin-less address with an active zone is serviceable and priced by the ZONE (not by distance); the snapshot freezes the zone', async () => {
     const h = harness({ branches: [branch('b1')], zones: [zoneRow()] });
@@ -531,5 +564,65 @@ describe('CheckoutPlannerService — Delivery Zones (PD-009)', () => {
     const error = await h.plan(adHoc('BUY_FROM_PLACE', { adHocPickupLatitude: 30.5, adHocPickupLongitude: 31.5 }), { address: zoneAddr }).catch((e) => e);
     expect(CODE(error)).toBe('DELIVERY_ZONE_UNAVAILABLE');
     expect(h.hatlyPricing.calculateCharge).not.toHaveBeenCalled();
+  });
+});
+
+describe('CheckoutPlannerService — Maps disabled (PD-009 G: the active zone prices and bounds every delivery)', () => {
+  const zoneRow = (over: any = {}) => ({
+    id: 'zone-1', name: 'Abu Naseeb', nameAr: 'أبو نصيب', city: 'Belbeis', cityAr: 'بلبيس', governorate: 'Sharqia', governorateAr: 'الشرقية',
+    deliveryFeeMinor: 1800, isActive: true, serviceAreaId: 'area-1', serviceArea: { id: 'area-1', isActive: true }, ...over,
+  });
+  const CODE = (e: any) => e?.response?.details?.code;
+  const pinnedZoneAddr = { ...addr, deliveryZoneId: 'zone-1' };
+  const disabled = (opts: Parameters<typeof harness>[0]) => {
+    const h = harness(opts);
+    (h.deliveryFee as any).roadDistancePricingAvailable = false; // what DeliveryFeeCalculationService reports with UnavailableMapProvider
+    return h;
+  };
+
+  it('a PINNED address is priced by its zone — never by distance — and the pin stays on the order for the driver', async () => {
+    const h = disabled({ branches: [branch('b1')], zones: [zoneRow()] });
+    const p = await h.plan(oneVendor(), { address: pinnedZoneAddr });
+    expect(h.deliveryFee.calculate).not.toHaveBeenCalled();
+    expect(p).toMatchObject({ deliveryFeeMinor: 1800, eligibility: { serviceable: true, pricingSource: 'DELIVERY_ZONE' } });
+    expect(p.address).toMatchObject({ latitude: addr.latitude, longitude: addr.longitude, deliveryZoneId: 'zone-1' });
+  });
+
+  it('the zone is the boundary: a pin outside every service-area radius changes nothing (no radius lookup is used)', async () => {
+    const h = disabled({ branches: [branch('b1')], zones: [zoneRow()], area: null });
+    const p = await h.plan(oneVendor(), { address: pinnedZoneAddr });
+    expect(p.eligibility).toMatchObject({ serviceable: true, serviceAreaId: 'area-1', pricingSource: 'DELIVERY_ZONE' });
+  });
+
+  it('quote and order give the same fee for the same inputs (one planner, one formula)', async () => {
+    const h = disabled({ branches: [branch('b1'), branch('b2')], zones: [zoneRow()] });
+    const quote = await h.plan(twoVendors(), { address: pinnedZoneAddr, mode: 'QUOTE' } as any);
+    const order = await h.plan(twoVendors(), { address: pinnedZoneAddr });
+    expect(quote.deliveryFeeMinor).toBe(1800 + 500);
+    expect(order.deliveryFeeMinor).toBe(quote.deliveryFeeMinor);
+    expect(order.delivery.breakdown).toMatchObject({ pricingSource: 'DELIVERY_ZONE', additionalVendorChargeMinor: 500 });
+  });
+
+  it('ORDER: a pinned address WITHOUT a zone → ADDRESS_ZONE_REQUIRED; an inactive zone → DELIVERY_ZONE_UNAVAILABLE; nothing priced', async () => {
+    const noZone = disabled({ branches: [branch('b1')], zones: [] });
+    expect(CODE(await noZone.plan(oneVendor(), { address: addr }).catch((e) => e))).toBe('ADDRESS_ZONE_REQUIRED');
+    const inactive = disabled({ branches: [branch('b1')], zones: [zoneRow({ isActive: false })] });
+    expect(CODE(await inactive.plan(oneVendor(), { address: pinnedZoneAddr }).catch((e) => e))).toBe('DELIVERY_ZONE_UNAVAILABLE');
+    expect(noZone.deliveryFee.calculateForZone).not.toHaveBeenCalled();
+    expect(inactive.deliveryFee.calculateForZone).not.toHaveBeenCalled();
+    expect(noZone.deliveryFee.calculate).not.toHaveBeenCalled();
+  });
+
+  it('ORDER: a branch in another service area than the zone is still refused', async () => {
+    const h = disabled({ branches: [branch('b1', { serviceAreaId: 'area-9' })], zones: [zoneRow()] });
+    expect(CODE(await h.plan(oneVendor(), { address: pinnedZoneAddr }).catch((e) => e))).toBe('VENDOR_OUTSIDE_DELIVERY_AREA');
+  });
+
+  it('with Maps available the existing rule is unchanged: a pin is priced by distance', async () => {
+    const h = harness({ branches: [branch('b1')], zones: [zoneRow()] });
+    (h.deliveryFee as any).roadDistancePricingAvailable = true;
+    const p = await h.plan(oneVendor(), { address: pinnedZoneAddr });
+    expect(h.deliveryFee.calculate).toHaveBeenCalled();
+    expect(p.eligibility?.pricingSource).toBe('DISTANCE');
   });
 });

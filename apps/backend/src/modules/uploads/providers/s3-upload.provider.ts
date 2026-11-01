@@ -104,6 +104,35 @@ export class S3UploadProvider implements UploadProvider {
     });
   }
 
+  /**
+   * Deletes an object this provider stored (signed DELETE). Accepts the stored reference in either access mode — `/uploads/files/<name>`
+   * (private) or `<publicBaseUrl>/<prefix>/<name>` (public) — and only exact generated names; anything else is refused (`false`). S3
+   * answers 204 for a deleted or already-absent key. Never throws; failures are logged without the provider's response body.
+   */
+  async remove(storedUrl: string): Promise<boolean> {
+    if (typeof storedUrl !== 'string') return false;
+    const fileName = storedUrl.split('?')[0].split('/').pop() ?? '';
+    if (!STORED_FILE_NAME.test(fileName)) return false;
+    const privateRef = `${this.settings.publicUrlPrefix.replace(/\/+$/, '')}/${fileName}`;
+    const prefix = this.settings.keyPrefix.split('/').filter(Boolean).join('/');
+    const publicRef = `${(this.settings.publicBaseUrl ?? '').replace(/\/+$/, '')}/${prefix ? `${prefix}/` : ''}${fileName}`;
+    if (storedUrl !== privateRef && storedUrl !== publicRef) return false;
+    const { origin, hostForSigning } = this.host;
+    const segments = this.objectSegments(fileName);
+    const headers = signRequestHeaders({ method: 'DELETE', host: hostForSigning, rawPathSegments: segments, payload: Buffer.alloc(0), credentials: this.settings });
+    const url = new URL(origin);
+    url.pathname = '/' + segments.map(encodeRfc3986).join('/');
+    try {
+      const response = await this.request('DELETE', url, headers, Buffer.alloc(0));
+      if ((response.status >= 200 && response.status < 300) || response.status === 404) return true;
+      this.logger.error(`Object storage refused a delete (HTTP ${response.status}).`);
+      return false;
+    } catch (error) {
+      this.logger.error(`Object storage delete failed: ${(error as Error).message}`);
+      return false;
+    }
+  }
+
   private request(method: string, url: URL, headers: Record<string, string>, body: Buffer): Promise<{ status: number }> {
     const transport = url.protocol === 'http:' ? http : https;
     return new Promise((resolve, reject) => {

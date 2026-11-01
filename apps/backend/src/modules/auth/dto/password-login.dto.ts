@@ -1,4 +1,4 @@
-import { IsPhoneNumber, IsString } from 'class-validator';
+import { IsOptional, IsPhoneNumber, IsString, MaxLength } from 'class-validator';
 
 /**
  * PHASE I-B, CHUNK 9. Staff-only login path — VENDOR/VENDOR_MANAGER/
@@ -12,4 +12,10 @@ export class PasswordLoginDto {
 
   @IsString()
   password: string;
+
+  /** Authenticator (or recovery) code — required only for an admin account that has an authenticator enabled. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  mfaCode?: string;
 }

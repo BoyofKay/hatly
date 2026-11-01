@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { REQUIRED_PERMISSIONS_KEY } from './decorators/requires-permission.decorator';
+import { ANY_PERMISSIONS_KEY, REQUIRED_PERMISSIONS_KEY } from './decorators/requires-permission.decorator';
 import { PermissionsService } from './permissions.service';
 import { Permission } from './permission.enum';
 import { Role } from '../../common/enums/role.enum';
@@ -39,7 +39,9 @@ export class PermissionsGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (!requiredPermissions || requiredPermissions.length === 0) {
+    const anyOf = this.reflector.getAllAndOverride<Permission[]>(ANY_PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
+
+    if ((!requiredPermissions || requiredPermissions.length === 0) && (!anyOf || anyOf.length === 0)) {
       return true;
     }
 
@@ -53,9 +55,22 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
-    for (const permission of requiredPermissions) {
+    for (const permission of requiredPermissions ?? []) {
       const granted = await this.permissionsService.hasPermission(user.id, permission);
       if (!granted) {
+        throw new ForbiddenException('You do not have permission to perform this action.');
+      }
+    }
+
+    if (anyOf && anyOf.length > 0) {
+      let any = false;
+      for (const permission of anyOf) {
+        if (await this.permissionsService.hasPermission(user.id, permission)) {
+          any = true;
+          break;
+        }
+      }
+      if (!any) {
         throw new ForbiddenException('You do not have permission to perform this action.');
       }
     }

@@ -31,6 +31,23 @@ export const RateLimitPolicies = {
   productImageUpload: { limit: 20, ttl: MINUTE },
   /** Excel import: parses a spreadsheet and runs an all-or-nothing transaction. */
   fileImport: { limit: 10, ttl: MINUTE },
+  /**
+   * Address-picker geocoding (`/geo/search`, `/geo/reverse`): each uncached call spends PAID map-provider quota, and a free-text query
+   * is trivially unique (the cache cannot absorb it). The picker asks once per pin move / typed search, so 30 a minute is generous.
+   */
+  geoLookup: { limit: 30, ttl: MINUTE },
+  /** Delivery-fee preview for an address: road distance from the map provider (paid quota on a cache miss). */
+  deliveryFeeQuote: { limit: 30, ttl: MINUTE },
+  /** Free-text / photo custom requests added to the cart (Hatly Service, vendor custom items): abuse-prone submissions. */
+  customRequest: { limit: 20, ttl: MINUTE },
+  /** Customer cancellation: locks the order and its segments, restores inventory and reverses wallet holds. */
+  orderCancel: { limit: 10, ttl: MINUTE },
+  /** Manual-transfer payment claim: creates a review item for operations. */
+  paymentClaim: { limit: 10, ttl: MINUTE },
+  /** Ratings: one per delivered order/segment/item — a person rates a handful at a time. */
+  ratingSubmit: { limit: 20, ttl: MINUTE },
+  /** Loyalty points → wallet credit: a financial mutation. */
+  loyaltyConvert: { limit: 10, ttl: MINUTE },
 } satisfies Record<string, RateLimitPolicy>;
 
 /** Replaces the per-route default limit with a named policy. */

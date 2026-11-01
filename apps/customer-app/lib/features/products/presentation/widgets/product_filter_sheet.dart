@@ -33,12 +33,13 @@ class ProductFilterSheet extends StatefulWidget {
 
 class _ProductFilterSheetState extends State<ProductFilterSheet> {
   late ProductFilters _draft = widget.initialFilters;
-  late final _minController =
-      TextEditingController(text: _minorToWhole(widget.initialFilters.minPriceMinor));
-  late final _maxController =
-      TextEditingController(text: _minorToWhole(widget.initialFilters.maxPriceMinor));
+  late final _minController = TextEditingController(
+      text: _minorToWhole(widget.initialFilters.minPriceMinor));
+  late final _maxController = TextEditingController(
+      text: _minorToWhole(widget.initialFilters.maxPriceMinor));
 
-  String _minorToWhole(int? minor) => minor == null ? '' : (minor / 100).round().toString();
+  String _minorToWhole(int? minor) =>
+      minor == null ? '' : (minor / 100).round().toString();
   int? _wholeToMinor(String text) {
     final value = int.tryParse(text.trim());
     return value == null ? null : value * 100;
@@ -84,7 +85,8 @@ class _ProductFilterSheetState extends State<ProductFilterSheet> {
               contentPadding: EdgeInsets.zero,
               title: Text(l10n.filterAvailableOnly, style: context.type.body),
               value: _draft.availableOnly,
-              onChanged: (value) => setState(() => _draft = _draft.copyWith(availableOnly: value)),
+              onChanged: (value) => setState(
+                  () => _draft = _draft.copyWith(availableOnly: value)),
             ),
           ),
           Semantics(
@@ -94,11 +96,13 @@ class _ProductFilterSheetState extends State<ProductFilterSheet> {
               contentPadding: EdgeInsets.zero,
               title: Text(l10n.filterHasOffers, style: context.type.body),
               value: _draft.hasOffers,
-              onChanged: (value) => setState(() => _draft = _draft.copyWith(hasOffers: value)),
+              onChanged: (value) =>
+                  setState(() => _draft = _draft.copyWith(hasOffers: value)),
             ),
           ),
           const SizedBox(height: HatlySpacing.sm),
-          Text(l10n.filterPriceRangeLabel, style: context.type.caption.copyWith(color: p.textMuted)),
+          Text(l10n.filterPriceRangeLabel,
+              style: context.type.caption.copyWith(color: p.textMuted)),
           const SizedBox(height: HatlySpacing.xs),
           Row(
             children: [
@@ -108,11 +112,13 @@ class _ProductFilterSheetState extends State<ProductFilterSheet> {
                   controller: _minController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (text) => setState(() => _draft = _draft.copyWith(minPriceMinor: _wholeToMinor(text))),
+                  onChanged: (text) => setState(() => _draft =
+                      _draft.copyWith(minPriceMinor: _wholeToMinor(text))),
                   decoration: InputDecoration(
                     labelText: l10n.filterPriceMinHint,
                     hintText: widget.minAvailablePriceMinor != null
-                        ? formatMinorUnits(widget.minAvailablePriceMinor!, context)
+                        ? formatMinorUnits(
+                            widget.minAvailablePriceMinor!, context)
                         : null,
                     border: const OutlineInputBorder(),
                   ),
@@ -125,11 +131,13 @@ class _ProductFilterSheetState extends State<ProductFilterSheet> {
                   controller: _maxController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onChanged: (text) => setState(() => _draft = _draft.copyWith(maxPriceMinor: _wholeToMinor(text))),
+                  onChanged: (text) => setState(() => _draft =
+                      _draft.copyWith(maxPriceMinor: _wholeToMinor(text))),
                   decoration: InputDecoration(
                     labelText: l10n.filterPriceMaxHint,
                     hintText: widget.maxAvailablePriceMinor != null
-                        ? formatMinorUnits(widget.maxAvailablePriceMinor!, context)
+                        ? formatMinorUnits(
+                            widget.maxAvailablePriceMinor!, context)
                         : null,
                     border: const OutlineInputBorder(),
                   ),

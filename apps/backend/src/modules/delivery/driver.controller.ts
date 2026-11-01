@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -9,6 +9,7 @@ import { DriverDeliveriesService } from './driver-deliveries.service';
 import { DriverOrderActionsService } from './driver-order-actions.service';
 import { DriverPurchaseService } from './driver-purchase.service';
 import { DriverWeightRecordService } from './driver-weight-record.service';
+import { DriverEarningsService } from './driver-earnings.service';
 import { UpdateDriverOnlineStatusDto } from './dto/update-driver-online-status.dto';
 import { UpdateDriverLocationDto } from './dto/update-driver-location.dto';
 import { UpdateOrderStatusDto } from '../orders/dto/update-order-status.dto';
@@ -36,6 +37,7 @@ export class DriverController {
     private readonly driverOrderActionsService: DriverOrderActionsService,
     private readonly driverPurchaseService: DriverPurchaseService,
     private readonly driverWeightRecordService: DriverWeightRecordService,
+    private readonly driverEarningsService: DriverEarningsService,
   ) {}
 
   @Patch('online-status')
@@ -48,6 +50,19 @@ export class DriverController {
   async updateLocation(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateDriverLocationDto) {
     const driver = await this.driverProfileService.updateLocation(user.id, dto.latitude, dto.longitude);
     return { data: driver };
+  }
+
+  /** The driver's own recorded money: the open-period preview, closed settlement periods and their payments. */
+  @Get('earnings')
+  async earnings(@CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.driverEarningsService.summary(user.id) };
+  }
+
+  /** One row per credited delivery, newest first (paginated). */
+  @Get('transactions')
+  async transactions(@CurrentUser() user: AuthenticatedUser, @Query() q: { page?: string; limit?: string }) {
+    const r = await this.driverEarningsService.transactions(user.id, q);
+    return { data: r.items, meta: { page: r.page, limit: r.limit, total: r.total } };
   }
 
   @Get('deliveries')

@@ -123,7 +123,12 @@ class CheckoutPaymentSection extends StatelessWidget {
           ],
           if (selection.needsElectronicMethod) ...[
             const SizedBox(height: HatlySpacing.ms),
-            Text(l10n.checkoutChooseElectronicMethod,
+            // A prompt only while nothing is chosen; once a method is picked this is a plain label, never a request.
+            Text(
+                needsMethod
+                    ? l10n.checkoutChooseElectronicMethod
+                    : l10n.checkoutElectronicMethodHeading,
+                key: const Key('checkout-electronic-heading'),
                 style: context.type.small.copyWith(
                     color: needsMethod ? p.warning : p.textMuted,
                     fontWeight: FontWeight.w600)),

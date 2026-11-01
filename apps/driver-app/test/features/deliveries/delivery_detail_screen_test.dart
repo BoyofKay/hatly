@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hatly_driver/features/deliveries/data/driver_api.dart';
 import 'package:hatly_driver/features/deliveries/data/driver_providers.dart';
 import 'package:hatly_driver/features/deliveries/domain/delivery.dart';
+import 'package:hatly_driver/features/earnings/domain/earnings.dart';
 import 'package:hatly_driver/features/deliveries/presentation/delivery_detail_screen.dart';
 
 /// A fake of the real `DriverApi` — no real Dio/ApiClient/secure-storage plumbing needed for these
@@ -21,6 +22,15 @@ class FakeDriverApi implements DriverApi {
 
   @override
   Future<Delivery> getDelivery(String id) async => _delivery;
+
+  @override
+  Future<DriverEarnings> getEarnings() async => throw UnimplementedError();
+
+  @override
+  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20}) async => throw UnimplementedError();
+
+  @override
+  Future<T> retryTransient<T>(Future<T> Function() op, {int attempts = 3, Duration pause = const Duration(milliseconds: 800)}) => op();
 
   @override
   Future<List<Delivery>> listDeliveries() async => [_delivery];

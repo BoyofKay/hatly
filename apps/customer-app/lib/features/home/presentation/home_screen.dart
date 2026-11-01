@@ -7,15 +7,19 @@ import '../../../shared_widgets/cart_summary_bar.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/skeleton_box.dart';
 import '../../auth/presentation/widgets/phone_verification_banner.dart';
+import '../../notifications/data/notifications_providers.dart';
+import '../data/home_banners_providers.dart';
 import '../data/home_providers.dart';
+import '../domain/home_content.dart';
 import 'widgets/hatly_service_entry_card.dart';
+import 'widgets/home_banner_section.dart';
 import 'widgets/home_category_section.dart';
 import 'widgets/home_location_bar.dart';
 import 'widgets/home_offers_section.dart';
 import 'widgets/home_popular_new_section.dart';
 import 'widgets/home_promo_actions.dart';
 import 'widgets/home_search_entry.dart';
-import 'widgets/promo_carousel.dart';
+import 'widgets/home_section_error.dart';
 
 /// Customer Home — approved structure, top to bottom:
 /// Location → Global Search → Rotating Promo Carousel → Shop by Category (3-column
@@ -48,7 +52,9 @@ class HomeScreen extends ConsumerWidget {
         child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(homeCategoriesProvider);
+            ref.invalidate(homeBannersProvider);
             ref.invalidate(homeSnapshotProvider);
+            ref.invalidate(unreadNotificationsCountProvider);
             await ref
                 .read(homeSnapshotProvider.future)
                 .catchError((_) => const HomeSnapshot(
@@ -68,57 +74,85 @@ class HomeScreen extends ConsumerWidget {
               // 2. Global search
               const HomeSearchEntry(),
               const SizedBox(height: HatlySpacing.md),
+              // 3. Rotating promo carousel — INDEPENDENT of the product rows below: its own request starts with the screen, and a slow
+              // or failed product load can never hold it back. Admin banners when there are any, otherwise the offer-derived promos
+              // (available once the snapshot is); nothing → no space.
+              HomeBannerSection(
+                fallbackPromos: snapshotAsync.valueOrNull?.promos ?? const [],
+                onPromoAction: (promo) =>
+                    handlePromoAction(context, ref, promo),
+              ),
+              // 4. Shop by category — needs only the sectors request, so it appears as soon as that answers.
+              const HomeCategorySection(),
+              const SizedBox(height: _sectionGap),
+              // Hatly Service entry point — additive, not part of the category grid (see hatly_service_entry_card.dart).
+              const HatlyServiceEntryCard(),
+              const SizedBox(height: _sectionGap),
+              // Everything below is composed from the vendor/product listings (several sequential requests): it loads on its own, shows
+              // its own skeleton while loading, and a failure there is a retry card — never a blank or broken Home above it.
               ...snapshotAsync.when(
-                loading: () => const [_HomeSkeleton()],
+                loading: () => const [_HomeSectionsSkeleton()],
                 error: (error, stackTrace) => [
-                  SizedBox(
-                    height: 260,
-                    child: HatlyStateView(
-                      icon: Icons.wifi_off_rounded,
-                      title: l10n.somethingWentWrong,
-                      retryLabel: l10n.retry,
-                      onRetry: () {
-                        ref.invalidate(homeCategoriesProvider);
-                        ref.invalidate(homeSnapshotProvider);
-                      },
+                  // A failed SECTORS call also fails the snapshot; the category section already shows that error with its retry.
+                  if (!ref.watch(homeCategoriesProvider).hasError)
+                    SizedBox(
+                      height: 200,
+                      child: HatlyStateView(
+                        icon: Icons.wifi_off_rounded,
+                        title: l10n.somethingWentWrong,
+                        retryLabel: l10n.retry,
+                        onRetry: () => ref.invalidate(homeSnapshotProvider),
+                      ),
                     ),
-                  ),
                 ],
                 data: (snapshot) => [
-                  // 3. Rotating promo carousel
-                  if (snapshot.promos.isNotEmpty) ...[
-                    PromoCarousel(
-                      promos: snapshot.promos,
-                      onAction: (promo) =>
-                          handlePromoAction(context, ref, promo),
+                  // 5. Offers — products with a valid offer. "See all" opens the full list of the SAME definition.
+                  if (snapshot.failedSections.contains(HomeSectionKind.offers))
+                    HomeSectionError(
+                      kind: HomeSectionKind.offers,
+                      title: l10n.homeSectionOffers,
+                      retrying: snapshotAsync.isRefreshing,
+                      onRetry: () => ref.invalidate(homeSnapshotProvider),
+                    )
+                  else
+                    HomeOffersSection(
+                      offers: snapshot.offers,
+                      onSeeAll: () => context
+                          .push(homeSectionRoute(HomeSectionKind.offers)),
+                      onOfferTap: (offer) => context.push(offerRoute(offer)),
+                      onQuickAdd: (offer) =>
+                          handleQuickAdd(context, ref, offer.targetId!),
                     ),
+                  if (snapshot.offers.isNotEmpty &&
+                      !snapshot.failedSections.contains(HomeSectionKind.offers))
                     const SizedBox(height: _sectionGap),
-                  ],
-                  // 4. Shop by category
-                  const HomeCategorySection(),
-                  const SizedBox(height: _sectionGap),
-                  // Hatly Service entry point — additive, not part of the
-                  // category grid (see hatly_service_entry_card.dart).
-                  const HatlyServiceEntryCard(),
-                  const SizedBox(height: _sectionGap),
-                  // 5. Offers  (there is no offers list screen yet → Explore/search)
-                  HomeOffersSection(
-                    offers: snapshot.offers,
-                    onSeeAll: () => context.push('/search'),
-                    onOfferTap: (offer) => context.push(offerRoute(offer)),
-                    onQuickAdd: (offer) =>
-                        handleQuickAdd(context, ref, offer.targetId!),
+                  // 6. Most ordered — only products that have really been delivered (never an arbitrary product).
+                  ..._productSection(
+                    context,
+                    ref,
+                    title: l10n.homeSectionMostOrdered,
+                    kind: HomeSectionKind.mostOrdered,
+                    failed: snapshot.failedSections
+                        .contains(HomeSectionKind.mostOrdered),
+                    retrying: snapshotAsync.isRefreshing,
+                    entries: [
+                      for (final e in snapshot.productEntries)
+                        if (e.tag == HomeProductTag.popular) e
+                    ],
                   ),
-                  if (snapshot.offers.isNotEmpty)
-                    const SizedBox(height: _sectionGap),
-                  // 6. Popular & new
-                  HomePopularNewSection(
-                    entries: snapshot.productEntries,
-                    onSeeAll: () => context.push('/search'),
-                    onProductTap: (entry) =>
-                        context.push(productRoute(entry.product.id)),
-                    onQuickAdd: (entry) =>
-                        handleQuickAdd(context, ref, entry.product.id),
+                  // 7. New — products created in the last 30 days.
+                  ..._productSection(
+                    context,
+                    ref,
+                    title: l10n.homeSectionNew,
+                    kind: HomeSectionKind.newest,
+                    failed: snapshot.failedSections
+                        .contains(HomeSectionKind.newest),
+                    retrying: snapshotAsync.isRefreshing,
+                    entries: [
+                      for (final e in snapshot.productEntries)
+                        if (e.tag == HomeProductTag.newItem) e
+                    ],
                   ),
                 ],
               ),
@@ -130,8 +164,43 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _HomeSkeleton extends StatelessWidget {
-  const _HomeSkeleton();
+/// One product row plus its gap, or nothing at all when the section has no products (sections without data disappear).
+List<Widget> _productSection(
+  BuildContext context,
+  WidgetRef ref, {
+  required String title,
+  required HomeSectionKind kind,
+  required List<HomeProductEntry> entries,
+  bool failed = false,
+  bool retrying = false,
+}) {
+  // A section the server could not produce is its own retry card; one that is simply empty disappears (the other rows are unaffected).
+  if (failed) {
+    return [
+      HomeSectionError(
+        kind: kind,
+        title: title,
+        retrying: retrying,
+        onRetry: () => ref.invalidate(homeSnapshotProvider),
+      ),
+    ];
+  }
+  if (entries.isEmpty) return const [];
+  return [
+    HomePopularNewSection(
+      title: title,
+      entries: entries,
+      onSeeAll: () => context.push(homeSectionRoute(kind)),
+      onProductTap: (entry) => context.push(productRoute(entry.product.id)),
+      onQuickAdd: (entry) => handleQuickAdd(context, ref, entry.product.id),
+    ),
+    const SizedBox(height: HomeScreen._sectionGap),
+  ];
+}
+
+/// Placeholder for the product rows only (banners and categories have their own skeletons).
+class _HomeSectionsSkeleton extends StatelessWidget {
+  const _HomeSectionsSkeleton();
 
   @override
   Widget build(BuildContext context) {
@@ -139,33 +208,6 @@ class _HomeSkeleton extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: HatlySpacing.screenPadding),
       child: Column(
         children: [
-          SkeletonBox(
-              width: double.infinity,
-              height: 176,
-              borderRadius: HatlyRadius.promoBanner),
-          SizedBox(height: HatlySpacing.lg),
-          Row(
-            children: [
-              Expanded(
-                  child: SkeletonBox(
-                      width: double.infinity,
-                      height: 96,
-                      borderRadius: HatlyRadius.card)),
-              SizedBox(width: HatlySpacing.ms),
-              Expanded(
-                  child: SkeletonBox(
-                      width: double.infinity,
-                      height: 96,
-                      borderRadius: HatlyRadius.card)),
-              SizedBox(width: HatlySpacing.ms),
-              Expanded(
-                  child: SkeletonBox(
-                      width: double.infinity,
-                      height: 96,
-                      borderRadius: HatlyRadius.card)),
-            ],
-          ),
-          SizedBox(height: HatlySpacing.lg),
           SkeletonBox(
               width: double.infinity,
               height: 210,

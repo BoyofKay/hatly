@@ -46,7 +46,8 @@ class _FakeVendorRepository implements VendorRepository {
   Future<List<Vendor>> getVendors({String? category}) async => const [];
 
   @override
-  Future<VendorDetails> getVendorDetails(String vendorId) => throw UnimplementedError();
+  Future<VendorDetails> getVendorDetails(String vendorId) =>
+      throw UnimplementedError();
 
   @override
   Future<VendorListPage> getVendorsPage(
@@ -57,6 +58,7 @@ class _FakeVendorRepository implements VendorRepository {
     int limit = 20,
     double? latitude,
     double? longitude,
+    String? deliveryZoneId,
     String? subcategoryId,
     bool? openNow,
     bool? hasOffers,
@@ -66,7 +68,8 @@ class _FakeVendorRepository implements VendorRepository {
     final data = subcategoryId == null
         ? [_vendor('all-1'), _vendor('all-2')]
         : [_vendor('filtered-for-$subcategoryId')];
-    return VendorListPage(data: data, page: 1, limit: limit, total: data.length);
+    return VendorListPage(
+        data: data, page: 1, limit: limit, total: data.length);
   }
 }
 
@@ -102,41 +105,55 @@ Future<void> _pump(
 }
 
 void main() {
-  testWidgets('a sector with no subcategories renders with no chip row at all', (tester) async {
+  testWidgets('a sector with no subcategories renders with no chip row at all',
+      (tester) async {
     final repo = _FakeVendorRepository();
-    await _pump(tester, repository: repo, sectorsApi: _FakeSectorsApi(subcategories: []));
+    await _pump(tester,
+        repository: repo, sectorsApi: _FakeSectorsApi(subcategories: []));
 
     expect(find.byKey(const Key('subcategory-chip-all')), findsNothing);
     expect(repo.calls, [null]); // unfiltered call still happens normally
   });
 
-  testWidgets('a subcategories-fetch failure degrades to no chip row, never an error banner over the vendor list',
+  testWidgets(
+      'a subcategories-fetch failure degrades to no chip row, never an error banner over the vendor list',
       (tester) async {
     final repo = _FakeVendorRepository();
     await _pump(tester,
-        repository: repo, sectorsApi: _FakeSectorsApi(failure: Exception('down')));
+        repository: repo,
+        sectorsApi: _FakeSectorsApi(failure: Exception('down')));
 
     expect(find.byKey(const Key('subcategory-chip-all')), findsNothing);
-    expect(find.text(_vendor('all-1').id), findsOneWidget); // vendor list itself is unaffected
+    expect(find.text(_vendor('all-1').id),
+        findsOneWidget); // vendor list itself is unaffected
   });
 
-  testWidgets('shows an "All" chip plus one chip per subcategory, ordered by sortOrder', (tester) async {
+  testWidgets(
+      'shows an "All" chip plus one chip per subcategory, ordered by sortOrder',
+      (tester) async {
     final repo = _FakeVendorRepository();
-    await _pump(tester, repository: repo, sectorsApi: _FakeSectorsApi(subcategories: [
-      _sub('sc-burgers', 'Burgers', 1),
-      _sub('sc-pizza', 'Pizza', 0),
-    ]));
+    await _pump(tester,
+        repository: repo,
+        sectorsApi: _FakeSectorsApi(subcategories: [
+          _sub('sc-burgers', 'Burgers', 1),
+          _sub('sc-pizza', 'Pizza', 0),
+        ]));
 
     expect(find.byKey(const Key('subcategory-chip-all')), findsOneWidget);
-    expect(find.byKey(const Key('subcategory-chip-sc-burgers')), findsOneWidget);
+    expect(
+        find.byKey(const Key('subcategory-chip-sc-burgers')), findsOneWidget);
     expect(find.byKey(const Key('subcategory-chip-sc-pizza')), findsOneWidget);
   });
 
-  testWidgets('selecting a subcategory chip re-queries the SAME vendor listing filtered by it', (tester) async {
+  testWidgets(
+      'selecting a subcategory chip re-queries the SAME vendor listing filtered by it',
+      (tester) async {
     final repo = _FakeVendorRepository();
-    await _pump(tester, repository: repo, sectorsApi: _FakeSectorsApi(subcategories: [
-      _sub('sc-burgers', 'Burgers'),
-    ]));
+    await _pump(tester,
+        repository: repo,
+        sectorsApi: _FakeSectorsApi(subcategories: [
+          _sub('sc-burgers', 'Burgers'),
+        ]));
     expect(repo.calls, [null]);
 
     await tester.tap(find.byKey(const Key('subcategory-chip-sc-burgers')));
@@ -144,14 +161,19 @@ void main() {
 
     expect(repo.calls, [null, 'sc-burgers']);
     expect(find.text('filtered-for-sc-burgers'), findsOneWidget);
-    expect(find.text('all-1'), findsNothing); // the unfiltered result is gone, replaced, not merged
+    expect(find.text('all-1'),
+        findsNothing); // the unfiltered result is gone, replaced, not merged
   });
 
-  testWidgets('selecting "All" after a subcategory resets to the unfiltered listing', (tester) async {
+  testWidgets(
+      'selecting "All" after a subcategory resets to the unfiltered listing',
+      (tester) async {
     final repo = _FakeVendorRepository();
-    await _pump(tester, repository: repo, sectorsApi: _FakeSectorsApi(subcategories: [
-      _sub('sc-burgers', 'Burgers'),
-    ]));
+    await _pump(tester,
+        repository: repo,
+        sectorsApi: _FakeSectorsApi(subcategories: [
+          _sub('sc-burgers', 'Burgers'),
+        ]));
 
     await tester.tap(find.byKey(const Key('subcategory-chip-sc-burgers')));
     await tester.pumpAndSettle();

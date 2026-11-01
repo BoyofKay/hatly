@@ -339,4 +339,33 @@ describe('DriverOrderActionsService — redispatch after a driver release (U3)',
     await expect(service.updateStatus({ userId: 'user-1', deliveryId: 'delivery-1', to: OrderStatus.READY_FOR_PICKUP })).rejects.toThrow();
     expect(automaticDispatch.redispatchAfterDriverRelease).not.toHaveBeenCalled();
   });
+
+  describe('retry safety (idempotency)', () => {
+    const build = (currentStatus: OrderStatus) => {
+      const driverAuthorizationService = {
+        getDriverForUser: jest.fn(async () => ({ id: 'driver-1' })),
+        assertOwnsDelivery: jest.fn(async () => ({ id: 'delivery-1', orderId: 'order-1' })),
+      };
+      const orderStateMachine = { transition: jest.fn(async () => ({ id: 'order-1', status: OrderStatus.DELIVERED })) };
+      const proofOfDeliveryService = { recordForDelivery: jest.fn() };
+      const dataSource = { getRepository: () => ({ findOne: jest.fn(async () => ({ id: 'order-1', status: currentStatus })) }) };
+      const service = new DriverOrderActionsService(driverAuthorizationService as any, orderStateMachine as any, proofOfDeliveryService as any, noRedispatch as any, dataSource as any);
+      return { service, orderStateMachine, proofOfDeliveryService };
+    };
+
+    it('repeating DELIVERED after it was applied returns the order and runs NOTHING again (no second proof, no second transition)', async () => {
+      const { service, orderStateMachine, proofOfDeliveryService } = build(OrderStatus.DELIVERED);
+      const result = await service.updateStatus({ userId: 'u', deliveryId: 'delivery-1', to: OrderStatus.DELIVERED, proofPhotoUrl: 'x', recipientName: 'y' });
+      expect(result.status).toBe(OrderStatus.DELIVERED);
+      expect(proofOfDeliveryService.recordForDelivery).not.toHaveBeenCalled();
+      expect(orderStateMachine.transition).not.toHaveBeenCalled();
+    });
+
+    it('a real transition (the order is in another status) still goes through the state machine as before', async () => {
+      const { service, orderStateMachine, proofOfDeliveryService } = build(OrderStatus.ON_THE_WAY);
+      await service.updateStatus({ userId: 'u', deliveryId: 'delivery-1', to: OrderStatus.DELIVERED, proofPhotoUrl: 'x', recipientName: 'y' });
+      expect(proofOfDeliveryService.recordForDelivery).toHaveBeenCalledTimes(1);
+      expect(orderStateMachine.transition).toHaveBeenCalledTimes(1);
+    });
+  });
 });

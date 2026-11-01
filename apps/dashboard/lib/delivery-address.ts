@@ -35,7 +35,11 @@ export function deliveryAreaLabel(address: Pick<DeliveryAddressView, 'deliveryZo
 /** Zone (when known) followed by the customer's own written address — what an operator needs when there is no pin. */
 export function deliveryAddressText(address: DeliveryAddressView, locale: 'ar' | 'en' = 'en'): string {
   const area = deliveryAreaLabel(address, locale);
-  const written = address.formattedAddress ?? address.line1;
+  // A GPS address has no written line (the server stores ''): the coordinates are then the address.
+  const hasPoint = typeof address.latitude === 'number' && typeof address.longitude === 'number';
+  const written =
+    address.formattedAddress ??
+    (address.line1 && address.line1.trim() ? address.line1 : hasPoint ? `GPS ${address.latitude!.toFixed(5)}, ${address.longitude!.toFixed(5)}` : '');
   const extras = [address.buildingNumber, address.floor, address.apartment, address.landmark].filter((v) => v && v.trim()).join('، ');
   return [area, written, extras || null].filter(Boolean).join(' · ');
 }

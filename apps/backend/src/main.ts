@@ -10,6 +10,10 @@ import { collectEnvIssues, ConfigurationError } from './config/env.validation';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   configureApp(app);
+  // `docker stop` / a rolling deploy sends SIGTERM. Without this Node dies on the signal (exit 143): in-flight requests are cut and the
+  // lifecycle hooks that close Redis, the throttler store and wait for the dispatch sweep (OnApplicationShutdown/OnModuleDestroy)
+  // never run. Deliberately here and not in `configureApp`, which the test harnesses call once per app instance.
+  app.enableShutdownHooks();
 
   // Non-fatal configuration findings (e.g. an acknowledged missing SMS provider, TRUST_PROXY unset). Messages never contain secrets.
   const logger = new Logger('Config');

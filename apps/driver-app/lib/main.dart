@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/api_config.dart';
+import 'core/error/error_reporting.dart';
+import 'core/localization/bilingual.dart';
 import 'core/localization/l10n/app_localizations.dart';
 import 'core/network/providers.dart';
 import 'core/routing/app_router.dart';
@@ -20,7 +22,11 @@ void main() {
     final problem = apiBaseUrlProblem(kApiBaseUrl);
     if (problem != null) throw StateError(problem);
   }
-  runApp(const ProviderScope(child: HatlyDriverApp()));
+  // G-22: every uncaught error (framework, platform, async) ends in ErrorReporting.sink. The fail-fast check above stays outside the zone.
+  ErrorReporting.runGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    runApp(const ProviderScope(child: HatlyDriverApp()));
+  });
 }
 
 class HatlyDriverApp extends ConsumerWidget {
@@ -54,7 +60,7 @@ class HatlyDriverApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: HatlyTheme.light(),
       routerConfig: router,
-      locale: const Locale('ar'),
+      locale: ref.watch(localeProvider),
       supportedLocales: const [Locale('ar'), Locale('en')],
       localizationsDelegates: const [
         AppLocalizations.delegate,

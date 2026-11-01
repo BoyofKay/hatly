@@ -39,4 +39,9 @@ export class CreateSectorDto {
   @IsString()
   @MaxLength(500)
   imageUrl?: string;
+
+  /** May customers send custom (free-text / photo) requests to vendors of this sector? Defaults to false. */
+  @IsOptional()
+  @IsBoolean()
+  customRequestsEnabled?: boolean;
 }

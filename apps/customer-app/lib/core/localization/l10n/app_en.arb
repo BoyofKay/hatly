@@ -38,7 +38,7 @@
   "verifyPhonePromptDismiss": "Not now",
   "verifyPhoneSuccess": "Phone verified.",
   "passwordSetupSectionTitle": "Password",
-  "passwordSetupSectionSubtitle": "Set a password so you can also sign in without a text message code.",
+  "passwordSetupSectionSubtitle": "Change the password you sign in with.",
   "passwordSetupSaveButton": "Save password",
   "passwordSetupSuccess": "Password saved.",
   "phoneInvalid": "That phone number doesn't look right",
@@ -68,6 +68,17 @@
   "errorInvalidOrExpiredOtp": "That code is invalid or has expired",
   "errorTooManyAttempts": "Too many attempts. Please try again shortly",
   "errorSmsProviderUnavailable": "We couldn't send the verification code right now. Please try again shortly",
+  "passwordTooShort": "Your password must be at least 8 characters",
+  "passwordConfirmLabel": "Confirm password",
+  "passwordMismatch": "The two passwords don't match",
+  "errorInvalidCredentials": "The phone number or password is incorrect",
+  "errorRegistrationUnavailable": "We couldn't complete your registration. If you already have an account, log in.",
+  "errorTooManyFailedLogins": "Too many failed login attempts. Please try again shortly",
+  "errorInvalidInput": "Please check what you entered and try again",
+  "errorPhoneVerificationUnavailable": "Phone verification isn't available right now",
+  "profileCurrentPasswordLabel": "Current password",
+  "errorCurrentPasswordRequired": "Enter your current password to change it",
+  "errorCurrentPasswordInvalid": "The current password is incorrect",
   "homeComingSoon": "Coming soon: browsing vendors and products",
   "searchComingSoon": "Coming soon: search",
   "ordersComingSoon": "Coming soon: your orders",
@@ -162,8 +173,8 @@
     }
   },
   "customRequestEntryPoint": "Can't find what you're looking for?",
-  "customRequestSheetTitle": "Request a custom item",
-  "customRequestSheetSubtitle": "Describe what you need and/or add a photo — we'll pass it on to the vendor.",
+  "customRequestSheetTitle": "Request an item that isn't listed",
+  "customRequestSheetSubtitle": "Describe what you need and/or add a photo. It's added to your cart and sent to the store with your order. The store confirms the item and sets its price — you'll see the final amount once it does.",
   "customRequestTextHint": "e.g. Panadol Extra 500mg, any brand",
   "customRequestImageLimitHint": "Up to {max} images",
   "@customRequestImageLimitHint": {
@@ -299,7 +310,6 @@
   "homeSectionCategories": "Shop by category",
   "homeSectionPopularNearYou": "Popular near you",
   "homeSectionOffers": "Offers",
-  "homeSectionPopularNew": "Popular & new",
   "homeFavoritesShortcut": "Favorites",
   "homePromoCarouselLabel": "Featured promotions",
   "homePromoPageIndicator": "Promotion {current} of {total}",
@@ -578,6 +588,9 @@
   "checkoutPaymentManualTransferHint": "Your order isn't prepared until the transfer is approved",
   "checkoutPaymentPayAtDeliveryHint": "You pay the driver on arrival by an electronic method",
   "checkoutChooseElectronicMethod": "Choose the electronic payment method",
+  "checkoutElectronicMethodHeading": "Electronic payment method",
+  "checkoutElectronicMethodUnavailable": "This payment method is not available right now — choose another one",
+  "checkoutCannotConfirmYet": "We couldn't confirm the order yet. Check your choices and try again",
   "checkoutNoElectronicMethods": "No electronic payment methods are available right now",
   "checkoutTransferUnavailable": "Manual transfer is not available right now",
   "checkoutPickupCashNote": "Pickup orders are paid in cash at the branch when you collect them.",
@@ -640,6 +653,7 @@
   "checkoutBlockerUnavailable": "An item or store in your cart is unavailable right now",
   "checkoutBlockerMultiVendorDisabled": "Ordering from several stores at once is not available right now",
   "checkoutBlockerFeeUnavailable": "Couldn't calculate the delivery fee. Please try again shortly.",
+  "checkoutBlockerGpsUnavailable": "Delivery to a GPS location isn't available right now. Choose an address with a delivery area, or add one.",
   "checkoutBlockerInvalidAddress": "The address location is not valid. Choose another location.",
   "checkoutOrderPlacedButLoadFailed": "Your order was placed, but we couldn't load its details right now",
   "checkoutSuccessTitle": "Order placed",
@@ -711,7 +725,7 @@
   "addressConfirmPin": "Confirm this location",
   "addressSearchLabel": "Search for your address",
   "addressSearchAction": "Search",
-  "addressSearchNoResult": "We couldn't find that address. Try different words or use your current location.",
+  "addressSearchNoResult": "We couldn't find that address. Address search isn't always available — you can type your address in the details above and save it without a map location, or use your current location.",
   "addressLocationUnavailable": "Couldn't get your location. Turn on location services, allow access, and try again.",
   "addressSuggestionLabel": "Suggested address for this location",
   "addressUseSuggestion": "Use",
@@ -839,7 +853,7 @@
   "addressZoneRequired": "Choose your area",
   "addressZoneFeeHint": "Delivery fee for this area: {fee} — the final fee is confirmed at checkout.",
   "addressZonesLoadError": "Couldn't load the delivery areas. Please try again.",
-  "addressZonesEmpty": "No delivery areas are available right now.",
+  "addressZonesEmpty": "No delivery areas are available yet, so an address can't be saved right now. Please try again later.",
   "addressDetailedLabel": "Detailed address",
   "addressDetailedHint": "e.g. Abu Naseeb St., next to Al-Kurdi Mosque, house 15",
   "addressLocationOptionalSection": "Map location (optional)",
@@ -851,7 +865,372 @@
   "checkoutAddressZoneRequired": "Choose a delivery area for this address so we can deliver to you.",
   "checkoutAddressZoneUnavailable": "Hatly doesn't deliver to this area right now. Choose another area or address.",
   "checkoutDeliveryZonePricing": "Delivery fee by area: {area}",
-  "checkoutHatlyServiceFeeFormula": "Your area's delivery fee {zoneFee} × {multiplier}",
   "addressZoneAutoSelected": "This is the only delivery area in this city, so it's selected for you.",
-  "addressCityNoZones": "No delivery areas are available in this city right now."
+  "addressCityNoZones": "No delivery areas are available in this city right now.",
+  "guestSignInTitle": "Sign in to continue",
+  "guestSignInBody": "Create an account or sign in to use your cart, orders and profile.",
+  "guestSignInAction": "Sign in or register",
+  "guestBrowseAction": "Browse without an account",
+  "weightEntryTitle": "Enter the weight",
+  "weightEntryHint": "e.g. 1.5",
+  "weightEntryConfirm": "Set weight",
+  "weightEntryTooltip": "Type a weight",
+  "weightEntryInvalid": "Enter a weight between {min} and {max}",
+  "@weightEntryInvalid": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "weightGramsShort": "{grams} g",
+  "@weightGramsShort": {
+    "placeholders": {
+      "grams": {
+        "type": "int"
+      }
+    }
+  },
+  "weightKgShort": "{kg} kg",
+  "@weightKgShort": {
+    "placeholders": {
+      "kg": {
+        "type": "String"
+      }
+    }
+  },
+  "addressPickerHint": "Choose a saved address",
+  "addressPickerNoPin": "No map location — add one in My Addresses",
+  "addressPickerNeedsPin": "That address has no map location, so it can't be used here. Add a pin to it first.",
+  "hatlyServiceRouteBuy": "Hatly buys from {place} and delivers to your delivery address",
+  "@hatlyServiceRouteBuy": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "hatlyServiceRouteDeliver": "Hatly picks up from your delivery address and delivers to {place}",
+  "@hatlyServiceRouteDeliver": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "hatlyServiceRoutePlaceUnset": "the place you choose",
+  "hatlyServiceDeliveryOnly": "Delivery fee only",
+  "homeSectionMostOrdered": "Most ordered",
+  "homeSectionNew": "New",
+  "homeSeeAllOffersTitle": "Offers",
+  "homeSeeAllEmpty": "Nothing here yet",
+  "notificationsTitle": "Notifications",
+  "notificationsEmptyTitle": "No notifications yet",
+  "notificationsEmptyBody": "We'll tell you here about every update on your orders.",
+  "notificationsLoadError": "Couldn't load your notifications",
+  "notificationsMarkAllRead": "Mark all as read",
+  "notificationsBellLabel": "Notifications",
+  "notificationsBellLabelUnread": "Notifications, {count} unread",
+  "@notificationsBellLabelUnread": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsUnread": "Unread",
+  "notificationOrderPlacedTitle": "Order received",
+  "notificationOrderPlacedBody": "We received your order {orderNumber}.",
+  "@notificationOrderPlacedBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderConfirmedTitle": "Order confirmed",
+  "notificationOrderConfirmedBody": "Your order {orderNumber} has been confirmed.",
+  "@notificationOrderConfirmedBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderPreparingTitle": "Preparing your order",
+  "notificationOrderPreparingBody": "Your order {orderNumber} is being prepared.",
+  "@notificationOrderPreparingBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderReadyForPickupTitle": "Ready for pickup",
+  "notificationOrderReadyForPickupBody": "Your order {orderNumber} is ready to collect from the branch.",
+  "@notificationOrderReadyForPickupBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderOnTheWayTitle": "Your order is on the way",
+  "notificationOrderOnTheWayBody": "Order {orderNumber} is on its way to you.",
+  "@notificationOrderOnTheWayBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderDeliveredTitle": "Order delivered",
+  "notificationOrderDeliveredBody": "Your order {orderNumber} has been delivered.",
+  "@notificationOrderDeliveredBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderCollectedTitle": "Order collected",
+  "notificationOrderCollectedBody": "You collected your order {orderNumber}.",
+  "@notificationOrderCollectedBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderCancelledTitle": "Order cancelled",
+  "notificationOrderCancelledBody": "Your order {orderNumber} has been cancelled.",
+  "@notificationOrderCancelledBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderFailedDeliveryTitle": "Delivery failed",
+  "notificationOrderFailedDeliveryBody": "We couldn't deliver your order {orderNumber}.",
+  "@notificationOrderFailedDeliveryBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "customRequestEntryHint": "Describe the item or add a photo — the store will check it and set its price.",
+  "customRequestAdded": "Added to your cart — the store will confirm the item and set its price.",
+  "cartErrorCustomRequestsUnavailable": "This store doesn't take custom requests.",
+  "optionChooseBetween": "Choose {min} to {max}",
+  "@optionChooseBetween": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "optionChooseAtLeast": "Choose at least {min}",
+  "@optionChooseAtLeast": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      }
+    }
+  },
+  "optionChooseUpTo": "Choose up to {max}",
+  "@optionChooseUpTo": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "optionMinError": "Choose at least {min}",
+  "@optionMinError": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      }
+    }
+  },
+  "optionMaxReached": "You can choose up to {max}",
+  "@optionMaxReached": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "cartErrorOptionLimit": "One of the options is outside what this item allows — review your choices.",
+  "deleteAccountAction": "Delete my account",
+  "deleteAccountTitle": "Delete your account permanently",
+  "deleteAccountExplanation": "Your personal data will be deleted: name, phone number, saved addresses, notifications, favorites and cart. Finished order and payment records stay, with nothing that identifies you, because vendors, drivers and Hatly need them for accounting. You will lose your Hatly points. This cannot be undone.",
+  "deleteAccountRequirements": "An account can't be deleted while an order is in progress or the Hatly wallet has a balance.",
+  "deleteAccountPasswordHint": "Enter your password to confirm",
+  "deleteAccountConfirm": "Delete account",
+  "deleteAccountCancel": "Cancel",
+  "deleteAccountPasswordRequired": "Enter your password to confirm the deletion",
+  "deleteAccountErrorPassword": "The password is incorrect",
+  "deleteAccountErrorActiveOrders": "You have an order in progress. You can delete your account after it is finished.",
+  "deleteAccountErrorWalletBalance": "Your Hatly wallet is not empty. Please contact Hatly support to settle it before deleting your account.",
+  "deleteAccountErrorGeneric": "Couldn't delete the account. Please try again.",
+  "homeNoStoresTitle": "No stores are available yet",
+  "homeNoStoresBody": "Stores and categories will appear here as soon as they open in your area. Please check again soon.",
+  "phoneEgyptOnly": "Hatly currently accepts Egyptian mobile numbers only (+20).",
+  "addressMapLocationSaved": "Map location saved",
+  "addressTextOnly": "Address text only — no map location",
+  "addressMethodTitle": "How do you want to add your address?",
+  "addressMethodSubtitle": "Choose ONE method — you never need both.",
+  "addressMethodGpsTitle": "Use my current location (GPS)",
+  "addressMethodGpsHint": "We read your location and price delivery by the road distance. No area to choose and no address to type.",
+  "addressMethodManualTitle": "Enter my address manually",
+  "addressMethodManualHint": "Choose your area and write your address. Delivery uses your area's fixed fee. We never ask for your location.",
+  "addressMethodGpsUnavailable": "Delivery by GPS location isn't available right now. Please enter your address manually.",
+  "addressChangeMethod": "Change address method",
+  "addressChangeMethodTitle": "Change address method?",
+  "addressChangeMethodDiscardsGps": "The detected location will be discarded.",
+  "addressChangeMethodDiscardsManual": "The selected area and the address you typed will be discarded.",
+  "addressChangeMethodConfirm": "Change method",
+  "addressGpsJourneyTitle": "Your location",
+  "addressGpsHelp": "Tap the button to share your current location. You don't need to choose an area or type an address.",
+  "addressGpsDetected": "Location detected",
+  "addressGpsFeeNote": "The delivery fee is calculated at checkout from the road distance. Any amount shown before then is only an estimate.",
+  "addressGpsNeedLocation": "Share your location first to continue.",
+  "addressGpsOutsideCoverage": "Hatly doesn't deliver to this location yet.",
+  "addressGpsInvalidLocation": "We couldn't use this location. Please try again.",
+  "addressGpsSaved": "GPS location",
+  "addressManualJourneyTitle": "Manual address",
+  "addressGpsJourneyBadge": "GPS method",
+  "addressManualJourneyBadge": "Manual method",
+  "addressMethodsLoading": "Loading address methods…",
+  "routeSectionTitle": "Request route",
+  "routeFromLabel": "From",
+  "routeToLabel": "To",
+  "routeBadgeDefault": "Default",
+  "routeBadgeChosen": "Your choice",
+  "routeChange": "Change",
+  "routeChoose": "Choose",
+  "routeNotSet": "Not set yet",
+  "routeDefaultMissingHint": "There is no default point right now — please choose one.",
+  "routeOriginRequiredHint": "Choose where the pick-up should happen.",
+  "routeSheetTitleOrigin": "Choose the starting point",
+  "routeSheetTitleDestination": "Choose the destination",
+  "routeSheetPointSection": "Your current location or a point on the map",
+  "routeSheetSavedSection": "From my saved addresses",
+  "routeNameThisPlace": "Name this place (optional)",
+  "routeNameThisPlaceHint": "e.g. Mom's house",
+  "routeUseDefault": "Use the default point",
+  "routeConfirmPoint": "Confirm this point",
+  "routeCurrentLocationLabel": "My current location",
+  "routeSelectedPointLabel": "Selected point",
+  "routeDirectionNote": "Direction: from the first point to the second.",
+  "routeOrderSectionTitle": "Request route",
+  "cartErrorAdHocOriginRequired": "Please choose where to pick up from before adding this request to your cart.",
+  "checkoutBlockerAdHocOriginRequired": "This Wasally request has no pick-up point. Choose one and add it again.",
+  "checkoutBlockerHatlyDefaultPickupMissing": "Hatly's default starting point isn't set up yet. Please choose a starting point for your request.",
+  "checkoutBlockerHatlyDefaultDestinationMissing": "Hatly's default destination isn't set up yet. Please choose a destination for your request.",
+  "checkoutBlockerWasallyDefaultDestinationMissing": "Wasally's default destination isn't set up yet. Please choose a destination for your request.",
+  "orderPartCancelledTitle": "Part of your order was cancelled",
+  "orderPartCancelledBody": "{rejected} of {total} vendors could not prepare their part. The rest of your order continues.",
+  "@orderPartCancelledBody": {
+    "placeholders": {
+      "rejected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "orderPartCancelledNoCharge": "You will not be charged for the cancelled part.",
+  "orderRejectionReasonLine": "Reason: {reason}",
+  "@orderRejectionReasonLine": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "orderRefundWalletLine": "{amount} was returned to your wallet.",
+  "@orderRefundWalletLine": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "orderRefundTransferPendingLine": "{amount} will be sent back to you by Hatly. We will mark it as sent once it is.",
+  "@orderRefundTransferPendingLine": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "orderRefundTransferSentLine": "{amount} was sent back to you.",
+  "@orderRefundTransferSentLine": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "orderRefundReviewLine": "{amount} will be settled once your payment has been reviewed.",
+  "@orderRefundReviewLine": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderPartCancelledTitle": "Part of your order was cancelled",
+  "notificationOrderPartCancelledBody": "A vendor could not prepare their part of order {orderNumber}. The rest of your order continues.",
+  "@notificationOrderPartCancelledBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "itemUnavailableTitle": "Some items are unavailable",
+  "itemUnavailableBody": "These items can't be prepared. Choose how to continue — nothing changes until you decide.",
+  "itemUnavailableContinue": "Continue without them",
+  "itemUnavailableCancel": "Cancel the whole order",
+  "itemUnavailableCancelConfirmTitle": "Cancel the whole order?",
+  "itemUnavailableCancelConfirmBody": "We will pass your request to our team to cancel this order. Money you paid in advance is returned under our usual rules.",
+  "itemUnavailableCancelConfirmAction": "Yes, cancel the order",
+  "itemUnavailableKeepOrder": "Keep my order",
+  "itemUnavailableCancelRequested": "We received your request to cancel. Our team will process it and contact you if needed.",
+  "itemUnavailableTeamContact": "Our team will contact you about this order.",
+  "itemUnavailableDone": "Done — your order continues without these items.",
+  "itemUnavailableError": "Couldn't send your answer. Please try again.",
+  "orderRemovedItemsTitle": "Removed from your order",
+  "notificationItemUnavailableTitle": "An item in your order is unavailable",
+  "notificationItemUnavailableBody": "Open order {orderNumber} to continue without the item or cancel the order.",
+  "@notificationItemUnavailableBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "cartCompatTitle": "This item can't be added right now",
+  "cartCompatMultiVendorDisabled": "Ordering from more than one vendor is not available right now. Finish your current order or empty the cart to order from another vendor.",
+  "cartCompatBranchPickupDisabled": "This vendor does not offer pickup.",
+  "cartCompatSwitchToDelivery": "Switch to delivery and add",
+  "cartCompatStartNewCart": "Empty the cart and add this",
+  "cartCompatKeepCart": "Keep my cart",
+  "cartCompatOk": "OK",
+  "addressOpenLocationSettings": "Open location settings",
+  "weightInlineLabel": "Or type the weight in kilograms",
+  "weightEstimateNote": "Estimated: {price} — the final price is set by the actual weight when your order is prepared.",
+  "@weightEstimateNote": {"placeholders": {"price": {"type": "String"}}}
 }

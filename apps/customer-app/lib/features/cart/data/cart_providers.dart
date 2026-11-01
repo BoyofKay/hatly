@@ -1,8 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/providers.dart';
+import '../../auth/presentation/auth_gate.dart';
 import '../data/cart_api.dart';
 import '../domain/cart.dart';
+import '../domain/cart_compatibility.dart';
+import '../../hatly_service/domain/route_endpoint.dart';
 import '../domain/delivery_fee_quote.dart';
 
 final cartApiProvider =
@@ -22,8 +25,13 @@ final cartApiProvider =
 /// Checkout both watch [cartControllerProvider]; no second Cart
 /// parser/provider exists anywhere in this feature.
 class CartController extends StateNotifier<AsyncValue<Cart>> {
-  CartController(this._api) : super(const AsyncValue.loading()) {
-    refresh();
+  /// [signedIn] false = a guest: the cart is simply empty and NOTHING is requested (the carts are per account; there is no
+  /// anonymous cart). Guests cannot reach any mutation — the UI sends them to sign-in first.
+  CartController(this._api, {bool signedIn = true})
+      : super(signedIn
+            ? const AsyncValue.loading()
+            : const AsyncValue.data(Cart.empty)) {
+    if (signedIn) refresh();
   }
 
   final CartApi _api;
@@ -38,6 +46,16 @@ class CartController extends StateNotifier<AsyncValue<Cart>> {
     } catch (error, stackTrace) {
       if (!mounted) return;
       state = AsyncValue.error(error, stackTrace);
+    }
+  }
+
+  /// The server's verdict on adding [productId] to the current cart. Null when it could not be asked (offline, server error): the caller
+  /// then simply tries the add, and the server's own refusal — authoritative either way — is shown instead.
+  Future<CartCompatibility?> checkAdd(String productId) async {
+    try {
+      return await _api.checkAddItem(productId);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -89,6 +107,8 @@ class CartController extends StateNotifier<AsyncValue<Cart>> {
     double? pickupLongitude,
     double? destinationLatitude,
     double? destinationLongitude,
+    String? pickupLabel,
+    String? destinationLabel,
     required String freeTextDescription,
     required int quantity,
     List<String>? imageUrls,
@@ -101,9 +121,26 @@ class CartController extends StateNotifier<AsyncValue<Cart>> {
           pickupLongitude: pickupLongitude,
           destinationLatitude: destinationLatitude,
           destinationLongitude: destinationLongitude,
+          pickupLabel: pickupLabel,
+          destinationLabel: destinationLabel,
           freeTextDescription: freeTextDescription,
           quantity: quantity,
           imageUrls: imageUrls,
+        ));
+  }
+
+  /// Changes the Hatly / Wasally route origin and/or destination (each independently; `clear…` = back to the configured default).
+  Future<ApiException?> updateAdHocRoute({
+    RouteEndpoint? origin,
+    bool clearOrigin = false,
+    RouteEndpoint? destination,
+    bool clearDestination = false,
+  }) {
+    return _mutate(() => _api.updateAdHocRoute(
+          origin: origin,
+          clearOrigin: clearOrigin,
+          destination: destination,
+          clearDestination: clearDestination,
         ));
   }
 
@@ -146,7 +183,8 @@ class CartController extends StateNotifier<AsyncValue<Cart>> {
 
 final cartControllerProvider =
     StateNotifierProvider<CartController, AsyncValue<Cart>>((ref) {
-  return CartController(ref.watch(cartApiProvider));
+  return CartController(ref.watch(cartApiProvider),
+      signedIn: ref.watch(isSignedInProvider));
 });
 
 /// CONFIRMED (decision 2): a one-shot fetch, not a watched provider —

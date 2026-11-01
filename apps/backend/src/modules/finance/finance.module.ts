@@ -21,6 +21,7 @@ import { AdminCommissionConfigController } from './admin-commission-config.contr
 import { AdminSettlementController } from './admin-settlement.controller';
 import { LocationModule } from '../location/location.module';
 import { BusinessConfigModule } from '../business-config/business-config.module';
+import { DeliveryFeeCalculationModule } from '../delivery-fee/delivery-fee-calculation.module';
 
 /**
  * No import of OrdersModule/VendorsModule/DeliveryModule/PaymentsModule
@@ -50,6 +51,7 @@ import { BusinessConfigModule } from '../business-config/business-config.module'
     ]),
     LocationModule,
     BusinessConfigModule,
+    DeliveryFeeCalculationModule,
   ],
   controllers: [AdminEmployeeLoansController, AdminCommissionConfigController, AdminSettlementController],
   providers: [

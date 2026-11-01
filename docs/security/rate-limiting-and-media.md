@@ -24,8 +24,8 @@ rate limiting never takes the API down. Overhead measured: ~0.05 ms per limit ch
 |---|---|---|---|---|---|
 | Any route (default) | all | 100 / min per route | user, else IP | yes | env `RATE_LIMIT_ROUTE_PER_MINUTE` |
 | Whole API (aggregate) | all | 600 / min per client | user, else IP | yes | env `RATE_LIMIT_CLIENT_PER_MINUTE` |
-| Registration, OTP request, customer register | `POST /auth/register`, `/auth/login`, `/auth/customer/password/register` | 5 / min | IP | yes | unchanged; plus OTP resend cooldown + attempt limits in `OtpService` |
-| OTP verify, password logins | `/auth/otp/verify`, `/auth/password/login`, `/auth/driver/login`, `/auth/customer/password/login` | 10 / min | IP | yes | unchanged |
+| Customer registration (retired legacy OTP stub included) | `POST /auth/customer/register/request-code`, `POST /auth/customer/password/register`, `POST /auth/register` (answers 410/400, creates nothing) | 5 / min each | IP | yes | with OTP on, registration needs the code texted to the phone first; per-phone resend cooldown (60s) + 5 wrong-attempt cap live in `OtpService` |
+| Password logins | `/auth/password/login`, `/auth/driver/login`, `/auth/customer/password/login` | 10 / min | IP | yes | plus a per-account failed-login brake. The OTP-login routes (`/auth/login`, `/auth/otp/verify`) no longer exist. |
 | **Failed password logins, per account** | the three password routes | 10 failures / 15 min, then 429 **before any bcrypt work** | phone number | yes | **new**: rotating IPs no longer allows unlimited guessing; unknown phones counted too (no enumeration); success resets; fails open if Redis is down |
 | Token refresh | `POST /auth/refresh` | 20 / min | IP | yes | unchanged; plus reuse detection (Batch 2) |
 | Search | `GET /search` | 60 / min | user, else IP | yes | **new** (was the default); the app debounces at 400 ms |
@@ -34,6 +34,16 @@ rate limiting never takes the API down. Overhead measured: ~0.05 ms per limit ch
 | Image upload (base64) | `POST /uploads` | 30 / min | user | yes | unchanged number; now per user (was per IP) |
 | Product image upload | `POST /vendor/products/:id/image` | 20 / min | user | yes | **new** |
 | Excel import | `/vendor/products/import/*`, `/admin/products/import/*` | 10 / min | user | yes | **new** |
+| **Geocoding** (paid map quota) | `GET /geo/search`, `GET /geo/reverse` | 30 / min each | user | yes | **new (security milestone)**; free-text queries defeat the cache, so the per-user limit is the quota guard |
+| Delivery-fee preview | `POST /cart/delivery-fee-quote` | 30 / min | user | yes | **new**; road distance from the map provider on a cache miss |
+| Custom requests | `POST /cart/adhoc-items`, `POST /cart/vendor-custom-items` | 20 / min each | user | yes | **new**; free-text/photo submissions |
+| Customer cancellation | `POST /orders/:id/cancel` | 10 / min | user | yes | **new**; counted whatever the outcome (foreign-id probing gets no free budget) |
+| Manual-transfer claim | `POST /payments/manual-transfer/orders/:orderId/claim` | 10 / min | user | yes | **new** |
+| Ratings | `POST /ratings/vendor|driver|product` | 20 / min each | user | yes | **new** |
+| Loyalty conversion | `POST /customer/loyalty/convert` | 10 / min | user | yes | **new**; financial mutation |
+| Dashboard session | `POST /auth/dashboard/login` 10/min; `refresh`, `logout` 30/min | | IP | yes | plus the per-account brake on login and on MFA codes |
+| MFA | `POST /auth/mfa/setup` 5, `enable` 10, `disable` 5 / min | | user | yes | plus the per-account code brake |
+| Customer password change / phone verification | `PATCH /auth/customer/password` 5, `verify-phone/request` 5, `verify-phone/confirm` 10 / min | | user | yes | plus per-account brake (password) and per-phone cooldown/attempt cap (OTP) |
 | Marketplace/catalog reads, cart, orders, admin | everything else | default + aggregate | user, else IP | yes | no change needed |
 | Health | `/health*` | default | IP | yes | unchanged |
 | Media files | `/uploads/files/*` | not rate limited | - | - | served by Express static (local) or a 302 to object storage (S3); no database or Redis access |
@@ -77,3 +87,16 @@ resize pipeline (server-side image library, derived-key storage, background work
 subsystem for a bandwidth saving that cannot be measured yet. Revisit when real product photography exists: the natural place is
 resizing at upload inside `UploadsService` (it already decodes and validates), or Cloudflare Image Resizing on the public R2 domain
 with no backend work at all.
+
+## Security milestone additions (2026-10-16)
+
+* **Aliases share one bucket.** The throttler keys on the handler, not the URL spelling: trailing slash, upper-case path and HEAD all land
+  in the same bucket (e2e `78` "aliases do not reset them").
+* **Login brake vs. re-formatted phones.** The per-account brake is keyed on the phone as sent, but the account lookup is an exact E.164
+  match, so a re-formatted variant never reaches a password comparison (e2e `78`).
+* **Map provider calls are bounded** (`MAPS_REQUEST_TIMEOUT_MS`, 5 s, AbortSignal) — `fetch` had no timeout, so a hung provider could hold
+  checkout requests open indefinitely. SMS (Unifonic) and object storage already had timeouts.
+* **Vendor order list bounded** to the newest 500 segments (`VENDOR_ORDERS_LIST_MAX_SEGMENTS`); it loaded the whole history per view.
+* **Pagination**: every paginated list clamps `limit` (≤ 50/100) or refuses it; `page=10^12` is harmless (e2e `93`).
+* **Monitoring**: refused requests emit `security.auth_failed` (401), `security.access_denied` (403), `security.rate_limited` (429) and
+  `security.financial_rejected` (400/409 on money routes) as one secret-free WARN line each (route template, user, role, IP).

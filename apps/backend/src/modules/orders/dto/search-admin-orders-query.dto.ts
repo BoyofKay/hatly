@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsIn, IsISO8601, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsIn, IsISO8601, IsInt, IsOptional, IsString, IsUUID, MaxLength, Matches, Min } from 'class-validator';
 import { OrderStatus } from '../order-status.enum';
 import { PaymentStatus } from '../../payments/payment-status.enum';
 import { ORDER_PAYMENT_METHODS, OrderPaymentMethod } from '../order-payment-method';
@@ -44,6 +44,17 @@ export class SearchAdminOrdersQueryDto {
   @IsEnum(OrderStatus)
   status?: OrderStatus;
 
+  /**
+   * Several statuses at once (comma-separated: `PREPARING,CONFIRMED`) — what a queue view such as "with a driver" or "needs a driver"
+   * needs. Every value must be a real OrderStatus; combined with `status` the order must match both.
+   */
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map((v) => v.trim()).filter(Boolean) : value))
+  @IsArray()
+  @ArrayMaxSize(12)
+  @IsEnum(OrderStatus, { each: true })
+  statuses?: OrderStatus[];
+
   /** Inclusive lower bound on `createdAt`, ISO-8601. */
   @IsOptional()
   @IsISO8601()
@@ -81,4 +92,30 @@ export class SearchAdminOrdersQueryDto {
   @IsOptional()
   @IsEnum(FulfillmentType)
   fulfillmentType?: FulfillmentType;
+
+  /** Enterprise Admin Panel — orders that include a part from this vendor branch. */
+  @IsOptional()
+  @IsUUID()
+  vendorBranchId?: string;
+
+  /** Africa/Cairo calendar dates (inclusive), YYYY-MM-DD — converted to instants by the database, so day boundaries and DST are exact. */
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  from?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  to?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minTotalMinor?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxTotalMinor?: number;
 }

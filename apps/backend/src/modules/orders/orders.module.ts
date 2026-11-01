@@ -15,6 +15,7 @@ import { OrderStateMachineService } from './order-state-machine.service';
 import { OrderActorAuthorizationService } from './order-actor-authorization.service';
 import { OrderVendorSegmentStateMachineService } from './order-vendor-segment-state-machine.service';
 import { OrderReadinessService } from './order-readiness.service';
+import { AdHocFulfilmentService } from './ad-hoc-fulfilment.service';
 import { OrderSegmentCancellationService } from './order-segment-cancellation.service';
 import { CustomerOrderCancellationService } from './customer-order-cancellation.service';
 import { CheckoutController } from './checkout/checkout.controller';
@@ -38,6 +39,18 @@ import { AdHocPurchaseRecordService } from './ad-hoc-purchase-record.service';
 import { OrderItemWeightRecordService } from './order-item-weight-record.service';
 import { VendorWeightRecordService } from './vendor-weight-record.service';
 import { CustomerOrdersService } from './customer-orders.service';
+import { OrderItemRemovalService } from './exceptions/order-item-removal.service';
+import { OrderExceptionsService } from './exceptions/order-exceptions.service';
+import { VendorUnavailableItemsController, CustomerItemUnavailabilityController } from './exceptions/order-exceptions.controllers';
+import { ChangeFeedService } from './changes/change-feed.service';
+import { AdminChangesController, VendorChangesController } from './changes/change-feed.controllers';
+import { VendorBusinessService } from './vendor-business.service';
+import { BranchClosuresService } from './branch-closures.service';
+import { StockLedgerService } from './stock-ledger.service';
+import { VendorFinanceService } from './vendor-finance.service';
+import { VendorTeamService } from './vendor-team.service';
+import { AdminBranchClosuresController, AdminVendorSettlementTermsController, VendorBranchClosuresController, VendorFinanceController, VendorInventoryController, VendorTeamController } from './vendor-operations.controllers';
+import { VendorBranchProfileController, VendorBusinessController, VendorOrderHistoryController } from './vendor-business.controllers';
 import { OrdersController } from './orders.controller';
 import { VendorOrdersController } from './vendor-orders.controller';
 import { VendorOrdersService } from './vendor-orders.service';
@@ -107,12 +120,13 @@ import { AdminOrdersService } from './admin-orders.service';
     LocationModule,
     ServiceAreasModule,
   ],
-  controllers: [OrdersController, VendorOrdersController, AdminOrdersController, CheckoutController, GeoController],
+  controllers: [OrdersController, VendorUnavailableItemsController, CustomerItemUnavailabilityController, VendorChangesController, VendorOrderHistoryController, VendorBusinessController, VendorBranchProfileController, VendorTeamController, VendorBranchClosuresController, VendorInventoryController, VendorFinanceController, AdminVendorSettlementTermsController, AdminBranchClosuresController, AdminChangesController, VendorOrdersController, AdminOrdersController, CheckoutController, GeoController],
   providers: [
     OrderStateMachineService,
     OrderActorAuthorizationService,
     OrderVendorSegmentStateMachineService,
     OrderReadinessService,
+    AdHocFulfilmentService,
     OrderSegmentCancellationService,
     CustomerOrderCancellationService,
     CheckoutPlannerService,
@@ -131,6 +145,14 @@ import { AdminOrdersService } from './admin-orders.service';
     CustomerOrdersService,
     CartPricingService,
     AdminOrdersService,
+    OrderItemRemovalService,
+    OrderExceptionsService,
+    ChangeFeedService,
+    VendorBusinessService,
+    BranchClosuresService,
+    StockLedgerService,
+    VendorFinanceService,
+    VendorTeamService,
   ],
   // OrderItemWeightRecordService exported for DeliveryModule's
   // DriverWeightRecordService — same forwardRef-based cross-module
@@ -140,6 +162,6 @@ import { AdminOrdersService } from './admin-orders.service';
   // — Admin plays no role in weight/weighted-price entry or correction.
   // M3c (Launch-Readiness Gap Audit, G-10): AdminOrdersService exported so AdminCustomersModule can
   // reuse its `search()` for a customer's "recent orders" summary without duplicating that query.
-  exports: [OrderStateMachineService, AdHocPurchaseRecordService, OrderItemWeightRecordService, AdminOrdersService],
+  exports: [AdHocFulfilmentService, OrderStateMachineService, AdHocPurchaseRecordService, OrderItemWeightRecordService, AdminOrdersService, OrderExceptionsService],
 })
 export class OrdersModule {}

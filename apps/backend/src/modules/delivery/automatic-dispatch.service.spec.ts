@@ -33,14 +33,27 @@ function buildHarness(opts: {
   // default order, since `??` treats `null` the same as `undefined` —
   // only substitute the default when the caller genuinely omitted
   // `order` altogether.
-  const ordersRepository = { findOne: jest.fn(async () => ('order' in opts ? opts.order : { id: 'order-1', fulfillmentType: 'DELIVERY', segments: [] })) };
+  const ordersRepository = { findOne: jest.fn(async () => ('order' in opts ? opts.order : { id: 'order-1', status: 'READY_FOR_PICKUP', fulfillmentType: 'DELIVERY', segments: [] })) };
+  // ONE open alert per (order, reason): the real service checks for an open one first (and the DB's partial unique index backs it up).
   const dispatchAlertsRepository = {
     create: jest.fn((data: any) => data),
+    findOne: jest.fn(async ({ where }: any) => alerts.find((a) => a.orderId === where.orderId && a.reason === where.reason && !a.resolvedAt) ?? null),
+    update: jest.fn(async (criteria: any, patch: any) => {
+      const hit = alerts.find((a) => a.id === criteria.id);
+      if (hit) Object.assign(hit, patch);
+    }),
     save: jest.fn(async (row: any) => {
-      alerts.push(row);
-      return row;
+      const saved = { id: `alert-${alerts.length + 1}`, ...row };
+      alerts.push(saved);
+      return saved;
+    }),
+    createQueryBuilder: jest.fn(() => {
+      const qb: any = { update: () => qb, set: () => qb, where: () => qb, execute: async () => undefined };
+      return qb;
     }),
   };
+  const attempts: any[] = [];
+  const dispatchAttemptsRepository = { insert: jest.fn(async (row: any) => void attempts.push(row)) };
   const driverRankingService = { rankCandidates: jest.fn(async () => opts.candidateDriverIds ?? []) };
   const deliveryAssignmentService = {
     assignDriver: jest.fn(async () => {
@@ -55,18 +68,19 @@ function buildHarness(opts: {
   const service = new AutomaticDispatchService(
     ordersRepository as any,
     dispatchAlertsRepository as any,
+    dispatchAttemptsRepository as any,
     driverRankingService as any,
     deliveryAssignmentService as any,
     businessConfigService as any,
     { getCorrelationId: () => 'corr-test' } as any,
     // Timeout-driven reassignment milestone: unused by attemptAutomaticDispatch itself, so plain
     // never-called fakes are enough here — the dedicated harness below exercises them for real.
-    { createQueryBuilder: jest.fn(), manager: { transaction: jest.fn() } } as any,
+    { createQueryBuilder: jest.fn(), update: jest.fn(async () => undefined), manager: { transaction: jest.fn() } } as any,
     { transitionInTransaction: jest.fn() } as any,
     fakeConfigService() as any,
     { set: jest.fn(), del: jest.fn(), eval: jest.fn() } as any,
   );
-  return { service, alerts, deliveryAssignmentService, driverRankingService };
+  return { service, alerts, attempts, deliveryAssignmentService, driverRankingService };
 }
 
 /**
@@ -81,7 +95,7 @@ function buildTimeoutHarness(opts: {
   /** Rows the initial "find expired" query returns — each `{ id }` is a Delivery id. */
   expiredDeliveryIds?: string[];
   /** Keyed by delivery id — what a fresh, LOCKED re-read of that Delivery row looks like at the moment it's processed. `undefined` = row vanished/already handled. */
-  deliveriesById?: Record<string, { acceptDeadlineAt: Date | null; orderId: string; driverId: string | null }>;
+  deliveriesById?: Record<string, { acceptDeadlineAt: Date | null; orderId: string; driverId: string | null; consecutiveUnanswered?: number }>;
   /** Keyed by order id — what `transitionInTransaction` does for that order: 'ok' (succeeds, matches existing rule), or an Error to throw (e.g. BadRequestException for "already progressed"). */
   transitionOutcomeByOrderId?: Record<string, 'ok' | Error>;
   /** Keyed by order id — candidate driver ids the (fake) ranking returns for it. */
@@ -106,11 +120,23 @@ function buildTimeoutHarness(opts: {
   const businessConfigService = { isAutomaticDispatchEnabled: jest.fn(async () => opts.isAutomaticDispatchEnabled ?? true) };
   const dispatchAlertsRepository = {
     create: jest.fn((data: any) => data),
+    findOne: jest.fn(async ({ where }: any) => alerts.find((a) => a.orderId === where.orderId && a.reason === where.reason && !a.resolvedAt) ?? null),
+    update: jest.fn(async (criteria: any, patch: any) => {
+      const hit = alerts.find((a) => a.id === criteria.id);
+      if (hit) Object.assign(hit, patch);
+    }),
     save: jest.fn(async (row: any) => {
-      alerts.push(row);
-      return row;
+      const saved = { id: `alert-${alerts.length + 1}`, ...row };
+      alerts.push(saved);
+      return saved;
+    }),
+    createQueryBuilder: jest.fn(() => {
+      const qb: any = { update: () => qb, set: () => qb, where: () => qb, execute: async () => undefined };
+      return qb;
     }),
   };
+  const attempts: any[] = [];
+  const dispatchAttemptsRepository = { insert: jest.fn(async (row: any) => void attempts.push(row)) };
   const driverRankingService = {
     rankCandidates: jest.fn(async (order: any) => opts.candidatesByOrderId?.[order.id] ?? []),
   };
@@ -146,6 +172,7 @@ function buildTimeoutHarness(opts: {
       }
       return opts.deliveriesById?.[opts2.where.id] ?? null;
     }),
+    save: jest.fn(async (row: any) => row),
   };
   const limitCalls: number[] = [];
   const deliveriesRepository = {
@@ -197,6 +224,7 @@ function buildTimeoutHarness(opts: {
   const service = new AutomaticDispatchService(
     ordersRepository as any,
     dispatchAlertsRepository as any,
+    dispatchAttemptsRepository as any,
     driverRankingService as any,
     deliveryAssignmentService as any,
     businessConfigService as any,
@@ -209,6 +237,8 @@ function buildTimeoutHarness(opts: {
 
   return {
     service,
+    attemptRows: attempts,
+    fakeManager,
     alerts,
     afterCommitCalls,
     assignDriverCalls,
@@ -300,14 +330,49 @@ describe('AutomaticDispatchService', () => {
     expect(alerts[0].reason).toBe('NO_ELIGIBLE_DRIVER');
   });
 
-  it('propagates any error other than ConflictException — does not silently swallow unrelated failures', async () => {
-    const { service } = buildHarness({
+  it('an unexpected assignment failure is NEVER thrown at the caller and NEVER silent: logged, an attempt row, ONE open ASSIGNMENT_ERROR alert (repeats refresh it)', async () => {
+    const { service, alerts, attempts } = buildHarness({
       isAutomaticDispatchEnabled: true,
       candidateDriverIds: ['driver-1'],
       assignDriverError: new Error('unexpected database failure'),
     });
 
-    await expect(service.attemptAutomaticDispatch('order-1')).rejects.toThrow('unexpected database failure');
+    await expect(service.attemptAutomaticDispatch('order-1')).resolves.toBeUndefined();
+    await service.attemptAutomaticDispatch('order-1');
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ orderId: 'order-1', reason: 'ASSIGNMENT_ERROR' });
+    expect(alerts[0].detail).toContain('unexpected database failure');
+    expect(attempts.map((a) => a.outcome)).toEqual(['ASSIGNMENT_ERROR', 'ASSIGNMENT_ERROR']);
+  });
+
+  it('automatic assignment switched OFF: never silent — an open AUTO_ASSIGN_DISABLED alert (one, however often it is asked) and an attempt row; no driver is ranked', async () => {
+    const { service, alerts, attempts, driverRankingService } = buildHarness({ isAutomaticDispatchEnabled: false });
+    await service.attemptAutomaticDispatch('order-1');
+    await service.attemptAutomaticDispatch('order-1');
+    expect(driverRankingService.rankCandidates).not.toHaveBeenCalled();
+    expect(alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'AUTO_ASSIGN_DISABLED' })]);
+    expect(attempts[0]).toMatchObject({ outcome: 'AUTO_ASSIGN_DISABLED' });
+  });
+
+  it('no eligible driver: an open NO_ELIGIBLE_DRIVER alert with a stable code and an attempt row; success records ASSIGNED', async () => {
+    const none = buildHarness({ isAutomaticDispatchEnabled: true, candidateDriverIds: [] });
+    await none.service.attemptAutomaticDispatch('order-1');
+    expect(none.alerts).toEqual([expect.objectContaining({ reason: 'NO_ELIGIBLE_DRIVER' })]);
+    expect(none.attempts[0]).toMatchObject({ outcome: 'NO_ELIGIBLE_DRIVER' });
+    const ok = buildHarness({ isAutomaticDispatchEnabled: true, candidateDriverIds: ['driver-1'] });
+    await ok.service.attemptAutomaticDispatch('order-1');
+    expect(ok.alerts).toEqual([]);
+    expect(ok.attempts[0]).toMatchObject({ outcome: 'ASSIGNED' });
+  });
+
+  it('an order that is not waiting for a driver (already assigned / cancelled) is left alone — no alert, no ranking', async () => {
+    const { service, alerts, driverRankingService } = buildHarness({
+      isAutomaticDispatchEnabled: false,
+      order: { id: 'order-1', status: 'ASSIGNED_TO_DRIVER', fulfillmentType: 'DELIVERY', segments: [] },
+    });
+    await service.attemptAutomaticDispatch('order-1');
+    expect(alerts).toEqual([]);
+    expect(driverRankingService.rankCandidates).not.toHaveBeenCalled();
   });
 
   it('does nothing when the order cannot be found', async () => {
@@ -341,7 +406,8 @@ describe('AutomaticDispatchService — one redispatch after a DRIVER hand-back, 
     await service.redispatchAfterDriverRelease('order-1', 'releaser');
     expect(driverRankingService.rankCandidates).not.toHaveBeenCalled();
     expect(deliveryAssignmentService.assignDriver).not.toHaveBeenCalled();
-    expect(alerts).toHaveLength(0);
+    // Never silent: the order waits for an admin AND says so with one open alert.
+    expect(alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'AUTO_ASSIGN_DISABLED' })]);
   });
 
   it('an admin assigned it meanwhile (ORDER_NOT_ASSIGNABLE): the attempt stops quietly — no alert, no error', async () => {
@@ -449,7 +515,7 @@ describe('AutomaticDispatchService.reassignTimedOutDeliveries (timeout-driven re
     const result = await h.service.reassignTimedOutDeliveries();
 
     expect(h.assignDriverCalls).toEqual([]);
-    expect(h.alerts).toEqual([{ orderId: 'order-1', reason: 'NO_ELIGIBLE_DRIVER' }]);
+    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'NO_ELIGIBLE_DRIVER' })]);
     expect(result).toEqual({ processed: 1, reassigned: 0, alerted: 1, skipped: 0 });
   });
 
@@ -463,7 +529,7 @@ describe('AutomaticDispatchService.reassignTimedOutDeliveries (timeout-driven re
 
     const result = await h.service.reassignTimedOutDeliveries();
 
-    expect(h.alerts).toEqual([{ orderId: 'order-1', reason: 'NO_ELIGIBLE_DRIVER' }]);
+    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'NO_ELIGIBLE_DRIVER' })]);
     expect(result.alerted).toBe(1);
   });
 
@@ -522,7 +588,7 @@ describe('AutomaticDispatchService.reassignTimedOutDeliveries (timeout-driven re
     expect(h.redis.eval).toHaveBeenCalledTimes(1); // only the one that acquired the lock ever releases it
   });
 
-  it('releases the whole-sweep lock even when processing throws — never leaves it stuck', async () => {
+  it('an unexpected failure on one delivery is persisted as an ASSIGNMENT_ERROR alert and the sweep releases its lock — never stuck, never silent', async () => {
     const h = buildTimeoutHarness({
       expiredDeliveryIds: ['delivery-1'],
       deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' } },
@@ -530,7 +596,8 @@ describe('AutomaticDispatchService.reassignTimedOutDeliveries (timeout-driven re
       assignDriverErrorByOrderId: { 'order-1': new Error('unexpected database failure') },
     });
 
-    await expect(h.service.reassignTimedOutDeliveries()).rejects.toThrow('unexpected database failure');
+    await expect(h.service.reassignTimedOutDeliveries()).resolves.toBeDefined();
+    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'ASSIGNMENT_ERROR' })]);
     expect(h.redis.eval).toHaveBeenCalledTimes(1);
   });
 
@@ -548,7 +615,38 @@ describe('AutomaticDispatchService.reassignTimedOutDeliveries (timeout-driven re
 
     expect(result).toEqual({ processed: 2, reassigned: 1, alerted: 1, skipped: 0 });
     expect(h.assignDriverCalls).toEqual([{ orderId: 'order-1', candidateDriverIds: ['driver-2'] }]);
-    expect(h.alerts).toEqual([{ orderId: 'order-2', reason: 'NO_ELIGIBLE_DRIVER' }]);
+    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-2', reason: 'NO_ELIGIBLE_DRIVER' })]);
+  });
+
+  it('the THIRD consecutive unanswered offer stops the cycling: DRIVER_NOT_RESPONDING alert + attempt rows, no further ranking or assignment', async () => {
+    const h = buildTimeoutHarness({
+      expiredDeliveryIds: ['delivery-1'],
+      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1', consecutiveUnanswered: 2 } },
+      candidatesByOrderId: { 'order-1': ['driver-2'] },
+    });
+
+    const result = await h.service.reassignTimedOutDeliveries();
+
+    expect(h.assignDriverCalls).toEqual([]);
+    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'DRIVER_NOT_RESPONDING' })]);
+    expect(h.alerts[0].detail).toMatch(/3 assignment offers in a row/);
+    expect(result).toMatchObject({ processed: 1, reassigned: 0, alerted: 1 });
+    expect(h.attemptRows.map((a: any) => a.outcome)).toEqual(['DRIVER_TIMED_OUT', 'DRIVER_NOT_RESPONDING']);
+  });
+
+  it('the FIRST and SECOND unanswered offers still reassign (the counter is saved with the release)', async () => {
+    const h = buildTimeoutHarness({
+      expiredDeliveryIds: ['delivery-1'],
+      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1', consecutiveUnanswered: 1 } },
+      candidatesByOrderId: { 'order-1': ['driver-2'] },
+    });
+
+    const result = await h.service.reassignTimedOutDeliveries();
+
+    expect(h.assignDriverCalls).toEqual([{ orderId: 'order-1', candidateDriverIds: ['driver-2'] }]);
+    expect(h.alerts).toEqual([]);
+    expect(result).toMatchObject({ processed: 1, reassigned: 1, alerted: 0 });
+    expect(h.fakeManager.save.mock.calls[0][0].consecutiveUnanswered).toBe(2);
   });
 
   it('the sweep query is BATCH-LIMITED using the configured technical constant — never an unbounded pass', async () => {

@@ -45,12 +45,12 @@ class CategoryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 AspectRatio(
-                  aspectRatio: 1,
+                  aspectRatio: 1.25,
                   child: HatlySoftImage(
                     url: imageUrl,
                     width: double.infinity,
                     height: double.infinity,
-                    placeholderIconSize: 40,
+                    placeholderIconSize: 36,
                     placeholderIcon: slug == null
                         ? Icons.category_outlined
                         : sectorIcon(slug!),

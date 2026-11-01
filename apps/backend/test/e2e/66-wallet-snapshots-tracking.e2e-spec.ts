@@ -213,7 +213,7 @@ describe('E2E — wallet, snapshots, ETA, tracking, order list (PD-006)', () => 
       await credit(full, 100000);
       const o = expectData<any>(await place(full, { paymentMethod: 'WALLET' }), 201);
       const removed = 20000 + 500; // vendor 2's merchandise + one additional-vendor fee
-      expectData(await vendorStatus(v2, await segmentOf(o.id, v2), { status: 'CANCELLED' }));
+      expectData(await vendorStatus(v2, await segmentOf(o.id, v2), { status: 'CANCELLED', reason: 'Out of stock' }));
       const row = await orderRow(o.id);
       expect(num(row.total_minor)).toBe(o.totalMinor - removed);
       expect(await balance(full)).toBe(100000 - o.totalMinor + removed);
@@ -221,7 +221,7 @@ describe('E2E — wallet, snapshots, ETA, tracking, order list (PD-006)', () => 
       expect(num(row.amount_due_minor)).toBe(0);
       expectConsistent(row);
       // cancelling the last vendor returns the rest — the wallet ends where it started
-      expectData(await vendorStatus(v1, await segmentOf(o.id, v1), { status: 'CANCELLED' }));
+      expectData(await vendorStatus(v1, await segmentOf(o.id, v1), { status: 'CANCELLED', reason: 'Out of stock' }));
       expect(await balance(full)).toBe(100000);
       expect((await ledger(full, 'ORDER_REFUND')).reduce((sum: number, r: any) => sum + num(r.amount_delta_minor), 0)).toBe(o.totalMinor);
 
@@ -229,7 +229,7 @@ describe('E2E — wallet, snapshots, ETA, tracking, order list (PD-006)', () => 
       const part = await cartFor([p1, p2]);
       await credit(part, 5000);
       const o2 = expectData<any>(await place(part, { paymentMethod: 'COD', useWallet: true }), 201);
-      expectData(await vendorStatus(v2, await segmentOf(o2.id, v2), { status: 'CANCELLED' }));
+      expectData(await vendorStatus(v2, await segmentOf(o2.id, v2), { status: 'CANCELLED', reason: 'Out of stock' }));
       const row2 = await orderRow(o2.id);
       expect(await ledger(part, 'ORDER_REFUND')).toEqual([]);
       expect(num(row2.amount_due_minor)).toBe(num(row2.total_minor) - 5000);
@@ -391,7 +391,7 @@ describe('E2E — wallet, snapshots, ETA, tracking, order list (PD-006)', () => 
       expect((await orderRow(order.id)).status).toBe('PENDING');
 
       // if that vendor then cancels its own segment, the remaining (not preparing) vendor no longer blocks the customer
-      expectData(await vendorStatus(v1, seg1, { status: 'CANCELLED' }));
+      expectData(await vendorStatus(v1, seg1, { status: 'CANCELLED', reason: 'Out of stock' }));
       expect((await details(c, order.id)).customerCanCancel).toBe(true);
       expectData(await cancel(c, order.id), 201);
     });
@@ -400,7 +400,7 @@ describe('E2E — wallet, snapshots, ETA, tracking, order list (PD-006)', () => 
       const c = await cartFor([p1, p2]);
       const order = expectData<any>(await place(c, { paymentMethod: 'COD' }), 201);
       const seg = await segmentOf(order.id, v1);
-      expect((await world.api('patch', `/vendor/orders/segments/${seg}/status`, { token: c.accessToken, body: { status: 'CANCELLED' } })).status).toBe(403);
+      expect((await world.api('patch', `/vendor/orders/segments/${seg}/status`, { token: c.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } })).status).toBe(403);
       expect((await world.api('post', `/orders/${order.id}/segments/${seg}/cancel`, { token: c.accessToken, body: {} })).status).toBe(404);
       expect((await orderRow(order.id)).status).toBe('PENDING');
     });

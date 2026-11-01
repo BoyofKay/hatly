@@ -66,6 +66,15 @@ describe('SettlementService.closeVendorPeriod — real gross-sales aggregation',
    * a real past timestamp rather than degenerating to `periodStart ===
    * periodEnd`, which the service correctly refuses as "no new activity"),
    * then the requested segments, all real rows in real tables.
+   *
+   * The rows are dated explicitly in the PAST (`createdAt`), not left to the
+   * database's `now()`: `closeVendorPeriod` takes `periodEnd = new Date()`
+   * (millisecond precision) while `created_at` has microseconds, so a row
+   * inserted in the same millisecond as the close compares as `>= periodEnd`
+   * and belongs to the NEXT period (by design — the next period starts at this
+   * `periodEnd`, so nothing is lost). That was this spec's intermittent
+   * failure: whether the last seeded row landed in the period depended on how
+   * fast the local database answered.
    */
   async function seedBranchWithSegments(
     segmentSpecs: Array<{ subtotalMinor: number; status: OrderVendorSegmentStatus }>,
@@ -74,8 +83,10 @@ describe('SettlementService.closeVendorPeriod — real gross-sales aggregation',
     const admin = await data.user();
     const customer = await data.user();
     const order = await data.order(customer.id);
+    const now = Date.now();
 
     await data.save<FinancialEvent>(FinancialEvent, {
+      createdAt: new Date(now - 60_000),
       type: FinancialEventType.VENDOR_COMMISSION_RECOGNIZED,
       direction: FinancialEventDirection.RECEIVABLE,
       idempotencyKey: `settlement-calc-seed-${branch.id}`,
@@ -90,6 +101,7 @@ describe('SettlementService.closeVendorPeriod — real gross-sales aggregation',
         groupType: CartGroupType.CATALOG,
         subtotalMinor: spec.subtotalMinor,
         status: spec.status,
+        createdAt: new Date(now - 30_000),
       });
     }
 
@@ -115,6 +127,8 @@ describe('SettlementService.closeVendorPeriod — real gross-sales aggregation',
     const period = await settlement.closeVendorPeriod(branch.id, admin.id);
 
     expect(period.grossSalesMinor).toBe(3_000);
+    // the explicit past dating really reached the database (not replaced by now()): the period starts at the seed event, a minute ago
+    expect(Date.now() - period.periodStart.getTime()).toBeGreaterThanOrEqual(59_000);
     data.track('vendor_settlement_periods', period.id);
   });
 
@@ -139,6 +153,7 @@ describe('SettlementService.closeVendorPeriod — real gross-sales aggregation',
     ]);
     // A real commission event within the window, distinct from the seed event above.
     await data.save<FinancialEvent>(FinancialEvent, {
+      createdAt: new Date(Date.now() - 30_000), // inside the window, before the close (see seedBranchWithSegments)
       type: FinancialEventType.VENDOR_COMMISSION_RECOGNIZED,
       direction: FinancialEventDirection.RECEIVABLE,
       idempotencyKey: `settlement-calc-commission-${branch.id}`,

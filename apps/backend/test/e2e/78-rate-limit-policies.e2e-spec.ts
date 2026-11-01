@@ -200,4 +200,55 @@ describe('E2E — rate limits by endpoint risk (real throttler)', () => {
       expect(await world.redis.get(`login-fail:${user.phone}`)).toBeNull();
     });
   });
+
+  describe('security milestone: paid-quota, financial and abuse-prone routes have their own budgets, and aliases do not reset them', () => {
+    const NEVER_EXISTS = '00000000-0000-4000-8000-000000000000';
+
+    it('geocoding (paid map quota): 30 per minute per user, then 429 with Retry-After; trailing-slash / upper-case / HEAD aliases share the SAME bucket', async () => {
+      await boot();
+      const c = await s.customer('Geo Customer');
+      const first = await statuses(30, (i) => world.api('get', '/geo/search', { token: c.accessToken, query: { q: `cairo street ${i}` } }));
+      expect(count(first, 429)).toBe(0);
+      const limited = await world.api('get', '/geo/search', { token: c.accessToken, query: { q: 'one more' } });
+      expect(limited.status).toBe(429);
+      expect(limited.headers['retry-after']).toMatch(/^\d+$/);
+      for (const path of ['/geo/search/', '/GEO/SEARCH', '/Geo/Search/']) {
+        expect((await world.api('get', path, { token: c.accessToken, query: { q: 'alias try' } })).status).not.toBe(200);
+      }
+      const head = await request(world.baseUrl).head('/api/v1/geo/search?q=alias').set('Authorization', `Bearer ${c.accessToken}`);
+      expect(head.status).not.toBe(200);
+      // another customer is unaffected (per user, not global)
+      const other = await s.customer('Geo Other');
+      expect((await world.api('get', '/geo/search', { token: other.accessToken, query: { q: 'fresh budget' } })).status).toBe(200);
+    });
+
+    it('customer cancellation: 10 per minute — counted whatever the outcome (probing foreign ids does not get a free budget)', async () => {
+      await boot();
+      const c = await s.customer('Cancel Prober');
+      const results = await statuses(11, () => world.api('post', `/orders/${NEVER_EXISTS}/cancel`, { token: c.accessToken, body: {} }));
+      expect(results.slice(0, 10).every((x) => x === 404)).toBe(true);
+      expect(results[10]).toBe(429);
+    });
+
+    it('loyalty conversion and manual-transfer claims: 10 per minute each; ratings: 20 per minute', async () => {
+      await boot();
+      const c = await s.customer('Money Prober');
+      const conv = await statuses(11, (i) => world.api('post', '/customer/loyalty/convert', { token: c.accessToken, body: { points: 500, idempotencyKey: `k-${i}` } }));
+      expect(conv.slice(0, 10).every((x) => x !== 429)).toBe(true);
+      expect(conv[10]).toBe(429);
+      const claims = await statuses(11, () => world.api('post', `/payments/manual-transfer/orders/${NEVER_EXISTS}/claim`, { token: c.accessToken }));
+      expect(claims[10]).toBe(429);
+      const ratings = await statuses(21, () => world.api('post', '/ratings/vendor', { token: c.accessToken, body: { segmentId: NEVER_EXISTS, stars: 5 } }));
+      expect(count(ratings, 429)).toBe(1);
+      expect(ratings[20]).toBe(429);
+    });
+
+    it('the per-account login brake cannot be dodged by re-formatting the phone: a formatted variant never even reaches a password check', async () => {
+      await boot();
+      const victim = await s.customer('Formatted Victim');
+      const spaced = `${victim.phone.slice(0, 3)} ${victim.phone.slice(3, 5)} ${victim.phone.slice(5, 9)} ${victim.phone.slice(9)}`;
+      const res = await world.api('post', '/auth/customer/password/login', { body: { phone: spaced, password: DEFAULT_PASSWORD } });
+      expect([400, 401]).toContain(res.status); // the RIGHT password with a re-formatted phone is still refused: lookup is exact E.164
+    });
+  });
 });

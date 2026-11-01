@@ -1,27 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import {
-  ServiceArea,
-  activateServiceArea,
-  createServiceArea,
-  deactivateServiceArea,
-  listServiceAreas,
-  updateServiceArea,
-} from '../../../lib/api/admin-service-areas';
+import { useCallback, useEffect, useState } from 'react';
+import { ServiceArea, activateServiceArea, createServiceArea, deactivateServiceArea, listServiceAreas, updateServiceArea } from '../../../lib/api/admin-service-areas';
 import { apiErrorMessage } from '../../../lib/api/errors';
+import { useLang } from '../../../lib/ui/lang';
+import { Badge, Button, Card, Column, ConfirmDialog, DataTable, LabeledInput, Modal, PageHeader, useToast } from '../../../components/ui';
 
 /**
- * Real Admin ServiceArea management — consumes the Phase I-B backend
- * exactly. A ServiceArea is a center-point + radius delivery zone
- * (not a polygon) — the form collects exactly those fields, nothing
- * fabricated.
+ * Service Areas — consumes the Phase I-B backend exactly. A service area is a centre point plus a radius (not a polygon), so the form collects exactly
+ * those fields and nothing is fabricated. Renaming and activating are one click; deactivating is confirmed.
  */
 export default function ServiceAreasPage() {
+  const { t, num } = useLang();
+  const toast = useToast();
   const [areas, setAreas] = useState<ServiceArea[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [lat, setLat] = useState('');
   const [lng, setLng] = useState('');
@@ -29,17 +25,27 @@ export default function ServiceAreasPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  async function refresh() {
+  const [renaming, setRenaming] = useState<ServiceArea | null>(null);
+  const [newName, setNewName] = useState('');
+  const [deactivate, setDeactivate] = useState<ServiceArea | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
     setError(null);
+    setLoading(true);
     try {
       setAreas(await listServiceAreas());
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to load service areas.'));
+      setError(apiErrorMessage(err, t('Failed to load service areas.', 'تعذّر تحميل مناطق الخدمة.')));
+    } finally {
+      setLoading(false);
     }
-  }
+  }, [t]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleCreate(e: React.FormEvent) {
@@ -48,127 +54,107 @@ export default function ServiceAreasPage() {
     const centerLatitude = Number(lat);
     const centerLongitude = Number(lng);
     const radiusMeters = Number(radius);
-    if ([centerLatitude, centerLongitude, radiusMeters].some((n) => Number.isNaN(n))) {
-      setCreateError('Latitude, longitude, and radius must all be valid numbers.');
-      return;
-    }
+    if ([lat, lng, radius].some((v) => !v.trim()) || [centerLatitude, centerLongitude, radiusMeters].some((n) => Number.isNaN(n))) return setCreateError(t('Latitude, longitude and radius must all be valid numbers.', 'خط العرض وخط الطول ونصف القطر يجب أن تكون كلها أرقامًا صحيحة.'));
     setIsSubmitting(true);
     setCreateError(null);
     try {
       await createServiceArea({ name, centerLatitude, centerLongitude, radiusMeters });
-      setName('');
-      setLat('');
-      setLng('');
-      setRadius('');
-      setShowCreateForm(false);
+      setName(''); setLat(''); setLng(''); setRadius('');
+      setCreating(false);
+      toast.push('success', t('Service area created.', 'تم إنشاء منطقة الخدمة.'));
       await refresh();
     } catch (err: any) {
-      setCreateError(apiErrorMessage(err, 'Failed to create service area.'));
+      setCreateError(apiErrorMessage(err, t('Failed to create service area.', 'تعذّر إنشاء منطقة الخدمة.')));
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  async function handleToggle(area: ServiceArea) {
-    setError(null);
+  async function run(fn: () => Promise<unknown>, ok: string, fail: string, done: () => void) {
+    if (busy) return;
+    setBusy(true);
+    setActionError(null);
     try {
-      area.isActive ? await deactivateServiceArea(area.id) : await activateServiceArea(area.id);
+      await fn();
+      toast.push('success', ok);
+      done();
       await refresh();
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to update service area.'));
+      setActionError(apiErrorMessage(err, fail));
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function handleRename(area: ServiceArea) {
-    const newName = window.prompt('Service area name', area.name);
-    if (!newName || newName === area.name) return;
-    try {
-      await updateServiceArea(area.id, { name: newName });
-      await refresh();
-    } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to rename service area.'));
-    }
-  }
+  const columns: Column<ServiceArea>[] = [
+    { key: 'name', header: t('Name', 'الاسم'), cell: (a) => <span className="font-medium text-gray-900">{a.name}</span> },
+    { key: 'center', header: t('Centre', 'المركز'), cell: (a) => <span dir="ltr" className="text-xs text-gray-600">{a.centerLatitude}, {a.centerLongitude}</span> },
+    { key: 'radius', header: t('Radius', 'نصف القطر'), align: 'end', cell: (a) => `${num(Number((a.radiusMeters / 1000).toFixed(1)))} ${t('km', 'كم')}` },
+    { key: 'status', header: t('Status', 'الحالة'), cell: (a) => <Badge tone={a.isActive ? 'green' : 'gray'}>{a.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge> },
+    {
+      key: 'actions', header: '', align: 'end',
+      cell: (a) => (
+        <span className="inline-flex gap-2">
+          <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setNewName(a.name); setRenaming(a); }}>{t('Rename', 'إعادة تسمية')}</Button>
+          {a.isActive
+            ? <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setDeactivate(a); }}>{t('Deactivate', 'إيقاف')}</Button>
+            : <Button size="sm" variant="primary" className="min-h-[36px]" loading={busy} onClick={() => void run(() => activateServiceArea(a.id), t('Service area activated.', 'تم تفعيل منطقة الخدمة.'), t('Failed to update service area.', 'تعذّر تحديث منطقة الخدمة.'), () => undefined)}>{t('Activate', 'تفعيل')}</Button>}
+        </span>
+      ),
+    },
+  ];
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Service Areas</h1>
-        <button
-          onClick={() => setShowCreateForm((v) => !v)}
-          className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white"
-        >
-          {showCreateForm ? 'Cancel' : 'New Service Area'}
-        </button>
-      </div>
+    <div className="max-w-5xl">
+      <PageHeader
+        title={t('Service Areas', 'مناطق الخدمة')}
+        subtitle={t('Each area is a centre point and a radius — not a drawn boundary.', 'كل منطقة هي نقطة مركز ونصف قطر — وليست حدودًا مرسومة.')}
+        actions={<><Button onClick={refresh} loading={loading}>{t('Refresh', 'تحديث')}</Button><Button variant="primary" onClick={() => { setCreateError(null); setCreating(true); }}>{t('New service area', 'منطقة خدمة جديدة')}</Button></>}
+      />
+      <Card pad={false}>
+        <DataTable columns={columns} rows={areas ?? undefined} rowKey={(a) => a.id} loading={loading} error={error} onRetry={refresh} emptyTitle={t('No service areas yet.', 'لا توجد مناطق خدمة بعد.')} emptyHint={t('Create the first area to define where you deliver.', 'أنشئ أول منطقة لتحديد أين توصّل.')} />
+      </Card>
 
-      {showCreateForm && (
-        <form onSubmit={handleCreate} className="mt-4 space-y-3 rounded border bg-white p-4">
-          <div>
-            <label className="block text-sm font-medium">Name</label>
-            <input required value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
+      <Modal
+        open={creating}
+        title={t('New service area', 'منطقة خدمة جديدة')}
+        onClose={() => !isSubmitting && setCreating(false)}
+        footer={<><Button onClick={() => setCreating(false)} disabled={isSubmitting}>{t('Cancel', 'إلغاء')}</Button><Button variant="primary" type="submit" form="sa-create" loading={isSubmitting}>{isSubmitting ? t('Creating...', 'جارٍ الإنشاء...') : t('Create service area', 'إنشاء المنطقة')}</Button></>}
+      >
+        <form id="sa-create" onSubmit={handleCreate} className="space-y-3">
+          <LabeledInput label={t('Name', 'الاسم')} required value={name} onChange={(e) => setName(e.target.value)} />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <LabeledInput label={t('Centre latitude', 'خط عرض المركز')} required dir="ltr" inputMode="decimal" value={lat} onChange={(e) => setLat(e.target.value)} />
+            <LabeledInput label={t('Centre longitude', 'خط طول المركز')} required dir="ltr" inputMode="decimal" value={lng} onChange={(e) => setLng(e.target.value)} />
+            <LabeledInput label={t('Radius (metres)', 'نصف القطر (متر)')} required dir="ltr" inputMode="numeric" value={radius} onChange={(e) => setRadius(e.target.value)} />
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium">Center latitude</label>
-              <input required value={lat} onChange={(e) => setLat(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Center longitude</label>
-              <input required value={lng} onChange={(e) => setLng(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium">Radius (meters)</label>
-              <input required value={radius} onChange={(e) => setRadius(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
-            </div>
-          </div>
-          {createError && <p className="text-sm text-red-600">{createError}</p>}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {isSubmitting ? 'Creating...' : 'Create Service Area'}
-          </button>
+          {createError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</p>}
         </form>
-      )}
+      </Modal>
 
-      <div className="mt-6">
-        {error && (
-          <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}{' '}
-            <button onClick={refresh} className="underline">
-              Retry
-            </button>
-          </div>
-        )}
-        {!error && areas === null && <p className="text-gray-500">Loading...</p>}
-        {!error && areas !== null && areas.length === 0 && <p className="text-gray-500">No service areas yet.</p>}
-        {!error && areas !== null && areas.length > 0 && (
-          <ul className="mt-2 divide-y rounded border bg-white">
-            {areas.map((a) => (
-              <li key={a.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <button onClick={() => handleRename(a)} className="text-left font-medium hover:underline">
-                    {a.name}
-                  </button>
-                  <p className="text-xs text-gray-500">
-                    {a.centerLatitude}, {a.centerLongitude} &middot; {(a.radiusMeters / 1000).toFixed(1)} km radius
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`rounded px-2 py-0.5 text-xs ${a.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
-                    {a.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                  <button onClick={() => handleToggle(a)} className="text-xs text-gray-500 underline">
-                    {a.isActive ? 'Deactivate' : 'Activate'}
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <Modal
+        open={!!renaming}
+        title={t('Rename service area', 'إعادة تسمية منطقة الخدمة')}
+        onClose={() => !busy && setRenaming(null)}
+        footer={<><Button onClick={() => setRenaming(null)} disabled={busy}>{t('Cancel', 'إلغاء')}</Button><Button variant="primary" type="submit" form="sa-rename" loading={busy} disabled={!newName.trim() || newName === renaming?.name}>{t('Save', 'حفظ')}</Button></>}
+      >
+        <form id="sa-rename" onSubmit={(e) => { e.preventDefault(); if (renaming) void run(() => updateServiceArea(renaming.id, { name: newName.trim() }), t('Service area renamed.', 'تمت إعادة تسمية المنطقة.'), t('Failed to rename service area.', 'تعذّرت إعادة التسمية.'), () => setRenaming(null)); }} className="space-y-3">
+          <LabeledInput label={t('Name', 'الاسم')} required value={newName} onChange={(e) => setNewName(e.target.value)} />
+          {actionError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>}
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!deactivate}
+        title={t('Deactivate this service area?', 'إيقاف منطقة الخدمة هذه؟')}
+        message={deactivate ? t(`"${deactivate.name}" will be marked inactive. You can activate it again at any time.`, `ستُوسَم "${deactivate.name}" كغير نشطة. يمكنك تفعيلها مجددًا في أي وقت.`) : ''}
+        confirmLabel={t('Deactivate', 'إيقاف')}
+        danger
+        busy={busy}
+        error={actionError}
+        onConfirm={() => deactivate && void run(() => deactivateServiceArea(deactivate.id), t('Service area deactivated.', 'تم إيقاف منطقة الخدمة.'), t('Failed to update service area.', 'تعذّر تحديث منطقة الخدمة.'), () => setDeactivate(null))}
+        onClose={() => setDeactivate(null)}
+      />
     </div>
   );
 }

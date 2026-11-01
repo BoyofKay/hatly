@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MAP_PROVIDER, MapProvider } from './map-provider.interface';
 import { GoogleMapsProvider } from './providers/google-maps.provider';
 import { DeterministicMapProvider } from './providers/deterministic-map.provider';
+import { UnavailableMapProvider } from './providers/unavailable-map.provider';
 
 /**
  * Selects the `MapProvider` implementation from `MAPS_PROVIDER` (config key `maps.provider`,
@@ -24,7 +25,13 @@ export function resolveMapProvider(
   env: string | undefined,
   google: MapProvider,
   deterministic: MapProvider,
+  unavailable?: MapProvider,
 ): MapProvider {
+  // PD-009 G: Maps deliberately disabled — allowed in every environment (it invents nothing; see UnavailableMapProvider).
+  if (configuredProvider === 'none') {
+    if (!unavailable) throw new Error('MAPS_PROVIDER=none needs the UnavailableMapProvider.');
+    return unavailable;
+  }
   if (configuredProvider === 'deterministic') {
     if (env === 'production') {
       throw new Error(
@@ -35,7 +42,7 @@ export function resolveMapProvider(
     return deterministic;
   }
   if (configuredProvider !== undefined && configuredProvider !== 'google') {
-    throw new Error(`Unknown MAPS_PROVIDER "${configuredProvider}" — expected "google" or "deterministic".`);
+    throw new Error(`Unknown MAPS_PROVIDER "${configuredProvider}" — expected "google", "none" or "deterministic".`);
   }
   return google;
 }
@@ -44,11 +51,19 @@ export function resolveMapProvider(
   providers: [
     GoogleMapsProvider,
     DeterministicMapProvider,
+    UnavailableMapProvider,
     {
       provide: MAP_PROVIDER,
-      useFactory: (configService: ConfigService, google: GoogleMapsProvider, deterministic: DeterministicMapProvider) =>
-        resolveMapProvider(configService.get<string>('maps.provider'), configService.get<string>('env'), google, deterministic),
-      inject: [ConfigService, GoogleMapsProvider, DeterministicMapProvider],
+      useFactory: (configService: ConfigService, google: GoogleMapsProvider, deterministic: DeterministicMapProvider, unavailable: UnavailableMapProvider) => {
+        const provider = resolveMapProvider(configService.get<string>('maps.provider'), configService.get<string>('env'), google, deterministic, unavailable);
+        if (provider === unavailable) {
+          new Logger('LocationModule').warn(
+            'Maps DISABLED (MAPS_PROVIDER=none): delivery is priced and bounded by the selected Delivery Zone; dispatch ranks drivers by straight-line distance; address search is off.',
+          );
+        }
+        return provider;
+      },
+      inject: [ConfigService, GoogleMapsProvider, DeterministicMapProvider, UnavailableMapProvider],
     },
   ],
   exports: [MAP_PROVIDER],

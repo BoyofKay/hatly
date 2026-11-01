@@ -70,6 +70,13 @@ class SessionController extends StateNotifier<SessionState> {
     state = const SessionState(SessionStatus.unauthenticated);
   }
 
+  /// Deletes the account on the backend (password re-checked there), clears the device and returns to the signed-out state.
+  /// Throws [ApiException] on a refusal — the caller shows the reason and the session is unchanged.
+  Future<void> deleteAccount({required String password}) async {
+    await _ref.read(authRepositoryProvider).deleteAccount(password: password);
+    state = const SessionState(SessionStatus.unauthenticated);
+  }
+
   /// Called by ApiClient when a refresh ultimately fails — the
   /// backend has already invalidated the session server-side (or it
   /// was never valid), so this only needs to clear local state, not

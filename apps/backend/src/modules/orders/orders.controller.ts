@@ -78,6 +78,7 @@ export class OrdersController {
    * Customer cancellation of their own WHOLE order (PD-005) — allowed only while PENDING or CONFIRMED. The customer is the
    * authenticated caller; the body carries at most a reason.
    */
+  @Throttled(RateLimitPolicies.orderCancel)
   @Post(':id/cancel')
   @Roles(Role.CUSTOMER)
   async cancel(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: CancelOrderDto) {

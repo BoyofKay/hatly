@@ -18,6 +18,12 @@ export interface PushSendResult {
 }
 
 export interface PushNotificationProvider {
+  /**
+   * Whether the provider can send at all (credentials present). Optional so existing doubles keep working; when it returns false the
+   * outbox records the delivery as SKIPPED / PROVIDER_NOT_CONFIGURED instead of pretending to try.
+   */
+  isConfigured?(): boolean;
+
   sendToTokens(params: {
     tokens: string[];
     title: string;

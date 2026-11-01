@@ -1,29 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { formatMinor } from '../../../lib/money';
 import Link from 'next/link';
-import {
-  AdminOrderListItem,
-  FULFILLMENT_TYPES,
-  ORDER_STATUSES,
-  PAYMENT_METHODS,
-  PAYMENT_STATUSES,
-  searchAdminOrders,
-} from '../../../lib/api/admin-order-search';
-import { I18nProvider, useI18n } from '../../../lib/i18n/i18n';
-import { LocaleToggle } from '../../../components/orders/LocaleToggle';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
+import { AdminOrderListItem, FULFILLMENT_TYPES, ORDER_STATUSES, PAYMENT_METHODS, PAYMENT_STATUSES, searchAdminOrders } from '../../../lib/api/admin-order-search';
 import { apiErrorMessage } from '../../../lib/api/errors';
+import { FULFILLMENT, ORDER_STATUS, PAYMENT_METHOD, PAYMENT_STATUS, label } from '../../../lib/admin/labels';
+import { I18nProvider, useI18n } from '../../../lib/i18n/i18n';
+import { useLang } from '../../../lib/ui/lang';
+import { Badge, Button, Card, Column, DataTable, inputCls, LabeledSelect, PageHeader, Pagination, StatusPill } from '../../../components/ui';
 
 /**
- * M3b (Launch-Readiness Gap Audit, G-04) — Admin Order Search. Reuses
- * the new, unchanged `GET admin/orders` endpoint exactly; opening a
- * result reuses the EXISTING admin order detail endpoint via
- * `/order-search/[id]` (a thin, read-only presentation page — see that
- * page's own top comment for why it isn't the Failed-Delivery detail
- * page). Mirrors this dashboard's established list-page conventions
- * (Failed Deliveries' table layout, Dispatch's loading/error/retry
- * shape) rather than inventing a new one.
+ * Admin Order Search — find any order and open its detail. One search box (order number, order id, customer phone or name) plus filters; the less
+ * common filters sit behind "More filters" with a count of what is active. Reuses `GET admin/orders` exactly. Filters live in the URL so a result list
+ * can be shared or reloaded, and `?status=` / `?fulfillmentType=` links from the Control Tower still pre-select the filter.
  */
 export default function OrderSearchPage() {
   return (
@@ -33,40 +23,46 @@ export default function OrderSearchPage() {
   );
 }
 
+const pickOne = (v: string | null, allowed: readonly string[]) => (v && allowed.includes(v) ? v : '');
+
 function OrderSearchScreen() {
   const { t } = useI18n();
-  const [pricing, setPricing] = useState<'' | 'PENDING'>('');
+  const { t: tl, money, dateTime } = useLang();
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [fulfillmentType, setFulfillmentType] = useState('');
+  const [pricing, setPricing] = useState<'' | 'PENDING'>('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [page, setPage] = useState(1);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const [items, setItems] = useState<AdminOrderListItem[] | null>(null);
   const [total, setTotal] = useState(0);
   const [limit, setLimit] = useState(20);
+  const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  async function runSearch(targetPage = page, statusOverride?: string, fulfillmentOverride?: string) {
+  const moreActive = [paymentStatus, paymentMethod, fulfillmentType, dateFrom, dateTo].filter(Boolean).length;
+  const anyActive = moreActive + (pricing ? 1 : 0) + (status ? 1 : 0) + (search.trim() ? 1 : 0);
+
+  const run = useCallback(async (targetPage: number, f: { search: string; status: string; paymentStatus: string; paymentMethod: string; fulfillmentType: string; pricing: string; dateFrom: string; dateTo: string }) => {
     setIsLoading(true);
     setError(null);
-    const effectiveStatus = statusOverride ?? status;
-    const effectiveFulfillment = fulfillmentOverride ?? fulfillmentType;
     try {
       const result = await searchAdminOrders({
         page: targetPage,
-        search: search || undefined,
-        status: effectiveStatus || undefined,
-        paymentStatus: paymentStatus || undefined,
-        paymentMethod: paymentMethod || undefined,
-        fulfillmentType: effectiveFulfillment || undefined,
-        hasPendingPricing: pricing === 'PENDING' ? true : undefined,
-        dateFrom: dateFrom ? new Date(dateFrom).toISOString() : undefined,
-        dateTo: dateTo ? new Date(dateTo).toISOString() : undefined,
+        search: f.search.trim() || undefined,
+        status: f.status || undefined,
+        paymentStatus: f.paymentStatus || undefined,
+        paymentMethod: f.paymentMethod || undefined,
+        fulfillmentType: f.fulfillmentType || undefined,
+        hasPendingPricing: f.pricing === 'PENDING' ? true : undefined,
+        dateFrom: f.dateFrom ? new Date(f.dateFrom).toISOString() : undefined,
+        dateTo: f.dateTo ? new Date(f.dateTo).toISOString() : undefined,
       });
       setItems(result.data);
       setTotal(result.meta.total);
@@ -77,195 +73,172 @@ function OrderSearchScreen() {
     } finally {
       setIsLoading(false);
     }
+  }, [t]);
+
+  const current = () => ({ search, status, paymentStatus, paymentMethod, fulfillmentType, pricing, dateFrom, dateTo });
+
+  function syncUrl(f: ReturnType<typeof current>) {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(f)) if (v) q.set(k, v);
+    window.history.replaceState(null, '', q.toString() ? `?${q}` : window.location.pathname);
+  }
+
+  function apply(next: Partial<ReturnType<typeof current>> = {}, targetPage = 1) {
+    const f = { ...current(), ...next };
+    syncUrl(f);
+    void run(targetPage, f);
   }
 
   useEffect(() => {
-    // A valid `?status=` / `?fulfillmentType=` (e.g. from a Control Tower count) pre-selects the filter; anything else is ignored.
-    const query = new URLSearchParams(window.location.search);
-    const fromUrl = query.get('status') ?? '';
-    const initialStatus = (ORDER_STATUSES as readonly string[]).includes(fromUrl) ? fromUrl : '';
-    if (initialStatus) setStatus(initialStatus);
-    const fulfillmentFromUrl = query.get('fulfillmentType') ?? '';
-    const initialFulfillment = (FULFILLMENT_TYPES as readonly string[]).includes(fulfillmentFromUrl) ? fulfillmentFromUrl : '';
-    if (initialFulfillment) setFulfillmentType(initialFulfillment);
-    runSearch(1, initialStatus, initialFulfillment);
+    const q = new URLSearchParams(window.location.search);
+    const f = {
+      search: q.get('search') ?? '',
+      status: pickOne(q.get('status'), ORDER_STATUSES),
+      paymentStatus: pickOne(q.get('paymentStatus'), PAYMENT_STATUSES),
+      paymentMethod: pickOne(q.get('paymentMethod'), PAYMENT_METHODS),
+      fulfillmentType: pickOne(q.get('fulfillmentType'), FULFILLMENT_TYPES),
+      pricing: q.get('pricing') === 'PENDING' ? 'PENDING' : '',
+      dateFrom: /^\d{4}-\d{2}-\d{2}$/.test(q.get('dateFrom') ?? '') ? q.get('dateFrom')! : '',
+      dateTo: /^\d{4}-\d{2}-\d{2}$/.test(q.get('dateTo') ?? '') ? q.get('dateTo')! : '',
+    };
+    setSearch(f.search); setStatus(f.status); setPaymentStatus(f.paymentStatus); setPaymentMethod(f.paymentMethod);
+    setFulfillmentType(f.fulfillmentType); setPricing(f.pricing as '' | 'PENDING'); setDateFrom(f.dateFrom); setDateTo(f.dateTo);
+    if (f.paymentStatus || f.paymentMethod || f.fulfillmentType || f.dateFrom || f.dateTo) setMoreOpen(true);
+    void run(1, f);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleSearchSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    runSearch(1);
+  function clearAll() {
+    setSearch(''); setStatus(''); setPaymentStatus(''); setPaymentMethod(''); setFulfillmentType(''); setPricing(''); setDateFrom(''); setDateTo('');
+    apply({ search: '', status: '', paymentStatus: '', paymentMethod: '', fulfillmentType: '', pricing: '', dateFrom: '', dateTo: '' });
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / (limit || 1)));
+  const columns: Column<AdminOrderListItem>[] = [
+    {
+      key: 'order', header: t('listColOrder'),
+      cell: (o) => (
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <Link href={`/order-search/${o.id}`} className="font-mono text-xs font-semibold text-gray-900 hover:underline">{o.orderNumber}</Link>
+          {o.hasPendingHatlyServicePricing && <span data-testid="pending-price-badge"><Badge tone="amber">{t('priceBadge')}</Badge></span>}
+        </span>
+      ),
+    },
+    {
+      key: 'status', header: t('listColStatus'),
+      cell: (o) => (
+        <span className="inline-flex flex-wrap items-center justify-end gap-1 md:justify-start">
+          <StatusPill status={o.status} label={label(ORDER_STATUS, o.status, tl)} />
+          {o.fulfillmentType === 'PICKUP' && <span data-testid="pickup-badge"><Badge tone="blue">{t('listFulfillmentPickup')}</Badge></span>}
+        </span>
+      ),
+    },
+    { key: 'customer', header: t('listColCustomer'), cell: (o) => (o.customer ? <span><span className="font-medium text-gray-900">{o.customer.fullName}</span> <span dir="ltr" className="text-xs text-gray-500">{o.customer.phone}</span></span> : '—') },
+    { key: 'total', header: t('listColTotal'), align: 'end', cell: (o) => (o.totalMinor != null ? money(o.totalMinor) : o.hasPendingHatlyServicePricing ? t('totalPendingShort') : t('dash')) },
+    {
+      key: 'payment', header: t('listColPayment'),
+      cell: (o) => (
+        <span className="inline-flex flex-wrap items-center justify-end gap-1 md:justify-start">
+          <span className="text-gray-700">{label(PAYMENT_METHOD, o.paymentMethod, tl)}</span>
+          {o.paymentStatus && <StatusPill status={o.paymentStatus} label={label(PAYMENT_STATUS, o.paymentStatus, tl)} />}
+        </span>
+      ),
+    },
+    { key: 'segments', header: t('listColSegments'), align: 'end', cell: (o) => o.segmentCount },
+    { key: 'created', header: t('listColCreated'), cell: (o) => <span className="whitespace-nowrap text-gray-600">{dateTime(o.createdAt)}</span> },
+    { key: 'open', header: '', align: 'end', cell: (o) => <Link href={`/order-search/${o.id}`} className="inline-flex min-h-[36px] items-center font-medium text-hatly-orangeDark hover:underline">{t('listOpen')}</Link> },
+  ];
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-xl font-semibold">{t('listTitle')}</h1>
-        <LocaleToggle />
-      </div>
+    <div className="max-w-6xl">
+      <PageHeader title={t('listTitle')} subtitle={tl('Find any order by number, customer or status, then open it to see the full history.', 'ابحث عن أي طلب برقمه أو بالعميل أو بالحالة ثم افتحه لمشاهدة السجل الكامل.')} />
 
-      <form onSubmit={handleSearchSubmit} className="mt-4 space-y-3 rounded border bg-white p-4">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('listSearchPlaceholder')}
-          className="w-full rounded border px-3 py-2 text-sm"
-        />
-        <div className="flex flex-wrap gap-2">
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded border px-2 py-1.5 text-sm">
+      <form onSubmit={(e) => { e.preventDefault(); apply(); }} className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('listSearchPlaceholder')} aria-label={t('listSearchPlaceholder')}
+            className={`${inputCls} min-h-[44px] flex-1 sm:min-h-0`} data-testid="os-search"
+          />
+          <Button type="submit" variant="primary" loading={isLoading} className="min-h-[44px] sm:min-h-0">{isLoading ? t('listSearching') : t('listSearch')}</Button>
+        </div>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,16rem)_minmax(0,16rem)_auto_auto] sm:items-end">
+          <LabeledSelect label={t('listColStatus')} value={status} onChange={(e) => { setStatus(e.target.value); apply({ status: e.target.value }); }}>
             <option value="">{t('listAnyStatus')}</option>
-            {ORDER_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className="rounded border px-2 py-1.5 text-sm">
-            <option value="">{t('listAnyPaymentStatus')}</option>
-            {PAYMENT_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="rounded border px-2 py-1.5 text-sm">
-            <option value="">{t('listAnyPaymentMethod')}</option>
-            {PAYMENT_METHODS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <select
-            value={fulfillmentType}
-            onChange={(e) => setFulfillmentType(e.target.value)}
-            aria-label={t('listFulfillmentLabel')}
-            data-testid="list-fulfillment"
-            className="rounded border px-2 py-1.5 text-sm"
-          >
-            <option value="">{t('listAnyFulfillment')}</option>
-            {FULFILLMENT_TYPES.map((f) => (
-              <option key={f} value={f}>
-                {t(f === 'PICKUP' ? 'listFulfillmentPickup' : 'listFulfillmentDelivery')}
-              </option>
-            ))}
-          </select>
-          <select
-            value={pricing}
-            onChange={(e) => setPricing(e.target.value as '' | 'PENDING')}
-            aria-label={t('listPricingFilterLabel')}
-            className="rounded border px-2 py-1.5 text-sm"
-          >
-            <option value="">{t('listPricingAll')}</option>
-            <option value="PENDING">{t('listPricingPending')}</option>
-          </select>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded border px-2 py-1.5 text-sm" />
-          <span className="self-center text-sm text-gray-400">{t('listTo')}</span>
-          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded border px-2 py-1.5 text-sm" />
-          <button type="submit" disabled={isLoading} className="rounded bg-hatly-orange px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50">
-            {isLoading ? t('listSearching') : t('listSearch')}
-          </button>
+            {ORDER_STATUSES.map((s) => <option key={s} value={s}>{label(ORDER_STATUS, s, tl)}</option>)}
+          </LabeledSelect>
+          <LabeledSelect label={t('listPricingFilterLabel')} value={pricing} onChange={(e) => { setPricing(e.target.value as '' | 'PENDING'); apply({ pricing: e.target.value as '' | 'PENDING' }); }} aria-label={t('listPricingFilterLabel')}>
+              <option value="">{t('listPricingAll')}</option>
+              <option value="PENDING">{t('listPricingPending')}</option>
+            </LabeledSelect>
+          <Button type="button" onClick={() => setMoreOpen((v) => !v)} aria-expanded={moreOpen} className="min-h-[40px]">
+            {tl('More filters', 'المزيد من الفلاتر')}{moreActive > 0 && <Badge tone="orange">{moreActive}</Badge>}
+          </Button>
+          {anyActive > 0 && <Button type="button" variant="ghost" onClick={clearAll} className="min-h-[40px]">{tl('Clear filters', 'مسح الفلاتر')}</Button>}
         </div>
-      </form>
-
-      {error && (
-        <div className="mt-4 rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}{' '}
-          <button onClick={() => runSearch(page)} className="underline">
-            {t('retry')}
-          </button>
-        </div>
-      )}
-
-      {!error && isLoading && items === null && <p className="mt-4 text-gray-500">{t('loading')}</p>}
-      {!error && items !== null && items.length === 0 && <p className="mt-4 text-gray-500">{pricing === 'PENDING' ? t('listEmptyPending') : t('listEmpty')}</p>}
-
-      {!error && items !== null && items.length > 0 && (
-        <>
-          <div className="mt-4 overflow-x-auto rounded border bg-white">
-            <table className="w-full text-start text-sm">
-              <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="px-4 py-2">{t('listColOrder')}</th>
-                  <th className="px-4 py-2">{t('listColStatus')}</th>
-                  <th className="px-4 py-2">{t('listColCustomer')}</th>
-                  <th className="px-4 py-2">{t('listColTotal')}</th>
-                  <th className="px-4 py-2">{t('listColPayment')}</th>
-                  <th className="px-4 py-2">{t('listColSegments')}</th>
-                  <th className="px-4 py-2">{t('listColCreated')}</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((order) => (
-                  <tr key={order.id} className="border-b last:border-0">
-                    <td className="px-4 py-2 font-mono text-xs">
-                      {order.orderNumber}
-                      {order.hasPendingHatlyServicePricing && (
-                        <span
-                          className="ms-2 inline-block rounded bg-amber-100 px-2 py-0.5 font-sans text-xs font-medium text-amber-800"
-                          data-testid="pending-price-badge"
-                        >
-                          {t('priceBadge')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">{order.status}</span>
-                      {order.fulfillmentType === 'PICKUP' && (
-                        <span className="ms-1 rounded bg-blue-50 px-2 py-0.5 text-xs text-blue-800" data-testid="pickup-badge">
-                          {t('listFulfillmentPickup')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2">
-                      {order.customer ? `${order.customer.fullName} (${order.customer.phone})` : '—'}
-                    </td>
-                    <td className="px-4 py-2">
-                      {order.totalMinor != null ? formatMinor(order.totalMinor) : order.hasPendingHatlyServicePricing ? t('totalPendingShort') : t('dash')}
-                    </td>
-                    <td className="px-4 py-2">
-                      {order.paymentMethod}
-                      {order.paymentStatus ? ` (${order.paymentStatus})` : ''}
-                    </td>
-                    <td className="px-4 py-2">{order.segmentCount}</td>
-                    <td className="px-4 py-2">{new Date(order.createdAt).toLocaleString()}</td>
-                    <td className="px-4 py-2 text-end">
-                      <Link href={`/order-search/${order.id}`} className="text-hatly-orange underline">
-                        {t('listOpen')}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-3 flex items-center justify-between text-sm text-gray-600">
-            <span>
-              {total === 1 ? t('listPageOfOne', { page, pages: totalPages }) : t('listPageOf', { page, pages: totalPages, total })}
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => runSearch(page - 1)}
-                disabled={isLoading || page <= 1}
-                className="rounded border px-3 py-1 disabled:opacity-50"
-              >
-                {t('listPrevious')}
-              </button>
-              <button
-                onClick={() => runSearch(page + 1)}
-                disabled={isLoading || page >= totalPages}
-                className="rounded border px-3 py-1 disabled:opacity-50"
-              >
-                {t('listNext')}
-              </button>
+        {moreOpen && (
+          <div className="grid gap-3 border-t border-gray-100 pt-3 sm:grid-cols-2 lg:grid-cols-3" data-testid="os-more">
+            <LabeledSelect label={t('listColPayment')} value={paymentStatus} onChange={(e) => { setPaymentStatus(e.target.value); apply({ paymentStatus: e.target.value }); }}>
+              <option value="">{t('listAnyPaymentStatus')}</option>
+              {PAYMENT_STATUSES.map((s) => <option key={s} value={s}>{label(PAYMENT_STATUS, s, tl)}</option>)}
+            </LabeledSelect>
+            <LabeledSelect label={tl('Payment method', 'طريقة الدفع')} value={paymentMethod} onChange={(e) => { setPaymentMethod(e.target.value); apply({ paymentMethod: e.target.value }); }}>
+              <option value="">{t('listAnyPaymentMethod')}</option>
+              {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{label(PAYMENT_METHOD, m, tl)}</option>)}
+            </LabeledSelect>
+            <LabeledSelect label={t('listFulfillmentLabel')} value={fulfillmentType} onChange={(e) => { setFulfillmentType(e.target.value); apply({ fulfillmentType: e.target.value }); }} aria-label={t('listFulfillmentLabel')} data-testid="list-fulfillment">
+              <option value="">{t('listAnyFulfillment')}</option>
+              {FULFILLMENT_TYPES.map((f) => <option key={f} value={f}>{label(FULFILLMENT, f, tl)}</option>)}
+            </LabeledSelect>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700" htmlFor="os-from">{tl('From', 'من')}</label>
+              <input id="os-from" type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); apply({ dateFrom: e.target.value }); }} className={inputCls} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700" htmlFor="os-to">{t('listTo')}</label>
+              <input id="os-to" type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); apply({ dateTo: e.target.value }); }} className={inputCls} />
             </div>
           </div>
-        </>
-      )}
+        )}
+      </form>
+
+      <Card pad={false}>
+        {items && (
+          <p className="border-b border-gray-100 px-4 py-2 text-xs text-gray-500" aria-live="polite" data-testid="os-count">
+            {tl(`${total} order${total === 1 ? '' : 's'}`, `${total} طلب`)}
+          </p>
+        )}
+        <DataTable
+          columns={columns}
+          rows={items ?? undefined}
+          rowKey={(o) => o.id}
+          loading={isLoading}
+          error={error}
+          onRetry={() => apply({}, page)}
+          emptyTitle={pricing === 'PENDING' ? t('listEmptyPending') : t('listEmpty')}
+          emptyHint={anyActive > 0 ? tl('Try removing a filter or checking the spelling.', 'جرّب إزالة أحد الفلاتر أو مراجعة الكتابة.') : undefined}
+          onRowClick={(o) => router.push(`/order-search/${o.id}`)}
+          renderCard={(o) => (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex flex-wrap items-center gap-1.5">
+                  <span className="font-mono text-sm font-semibold text-gray-900">{o.orderNumber}</span>
+                  {o.hasPendingHatlyServicePricing && <Badge tone="amber">{t('priceBadge')}</Badge>}
+                </span>
+                <span className="shrink-0 text-sm font-semibold tabular-nums text-gray-900">{o.totalMinor != null ? money(o.totalMinor) : o.hasPendingHatlyServicePricing ? t('totalPendingShort') : t('dash')}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <StatusPill status={o.status} label={label(ORDER_STATUS, o.status, tl)} />
+                {o.fulfillmentType === 'PICKUP' && <Badge tone="blue">{t('listFulfillmentPickup')}</Badge>}
+                {o.paymentStatus && <StatusPill status={o.paymentStatus} label={`${label(PAYMENT_METHOD, o.paymentMethod, tl)} · ${label(PAYMENT_STATUS, o.paymentStatus, tl)}`} />}
+              </div>
+              <p className="flex items-center justify-between gap-2 text-xs text-gray-500">
+                <span className="min-w-0 truncate">{o.customer ? o.customer.fullName : '—'}</span>
+                <span className="shrink-0">{dateTime(o.createdAt)}</span>
+              </p>
+            </div>
+          )}
+        />
+        {items && items.length > 0 && <Pagination page={page} limit={limit} total={total} onPage={(p) => apply({}, p)} />}
+      </Card>
     </div>
   );
 }

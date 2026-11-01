@@ -125,7 +125,7 @@ export class ProductsController {
     // the whole page — CONFIRMED never a per-product Offer query.
     const offersByProductId = await this.offerConsumptionService.resolveActiveOffersForProducts({
       vendorBranchId: branchId,
-      products: result.data.map((p) => ({ productId: p.id, categoryId: p.categoryId })),
+      products: result.data.map((p) => ({ productId: p.id, categoryId: p.categoryId, priceMinor: p.priceMinor, pricingUnit: p.pricingUnit })),
     });
     const data = result.data.map((product) => ({
       ...product,
@@ -141,7 +141,7 @@ export class ProductsController {
     const product = await this.productsService.getProductById(id);
     const offersByProductId = await this.offerConsumptionService.resolveActiveOffersForProducts({
       vendorBranchId: product.vendorBranchId,
-      products: [{ productId: product.id, categoryId: product.categoryId }],
+      products: [{ productId: product.id, categoryId: product.categoryId, priceMinor: product.priceMinor, pricingUnit: product.pricingUnit }],
     });
     const extras = await this.productsService.getPublicExtras(product);
     return { data: { ...product, activeOffer: offersByProductId.get(product.id) ?? null, ...extras } };

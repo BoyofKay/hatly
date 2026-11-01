@@ -30,6 +30,9 @@ class Product {
     this.activeOffer,
     this.catalogProductId,
     this.vendor,
+    this.deliveredQuantityCount = 0,
+    this.deliveredWeightGramsCount = 0,
+    this.createdAt,
   });
 
   final String id;
@@ -75,6 +78,18 @@ class Product {
   /// Small summary of the selling vendor/branch (`GET /products/:id` only; null elsewhere).
   final ProductVendorSummary? vendor;
 
+  /// How much of this listing has actually been DELIVERED (pieces for a piece product, grams for a weighed one) — the backend's
+  /// real order-based popularity cache. Zero until the first delivery. "Most ordered" is only ever claimed from this.
+  final int deliveredQuantityCount;
+  final int deliveredWeightGramsCount;
+
+  /// When the listing was created (the only recency signal that exists; there is no configurable "new" flag).
+  final DateTime? createdAt;
+
+  /// Genuinely ordered at least once. A product that was never delivered is not "most ordered", however a sort ties.
+  bool get hasBeenOrdered =>
+      deliveredQuantityCount > 0 || deliveredWeightGramsCount > 0;
+
   bool get isWeighted => pricingUnit == 'WEIGHT';
   bool get isTracked => inventoryMode == 'TRACKED';
 }
@@ -84,10 +99,15 @@ class Product {
 /// when `mechanism == 'FLASH_SALE'`. Never carries `discountType`/
 /// `discountValue`/limits/budget — those remain Admin-internal.
 class ActiveOffer {
-  const ActiveOffer({required this.mechanism, this.specialPriceMinor});
+  const ActiveOffer(
+      {required this.mechanism, this.specialPriceMinor, this.perOrderLimit});
 
   final String mechanism;
   final int? specialPriceMinor;
+
+  /// FLASH_SALE only: at most this many units per order get the special price (the rest cost the normal price, exactly as
+  /// the server plans checkout). Null = no cap. Used only to ESTIMATE a quantity's total; the server stays authoritative.
+  final int? perOrderLimit;
 
   bool get isFlashSale => mechanism == 'FLASH_SALE';
 
@@ -95,6 +115,7 @@ class ActiveOffer {
     return ActiveOffer(
       mechanism: json['mechanism'] as String,
       specialPriceMinor: json['specialPriceMinor'] as int?,
+      perOrderLimit: json['perOrderLimit'] as int?,
     );
   }
 }

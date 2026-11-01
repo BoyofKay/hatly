@@ -27,6 +27,10 @@ export class Delivery extends BaseEntity {
   @Column({ name: 'delivered_at', type: 'timestamptz', nullable: true })
   deliveredAt?: Date | null;
 
+  /** Assignment offers in a row that nobody answered (reset when a driver acts or an admin assigns) — drives the DRIVER_NOT_RESPONDING alert. */
+  @Column({ name: 'consecutive_unanswered', type: 'int', default: 0 })
+  consecutiveUnanswered: number;
+
   @Column({ name: 'reassignment_count', type: 'int', default: 0 })
   reassignmentCount: number;
 }

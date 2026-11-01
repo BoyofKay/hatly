@@ -7,7 +7,7 @@ import { WalletTransaction } from '../../src/modules/wallet/entities/wallet-tran
 import { WalletTransactionType } from '../../src/modules/wallet/wallet-transaction-type.enum';
 import { LoyaltyPointsTransaction } from '../../src/modules/loyalty/entities/loyalty-points-transaction.entity';
 import { LoyaltyTransactionType } from '../../src/modules/loyalty/loyalty-transaction-type.enum';
-import { LoyaltyService } from '../../src/modules/loyalty/loyalty.service';
+import { LoyaltyService, loyaltyConversionKey } from '../../src/modules/loyalty/loyalty.service';
 
 /**
  * Real PostgreSQL BEGIN/COMMIT/ROLLBACK through TypeORM's own
@@ -131,10 +131,11 @@ describe('Real PostgreSQL transaction atomicity', () => {
     const earning = await data.save<LoyaltyPointsTransaction>(LoyaltyPointsTransaction, {
       customerId: customer.id, pointsDelta: 500, type: LoyaltyTransactionType.EARNING, reason: 'seed', idempotencyKey: `seed-${customer.id}`,
     });
-    // A pre-existing wallet row already owns this idempotency key, so the conversion's SECOND write (wallet) must fail
-    // with a genuine unique violation after its FIRST write (loyalty redemption) already succeeded inside the transaction.
+    // A pre-existing wallet row already owns the conversion's LEDGER key (the client key namespaced to this customer — see
+    // loyaltyConversionKey), so the conversion's SECOND write (wallet) must fail with a genuine unique violation after its FIRST
+    // write (loyalty redemption) already succeeded inside the transaction.
     const blocker = await data.save<WalletTransaction>(WalletTransaction, {
-      customerId: customer.id, amountDeltaMinor: 1, type: WalletTransactionType.ADMIN_CREDIT, reason: 'blocker', idempotencyKey: key,
+      customerId: customer.id, amountDeltaMinor: 1, type: WalletTransactionType.ADMIN_CREDIT, reason: 'blocker', idempotencyKey: loyaltyConversionKey(customer.id, key),
     });
 
     // The wallet unique violation aborts the transaction; the service now answers it as a clear 409 (the key is

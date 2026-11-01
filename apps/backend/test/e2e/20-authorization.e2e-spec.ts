@@ -147,7 +147,7 @@ describe('E2E — authorization / IDOR', () => {
 
     it("cannot change the status of another vendor's segment", async () => {
       const segA = (await world.ds.query('SELECT id, status FROM order_vendor_segments WHERE order_id = $1', [orderA.id]))[0];
-      const res = await world.api('patch', `/vendor/orders/segments/${segA.id}/status`, { token: vendorB.manager.accessToken, body: { status: 'CANCELLED' } });
+      const res = await world.api('patch', `/vendor/orders/segments/${segA.id}/status`, { token: vendorB.manager.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } });
       expect([403, 404]).toContain(res.status);
       expect((await world.ds.query('SELECT status FROM order_vendor_segments WHERE id = $1', [segA.id]))[0].status).toBe(segA.status);
     });
@@ -287,6 +287,7 @@ describe('E2E — authorization / IDOR', () => {
       { permission: Permission.VIEW_ORDERS, method: 'get', path: '/admin/orders?search=nonexistent' },
       { permission: Permission.VIEW_CUSTOMERS, method: 'get', path: '/admin/customers?search=nonexistent' },
       { permission: Permission.VIEW_CUSTOMERS, method: 'get', path: `/admin/customers/${NEVER_EXISTS}` },
+      { permission: Permission.VIEW_AUDIT_LOG, method: 'get', path: '/admin/audit-logs' },
       { permission: Permission.MANAGE_VENDOR_COMMISSION, method: 'patch', path: `/admin/vendor-branches/${NEVER_EXISTS}/commission-rate`, body: { commissionRateBasisPoints: 100 } },
       { permission: Permission.MANAGE_DRIVER_COMMISSION, method: 'patch', path: `/admin/drivers/${NEVER_EXISTS}/commission-rate`, body: { commissionRateBasisPoints: 100 } },
       { permission: Permission.MANAGE_EMPLOYEE_LOANS, method: 'get', path: `/admin/employee-loans/employee/${NEVER_EXISTS}` },
@@ -386,12 +387,13 @@ describe('E2E — authorization / IDOR', () => {
       }
     });
 
-    it('CHARACTERIZATION: a role in the JWT is trusted until expiry — a deactivated account keeps its access token for its 15-minute lifetime', async () => {
+    it('a deactivated staff account loses access IMMEDIATELY (the strategy re-checks vendor/admin staff in the database), not when its 15-minute token expires; reactivating restores it', async () => {
       const staffRows = expectData<Array<{ id: string }>>(await world.api('get', '/admin/vendor-staff', { token: superAdmin.accessToken, query: { vendorBranchId: vendorB.branchId } }));
       expectData(await world.api('patch', `/admin/vendor-staff/${staffRows[0].id}/deactivate`, { token: superAdmin.accessToken }));
-      const stillWorks = await world.api('get', '/vendor/orders', { token: vendorB.manager.accessToken });
-      expect(stillWorks.status).toBe(200); // documented limitation: JwtStrategy.validate() does not consult the database
+      const refused = await world.api('get', '/vendor/orders', { token: vendorB.manager.accessToken });
+      expect(refused.status).toBe(401);
       expectData(await world.api('patch', `/admin/vendor-staff/${staffRows[0].id}/activate`, { token: superAdmin.accessToken }));
+      expect((await world.api('get', '/vendor/orders', { token: vendorB.manager.accessToken })).status).toBe(200);
     });
   });
 

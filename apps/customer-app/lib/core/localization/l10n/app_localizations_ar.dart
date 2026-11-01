@@ -128,7 +128,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get passwordSetupSectionSubtitle =>
-      'عيّن كلمة مرور لتتمكن من تسجيل الدخول أيضًا بدون رمز عبر رسالة نصية.';
+      'غيّر كلمة المرور التي تسجّل بها الدخول.';
 
   @override
   String get passwordSetupSaveButton => 'حفظ كلمة المرور';
@@ -181,6 +181,43 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get errorSmsProviderUnavailable =>
       'تعذر إرسال رمز التحقق حاليًا. برجاء المحاولة لاحقًا';
+
+  @override
+  String get passwordTooShort => 'كلمة المرور يجب ألا تقل عن 8 أحرف';
+
+  @override
+  String get passwordConfirmLabel => 'تأكيد كلمة المرور';
+
+  @override
+  String get passwordMismatch => 'كلمتا المرور غير متطابقتين';
+
+  @override
+  String get errorInvalidCredentials => 'رقم الهاتف أو كلمة المرور غير صحيحة';
+
+  @override
+  String get errorRegistrationUnavailable =>
+      'تعذر إكمال التسجيل. إذا كان لديك حساب بالفعل فسجّل الدخول.';
+
+  @override
+  String get errorTooManyFailedLogins =>
+      'محاولات تسجيل دخول فاشلة كثيرة. حاول مرة أخرى بعد قليل';
+
+  @override
+  String get errorInvalidInput => 'تحقق من البيانات المدخلة وحاول مرة أخرى';
+
+  @override
+  String get errorPhoneVerificationUnavailable =>
+      'التحقق من الهاتف غير متاح حاليًا';
+
+  @override
+  String get profileCurrentPasswordLabel => 'كلمة المرور الحالية';
+
+  @override
+  String get errorCurrentPasswordRequired =>
+      'أدخل كلمة المرور الحالية لتغييرها';
+
+  @override
+  String get errorCurrentPasswordInvalid => 'كلمة المرور الحالية غير صحيحة';
 
   @override
   String get homeComingSoon => 'قريبًا: تصفح المتاجر والمنتجات';
@@ -355,11 +392,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get customRequestEntryPoint => 'لم تجد ما تبحث عنه؟';
 
   @override
-  String get customRequestSheetTitle => 'اطلب صنفًا مخصصًا';
+  String get customRequestSheetTitle => 'اطلب صنفًا غير موجود في القائمة';
 
   @override
   String get customRequestSheetSubtitle =>
-      'صف ما تحتاجه و/أو أضف صورة — سنرسلها إلى المتجر.';
+      'صف ما تحتاجه و/أو أضف صورة. سيُضاف إلى سلتك ويصل إلى المتجر مع طلبك، ويؤكد المتجر توفر الصنف ويحدد سعره، وسيظهر لك المبلغ النهائي بعد ذلك.';
 
   @override
   String get customRequestTextHint =>
@@ -707,9 +744,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get homeSectionOffers => 'العروض';
-
-  @override
-  String get homeSectionPopularNew => 'الأكثر طلبًا والجديد';
 
   @override
   String get homeFavoritesShortcut => 'المفضلة';
@@ -1114,6 +1148,17 @@ class AppLocalizationsAr extends AppLocalizations {
   String get checkoutChooseElectronicMethod => 'اختر وسيلة الدفع الإلكتروني';
 
   @override
+  String get checkoutElectronicMethodHeading => 'وسيلة الدفع الإلكتروني';
+
+  @override
+  String get checkoutElectronicMethodUnavailable =>
+      'وسيلة الدفع هذه غير متاحة حاليًا، اختر وسيلة أخرى';
+
+  @override
+  String get checkoutCannotConfirmYet =>
+      'لم نتمكن من تأكيد الطلب بعد. راجع اختياراتك وحاول مرة أخرى';
+
+  @override
   String get checkoutNoElectronicMethods =>
       'لا توجد وسائل دفع إلكتروني متاحة حاليًا';
 
@@ -1259,6 +1304,10 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get checkoutBlockerFeeUnavailable =>
       'تعذّر حساب رسوم التوصيل الآن. حاول مرة أخرى بعد قليل.';
+
+  @override
+  String get checkoutBlockerGpsUnavailable =>
+      'التوصيل إلى موقع GPS غير متاح حاليًا. اختر عنوانًا بمنطقة توصيل أو أضف عنوانًا جديدًا.';
 
   @override
   String get checkoutBlockerInvalidAddress =>
@@ -1416,7 +1465,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get addressSearchNoResult =>
-      'لم نجد هذا العنوان. جرّب صياغة أخرى أو استخدم موقعك الحالي.';
+      'لم نجد هذا العنوان. البحث عن العناوين غير متاح دائمًا — يمكنك كتابة عنوانك في التفاصيل أعلاه وحفظه بدون موقع على الخريطة، أو استخدام موقعك الحالي.';
 
   @override
   String get addressLocationUnavailable =>
@@ -1835,7 +1884,8 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addressZonesLoadError => 'معرفناش نحمّل مناطق التوصيل. حاول تاني.';
 
   @override
-  String get addressZonesEmpty => 'مفيش مناطق توصيل متاحة دلوقتي.';
+  String get addressZonesEmpty =>
+      'لا توجد مناطق توصيل متاحة بعد، لذلك لا يمكن حفظ عنوان الآن. حاول مرة أخرى لاحقًا.';
 
   @override
   String get addressDetailedLabel => 'العنوان بالتفصيل';
@@ -1879,15 +1929,581 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String checkoutHatlyServiceFeeFormula(String zoneFee, String multiplier) {
-    return 'رسوم توصيل منطقتك $zoneFee × $multiplier';
-  }
-
-  @override
   String get addressZoneAutoSelected =>
       'دي المنطقة الوحيدة المتاحة في المدينة دي، فاخترناها لك.';
 
   @override
   String get addressCityNoZones =>
       'مفيش مناطق توصيل متاحة في المدينة دي دلوقتي.';
+
+  @override
+  String get guestSignInTitle => 'سجّل الدخول للمتابعة';
+
+  @override
+  String get guestSignInBody =>
+      'أنشئ حسابًا أو سجّل الدخول لاستخدام السلة والطلبات والملف الشخصي.';
+
+  @override
+  String get guestSignInAction => 'تسجيل الدخول أو إنشاء حساب';
+
+  @override
+  String get guestBrowseAction => 'تصفح بدون حساب';
+
+  @override
+  String get weightEntryTitle => 'أدخل الوزن';
+
+  @override
+  String get weightEntryHint => 'مثال: 1.5';
+
+  @override
+  String get weightEntryConfirm => 'تأكيد الوزن';
+
+  @override
+  String get weightEntryTooltip => 'اكتب الوزن';
+
+  @override
+  String weightEntryInvalid(String min, String max) {
+    return 'أدخل وزنًا بين $min و$max';
+  }
+
+  @override
+  String weightGramsShort(int grams) {
+    return '$grams جم';
+  }
+
+  @override
+  String weightKgShort(String kg) {
+    return '$kg كجم';
+  }
+
+  @override
+  String get addressPickerHint => 'اختر عنوانًا محفوظًا';
+
+  @override
+  String get addressPickerNoPin => 'لا يوجد موقع على الخريطة — أضفه من عناويني';
+
+  @override
+  String get addressPickerNeedsPin =>
+      'هذا العنوان بلا موقع على الخريطة فلا يمكن استخدامه هنا. أضف له موقعًا أولًا.';
+
+  @override
+  String hatlyServiceRouteBuy(String place) {
+    return 'هاتلي تشتري من $place وتوصّل إلى عنوان التوصيل الخاص بك';
+  }
+
+  @override
+  String hatlyServiceRouteDeliver(String place) {
+    return 'هاتلي تستلم من عنوان التوصيل الخاص بك وتوصّل إلى $place';
+  }
+
+  @override
+  String get hatlyServiceRoutePlaceUnset => 'المكان الذي تختاره';
+
+  @override
+  String get hatlyServiceDeliveryOnly => 'رسوم التوصيل فقط';
+
+  @override
+  String get homeSectionMostOrdered => 'الأكثر طلبًا';
+
+  @override
+  String get homeSectionNew => 'الجديد';
+
+  @override
+  String get homeSeeAllOffersTitle => 'العروض';
+
+  @override
+  String get homeSeeAllEmpty => 'لا يوجد شيء هنا بعد';
+
+  @override
+  String get notificationsTitle => 'الإشعارات';
+
+  @override
+  String get notificationsEmptyTitle => 'لا توجد إشعارات بعد';
+
+  @override
+  String get notificationsEmptyBody => 'سنخبرك هنا بكل تحديث على طلباتك.';
+
+  @override
+  String get notificationsLoadError => 'تعذّر تحميل الإشعارات';
+
+  @override
+  String get notificationsMarkAllRead => 'تحديد الكل كمقروء';
+
+  @override
+  String get notificationsBellLabel => 'الإشعارات';
+
+  @override
+  String notificationsBellLabelUnread(int count) {
+    return 'الإشعارات، $count غير مقروء';
+  }
+
+  @override
+  String get notificationsUnread => 'غير مقروء';
+
+  @override
+  String get notificationOrderPlacedTitle => 'تم استلام طلبك';
+
+  @override
+  String notificationOrderPlacedBody(String orderNumber) {
+    return 'استلمنا طلبك رقم $orderNumber.';
+  }
+
+  @override
+  String get notificationOrderConfirmedTitle => 'تم تأكيد طلبك';
+
+  @override
+  String notificationOrderConfirmedBody(String orderNumber) {
+    return 'تم تأكيد طلبك رقم $orderNumber.';
+  }
+
+  @override
+  String get notificationOrderPreparingTitle => 'جارٍ تجهيز طلبك';
+
+  @override
+  String notificationOrderPreparingBody(String orderNumber) {
+    return 'بدأ تجهيز طلبك رقم $orderNumber.';
+  }
+
+  @override
+  String get notificationOrderReadyForPickupTitle => 'طلبك جاهز للاستلام';
+
+  @override
+  String notificationOrderReadyForPickupBody(String orderNumber) {
+    return 'طلبك رقم $orderNumber جاهز، يمكنك استلامه من الفرع.';
+  }
+
+  @override
+  String get notificationOrderOnTheWayTitle => 'طلبك في الطريق';
+
+  @override
+  String notificationOrderOnTheWayBody(String orderNumber) {
+    return 'طلبك رقم $orderNumber في الطريق إليك.';
+  }
+
+  @override
+  String get notificationOrderDeliveredTitle => 'تم توصيل طلبك';
+
+  @override
+  String notificationOrderDeliveredBody(String orderNumber) {
+    return 'تم توصيل طلبك رقم $orderNumber.';
+  }
+
+  @override
+  String get notificationOrderCollectedTitle => 'تم استلام طلبك';
+
+  @override
+  String notificationOrderCollectedBody(String orderNumber) {
+    return 'تم استلام طلبك رقم $orderNumber.';
+  }
+
+  @override
+  String get notificationOrderCancelledTitle => 'تم إلغاء طلبك';
+
+  @override
+  String notificationOrderCancelledBody(String orderNumber) {
+    return 'تم إلغاء طلبك رقم $orderNumber.';
+  }
+
+  @override
+  String get notificationOrderFailedDeliveryTitle => 'تعذّر توصيل طلبك';
+
+  @override
+  String notificationOrderFailedDeliveryBody(String orderNumber) {
+    return 'لم نتمكن من توصيل طلبك رقم $orderNumber.';
+  }
+
+  @override
+  String get customRequestEntryHint =>
+      'اكتب الصنف أو أضف صورة، وسيتأكد المتجر منه ويحدد سعره.';
+
+  @override
+  String get customRequestAdded =>
+      'تمت الإضافة إلى سلتك — سيؤكد المتجر توفر الصنف ويحدد سعره.';
+
+  @override
+  String get cartErrorCustomRequestsUnavailable =>
+      'هذا المتجر لا يقبل الطلبات المخصصة.';
+
+  @override
+  String optionChooseBetween(int min, int max) {
+    return 'اختر من $min إلى $max';
+  }
+
+  @override
+  String optionChooseAtLeast(int min) {
+    return 'اختر $min على الأقل';
+  }
+
+  @override
+  String optionChooseUpTo(int max) {
+    return 'اختر حتى $max';
+  }
+
+  @override
+  String optionMinError(int min) {
+    return 'اختر $min على الأقل';
+  }
+
+  @override
+  String optionMaxReached(int max) {
+    return 'يمكنك اختيار $max كحد أقصى';
+  }
+
+  @override
+  String get cartErrorOptionLimit =>
+      'أحد الاختيارات خارج ما يسمح به هذا المنتج — راجع اختياراتك.';
+
+  @override
+  String get deleteAccountAction => 'حذف حسابي';
+
+  @override
+  String get deleteAccountTitle => 'حذف الحساب نهائيًا';
+
+  @override
+  String get deleteAccountExplanation =>
+      'سيتم حذف بياناتك الشخصية (الاسم ورقم الهاتف والعناوين المحفوظة والإشعارات والمفضلة وسلة التسوق). تبقى سجلات الطلبات والمدفوعات المنتهية بدون أي بيانات تعرّف بك، لأن المتاجر والسائقين وهاتلي يحتاجونها للمحاسبة. ستفقد نقاط هاتلي. لا يمكن التراجع عن هذا الإجراء.';
+
+  @override
+  String get deleteAccountRequirements =>
+      'لا يمكن حذف الحساب أثناء وجود طلب قيد التنفيذ أو رصيد في محفظة هاتلي.';
+
+  @override
+  String get deleteAccountPasswordHint => 'أدخل كلمة المرور للتأكيد';
+
+  @override
+  String get deleteAccountConfirm => 'حذف الحساب';
+
+  @override
+  String get deleteAccountCancel => 'إلغاء';
+
+  @override
+  String get deleteAccountPasswordRequired => 'أدخل كلمة المرور لتأكيد الحذف';
+
+  @override
+  String get deleteAccountErrorPassword => 'كلمة المرور غير صحيحة';
+
+  @override
+  String get deleteAccountErrorActiveOrders =>
+      'لديك طلب قيد التنفيذ. يمكنك حذف حسابك بعد انتهائه.';
+
+  @override
+  String get deleteAccountErrorWalletBalance =>
+      'محفظة هاتلي ليست فارغة. تواصل مع دعم هاتلي لتسويتها قبل حذف الحساب.';
+
+  @override
+  String get deleteAccountErrorGeneric => 'تعذّر حذف الحساب. حاول مرة أخرى.';
+
+  @override
+  String get homeNoStoresTitle => 'لا توجد متاجر متاحة بعد';
+
+  @override
+  String get homeNoStoresBody =>
+      'ستظهر المتاجر والأقسام هنا بمجرد توفرها في منطقتك. تفقّد التطبيق مرة أخرى قريبًا.';
+
+  @override
+  String get phoneEgyptOnly =>
+      'هاتلي تقبل حاليًا أرقام الموبايل المصرية فقط (+20).';
+
+  @override
+  String get addressMapLocationSaved => 'تم حفظ الموقع على الخريطة';
+
+  @override
+  String get addressTextOnly => 'عنوان نصي فقط — بدون موقع على الخريطة';
+
+  @override
+  String get addressMethodTitle => 'إزاي عايز تضيف عنوانك؟';
+
+  @override
+  String get addressMethodSubtitle =>
+      'اختار طريقة واحدة بس — مش محتاج الاتنين.';
+
+  @override
+  String get addressMethodGpsTitle => 'استخدم موقعي الحالي (GPS)';
+
+  @override
+  String get addressMethodGpsHint =>
+      'بنقرأ موقعك ونحسب التوصيل على حسب مسافة الطريق. مش محتاج تختار منطقة ولا تكتب عنوان.';
+
+  @override
+  String get addressMethodManualTitle => 'هكتب عنواني بنفسي';
+
+  @override
+  String get addressMethodManualHint =>
+      'اختار منطقتك واكتب عنوانك بالتفصيل. التوصيل بسعر المنطقة الثابت. مفيش طلب لموقعك.';
+
+  @override
+  String get addressMethodGpsUnavailable =>
+      'التوصيل بالموقع (GPS) مش متاح دلوقتي. اكتب عنوانك بنفسك.';
+
+  @override
+  String get addressChangeMethod => 'تغيير طريقة العنوان';
+
+  @override
+  String get addressChangeMethodTitle => 'تغيير طريقة العنوان؟';
+
+  @override
+  String get addressChangeMethodDiscardsGps => 'هيتم مسح الموقع اللي اتحدد.';
+
+  @override
+  String get addressChangeMethodDiscardsManual =>
+      'هيتم مسح المنطقة المختارة والعنوان اللي كتبته.';
+
+  @override
+  String get addressChangeMethodConfirm => 'غيّر الطريقة';
+
+  @override
+  String get addressGpsJourneyTitle => 'موقعك';
+
+  @override
+  String get addressGpsHelp =>
+      'اضغط على الزر لمشاركة موقعك الحالي. مش محتاج تختار منطقة ولا تكتب عنوان.';
+
+  @override
+  String get addressGpsDetected => 'تم تحديد موقعك';
+
+  @override
+  String get addressGpsFeeNote =>
+      'سعر التوصيل بيتحسب عند إتمام الطلب من مسافة الطريق. أي مبلغ يظهر قبل كده هو تقدير فقط.';
+
+  @override
+  String get addressGpsNeedLocation => 'شارك موقعك الأول عشان تكمّل.';
+
+  @override
+  String get addressGpsOutsideCoverage => 'هاتلي لا توصّل للموقع ده لسه.';
+
+  @override
+  String get addressGpsInvalidLocation =>
+      'مقدرناش نستخدم الموقع ده. جرّب تاني.';
+
+  @override
+  String get addressGpsSaved => 'موقع GPS';
+
+  @override
+  String get addressManualJourneyTitle => 'عنوان مكتوب';
+
+  @override
+  String get addressGpsJourneyBadge => 'طريقة GPS';
+
+  @override
+  String get addressManualJourneyBadge => 'طريقة العنوان المكتوب';
+
+  @override
+  String get addressMethodsLoading => 'بنجهّز طرق العنوان…';
+
+  @override
+  String get routeSectionTitle => 'مسار الطلب';
+
+  @override
+  String get routeFromLabel => 'من';
+
+  @override
+  String get routeToLabel => 'إلى';
+
+  @override
+  String get routeBadgeDefault => 'افتراضي';
+
+  @override
+  String get routeBadgeChosen => 'من اختيارك';
+
+  @override
+  String get routeChange => 'تغيير';
+
+  @override
+  String get routeChoose => 'اختيار';
+
+  @override
+  String get routeNotSet => 'لم يُحدد بعد';
+
+  @override
+  String get routeDefaultMissingHint =>
+      'لا توجد نقطة افتراضية حاليًا — اختر نقطة.';
+
+  @override
+  String get routeOriginRequiredHint => 'اختر المكان اللي هيتم الاستلام منه.';
+
+  @override
+  String get routeSheetTitleOrigin => 'اختر نقطة البداية';
+
+  @override
+  String get routeSheetTitleDestination => 'اختر الوجهة';
+
+  @override
+  String get routeSheetPointSection => 'موقعك الحالي أو نقطة على الخريطة';
+
+  @override
+  String get routeSheetSavedSection => 'من عناويني المحفوظة';
+
+  @override
+  String get routeNameThisPlace => 'سمّ المكان (اختياري)';
+
+  @override
+  String get routeNameThisPlaceHint => 'مثال: بيت ماما';
+
+  @override
+  String get routeUseDefault => 'استخدام النقطة الافتراضية';
+
+  @override
+  String get routeConfirmPoint => 'تأكيد هذه النقطة';
+
+  @override
+  String get routeCurrentLocationLabel => 'موقعي الحالي';
+
+  @override
+  String get routeSelectedPointLabel => 'نقطة محددة';
+
+  @override
+  String get routeDirectionNote => 'الاتجاه: من النقطة الأولى إلى الثانية.';
+
+  @override
+  String get routeOrderSectionTitle => 'مسار الطلب';
+
+  @override
+  String get cartErrorAdHocOriginRequired =>
+      'اختر مكان الاستلام لهذا الطلب قبل إضافته للسلة.';
+
+  @override
+  String get checkoutBlockerAdHocOriginRequired =>
+      'طلب وصّلي لمكان ده من غير نقطة استلام. اختر نقطة الاستلام وأضفه تاني.';
+
+  @override
+  String get checkoutBlockerHatlyDefaultPickupMissing =>
+      'نقطة البداية الافتراضية لهاتلي لسه متظبطتش. اختر نقطة بداية لطلبك.';
+
+  @override
+  String get checkoutBlockerHatlyDefaultDestinationMissing =>
+      'الوجهة الافتراضية لهاتلي لسه متظبطتش. اختر وجهة لطلبك.';
+
+  @override
+  String get checkoutBlockerWasallyDefaultDestinationMissing =>
+      'الوجهة الافتراضية لوصّلي لسه متظبطتش. اختر وجهة لطلبك.';
+
+  @override
+  String get orderPartCancelledTitle => 'تم إلغاء جزء من طلبك';
+
+  @override
+  String orderPartCancelledBody(int rejected, int total) {
+    return 'تعذّر على $rejected من $total بائعين تجهيز جزئهم. يستمر باقي طلبك.';
+  }
+
+  @override
+  String get orderPartCancelledNoCharge =>
+      'لن يتم تحصيل مبلغ الجزء الملغي منك.';
+
+  @override
+  String orderRejectionReasonLine(String reason) {
+    return 'السبب: $reason';
+  }
+
+  @override
+  String orderRefundWalletLine(String amount) {
+    return 'تمت إعادة $amount إلى محفظتك.';
+  }
+
+  @override
+  String orderRefundTransferPendingLine(String amount) {
+    return 'سيعيد لك هاتلي مبلغ $amount. سنحدّث الحالة عند إرساله.';
+  }
+
+  @override
+  String orderRefundTransferSentLine(String amount) {
+    return 'تم إرسال $amount إليك.';
+  }
+
+  @override
+  String orderRefundReviewLine(String amount) {
+    return 'سيتم تسوية $amount بعد مراجعة دفعتك.';
+  }
+
+  @override
+  String get notificationOrderPartCancelledTitle => 'تم إلغاء جزء من طلبك';
+
+  @override
+  String notificationOrderPartCancelledBody(String orderNumber) {
+    return 'تعذّر على أحد البائعين تجهيز جزئه من الطلب رقم $orderNumber. يستمر باقي طلبك.';
+  }
+
+  @override
+  String get itemUnavailableTitle => 'بعض المنتجات غير متوفرة';
+
+  @override
+  String get itemUnavailableBody =>
+      'لا يمكن تجهيز هذه المنتجات. اختر كيف تريد المتابعة — لن يتغير شيء حتى تقرر.';
+
+  @override
+  String get itemUnavailableContinue => 'المتابعة بدونها';
+
+  @override
+  String get itemUnavailableCancel => 'إلغاء الطلب كاملًا';
+
+  @override
+  String get itemUnavailableCancelConfirmTitle => 'إلغاء الطلب كاملًا؟';
+
+  @override
+  String get itemUnavailableCancelConfirmBody =>
+      'سنحوّل طلبك إلى فريقنا لإلغاء هذا الطلب. تُرد المبالغ المدفوعة مسبقًا وفق قواعدنا المعتادة.';
+
+  @override
+  String get itemUnavailableCancelConfirmAction => 'نعم، ألغِ الطلب';
+
+  @override
+  String get itemUnavailableKeepOrder => 'الإبقاء على الطلب';
+
+  @override
+  String get itemUnavailableCancelRequested =>
+      'استلمنا طلب الإلغاء. سيعالجه فريقنا ويتواصل معك عند الحاجة.';
+
+  @override
+  String get itemUnavailableTeamContact =>
+      'سيتواصل معك فريقنا بخصوص هذا الطلب.';
+
+  @override
+  String get itemUnavailableDone => 'تم — يستمر طلبك بدون هذه المنتجات.';
+
+  @override
+  String get itemUnavailableError => 'تعذّر إرسال إجابتك. حاول مرة أخرى.';
+
+  @override
+  String get orderRemovedItemsTitle => 'تمت إزالتها من طلبك';
+
+  @override
+  String get notificationItemUnavailableTitle => 'منتج في طلبك غير متوفر';
+
+  @override
+  String notificationItemUnavailableBody(String orderNumber) {
+    return 'افتح الطلب رقم $orderNumber للمتابعة بدون المنتج أو لإلغاء الطلب.';
+  }
+
+  @override
+  String get cartCompatTitle => 'لا يمكن إضافة هذا المنتج الآن';
+
+  @override
+  String get cartCompatMultiVendorDisabled =>
+      'الطلب من أكثر من متجر غير متاح حاليًا. أكمل طلبك الحالي أو أفرغ السلة لتطلب من متجر آخر.';
+
+  @override
+  String get cartCompatBranchPickupDisabled =>
+      'هذا المتجر لا يوفّر الاستلام من الفرع.';
+
+  @override
+  String get cartCompatSwitchToDelivery => 'التحويل إلى التوصيل وإضافة المنتج';
+
+  @override
+  String get cartCompatStartNewCart => 'إفراغ السلة وإضافة المنتج';
+
+  @override
+  String get cartCompatKeepCart => 'الإبقاء على سلتي';
+
+  @override
+  String get cartCompatOk => 'حسنًا';
+
+  @override
+  String get addressOpenLocationSettings => 'فتح إعدادات الموقع';
+
+  @override
+  String get weightInlineLabel => 'أو اكتب الوزن بالكيلوغرام';
+
+  @override
+  String weightEstimateNote(String price) {
+    return 'التقدير: $price — يُحدَّد السعر النهائي حسب الوزن الفعلي عند التجهيز.';
+  }
 }

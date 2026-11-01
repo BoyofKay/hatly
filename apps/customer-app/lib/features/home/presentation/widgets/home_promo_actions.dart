@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../auth/presentation/auth_gate.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../cart/data/cart_providers.dart';
 import '../../../cart/presentation/cart_error_messages.dart';
+import '../../../cart/presentation/cart_compatibility_flow.dart';
 import '../../data/home_demo_content.dart';
+import '../../domain/home_banner.dart';
 import '../../domain/home_content.dart';
 
 /// Existing routes only — Home adds no navigation of its own.
@@ -12,6 +15,30 @@ String productRoute(String? id) =>
     id == null || isDemoId(id) ? '/search' : '/products/$id';
 String vendorRoute(String? id) =>
     id == null || isDemoId(id) ? '/vendors' : '/vendors/$id';
+
+/// The "See all" list behind a Home section (`/home/products/<kind>`): the same definition as the row, more products.
+String homeSectionRoute(HomeSectionKind kind) {
+  switch (kind) {
+    case HomeSectionKind.mostOrdered:
+      return '/home/products/most-ordered';
+    case HomeSectionKind.newest:
+      return '/home/products/new';
+    case HomeSectionKind.offers:
+      return '/home/products/offers';
+  }
+}
+
+HomeSectionKind? homeSectionKindFromSlug(String? slug) {
+  switch (slug) {
+    case 'most-ordered':
+      return HomeSectionKind.mostOrdered;
+    case 'new':
+      return HomeSectionKind.newest;
+    case 'offers':
+      return HomeSectionKind.offers;
+  }
+  return null;
+}
 
 /// Where an Offers-row card leads.
 String offerRoute(HomeOffer offer) {
@@ -23,6 +50,24 @@ String offerRoute(HomeOffer offer) {
     case HomeOfferKind.freeDelivery:
     case HomeOfferKind.bundle:
       return vendorRoute(offer.targetId);
+  }
+}
+
+/// Where tapping an admin banner leads, or null when it is purely informative (or its destination is unusable). Existing routes
+/// only — a product page, a vendor branch page, or a sector's vendor list — so a banner can never open an external site. The
+/// sector list is titled with the banner's own title (the route needs a display name).
+String? bannerRoute(HomeBanner banner, {required bool arabic}) {
+  if (!banner.isTappable) return null;
+  final id = banner.targetId!;
+  switch (banner.action) {
+    case HomeBannerAction.product:
+      return productRoute(id);
+    case HomeBannerAction.vendor:
+      return vendorRoute(id);
+    case HomeBannerAction.sector:
+      return '/vendors?sectorId=${Uri.encodeQueryComponent(id)}&sectorName=${Uri.encodeComponent(banner.displayTitle(arabic))}';
+    case HomeBannerAction.none:
+      return null;
   }
 }
 
@@ -62,9 +107,15 @@ Future<void> handleQuickAdd(
     return;
   }
 
+  // Adding to the cart needs an account: a guest is sent to sign-in (and back here) before anything is requested.
+  if (!requireSignIn(context, ref)) return;
+
   final l10n = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.of(context);
   final router = GoRouter.of(context);
+
+  if (!await ensureCartCompatible(context, ref, productId)) return;
+  if (!context.mounted) return;
 
   final error = await ref
       .read(cartControllerProvider.notifier)

@@ -6,6 +6,8 @@
 /// the backend itself never does either.
 library;
 
+import 'item_unavailability.dart';
+import '../../hatly_service/domain/route_endpoint.dart';
 import '../../checkout/domain/checkout_quote.dart';
 
 /// Operational ETA (never financial). [state]: `ESTIMATED` · `UNAVAILABLE` (see [reason]) · `COMPLETED` · `CANCELLED`.
@@ -253,6 +255,62 @@ class OrderItemDetails {
   }
 }
 
+/// What has been given back on the order, assembled by the server from the real ledgers. A bank/wallet-transfer refund is only
+/// reported as sent once Hatly operations marked it sent — the app never claims money moved earlier than the server does.
+class OrderRefundSummary {
+  const OrderRefundSummary({
+    this.walletRefundedMinor = 0,
+    this.transferRefundRecordedMinor = 0,
+    this.transferRefundSentMinor = 0,
+    this.pendingRefundMinor = 0,
+    this.totalRefundMinor = 0,
+  });
+
+  final int walletRefundedMinor;
+  final int transferRefundRecordedMinor;
+  final int transferRefundSentMinor;
+  final int pendingRefundMinor;
+  final int totalRefundMinor;
+
+  /// Recorded but not yet sent back to the customer.
+  int get transferRefundAwaitingMinor =>
+      transferRefundRecordedMinor - transferRefundSentMinor;
+
+  bool get isEmpty => totalRefundMinor == 0 && pendingRefundMinor == 0;
+
+  static OrderRefundSummary fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const OrderRefundSummary();
+    int n(String key) => (json[key] as num?)?.toInt() ?? 0;
+    return OrderRefundSummary(
+      walletRefundedMinor: n('walletRefundedMinor'),
+      transferRefundRecordedMinor: n('transferRefundRecordedMinor'),
+      transferRefundSentMinor: n('transferRefundSentMinor'),
+      pendingRefundMinor: n('pendingRefundMinor'),
+      totalRefundMinor: n('totalRefundMinor'),
+    );
+  }
+}
+
+/// Some — not all — vendor parts of a multi-vendor order were rejected; the rest of the order continues.
+class OrderPartialRejection {
+  const OrderPartialRejection(
+      {required this.rejectedSegmentCount, required this.activeSegmentCount});
+
+  final int rejectedSegmentCount;
+  final int activeSegmentCount;
+
+  int get totalSegmentCount => rejectedSegmentCount + activeSegmentCount;
+
+  static OrderPartialRejection? tryParse(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+    final rejected = (json['rejectedSegmentCount'] as num?)?.toInt() ?? 0;
+    final active = (json['activeSegmentCount'] as num?)?.toInt() ?? 0;
+    if (rejected <= 0) return null;
+    return OrderPartialRejection(
+        rejectedSegmentCount: rejected, activeSegmentCount: active);
+  }
+}
+
 class OrderSegmentDetails {
   const OrderSegmentDetails({
     required this.id,
@@ -276,6 +334,8 @@ class OrderSegmentDetails {
     this.adHocPickupLongitudeSnapshot,
     this.adHocDestinationLatitudeSnapshot,
     this.adHocDestinationLongitudeSnapshot,
+    this.rejectionReason,
+    this.removedItems = const [],
   });
 
   final String id;
@@ -285,6 +345,14 @@ class OrderSegmentDetails {
   final String status;
   final int? subtotalMinor;
   final List<OrderItemDetails> items;
+
+  /// Items taken off this part because they were unavailable (PD-016); an older server never sends this.
+  final List<RemovedOrderItem> removedItems;
+
+  /// Why this vendor part was rejected (the vendor's or Hatly's reason); null unless the part is CANCELLED with a recorded reason.
+  final String? rejectionReason;
+
+  bool get isRejected => status == 'CANCELLED';
 
   /// Standalone Hatly Service (AD_HOC_SERVICE) snapshot fields — frozen
   /// on `OrderVendorSegment` at order-creation time exactly like every
@@ -299,6 +367,10 @@ class OrderSegmentDetails {
   final double? adHocDestinationLongitudeSnapshot;
 
   bool get isAdHocService => groupType == 'AD_HOC_SERVICE';
+
+  /// "وصّلي لمكان" (Wasally): no product, the delivery fee is the whole charge.
+  bool get isDeliveryOnly =>
+      isAdHocService && adHocServiceTypeSnapshot == 'DELIVER_TO_PLACE';
 
   /// Customer Offers Integration. Historical SUBTOTAL_DISCOUNT
   /// snapshot — read directly from the backend's frozen
@@ -329,6 +401,9 @@ class OrderSegmentDetails {
       items: (json['items'] as List)
           .map((e) => OrderItemDetails.fromJson(e as Map<String, dynamic>))
           .toList(),
+      removedItems: ((json['removedItems'] as List?) ?? const [])
+          .map((e) => RemovedOrderItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
       offerDiscountTypeSnapshot: json['offerDiscountTypeSnapshot'] as String?,
       offerDiscountValueSnapshot: json['offerDiscountValueSnapshot'] as int?,
       offerEligibleSubtotalMinorSnapshot:
@@ -351,6 +426,7 @@ class OrderSegmentDetails {
           (json['adHocDestinationLatitudeSnapshot'] as num?)?.toDouble(),
       adHocDestinationLongitudeSnapshot:
           (json['adHocDestinationLongitudeSnapshot'] as num?)?.toDouble(),
+      rejectionReason: json['rejectionReason'] as String?,
     );
   }
 }
@@ -432,9 +508,12 @@ class OrderDetails {
     this.amountDueMinor,
     this.coupon,
     this.deliveryBreakdown,
+    this.deliveryRoute,
     this.eta = const OrderEta(state: 'UNAVAILABLE'),
     this.timeline = const [],
     this.customerCanCancel = false,
+    this.refundSummary = const OrderRefundSummary(),
+    this.partialRejection,
   });
 
   final String id;
@@ -475,11 +554,18 @@ class OrderDetails {
   final int? amountDueMinor;
   final OrderCouponDetails? coupon;
   final OrderDeliveryBreakdown? deliveryBreakdown;
+
+  /// Hatly / Wasally only (PD-012): the route as it was frozen at checkout, origin → destination. Null for every other order.
+  final ResolvedRoute? deliveryRoute;
   final OrderEta eta;
   final List<OrderTimelineEntry> timeline;
 
   /// The server's verdict on whether the whole order can be cancelled by the customer right now.
   final bool customerCanCancel;
+
+  /// What has been given back so far (from the real ledgers) and whether only some vendor parts were rejected.
+  final OrderRefundSummary refundSummary;
+  final OrderPartialRejection? partialRejection;
 
   bool get isPickup => fulfillmentType == 'PICKUP';
 
@@ -526,11 +612,15 @@ class OrderDetails {
           ? OrderDeliveryBreakdown.fromJson(
               json['deliveryBreakdown'] as Map<String, dynamic>)
           : null,
+      deliveryRoute: ResolvedRoute.tryParse(json['deliveryRoute']),
       eta: OrderEta.fromJson(json['eta'] as Map<String, dynamic>?),
       timeline: (json['timeline'] as List? ?? [])
           .map((e) => OrderTimelineEntry.fromJson(e as Map<String, dynamic>))
           .toList(),
       customerCanCancel: json['customerCanCancel'] as bool? ?? false,
+      refundSummary: OrderRefundSummary.fromJson(
+          json['refundSummary'] as Map<String, dynamic>?),
+      partialRejection: OrderPartialRejection.tryParse(json['partialRejection']),
     );
   }
 }

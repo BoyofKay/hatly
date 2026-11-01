@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { DriverDeliveriesService } from './driver-deliveries.service';
+import { DRIVER_FINISHED_DELIVERIES_LIMIT, DriverDeliveriesService } from './driver-deliveries.service';
 import { CartGroupType } from '../cart/cart-group-type.enum';
 
 function makeOrder(overrides: Partial<any> = {}) {
@@ -24,6 +24,7 @@ function makeDelivery(overrides: Partial<any> = {}) {
     acceptDeadlineAt: null,
     pickedUpAt: null,
     deliveredAt: null,
+    createdAt: new Date('2026-10-01T10:00:00Z'),
     order: makeOrder(),
     ...overrides,
   };
@@ -31,7 +32,19 @@ function makeDelivery(overrides: Partial<any> = {}) {
 
 function buildHarness(deliveries: any[], branches: any[] = [], driverId = 'driver-1') {
   const deliveriesRepository = {
-    find: jest.fn(async ({ where }: any) => deliveries.filter((d) => d.driverId === where.driverId)),
+    // Evaluates the driver filter plus the TypeORM status operator the service uses (In / Not(In)), newest first, and `take`.
+    find: jest.fn(async ({ where, take }: any) => {
+      const matches = (status: string, op: any): boolean => {
+        if (!op) return true;
+        if (op.type === 'not') return !matches(status, op.child ?? op._value);
+        if (op.type === 'in') return op.value.includes(status);
+        return status === op;
+      };
+      const rows = deliveries
+        .filter((d) => d.driverId === where.driverId && matches(d.order.status, where.order?.status))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      return take ? rows.slice(0, take) : rows;
+    }),
     findOne: jest.fn(async ({ where }: any) => deliveries.find((d) => d.id === where.id) ?? null),
   };
   const vendorBranchesRepository = {
@@ -146,5 +159,17 @@ describe('DriverDeliveriesService', () => {
     const results = await service.listForUser('user-1');
     expect(results[0].amountDueMinor).toBeNull();
     expect(results[0].electronicPaymentMethod).toBeNull();
+  });
+
+  it('the list is bounded: EVERY active delivery is returned, but only the newest DRIVER_FINISHED_DELIVERIES_LIMIT finished ones (past customers\' contact details do not accumulate forever)', async () => {
+    const finished = Array.from({ length: DRIVER_FINISHED_DELIVERIES_LIMIT + 25 }, (_, i) =>
+      makeDelivery({ id: `done-${i}`, orderId: `o-${i}`, createdAt: new Date(Date.UTC(2026, 8, 1, 0, i)), order: makeOrder({ id: `o-${i}`, status: 'DELIVERED' }) }),
+    );
+    const oldActive = makeDelivery({ id: 'old-active', orderId: 'o-active', createdAt: new Date(Date.UTC(2026, 0, 1)), order: makeOrder({ id: 'o-active', status: 'ON_THE_WAY' }) });
+    const { service } = buildHarness([...finished, oldActive]);
+    const list = await service.listForUser('user-1');
+    expect(list.filter((d) => d.orderStatus === 'DELIVERED')).toHaveLength(DRIVER_FINISHED_DELIVERIES_LIMIT);
+    expect(list.map((d) => d.id)).toContain('old-active'); // an old but still ACTIVE delivery is never cut off
+    expect(list.map((d) => d.id)).not.toContain('done-0'); // the oldest finished ones fall away
   });
 });

@@ -1,0 +1,147 @@
+/**
+ * The Admin navigation, as in the approved reference (`docs/transformation/reference/admin-vendor-reference.jpg`): ten flat sections in the
+ * sidebar (Home, Orders, Stores, Products, Categories, Offers, Customers, Delivery, Reports, Settings); each section's pages are tabs at the top
+ * of the page, so every existing page stays one click away. `perms` = the admin needs ANY of them to SEE the link (a UX filter only — the backend
+ * enforces every route); a section shows when at least one of its pages does, and opens its first visible page. `match` adds address prefixes
+ * that belong to the section without being a tab (detail pages). Labels are English/Arabic pairs; existing page link names are kept.
+ */
+export interface NavItem {
+  href: string;
+  en: string;
+  ar: string;
+  perms?: string[];
+  /** SUPER_ADMIN only. */
+  superOnly?: boolean;
+}
+export interface NavGroup {
+  id: string;
+  en: string;
+  ar: string;
+  icon: string;
+  items: NavItem[];
+  match?: string[];
+}
+
+const P = {
+  orders: ['VIEW_ORDERS'],
+  fin: ['VIEW_FINANCIALS'],
+  vendors: ['VENDORS_VIEW', 'MANAGE_VENDORS'],
+  catalog: ['CATALOG_VIEW', 'MANAGE_CATALOG'],
+  fleet: ['FLEET_VIEW', 'MANAGE_DRIVERS', 'ASSIGN_REASSIGN_ORDERS'],
+  marketing: ['MARKETING_VIEW', 'MANAGE_OFFERS', 'MANAGE_CAMPAIGNS', 'MANAGE_BROADCASTS'],
+  media: ['MEDIA_VIEW', 'MANAGE_MEDIA', 'MANAGE_CATALOG', 'MANAGE_VENDORS', 'MANAGE_MARKETPLACE_SECTORS', 'MANAGE_HOME_BANNERS'],
+};
+
+export const NAV: NavGroup[] = [
+  {
+    id: 'home', en: 'Home', ar: 'الرئيسية', icon: 'home',
+    items: [{ href: '/home', en: 'Home', ar: 'الرئيسية', perms: [] }],
+  },
+  {
+    id: 'orders', en: 'Orders', ar: 'الطلبات', icon: 'clipboard', match: ['/order-search', '/dispatch'],
+    items: [
+      { href: '/order-management', en: 'Orders', ar: 'الطلبات', perms: P.orders },
+      { href: '/control-tower', en: 'Control Tower', ar: 'برج المراقبة', perms: P.orders },
+      { href: '/exceptions', en: 'Exceptions', ar: 'الاستثناءات', perms: P.orders },
+      { href: '/failed-deliveries', en: 'Failed Deliveries', ar: 'التوصيلات الفاشلة', perms: ['MANAGE_ORDER_ISSUES'] },
+      { href: '/alerts', en: 'Alerts', ar: 'التنبيهات', perms: P.orders },
+      { href: '/inbox', en: 'Notifications', ar: 'الإشعارات', perms: P.orders },
+      { href: '/payments', en: 'Payments', ar: 'المدفوعات', perms: ['VERIFY_MANUAL_PAYMENTS', 'VIEW_FINANCIALS'] },
+      { href: '/manual-transfer', en: 'Manual Transfer', ar: 'التحويل اليدوي', perms: ['VERIFY_MANUAL_PAYMENTS'] },
+      { href: '/refunds', en: 'Refunds', ar: 'المستردات', perms: ['VERIFY_MANUAL_PAYMENTS', 'VIEW_FINANCIALS'] },
+    ],
+  },
+  {
+    id: 'stores', en: 'Stores', ar: 'المتاجر', icon: 'shop',
+    items: [
+      { href: '/vendors', en: 'Vendors', ar: 'المتاجر', perms: P.vendors },
+      { href: '/branches', en: 'Branches', ar: 'الفروع', perms: P.vendors },
+      { href: '/vendor-staff', en: 'Vendor Staff', ar: 'موظفو المتاجر', perms: ['MANAGE_VENDOR_STAFF'] },
+    ],
+  },
+  {
+    id: 'products', en: 'Products', ar: 'المنتجات', icon: 'box',
+    items: [
+      { href: '/catalog', en: 'Products', ar: 'المنتجات', perms: P.catalog },
+      { href: '/inventory', en: 'Inventory', ar: 'المخزون', perms: P.catalog },
+      { href: '/media', en: 'Media library', ar: 'مكتبة الوسائط', perms: P.media },
+    ],
+  },
+  {
+    id: 'categories', en: 'Categories', ar: 'الأقسام', icon: 'layers',
+    items: [{ href: '/sectors', en: 'Sectors', ar: 'الأقسام', perms: ['MANAGE_MARKETPLACE_SECTORS'] }],
+  },
+  {
+    id: 'offers', en: 'Offers', ar: 'العروض', icon: 'tag',
+    items: [
+      { href: '/offers', en: 'Offers', ar: 'العروض', perms: ['MANAGE_OFFERS'] },
+      { href: '/banners', en: 'Banners', ar: 'البنرات', perms: ['MANAGE_HOME_BANNERS'] },
+      { href: '/campaigns', en: 'Campaigns', ar: 'الحملات', perms: P.marketing },
+      { href: '/broadcasts', en: 'Broadcasts', ar: 'الرسائل الجماعية', perms: P.marketing },
+      { href: '/audiences', en: 'Audiences', ar: 'الجمهور', perms: P.marketing },
+      { href: '/growth', en: 'Growth', ar: 'النمو', perms: P.marketing },
+    ],
+  },
+  {
+    id: 'customers', en: 'Customers', ar: 'العملاء', icon: 'users',
+    items: [
+      { href: '/customers', en: 'Customers', ar: 'العملاء', perms: ['VIEW_CUSTOMERS'] },
+      { href: '/reviews', en: 'Reviews', ar: 'التقييمات', perms: ['MODERATE_REVIEWS'] },
+      { href: '/wallet-adjustments', en: 'Wallet adjustments', ar: 'تعديلات المحفظة', perms: P.fin },
+      { href: '/account-deletion-requests', en: 'Deletion requests', ar: 'طلبات الحذف', perms: [] },
+    ],
+  },
+  {
+    id: 'delivery', en: 'Delivery', ar: 'التوصيل', icon: 'truck',
+    items: [
+      { href: '/fleet', en: 'Live fleet', ar: 'الأسطول المباشر', perms: P.fleet },
+      { href: '/drivers', en: 'Drivers', ar: 'السائقون', perms: ['MANAGE_DRIVERS'] },
+      { href: '/delivery-zones', en: 'Delivery Zones', ar: 'مناطق التوصيل', perms: ['MANAGE_SERVICE_AREAS'] },
+      { href: '/service-areas', en: 'Service Areas', ar: 'مناطق الخدمة', perms: ['MANAGE_SERVICE_AREAS'] },
+      { href: '/vehicle-types', en: 'Vehicle Types', ar: 'أنواع المركبات', perms: ['MANAGE_VEHICLE_TYPES'] },
+      { href: '/cash-remainders', en: 'Cash Remainders', ar: 'باقي النقد', perms: ['MANAGE_CUSTOMER_WALLET'] },
+      { href: '/employee-loans', en: 'Employee Loans', ar: 'سلف الموظفين', perms: ['MANAGE_EMPLOYEE_LOANS'] },
+    ],
+  },
+  {
+    id: 'reports', en: 'Reports', ar: 'التقارير', icon: 'chart',
+    items: [
+      { href: '/reports', en: 'Reports', ar: 'التقارير', perms: ['VIEW_REPORTS'] },
+      { href: '/executive', en: 'Executive overview', ar: 'النظرة التنفيذية', perms: ['VIEW_REPORTS'] },
+      { href: '/exports', en: 'Exports', ar: 'التصدير', perms: ['VIEW_REPORTS'] },
+      { href: '/finance/ledger', en: 'Ledger', ar: 'دفتر الأستاذ', perms: P.fin },
+      { href: '/finance/revenue', en: 'Revenue', ar: 'الإيرادات', perms: P.fin },
+      { href: '/finance/receivables', en: 'Vendor receivables', ar: 'مستحقات المتاجر', perms: P.fin },
+      { href: '/finance/liabilities', en: 'Liabilities', ar: 'الالتزامات', perms: P.fin },
+      { href: '/finance/reconciliation', en: 'Reconciliation', ar: 'المطابقة', perms: P.fin },
+      { href: '/settlement', en: 'Settlement', ar: 'إغلاق التسوية', perms: ['CLOSE_VENDOR_SETTLEMENTS', 'CLOSE_DRIVER_SETTLEMENTS'] },
+      { href: '/settlements', en: 'Settlement periods', ar: 'فترات التسوية', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
+    ],
+  },
+  {
+    id: 'settings', en: 'Settings', ar: 'الإعدادات', icon: 'cog',
+    items: [
+      { href: '/settings', en: 'Settings', ar: 'الإعدادات', perms: ['MANAGE_BUSINESS_CONFIG', 'CONFIG_VIEW'] },
+      { href: '/config', en: 'Configuration overview', ar: 'نظرة عامة على الإعدادات', perms: ['MANAGE_BUSINESS_CONFIG', 'CONFIG_VIEW'] },
+      { href: '/users', en: 'Users', ar: 'المستخدمون', superOnly: true },
+      { href: '/access/templates', en: 'Role templates', ar: 'قوالب الأدوار', superOnly: true },
+      { href: '/audit-log', en: 'Audit log', ar: 'سجل التدقيق', perms: ['VIEW_AUDIT_LOG'] },
+      { href: '/security', en: 'Security', ar: 'الأمان', perms: [] },
+      { href: '/system', en: 'System health', ar: 'صحة النظام', perms: ['VIEW_SYSTEM_HEALTH'] },
+      { href: '/system/metrics', en: 'Metrics', ar: 'المقاييس', perms: ['VIEW_SYSTEM_HEALTH'] },
+      { href: '/system/jobs', en: 'Jobs', ar: 'المهام', perms: ['VIEW_SYSTEM_HEALTH'] },
+    ],
+  },
+];
+
+const startsAt = (pathname: string, href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+/** The section and the page (tab) the address belongs to: the longest matching address wins, so `/system/jobs` is Jobs, not System health. */
+export function locate(pathname: string, groups: NavGroup[] = NAV): { group: NavGroup | null; item: NavItem | null } {
+  let best: { group: NavGroup; item: NavItem | null; len: number } | null = null;
+  for (const g of groups) {
+    for (const i of g.items) if (startsAt(pathname, i.href) && (!best || i.href.length > best.len)) best = { group: g, item: i, len: i.href.length };
+    for (const m of g.match ?? []) if (startsAt(pathname, m) && (!best || m.length > best.len)) best = { group: g, item: null, len: m.length };
+  }
+  return best ? { group: best.group, item: best.item } : { group: null, item: null };
+}

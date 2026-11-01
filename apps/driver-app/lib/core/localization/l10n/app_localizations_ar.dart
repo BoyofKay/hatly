@@ -18,15 +18,6 @@ class AppLocalizationsAr extends AppLocalizations {
   String get goOffline => 'إنهاء الاستلام';
 
   @override
-  String get incomingRequest => 'طلب توصيل جديد';
-
-  @override
-  String get accept => 'قبول';
-
-  @override
-  String get reject => 'رفض';
-
-  @override
   String get pickupDetails => 'تفاصيل الاستلام';
 
   @override

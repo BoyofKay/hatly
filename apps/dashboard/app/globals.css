@@ -6,3 +6,6 @@
   --hatly-orange: #ff7a1a;
   --hatly-white: #ffffff;
 }
+
+/* Long identifiers (route patterns, setting keys) must wrap instead of widening the page on small screens. */
+code { overflow-wrap: anywhere; }

@@ -16,17 +16,23 @@ export const UPLOAD_BODY_LIMIT = '8mb';
 /**
  * CORS. Browsers are the only clients CORS applies to (the native apps send no Origin), and the only browser client is the
  * admin dashboard, so production/staging allows exactly the configured origins. When none are configured (development/test)
- * the previous open behaviour is kept so the local workflow is unchanged. Authentication is by bearer token in a header, never
- * cookies, so credentials are not enabled.
+ * any origin is reflected, so the local workflow is unchanged.
+ *
+ * Credentials ARE enabled: the dashboard's session lives in HttpOnly cookies (see modules/auth/dashboard-session.ts), which a
+ * cross-origin page only sends when the API answers `Access-Control-Allow-Credentials: true` for an EXACT origin — a wildcard is never
+ * valid with credentials, which is why the open development mode reflects the request origin instead of answering `*`. The mobile
+ * apps keep using bearer headers and are unaffected; the CSRF guard protects the cookie routes.
  */
 export function buildCorsOptions(allowedOrigins: string[], strict: boolean): CorsOptions {
   const common: CorsOptions = {
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'X-Correlation-Id'],
+    // Idempotency-Key: the dashboard sends it on exports and settlement payments (a cross-origin browser call is refused at preflight without it).
+    allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Correlation-Id', 'X-CSRF-Token', 'X-Requested-With'],
+    credentials: true,
     exposedHeaders: ['X-Correlation-Id'],
     maxAge: 600,
   };
-  if (allowedOrigins.length === 0 && !strict) return { ...common, origin: '*' };
+  if (allowedOrigins.length === 0 && !strict) return { ...common, origin: true };
   // Exact-match allow list. An origin that is not on it (or a strict deployment with an empty list) gets NO CORS headers.
   return { ...common, origin: allowedOrigins };
 }

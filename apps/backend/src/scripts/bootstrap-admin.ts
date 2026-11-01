@@ -27,14 +27,9 @@ import { Role } from '../common/enums/role.enum';
  * other legitimate consumer of that same config, reusing it exactly
  * as instructed, not a second database configuration).
  *
- * IMPORTANT, worth being explicit about: `SUPER_ADMIN` (like every
- * other non-Driver role) actually logs into the dashboard via the
- * existing OTP flow (`auth/login` + `auth/otp/verify`), NOT via
- * password — `auth/driver/login` explicitly rejects any non-DRIVER
- * role. The password collected and hashed here is stored because this
- * task explicitly required it, but it is not what authenticates this
- * account today; OTP is. Documenting this plainly rather than
- * silently leaving the mismatch unexplained.
+ * IMPORTANT: `SUPER_ADMIN` (like every staff role) signs in to the dashboard with the PASSWORD collected here, through
+ * `POST auth/password/login`. A one-time code can never sign in an account that has a password, or any staff account
+ * (see `AuthService.isLegacyOtpAccount`), so the OTP endpoints are not a way into this account.
  *
  * Idempotency / one-time safety: checks for an existing SUPER_ADMIN
  * before inserting, and exits non-zero without touching anything if
@@ -120,7 +115,7 @@ async function main(): Promise<void> {
     // contains non-sensitive confirmation/rejection details.
     if (result.created) {
       console.log(result.message);
-      console.log('Log into the dashboard using the existing OTP flow with this phone number.');
+      console.log('Log into the dashboard with this phone number and the password you provided.');
     } else {
       console.error(result.message);
       process.exitCode = 1;

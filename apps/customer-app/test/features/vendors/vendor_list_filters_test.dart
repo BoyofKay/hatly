@@ -22,11 +22,14 @@ class _FakeSectorsApi implements SectorsApi {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
   @override
-  Future<List<MarketplaceSubcategory>> getSubcategories(String sectorId) async => const [];
+  Future<List<MarketplaceSubcategory>> getSubcategories(
+          String sectorId) async =>
+      const [];
 }
 
 class _FakeVendorRepository implements VendorRepository {
-  final calls = <({bool? openNow, bool? hasOffers, double? minRating, String? sort})>[];
+  final calls =
+      <({bool? openNow, bool? hasOffers, double? minRating, String? sort})>[];
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -35,7 +38,8 @@ class _FakeVendorRepository implements VendorRepository {
   Future<List<Vendor>> getVendors({String? category}) async => const [];
 
   @override
-  Future<VendorDetails> getVendorDetails(String vendorId) => throw UnimplementedError();
+  Future<VendorDetails> getVendorDetails(String vendorId) =>
+      throw UnimplementedError();
 
   @override
   Future<VendorListPage> getVendorsPage(
@@ -46,14 +50,21 @@ class _FakeVendorRepository implements VendorRepository {
     int limit = 20,
     double? latitude,
     double? longitude,
+    String? deliveryZoneId,
     String? subcategoryId,
     bool? openNow,
     bool? hasOffers,
     double? minRating,
   }) async {
-    calls.add((openNow: openNow, hasOffers: hasOffers, minRating: minRating, sort: sort));
+    calls.add((
+      openNow: openNow,
+      hasOffers: hasOffers,
+      minRating: minRating,
+      sort: sort
+    ));
     final data = [_vendor('v1')];
-    return VendorListPage(data: data, page: 1, limit: limit, total: data.length);
+    return VendorListPage(
+        data: data, page: 1, limit: limit, total: data.length);
   }
 }
 
@@ -84,12 +95,15 @@ Future<_FakeVendorRepository> _pump(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('the filter button starts with no active-count badge', (tester) async {
+  testWidgets('the filter button starts with no active-count badge',
+      (tester) async {
     await _pump(tester);
-    expect(find.text('1'), findsNothing); // no badge digit rendered anywhere yet
+    expect(
+        find.text('1'), findsNothing); // no badge digit rendered anywhere yet
   });
 
-  testWidgets('applying Open Now + Offers + Rating re-queries with all three params and shows the badge count',
+  testWidgets(
+      'applying Open Now + Offers + Rating re-queries with all three params and shows the badge count',
       (tester) async {
     final repo = await _pump(tester);
     expect(repo.calls, hasLength(1)); // initial unfiltered load
@@ -106,10 +120,13 @@ void main() {
     expect(repo.calls.last.openNow, isTrue);
     expect(repo.calls.last.hasOffers, isTrue);
     expect(repo.calls.last.minRating, 4);
-    expect(find.text('3'), findsOneWidget); // real active-filter count, not decorative
+    expect(find.text('3'),
+        findsOneWidget); // real active-filter count, not decorative
   });
 
-  testWidgets('Cancel never re-queries and never changes the active filter state', (tester) async {
+  testWidgets(
+      'Cancel never re-queries and never changes the active filter state',
+      (tester) async {
     final repo = await _pump(tester);
     final callsBefore = repo.calls.length;
 
@@ -124,7 +141,9 @@ void main() {
     expect(find.text('1'), findsNothing); // badge still shows nothing active
   });
 
-  testWidgets('clearing filters after applying restores the default unfiltered listing', (tester) async {
+  testWidgets(
+      'clearing filters after applying restores the default unfiltered listing',
+      (tester) async {
     final repo = await _pump(tester);
 
     await tester.tap(find.byKey(const Key('vendor-filter-action')));
@@ -147,7 +166,8 @@ void main() {
     expect(repo.calls.last.minRating, isNull);
   });
 
-  testWidgets('selecting sort=Offers sends sort=offers to the real query', (tester) async {
+  testWidgets('selecting sort=Offers sends sort=offers to the real query',
+      (tester) async {
     final repo = await _pump(tester);
 
     await tester.tap(find.byIcon(Icons.sort_rounded));

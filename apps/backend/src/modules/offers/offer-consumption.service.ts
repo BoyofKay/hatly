@@ -8,6 +8,7 @@ import { DiscountType } from './discount-type.enum';
 import { OfferMechanism } from './offer-mechanism.enum';
 import { PricingUnit } from '../products/pricing-unit.enum';
 import { FinancialEventService } from '../finance/financial-event.service';
+import { FinancialEvent } from '../finance/entities/financial-event.entity';
 import { FinancialEventDirection, FinancialEventType } from '../finance/financial-event-type.enum';
 
 export interface OfferCandidateItem {
@@ -16,7 +17,14 @@ export interface OfferCandidateItem {
   productId: string;
   categoryId: string;
   quantity: number;
+  /** The whole unit as the customer buys it: product base price + every selected option's price. */
   unitPriceMinor: number;
+  /**
+   * The product's own base price, WITHOUT options. A flash-sale special price replaces ONLY this part (paid options are added
+   * on top of the promotional base, never absorbed into the discount). When a caller omits it the whole unit price is used,
+   * which is only correct for a product with no priced options.
+   */
+  basePriceMinor?: number;
   pricingUnit: PricingUnit | null | undefined;
 }
 
@@ -67,6 +75,12 @@ export interface ActiveOfferSummary {
   mechanism: OfferMechanism;
   /** FLASH_SALE only — the real replacement price. Undefined/omitted for SUBTOTAL_DISCOUNT. */
   specialPriceMinor?: number;
+  /**
+   * FLASH_SALE only — at most this many UNITS per order get the special price (the rest are charged the normal price, exactly
+   * as checkout plans it). Omitted = no per-order cap. Lets a client ESTIMATE a quantity's total consistently with checkout;
+   * the server still computes every payable amount.
+   */
+  perOrderLimit?: number;
 }
 
 /**
@@ -167,7 +181,7 @@ export class OfferConsumptionService {
       if (offers.length > 0) {
         let best: { offer: Offer; discountPerUnitMinor: number } | null = null;
         for (const offer of offers) {
-          const discountPerUnitMinor = this.computeFlashSaleDiscountPerUnit(offer, item.unitPriceMinor);
+          const discountPerUnitMinor = this.computeFlashSaleDiscountPerUnit(offer, item.basePriceMinor ?? item.unitPriceMinor);
           if (discountPerUnitMinor <= 0) continue;
           if (!best || discountPerUnitMinor > best.discountPerUnitMinor) {
             best = { offer, discountPerUnitMinor };
@@ -233,7 +247,15 @@ export class OfferConsumptionService {
    * same as every other branch-scoped query in this codebase).
    */
   async resolveActiveOffersForProducts(
-    params: { vendorBranchId: string; products: Array<{ productId: string; categoryId: string }> },
+    params: {
+      vendorBranchId: string;
+      /**
+       * `priceMinor` / `pricingUnit` are OPTIONAL and let the display follow the SAME eligibility checkout applies: a WEIGHT
+       * product is never eligible for either mechanism, and a flash sale whose special price is not below the product's
+       * price gives no discount, so neither may be advertised. Callers that do not know them keep the previous behaviour.
+       */
+      products: Array<{ productId: string; categoryId: string; priceMinor?: number; pricingUnit?: string }>;
+    },
   ): Promise<Map<string, ActiveOfferSummary>> {
     const result = new Map<string, ActiveOfferSummary>();
     if (params.products.length === 0) return result;
@@ -243,7 +265,15 @@ export class OfferConsumptionService {
     const activeOffers = await manager.find(Offer, {
       where: { vendorBranchId: params.vendorBranchId, isActive: true },
     });
-    const validOffers = activeOffers.filter((o) => o.startAt <= now && now < o.endAt);
+    // In its validity window AND not already used up: a flash sale whose global allocation is exhausted is rejected at checkout
+    // (FlashSaleLimitExceededException), so it must not be advertised either. (The per-CUSTOMER lifetime limit depends on who is
+    // asking and stays a checkout-time rule.)
+    const validOffers = activeOffers.filter(
+      (o) =>
+        o.startAt <= now &&
+        now < o.endAt &&
+        !(o.mechanism === OfferMechanism.FLASH_SALE && o.totalAllocationLimit != null && o.consumedUnitsCount >= o.totalAllocationLimit),
+    );
     if (validOffers.length === 0) return result;
 
     const offerIds = validOffers.map((o) => o.id);
@@ -273,6 +303,8 @@ export class OfferConsumptionService {
     );
 
     for (const product of params.products) {
+      // Decision C (see the class comment): WEIGHT products are never eligible for either mechanism.
+      if (product.pricingUnit === PricingUnit.WEIGHT) continue;
       const matching = validOffers.filter((offer) => {
         if (productIdsByOfferId.get(offer.id)?.has(product.productId)) return true;
         if (categoryIdsByOfferId.get(offer.id)?.has(product.categoryId)) return true;
@@ -285,7 +317,12 @@ export class OfferConsumptionService {
       // one match is sufficient — the customer only ever receives a
       // presence signal, never a computed amount, so there is no
       // "best" to choose between (decision explicitly not reopened).
-      const flashSaleMatches = matching.filter((o) => o.mechanism === OfferMechanism.FLASH_SALE);
+      const flashSaleMatches = matching.filter(
+        (o) =>
+          o.mechanism === OfferMechanism.FLASH_SALE &&
+          // Checkout discounts `max(0, unitPrice - specialPrice)`; with a price that is not below the product's there is none.
+          (product.priceMinor == null || (o.specialPriceMinor != null && o.specialPriceMinor < product.priceMinor)),
+      );
       if (flashSaleMatches.length > 0) {
         // unitPriceMinor isn't known at this layer (this method never
         // needs a real customer price to answer "is there a special
@@ -293,7 +330,11 @@ export class OfferConsumptionService {
         // depend on the normal price) — pick the lowest specialPriceMinor,
         // the equivalent of "best offer" without needing a unit price.
         const best = flashSaleMatches.reduce((a, b) => ((b.specialPriceMinor ?? Infinity) < (a.specialPriceMinor ?? Infinity) ? b : a));
-        result.set(product.productId, { mechanism: OfferMechanism.FLASH_SALE, specialPriceMinor: best.specialPriceMinor ?? undefined });
+        result.set(product.productId, {
+          mechanism: OfferMechanism.FLASH_SALE,
+          specialPriceMinor: best.specialPriceMinor ?? undefined,
+          ...(best.perOrderLimit != null ? { perOrderLimit: best.perOrderLimit } : {}),
+        });
         continue; // mutual exclusion — never also set SUBTOTAL_DISCOUNT for the same product
       }
 
@@ -351,7 +392,7 @@ export class OfferConsumptionService {
 
       let best: { offer: Offer; discountPerUnitMinor: number } | null = null;
       for (const offer of candidates) {
-        const discountPerUnitMinor = this.computeFlashSaleDiscountPerUnit(offer, item.unitPriceMinor);
+        const discountPerUnitMinor = this.computeFlashSaleDiscountPerUnit(offer, item.basePriceMinor ?? item.unitPriceMinor);
         if (discountPerUnitMinor <= 0) continue;
         if (!best || discountPerUnitMinor > best.discountPerUnitMinor) {
           best = { offer, discountPerUnitMinor };
@@ -578,8 +619,9 @@ export class OfferConsumptionService {
     params: { offer: Offer; customerId: string },
   ): Promise<boolean> {
     if (params.offer.perCustomerLifetimeLimit == null) return true;
+    // PD-014: a discount given back (its segment rejected / its order cancelled) no longer counts as one of the customer's uses.
     const usedCount = await manager.count(OfferConsumption, {
-      where: { offerId: params.offer.id, customerId: params.customerId },
+      where: { offerId: params.offer.id, customerId: params.customerId, isReversed: false },
     });
     return usedCount < params.offer.perCustomerLifetimeLimit;
   }
@@ -731,6 +773,98 @@ export class OfferConsumptionService {
     for (const offer of lockedOffers.values()) {
       await manager.save(Offer, offer);
     }
+    await this.recordDiscountRestorations(manager, orderId, consumptions);
+  }
+
+  /**
+   * PD-014 — discount / coupon restoration. A SUBTOTAL_DISCOUNT (automatic offer OR coupon: a coupon is an offer with a code) is
+   * consumed per vendor SEGMENT, in ONE OfferConsumption row that carries the whole discount of that segment. Rejecting the segment
+   * therefore removes exactly that segment's discount (100 % of what is attributable to it — the discount is never spread over other
+   * vendors, so there is no apportioning and no rounding), and this gives its entitlement back, once:
+   *   - the row is marked reversed (kept as history — never deleted), so the customer's per-customer limit stops counting it;
+   *   - `offer.consumedUnitsCount` −1 (the usage limit) and `offer.consumedDiscountMinor` − the row's discount (the budget cap), each
+   *     never below 0 and never by more than the row itself recorded, so the offer can never be credited beyond what was consumed.
+   * Money is untouched here: the customer never paid the discount, so the refund (wallet / transfer / amount due) is computed from the
+   * reduced order total by the existing partial-cancellation logic and is not changed by restoring the entitlement.
+   *
+   * Exactly once: only rows still `isReversed = false` are touched, under the caller's order lock and a pessimistic lock on the Offer
+   * row; a repeat finds nothing. `onlySegmentIds` limits it to the rejected segment(s); omitted = every segment of the order.
+   */
+  async reverseSubtotalDiscountConsumptionForOrder(manager: EntityManager, orderId: string, onlySegmentIds?: string[]): Promise<void> {
+    if (onlySegmentIds && onlySegmentIds.length === 0) return;
+    const consumptions = await manager.find(OfferConsumption, {
+      where: {
+        orderId,
+        mechanismSnapshot: OfferMechanism.SUBTOTAL_DISCOUNT,
+        isReversed: false,
+        ...(onlySegmentIds ? { orderVendorSegmentId: In(onlySegmentIds) } : {}),
+      },
+    });
+    if (consumptions.length === 0) return;
+
+    const lockedOffers = new Map<string, Offer>();
+    for (const offerId of [...new Set(consumptions.map((c) => c.offerId))].sort()) {
+      const locked = await manager.findOne(Offer, { where: { id: offerId }, lock: { mode: 'pessimistic_write' } });
+      if (locked) lockedOffers.set(offerId, locked);
+    }
+
+    const now = new Date();
+    for (const consumption of consumptions) {
+      consumption.isReversed = true;
+      consumption.reversedAt = now;
+      await manager.save(OfferConsumption, consumption);
+      const offer = lockedOffers.get(consumption.offerId);
+      if (offer) {
+        offer.consumedUnitsCount = Math.max(0, offer.consumedUnitsCount - Math.max(1, consumption.quantityConsumed));
+        offer.consumedDiscountMinor = Math.max(0, offer.consumedDiscountMinor - Number(consumption.discountAppliedMinor));
+      }
+    }
+    for (const offer of lockedOffers.values()) await manager.save(Offer, offer);
+    await this.recordDiscountRestorations(manager, orderId, consumptions);
+  }
+
+  /**
+   * PD-015 - appends the compensating HATLY_FUNDED_OFFER_DISCOUNT_RESTORED event for each consumption row that has JUST been reversed,
+   * inside the caller's transaction (so it commits or rolls back with the rejection/cancellation). The original event is never modified.
+   * Called only with rows this call flipped from `isReversed=false` (under the order lock), and keyed per consumption row, so a repeat or
+   * a concurrent request can neither double-compensate nor compensate something that was never recorded. If the original event does not
+   * exist (an order that never recorded one) nothing is compensated - a restoration without an original would make the net negative.
+   */
+  private async recordDiscountRestorations(manager: EntityManager, orderId: string, reversed: OfferConsumption[]): Promise<void> {
+    const positive = reversed.filter((c) => Number(c.discountAppliedMinor) > 0);
+    if (positive.length === 0) return;
+    const original = await manager.getRepository(FinancialEvent).findOne({
+      where: { idempotencyKey: `hatly-funded-offer-discount:${orderId}` },
+    });
+    if (!original) return;
+
+    // A flash-sale consumption belongs to an ITEM; its segment is the item's segment. A subtotal discount carries its segment directly.
+    const itemIds = positive.filter((c) => !c.orderVendorSegmentId && c.orderItemId).map((c) => c.orderItemId as string);
+    const segmentByItem = new Map<string, string>();
+    if (itemIds.length > 0) {
+      const rows: Array<{ id: string; order_vendor_segment_id: string }> = await manager.query(
+        'SELECT id, order_vendor_segment_id FROM order_items WHERE id = ANY($1::uuid[])',
+        [itemIds],
+      );
+      for (const r of rows) segmentByItem.set(r.id, r.order_vendor_segment_id);
+    }
+    for (const c of positive) {
+      await this.financialEventService.record(
+        {
+          type: FinancialEventType.HATLY_FUNDED_OFFER_DISCOUNT_RESTORED,
+          direction: FinancialEventDirection.INFORMATIONAL,
+          idempotencyKey: `hatly-funded-offer-discount-restored:${c.id}`,
+          amountMinor: Number(c.discountAppliedMinor),
+          orderId,
+          orderVendorSegmentId: c.orderVendorSegmentId ?? (c.orderItemId ? segmentByItem.get(c.orderItemId) ?? null : null),
+          // No vendorBranchId on purpose: settlement derives a vendor's first activity from ANY event carrying one, and this
+          // informational event must not influence it. The branch is reachable through the linked segment.
+          relatedEventId: original.id,
+          reason: 'Hatly-funded promotional discount restored: its vendor part was rejected or the order was cancelled (compensates HATLY_FUNDED_OFFER_DISCOUNT_RECORDED; the original is unchanged).',
+        },
+        manager,
+      );
+    }
   }
 
   async recordHatlyFundedDiscountEvent(orderId: string, totalDiscountMinor: number): Promise<void> {
@@ -745,9 +879,10 @@ export class OfferConsumptionService {
     });
   }
 
-  private computeFlashSaleDiscountPerUnit(offer: Offer, unitPriceMinor: number): number {
+  /** The special price replaces the product's BASE price only; options stay payable on top (see OfferCandidateItem.basePriceMinor). */
+  private computeFlashSaleDiscountPerUnit(offer: Offer, basePriceMinor: number): number {
     if (offer.specialPriceMinor == null) return 0;
-    return Math.max(0, unitPriceMinor - offer.specialPriceMinor);
+    return Math.max(0, basePriceMinor - offer.specialPriceMinor);
   }
 
   private computeSubtotalDiscount(offer: Offer, eligibleSubtotalMinor: number): number {

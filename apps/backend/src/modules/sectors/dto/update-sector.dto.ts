@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Min, MaxLength } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Min, MaxLength } from 'class-validator';
 
 /**
  * CONFIRMED (decision 10, "update safe configuration"): `slug` is
@@ -30,4 +30,9 @@ export class UpdateSectorDto {
   @IsString()
   @MaxLength(500)
   imageUrl?: string;
+
+  /** May customers send custom (free-text / photo) requests to vendors of this sector? */
+  @IsOptional()
+  @IsBoolean()
+  customRequestsEnabled?: boolean;
 }

@@ -16,6 +16,15 @@ import { SUPER_ADMIN_STORAGE_STATE } from './env';
 test.describe('Admin Settings — operational configuration', () => {
   test.use({ storageState: SUPER_ADMIN_STORAGE_STATE });
 
+  test('the Customer OTP setting is described as first-time phone verification during registration — never as the way customers sign in', async ({ page }) => {
+    await page.goto('/settings');
+    const card = page.locator('div.rounded-xl.border.bg-white', { hasText: 'Customer Authentication — OTP' }).first();
+    await expect(card).toContainText('verify a customer\'s phone number the first time, during registration');
+    await expect(card).toContainText('customers always sign in with phone + password');
+    await expect(card).not.toContainText('authenticate with OTP');
+    await expect(card).not.toContainText('instead of OTP');
+  });
+
   test('toggling Multi-Vendor Orders and saving PUTs the new value, and the server\'s own response confirms it was persisted', async ({ page }) => {
     await page.goto('/settings');
     // The specific ConfigRow wrapper (its own className) — not the deepest text match, which would

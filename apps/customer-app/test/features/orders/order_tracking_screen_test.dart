@@ -39,7 +39,7 @@ void main() {
     expect(find.byKey(const Key('order-status-title')), findsOneWidget);
     expect(find.text('جارٍ التحضير'), findsWidgets);
     // the customer-facing order number, never the internal UUID
-    expect(find.text('⁦#HT-100001⁩'), findsOneWidget);
+    expect(find.text('\u2066#HT-100001\u2069'), findsOneWidget);
     expect(find.byKey(const Key('order-eta')), findsOneWidget);
     expect(find.byKey(const Key('order-timeline')), findsOneWidget);
     // three history steps, oldest first

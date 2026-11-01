@@ -1,4 +1,5 @@
 import * as http from 'http';
+import type { AddressInfo } from 'net';
 import { LoggerService } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
@@ -6,6 +7,8 @@ import { ThrottlerStorage } from '@nestjs/throttler';
 import { DataSource } from 'typeorm';
 import Redis from 'ioredis';
 import * as request from 'supertest';
+import * as passport from 'passport';
+import { JwtStrategy } from '../../../src/modules/auth/strategies/jwt.strategy';
 import { AppModule } from '../../../src/app.module';
 import { configureApp } from '../../../src/app.setup';
 import { PUSH_NOTIFICATION_PROVIDER, PushNotificationProvider } from '../../../src/modules/notifications/push-provider.interface';
@@ -16,6 +19,8 @@ import { resetE2eInfrastructure } from './db';
 export interface ApiResponse<T = any> {
   status: number;
   body: T;
+  /** The raw response text (the only way to read a non-JSON body such as a CSV download). */
+  text: string;
   headers: Record<string, string>;
 }
 
@@ -79,6 +84,14 @@ const relaxedThrottlerStorage: ThrottlerStorage = {
   },
 };
 
+/**
+ * Passport keeps strategies in a PROCESS-WIDE registry, so when a test boots a second app (multi-instance scenarios) its JwtStrategy — and
+ * that app's database connection — replaces the first app's. Production runs one app per process; here, closing an extra instance must hand
+ * authentication back to the app still running, otherwise it would authenticate through a closed pool (the strategy looks staff accounts up
+ * in the database). The stack keeps the booted instances in order.
+ */
+const jwtStrategyStack: JwtStrategy[] = [];
+
 export async function bootWorld(options: BootOptions = {}): Promise<World> {
   const logs: CapturedLog[] = [];
   const stringify = (m: unknown) => (typeof m === 'string' ? m : JSON.stringify(m));
@@ -102,8 +115,12 @@ export async function bootWorld(options: BootOptions = {}): Promise<World> {
   const app = moduleRef.createNestApplication<NestExpressApplication>({ logger: capturingLogger });
   configureApp(app);
   await app.init();
-  await app.listen(0);
-  const baseUrl = await app.getUrl().then((u) => u.replace('[::1]', '127.0.0.1'));
+  const jwtStrategy = app.get(JwtStrategy);
+  jwtStrategyStack.push(jwtStrategy);
+  // Bound to 127.0.0.1, the address the tests call. On the wildcard address the OS may hand out a port that another process (e.g. an Android
+  // emulator) already holds on 127.0.0.1 — macOS allows the overlap — and requests to 127.0.0.1 then reach that process and hang the run.
+  await app.listen(0, '127.0.0.1');
+  const baseUrl = `http://127.0.0.1:${(app.getHttpServer().address() as AddressInfo).port}`;
 
   const redis = new Redis(E2E_REDIS_URL);
   const ds = app.get(DataSource);
@@ -115,7 +132,7 @@ export async function bootWorld(options: BootOptions = {}): Promise<World> {
     if (opts.query) req = req.query(opts.query);
     if (opts.body !== undefined) req = req.send(opts.body as object);
     const res = await req;
-    return { status: res.status, body: res.body, headers: res.headers as Record<string, string> };
+    return { status: res.status, body: res.body, text: res.text ?? '', headers: res.headers as Record<string, string> };
   };
 
   return {
@@ -133,6 +150,10 @@ export async function bootWorld(options: BootOptions = {}): Promise<World> {
       http.globalAgent.destroy();
       (app.getHttpServer() as http.Server).closeAllConnections();
       await app.close();
+      const at = jwtStrategyStack.indexOf(jwtStrategy);
+      if (at >= 0) jwtStrategyStack.splice(at, 1);
+      const stillRunning = jwtStrategyStack[jwtStrategyStack.length - 1];
+      if (stillRunning) passport.use('jwt', stillRunning as never);
     },
   };
 }

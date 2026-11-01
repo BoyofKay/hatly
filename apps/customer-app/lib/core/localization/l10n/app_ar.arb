@@ -38,7 +38,7 @@
   "verifyPhonePromptDismiss": "ليس الآن",
   "verifyPhoneSuccess": "تم التحقق من الهاتف.",
   "passwordSetupSectionTitle": "كلمة المرور",
-  "passwordSetupSectionSubtitle": "عيّن كلمة مرور لتتمكن من تسجيل الدخول أيضًا بدون رمز عبر رسالة نصية.",
+  "passwordSetupSectionSubtitle": "غيّر كلمة المرور التي تسجّل بها الدخول.",
   "passwordSetupSaveButton": "حفظ كلمة المرور",
   "passwordSetupSuccess": "تم حفظ كلمة المرور.",
   "phoneInvalid": "رقم الهاتف غير صحيح",
@@ -68,6 +68,17 @@
   "errorInvalidOrExpiredOtp": "الرمز غير صحيح أو منتهي الصلاحية",
   "errorTooManyAttempts": "محاولات كثيرة جدًا. حاول مرة أخرى بعد قليل",
   "errorSmsProviderUnavailable": "تعذر إرسال رمز التحقق حاليًا. برجاء المحاولة لاحقًا",
+  "passwordTooShort": "كلمة المرور يجب ألا تقل عن 8 أحرف",
+  "passwordConfirmLabel": "تأكيد كلمة المرور",
+  "passwordMismatch": "كلمتا المرور غير متطابقتين",
+  "errorInvalidCredentials": "رقم الهاتف أو كلمة المرور غير صحيحة",
+  "errorRegistrationUnavailable": "تعذر إكمال التسجيل. إذا كان لديك حساب بالفعل فسجّل الدخول.",
+  "errorTooManyFailedLogins": "محاولات تسجيل دخول فاشلة كثيرة. حاول مرة أخرى بعد قليل",
+  "errorInvalidInput": "تحقق من البيانات المدخلة وحاول مرة أخرى",
+  "errorPhoneVerificationUnavailable": "التحقق من الهاتف غير متاح حاليًا",
+  "profileCurrentPasswordLabel": "كلمة المرور الحالية",
+  "errorCurrentPasswordRequired": "أدخل كلمة المرور الحالية لتغييرها",
+  "errorCurrentPasswordInvalid": "كلمة المرور الحالية غير صحيحة",
   "homeComingSoon": "قريبًا: تصفح المتاجر والمنتجات",
   "searchComingSoon": "قريبًا: البحث",
   "ordersComingSoon": "قريبًا: طلباتك",
@@ -162,8 +173,8 @@
     }
   },
   "customRequestEntryPoint": "لم تجد ما تبحث عنه؟",
-  "customRequestSheetTitle": "اطلب صنفًا مخصصًا",
-  "customRequestSheetSubtitle": "صف ما تحتاجه و/أو أضف صورة — سنرسلها إلى المتجر.",
+  "customRequestSheetTitle": "اطلب صنفًا غير موجود في القائمة",
+  "customRequestSheetSubtitle": "صف ما تحتاجه و/أو أضف صورة. سيُضاف إلى سلتك ويصل إلى المتجر مع طلبك، ويؤكد المتجر توفر الصنف ويحدد سعره، وسيظهر لك المبلغ النهائي بعد ذلك.",
   "customRequestTextHint": "مثال: بانادول إكسترا 500 مجم، أي نوع متاح",
   "customRequestImageLimitHint": "حتى {max} صور",
   "@customRequestImageLimitHint": {
@@ -299,7 +310,6 @@
   "homeSectionCategories": "تسوّق حسب الفئة",
   "homeSectionPopularNearYou": "الأشهر بالقرب منك",
   "homeSectionOffers": "العروض",
-  "homeSectionPopularNew": "الأكثر طلبًا والجديد",
   "homeFavoritesShortcut": "المفضلة",
   "homePromoCarouselLabel": "عروض مميزة",
   "homePromoPageIndicator": "العرض {current} من {total}",
@@ -578,6 +588,9 @@
   "checkoutPaymentManualTransferHint": "لا يبدأ تجهيز طلبك إلا بعد اعتماد التحويل",
   "checkoutPaymentPayAtDeliveryHint": "تدفع للمندوب عند التسليم بوسيلة دفع إلكترونية",
   "checkoutChooseElectronicMethod": "اختر وسيلة الدفع الإلكتروني",
+  "checkoutElectronicMethodHeading": "وسيلة الدفع الإلكتروني",
+  "checkoutElectronicMethodUnavailable": "وسيلة الدفع هذه غير متاحة حاليًا، اختر وسيلة أخرى",
+  "checkoutCannotConfirmYet": "لم نتمكن من تأكيد الطلب بعد. راجع اختياراتك وحاول مرة أخرى",
   "checkoutNoElectronicMethods": "لا توجد وسائل دفع إلكتروني متاحة حاليًا",
   "checkoutTransferUnavailable": "التحويل اليدوي غير متاح حاليًا",
   "checkoutPickupCashNote": "طلبات الاستلام تُدفع نقدًا في الفرع عند استلامها.",
@@ -640,6 +653,7 @@
   "checkoutBlockerUnavailable": "أحد المنتجات أو المتاجر في سلتك غير متاح حاليًا",
   "checkoutBlockerMultiVendorDisabled": "الطلب من أكثر من متجر غير متاح حاليًا",
   "checkoutBlockerFeeUnavailable": "تعذّر حساب رسوم التوصيل الآن. حاول مرة أخرى بعد قليل.",
+  "checkoutBlockerGpsUnavailable": "التوصيل إلى موقع GPS غير متاح حاليًا. اختر عنوانًا بمنطقة توصيل أو أضف عنوانًا جديدًا.",
   "checkoutBlockerInvalidAddress": "موقع العنوان غير صالح. اختر موقعًا آخر.",
   "checkoutOrderPlacedButLoadFailed": "تم إنشاء طلبك، لكن تعذّر تحميل تفاصيله الآن",
   "checkoutSuccessTitle": "تم استلام طلبك",
@@ -711,7 +725,7 @@
   "addressConfirmPin": "تأكيد هذا الموقع",
   "addressSearchLabel": "ابحث عن عنوانك",
   "addressSearchAction": "بحث",
-  "addressSearchNoResult": "لم نجد هذا العنوان. جرّب صياغة أخرى أو استخدم موقعك الحالي.",
+  "addressSearchNoResult": "لم نجد هذا العنوان. البحث عن العناوين غير متاح دائمًا — يمكنك كتابة عنوانك في التفاصيل أعلاه وحفظه بدون موقع على الخريطة، أو استخدام موقعك الحالي.",
   "addressLocationUnavailable": "تعذّر الحصول على موقعك. فعّل خدمة الموقع وامنح التطبيق الإذن ثم حاول مرة أخرى.",
   "addressSuggestionLabel": "عنوان مقترح للموقع المحدد",
   "addressUseSuggestion": "استخدام",
@@ -846,7 +860,7 @@
     }
   },
   "addressZonesLoadError": "معرفناش نحمّل مناطق التوصيل. حاول تاني.",
-  "addressZonesEmpty": "مفيش مناطق توصيل متاحة دلوقتي.",
+  "addressZonesEmpty": "لا توجد مناطق توصيل متاحة بعد، لذلك لا يمكن حفظ عنوان الآن. حاول مرة أخرى لاحقًا.",
   "addressDetailedLabel": "العنوان بالتفصيل",
   "addressDetailedHint": "مثال: شارع أبو نصيب جنب جامع الكردي، منزل 15",
   "addressLocationOptionalSection": "الموقع على الخريطة (اختياري)",
@@ -865,17 +879,372 @@
       }
     }
   },
-  "checkoutHatlyServiceFeeFormula": "رسوم توصيل منطقتك {zoneFee} × {multiplier}",
-  "@checkoutHatlyServiceFeeFormula": {
+  "addressZoneAutoSelected": "دي المنطقة الوحيدة المتاحة في المدينة دي، فاخترناها لك.",
+  "addressCityNoZones": "مفيش مناطق توصيل متاحة في المدينة دي دلوقتي.",
+  "guestSignInTitle": "سجّل الدخول للمتابعة",
+  "guestSignInBody": "أنشئ حسابًا أو سجّل الدخول لاستخدام السلة والطلبات والملف الشخصي.",
+  "guestSignInAction": "تسجيل الدخول أو إنشاء حساب",
+  "guestBrowseAction": "تصفح بدون حساب",
+  "weightEntryTitle": "أدخل الوزن",
+  "weightEntryHint": "مثال: 1.5",
+  "weightEntryConfirm": "تأكيد الوزن",
+  "weightEntryTooltip": "اكتب الوزن",
+  "weightEntryInvalid": "أدخل وزنًا بين {min} و{max}",
+  "@weightEntryInvalid": {
     "placeholders": {
-      "zoneFee": {
+      "min": {
         "type": "String"
       },
-      "multiplier": {
+      "max": {
         "type": "String"
       }
     }
   },
-  "addressZoneAutoSelected": "دي المنطقة الوحيدة المتاحة في المدينة دي، فاخترناها لك.",
-  "addressCityNoZones": "مفيش مناطق توصيل متاحة في المدينة دي دلوقتي."
+  "weightGramsShort": "{grams} جم",
+  "@weightGramsShort": {
+    "placeholders": {
+      "grams": {
+        "type": "int"
+      }
+    }
+  },
+  "weightKgShort": "{kg} كجم",
+  "@weightKgShort": {
+    "placeholders": {
+      "kg": {
+        "type": "String"
+      }
+    }
+  },
+  "addressPickerHint": "اختر عنوانًا محفوظًا",
+  "addressPickerNoPin": "لا يوجد موقع على الخريطة — أضفه من عناويني",
+  "addressPickerNeedsPin": "هذا العنوان بلا موقع على الخريطة فلا يمكن استخدامه هنا. أضف له موقعًا أولًا.",
+  "hatlyServiceRouteBuy": "هاتلي تشتري من {place} وتوصّل إلى عنوان التوصيل الخاص بك",
+  "@hatlyServiceRouteBuy": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "hatlyServiceRouteDeliver": "هاتلي تستلم من عنوان التوصيل الخاص بك وتوصّل إلى {place}",
+  "@hatlyServiceRouteDeliver": {
+    "placeholders": {
+      "place": {
+        "type": "String"
+      }
+    }
+  },
+  "hatlyServiceRoutePlaceUnset": "المكان الذي تختاره",
+  "hatlyServiceDeliveryOnly": "رسوم التوصيل فقط",
+  "homeSectionMostOrdered": "الأكثر طلبًا",
+  "homeSectionNew": "الجديد",
+  "homeSeeAllOffersTitle": "العروض",
+  "homeSeeAllEmpty": "لا يوجد شيء هنا بعد",
+  "notificationsTitle": "الإشعارات",
+  "notificationsEmptyTitle": "لا توجد إشعارات بعد",
+  "notificationsEmptyBody": "سنخبرك هنا بكل تحديث على طلباتك.",
+  "notificationsLoadError": "تعذّر تحميل الإشعارات",
+  "notificationsMarkAllRead": "تحديد الكل كمقروء",
+  "notificationsBellLabel": "الإشعارات",
+  "notificationsBellLabelUnread": "الإشعارات، {count} غير مقروء",
+  "@notificationsBellLabelUnread": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsUnread": "غير مقروء",
+  "notificationOrderPlacedTitle": "تم استلام طلبك",
+  "notificationOrderPlacedBody": "استلمنا طلبك رقم {orderNumber}.",
+  "@notificationOrderPlacedBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderConfirmedTitle": "تم تأكيد طلبك",
+  "notificationOrderConfirmedBody": "تم تأكيد طلبك رقم {orderNumber}.",
+  "@notificationOrderConfirmedBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderPreparingTitle": "جارٍ تجهيز طلبك",
+  "notificationOrderPreparingBody": "بدأ تجهيز طلبك رقم {orderNumber}.",
+  "@notificationOrderPreparingBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderReadyForPickupTitle": "طلبك جاهز للاستلام",
+  "notificationOrderReadyForPickupBody": "طلبك رقم {orderNumber} جاهز، يمكنك استلامه من الفرع.",
+  "@notificationOrderReadyForPickupBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderOnTheWayTitle": "طلبك في الطريق",
+  "notificationOrderOnTheWayBody": "طلبك رقم {orderNumber} في الطريق إليك.",
+  "@notificationOrderOnTheWayBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderDeliveredTitle": "تم توصيل طلبك",
+  "notificationOrderDeliveredBody": "تم توصيل طلبك رقم {orderNumber}.",
+  "@notificationOrderDeliveredBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderCollectedTitle": "تم استلام طلبك",
+  "notificationOrderCollectedBody": "تم استلام طلبك رقم {orderNumber}.",
+  "@notificationOrderCollectedBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderCancelledTitle": "تم إلغاء طلبك",
+  "notificationOrderCancelledBody": "تم إلغاء طلبك رقم {orderNumber}.",
+  "@notificationOrderCancelledBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderFailedDeliveryTitle": "تعذّر توصيل طلبك",
+  "notificationOrderFailedDeliveryBody": "لم نتمكن من توصيل طلبك رقم {orderNumber}.",
+  "@notificationOrderFailedDeliveryBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "customRequestEntryHint": "اكتب الصنف أو أضف صورة، وسيتأكد المتجر منه ويحدد سعره.",
+  "customRequestAdded": "تمت الإضافة إلى سلتك — سيؤكد المتجر توفر الصنف ويحدد سعره.",
+  "cartErrorCustomRequestsUnavailable": "هذا المتجر لا يقبل الطلبات المخصصة.",
+  "optionChooseBetween": "اختر من {min} إلى {max}",
+  "@optionChooseBetween": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "optionChooseAtLeast": "اختر {min} على الأقل",
+  "@optionChooseAtLeast": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      }
+    }
+  },
+  "optionChooseUpTo": "اختر حتى {max}",
+  "@optionChooseUpTo": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "optionMinError": "اختر {min} على الأقل",
+  "@optionMinError": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      }
+    }
+  },
+  "optionMaxReached": "يمكنك اختيار {max} كحد أقصى",
+  "@optionMaxReached": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "cartErrorOptionLimit": "أحد الاختيارات خارج ما يسمح به هذا المنتج — راجع اختياراتك.",
+  "deleteAccountAction": "حذف حسابي",
+  "deleteAccountTitle": "حذف الحساب نهائيًا",
+  "deleteAccountExplanation": "سيتم حذف بياناتك الشخصية (الاسم ورقم الهاتف والعناوين المحفوظة والإشعارات والمفضلة وسلة التسوق). تبقى سجلات الطلبات والمدفوعات المنتهية بدون أي بيانات تعرّف بك، لأن المتاجر والسائقين وهاتلي يحتاجونها للمحاسبة. ستفقد نقاط هاتلي. لا يمكن التراجع عن هذا الإجراء.",
+  "deleteAccountRequirements": "لا يمكن حذف الحساب أثناء وجود طلب قيد التنفيذ أو رصيد في محفظة هاتلي.",
+  "deleteAccountPasswordHint": "أدخل كلمة المرور للتأكيد",
+  "deleteAccountConfirm": "حذف الحساب",
+  "deleteAccountCancel": "إلغاء",
+  "deleteAccountPasswordRequired": "أدخل كلمة المرور لتأكيد الحذف",
+  "deleteAccountErrorPassword": "كلمة المرور غير صحيحة",
+  "deleteAccountErrorActiveOrders": "لديك طلب قيد التنفيذ. يمكنك حذف حسابك بعد انتهائه.",
+  "deleteAccountErrorWalletBalance": "محفظة هاتلي ليست فارغة. تواصل مع دعم هاتلي لتسويتها قبل حذف الحساب.",
+  "deleteAccountErrorGeneric": "تعذّر حذف الحساب. حاول مرة أخرى.",
+  "homeNoStoresTitle": "لا توجد متاجر متاحة بعد",
+  "homeNoStoresBody": "ستظهر المتاجر والأقسام هنا بمجرد توفرها في منطقتك. تفقّد التطبيق مرة أخرى قريبًا.",
+  "phoneEgyptOnly": "هاتلي تقبل حاليًا أرقام الموبايل المصرية فقط (+20).",
+  "addressMapLocationSaved": "تم حفظ الموقع على الخريطة",
+  "addressTextOnly": "عنوان نصي فقط — بدون موقع على الخريطة",
+  "addressMethodTitle": "إزاي عايز تضيف عنوانك؟",
+  "addressMethodSubtitle": "اختار طريقة واحدة بس — مش محتاج الاتنين.",
+  "addressMethodGpsTitle": "استخدم موقعي الحالي (GPS)",
+  "addressMethodGpsHint": "بنقرأ موقعك ونحسب التوصيل على حسب مسافة الطريق. مش محتاج تختار منطقة ولا تكتب عنوان.",
+  "addressMethodManualTitle": "هكتب عنواني بنفسي",
+  "addressMethodManualHint": "اختار منطقتك واكتب عنوانك بالتفصيل. التوصيل بسعر المنطقة الثابت. مفيش طلب لموقعك.",
+  "addressMethodGpsUnavailable": "التوصيل بالموقع (GPS) مش متاح دلوقتي. اكتب عنوانك بنفسك.",
+  "addressChangeMethod": "تغيير طريقة العنوان",
+  "addressChangeMethodTitle": "تغيير طريقة العنوان؟",
+  "addressChangeMethodDiscardsGps": "هيتم مسح الموقع اللي اتحدد.",
+  "addressChangeMethodDiscardsManual": "هيتم مسح المنطقة المختارة والعنوان اللي كتبته.",
+  "addressChangeMethodConfirm": "غيّر الطريقة",
+  "addressGpsJourneyTitle": "موقعك",
+  "addressGpsHelp": "اضغط على الزر لمشاركة موقعك الحالي. مش محتاج تختار منطقة ولا تكتب عنوان.",
+  "addressGpsDetected": "تم تحديد موقعك",
+  "addressGpsFeeNote": "سعر التوصيل بيتحسب عند إتمام الطلب من مسافة الطريق. أي مبلغ يظهر قبل كده هو تقدير فقط.",
+  "addressGpsNeedLocation": "شارك موقعك الأول عشان تكمّل.",
+  "addressGpsOutsideCoverage": "هاتلي لا توصّل للموقع ده لسه.",
+  "addressGpsInvalidLocation": "مقدرناش نستخدم الموقع ده. جرّب تاني.",
+  "addressGpsSaved": "موقع GPS",
+  "addressManualJourneyTitle": "عنوان مكتوب",
+  "addressGpsJourneyBadge": "طريقة GPS",
+  "addressManualJourneyBadge": "طريقة العنوان المكتوب",
+  "addressMethodsLoading": "بنجهّز طرق العنوان…",
+  "routeSectionTitle": "مسار الطلب",
+  "routeFromLabel": "من",
+  "routeToLabel": "إلى",
+  "routeBadgeDefault": "افتراضي",
+  "routeBadgeChosen": "من اختيارك",
+  "routeChange": "تغيير",
+  "routeChoose": "اختيار",
+  "routeNotSet": "لم يُحدد بعد",
+  "routeDefaultMissingHint": "لا توجد نقطة افتراضية حاليًا — اختر نقطة.",
+  "routeOriginRequiredHint": "اختر المكان اللي هيتم الاستلام منه.",
+  "routeSheetTitleOrigin": "اختر نقطة البداية",
+  "routeSheetTitleDestination": "اختر الوجهة",
+  "routeSheetPointSection": "موقعك الحالي أو نقطة على الخريطة",
+  "routeSheetSavedSection": "من عناويني المحفوظة",
+  "routeNameThisPlace": "سمّ المكان (اختياري)",
+  "routeNameThisPlaceHint": "مثال: بيت ماما",
+  "routeUseDefault": "استخدام النقطة الافتراضية",
+  "routeConfirmPoint": "تأكيد هذه النقطة",
+  "routeCurrentLocationLabel": "موقعي الحالي",
+  "routeSelectedPointLabel": "نقطة محددة",
+  "routeDirectionNote": "الاتجاه: من النقطة الأولى إلى الثانية.",
+  "routeOrderSectionTitle": "مسار الطلب",
+  "cartErrorAdHocOriginRequired": "اختر مكان الاستلام لهذا الطلب قبل إضافته للسلة.",
+  "checkoutBlockerAdHocOriginRequired": "طلب وصّلي لمكان ده من غير نقطة استلام. اختر نقطة الاستلام وأضفه تاني.",
+  "checkoutBlockerHatlyDefaultPickupMissing": "نقطة البداية الافتراضية لهاتلي لسه متظبطتش. اختر نقطة بداية لطلبك.",
+  "checkoutBlockerHatlyDefaultDestinationMissing": "الوجهة الافتراضية لهاتلي لسه متظبطتش. اختر وجهة لطلبك.",
+  "checkoutBlockerWasallyDefaultDestinationMissing": "الوجهة الافتراضية لوصّلي لسه متظبطتش. اختر وجهة لطلبك.",
+  "orderPartCancelledTitle": "تم إلغاء جزء من طلبك",
+  "orderPartCancelledBody": "تعذّر على {rejected} من {total} بائعين تجهيز جزئهم. يستمر باقي طلبك.",
+  "@orderPartCancelledBody": {
+    "placeholders": {
+      "rejected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "orderPartCancelledNoCharge": "لن يتم تحصيل مبلغ الجزء الملغي منك.",
+  "orderRejectionReasonLine": "السبب: {reason}",
+  "@orderRejectionReasonLine": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "orderRefundWalletLine": "تمت إعادة {amount} إلى محفظتك.",
+  "@orderRefundWalletLine": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "orderRefundTransferPendingLine": "سيعيد لك هاتلي مبلغ {amount}. سنحدّث الحالة عند إرساله.",
+  "@orderRefundTransferPendingLine": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "orderRefundTransferSentLine": "تم إرسال {amount} إليك.",
+  "@orderRefundTransferSentLine": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "orderRefundReviewLine": "سيتم تسوية {amount} بعد مراجعة دفعتك.",
+  "@orderRefundReviewLine": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "notificationOrderPartCancelledTitle": "تم إلغاء جزء من طلبك",
+  "notificationOrderPartCancelledBody": "تعذّر على أحد البائعين تجهيز جزئه من الطلب رقم {orderNumber}. يستمر باقي طلبك.",
+  "@notificationOrderPartCancelledBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "itemUnavailableTitle": "بعض المنتجات غير متوفرة",
+  "itemUnavailableBody": "لا يمكن تجهيز هذه المنتجات. اختر كيف تريد المتابعة — لن يتغير شيء حتى تقرر.",
+  "itemUnavailableContinue": "المتابعة بدونها",
+  "itemUnavailableCancel": "إلغاء الطلب كاملًا",
+  "itemUnavailableCancelConfirmTitle": "إلغاء الطلب كاملًا؟",
+  "itemUnavailableCancelConfirmBody": "سنحوّل طلبك إلى فريقنا لإلغاء هذا الطلب. تُرد المبالغ المدفوعة مسبقًا وفق قواعدنا المعتادة.",
+  "itemUnavailableCancelConfirmAction": "نعم، ألغِ الطلب",
+  "itemUnavailableKeepOrder": "الإبقاء على الطلب",
+  "itemUnavailableCancelRequested": "استلمنا طلب الإلغاء. سيعالجه فريقنا ويتواصل معك عند الحاجة.",
+  "itemUnavailableTeamContact": "سيتواصل معك فريقنا بخصوص هذا الطلب.",
+  "itemUnavailableDone": "تم — يستمر طلبك بدون هذه المنتجات.",
+  "itemUnavailableError": "تعذّر إرسال إجابتك. حاول مرة أخرى.",
+  "orderRemovedItemsTitle": "تمت إزالتها من طلبك",
+  "notificationItemUnavailableTitle": "منتج في طلبك غير متوفر",
+  "notificationItemUnavailableBody": "افتح الطلب رقم {orderNumber} للمتابعة بدون المنتج أو لإلغاء الطلب.",
+  "@notificationItemUnavailableBody": {
+    "placeholders": {
+      "orderNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "cartCompatTitle": "لا يمكن إضافة هذا المنتج الآن",
+  "cartCompatMultiVendorDisabled": "الطلب من أكثر من متجر غير متاح حاليًا. أكمل طلبك الحالي أو أفرغ السلة لتطلب من متجر آخر.",
+  "cartCompatBranchPickupDisabled": "هذا المتجر لا يوفّر الاستلام من الفرع.",
+  "cartCompatSwitchToDelivery": "التحويل إلى التوصيل وإضافة المنتج",
+  "cartCompatStartNewCart": "إفراغ السلة وإضافة المنتج",
+  "cartCompatKeepCart": "الإبقاء على سلتي",
+  "cartCompatOk": "حسنًا",
+  "addressOpenLocationSettings": "فتح إعدادات الموقع",
+  "weightInlineLabel": "أو اكتب الوزن بالكيلوغرام",
+  "weightEstimateNote": "التقدير: {price} — يُحدَّد السعر النهائي حسب الوزن الفعلي عند التجهيز.",
+  "@weightEstimateNote": {"placeholders": {"price": {"type": "String"}}}
 }

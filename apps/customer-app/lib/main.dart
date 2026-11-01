@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/api_config.dart';
+import 'core/error/error_reporting.dart';
 import 'core/localization/l10n/app_localizations.dart';
 import 'core/network/providers.dart';
 import 'core/routing/app_router.dart';
@@ -29,12 +30,18 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // Fail fast (release only) if the app was built without a reachable backend URL — see apiBaseUrlProblem.
+  // Fail fast (release only) if the app was built without a reachable backend URL — see apiBaseUrlProblem. Deliberately OUTSIDE the
+  // guarded zone below: a misconfigured release must crash loudly, not be swallowed into a blank screen.
   if (kReleaseMode) {
     final problem = apiBaseUrlProblem(kApiBaseUrl);
     if (problem != null) throw StateError(problem);
   }
+  // G-22: every uncaught error (framework, platform, async) ends in ErrorReporting.sink.
+  ErrorReporting.runGuarded(_start);
+}
+
+Future<void> _start() async {
+  WidgetsFlutterBinding.ensureInitialized();
   try {
     // Must be registered before runApp() per firebase_messaging's own
     // contract. Wrapped defensively — same "never block app startup"

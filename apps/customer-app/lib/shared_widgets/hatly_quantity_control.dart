@@ -14,7 +14,13 @@ class HatlyQuantityControl extends StatelessWidget {
     required this.onIncrease,
     required this.decreaseTooltip,
     required this.increaseTooltip,
+    this.onValueTap,
+    this.valueTapTooltip,
   });
+
+  /// When set, tapping the value itself lets the customer TYPE the amount (used for weights, where ten taps of "+" is slow).
+  final VoidCallback? onValueTap;
+  final String? valueTapTooltip;
 
   final String valueLabel;
   final VoidCallback? onDecrease;
@@ -47,21 +53,37 @@ class HatlyQuantityControl extends StatelessWidget {
               // very large text instead of overflowing.
               Flexible(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(minWidth: 44),
+                  constraints: const BoxConstraints(
+                      minWidth: 44, minHeight: HatlyTouch.minTarget),
                   child: Semantics(
                     liveRegion: true,
+                    button: onValueTap != null,
                     label: valueLabel,
+                    hint: valueTapTooltip,
+                    onTap: onValueTap,
                     child: ExcludeSemantics(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: HatlySpacing.sm),
-                          child: LtrText(valueLabel,
-                              textAlign: TextAlign.center,
-                              style: context.type.body.copyWith(
-                                  color: p.textPrimary,
-                                  fontWeight: FontWeight.w800)),
+                      child: InkWell(
+                        key: const Key('qty-value'),
+                        borderRadius: BorderRadius.circular(HatlyRadius.chip),
+                        onTap: onValueTap,
+                        child: Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: HatlySpacing.sm),
+                              child: LtrText(valueLabel,
+                                  textAlign: TextAlign.center,
+                                  style: context.type.body.copyWith(
+                                      color: p.textPrimary,
+                                      fontWeight: FontWeight.w800,
+                                      decoration: onValueTap == null
+                                          ? null
+                                          : TextDecoration.underline,
+                                      decorationStyle:
+                                          TextDecorationStyle.dotted)),
+                            ),
+                          ),
                         ),
                       ),
                     ),

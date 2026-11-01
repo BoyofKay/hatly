@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from 'fs';
 import axios from 'axios';
-import { API_BASE_URL, STORAGE_STATE_DIR, SUPER_ADMIN_STORAGE_STATE } from './env';
+import { API_BASE_URL, STORAGE_STATE_DIR, TOKENS_FILE } from './env';
 
 /**
  * Fixtures for the Hatly Service pricing specs — real HTTP against the real backend, like `global-setup.ts`: a throwaway customer
@@ -79,8 +79,13 @@ async function tryPlacePendingHatlyOrder(customer: CustomerApi, descriptions: st
   const first = await customer.post('/cart/adhoc-items', {
     adHocPlaceName: 'Playwright Corner Pharmacy',
     adHocServiceType: 'BUY_FROM_PLACE',
+    // PD-012: a route has two ends; both are chosen here so the fixture does not depend on any configured default.
     pickupLatitude: 30.3,
     pickupLongitude: 31.45,
+    pickupLabel: 'Playwright Corner Pharmacy',
+    destinationLatitude: 30.31,
+    destinationLongitude: 31.46,
+    destinationLabel: 'Playwright drop-off',
     freeTextDescription: descriptions[0],
     quantity: 1,
   });
@@ -113,8 +118,7 @@ async function tryPlacePendingHatlyOrder(customer: CustomerApi, descriptions: st
 
 /** The SUPER_ADMIN session `global-setup.ts` already persisted — used only to read/confirm out-of-band, never in the browser. */
 function adminToken(): string {
-  const state = JSON.parse(readFileSync(SUPER_ADMIN_STORAGE_STATE, 'utf8'));
-  return state.origins[0].localStorage.find((e: any) => e.name === 'hatly_dashboard_token').value;
+  return JSON.parse(readFileSync(TOKENS_FILE, 'utf8')).superAdmin as string;
 }
 
 const adminApi = () => axios.create({ baseURL: API_BASE_URL, headers: { Authorization: `Bearer ${adminToken()}` }, validateStatus: () => true });

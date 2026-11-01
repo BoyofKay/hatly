@@ -23,10 +23,10 @@ test.describe('Admin Manual Transfer — record refund', () => {
 
     await page.goto('/manual-transfer');
     await page.getByPlaceholder('Payment id').fill('00000000-0000-0000-0000-000000000000');
-    await page.getByPlaceholder('Amount (minor units)').fill('1000');
+    await page.getByPlaceholder('Amount (EGP)').fill('10');
 
-    page.once('dialog', (dialog) => dialog.dismiss());
     await page.getByRole('button', { name: 'Record Refund' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
 
     expect(refundRequestSent).toBe(false);
     await expect(page.getByText('Refund recorded.')).toHaveCount(0);
@@ -35,12 +35,12 @@ test.describe('Admin Manual Transfer — record refund', () => {
   test('accepting the confirmation sends the refund request and the page surfaces the real backend response', async ({ page }) => {
     await page.goto('/manual-transfer');
     await page.getByPlaceholder('Payment id').fill('00000000-0000-0000-0000-000000000000');
-    await page.getByPlaceholder('Amount (minor units)').fill('1000');
+    await page.getByPlaceholder('Amount (EGP)').fill('10');
 
-    page.once('dialog', (dialog) => dialog.accept());
+    await page.getByRole('button', { name: 'Record Refund' }).click();
     const [response] = await Promise.all([
       page.waitForResponse((res) => res.url().includes('/admin/manual-transfer-payments/') && res.url().endsWith('/refund')),
-      page.getByRole('button', { name: 'Record Refund' }).click(),
+      page.getByRole('dialog').getByRole('button', { name: 'Record Refund' }).click(),
     ]);
 
     expect(response.status()).toBe(404); // "Payment not found" — the nonexistent id above

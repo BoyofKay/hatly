@@ -23,6 +23,10 @@ import {
   validateVendorImport,
 } from '../../../lib/api/vendor-products';
 import { apiErrorMessage } from '../../../lib/api/errors';
+import { ProductOptionsEditor } from '../../../components/products/ProductOptionsEditor';
+import { useLang } from '../../../lib/ui/lang';
+import { KpiCard } from '../../../components/ui';
+import { ICONS } from '../../../components/ui/icons';
 
 /**
  * Real Vendor Product Management — Chunk 12B-4. Consumes only
@@ -35,6 +39,7 @@ import { apiErrorMessage } from '../../../lib/api/errors';
  * is create-only; edit uses the separate activate/deactivate actions.
  */
 export default function VendorProductsPage() {
+  const { t, num } = useLang();
   const [branches, setBranches] = useState<VendorOwnedBranch[] | null>(null);
   const [branchError, setBranchError] = useState<string | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
@@ -44,6 +49,7 @@ export default function VendorProductsPage() {
   const [categories, setCategories] = useState<VendorCategory[] | null>(null);
   const [categoryError, setCategoryError] = useState<string | null>(null);
 
+  const [optionsOpenId, setOptionsOpenId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -99,7 +105,7 @@ export default function VendorProductsPage() {
       setBranches(result);
       if (result.length > 0) setSelectedBranchId((prev) => prev || result[0].id);
     } catch (err: any) {
-      setBranchError(apiErrorMessage(err, 'Failed to load branches.'));
+      setBranchError(apiErrorMessage(err, t('Failed to load branches.', 'تعذّر تحميل الفروع.')));
     }
   }
 
@@ -114,7 +120,7 @@ export default function VendorProductsPage() {
       setProducts(productList);
       setCategories(categoryList);
     } catch (err: any) {
-      setProductError(apiErrorMessage(err, 'Failed to load products.'));
+      setProductError(apiErrorMessage(err, t('Failed to load products.', 'تعذّر تحميل المنتجات.')));
     }
   }
 
@@ -151,7 +157,7 @@ export default function VendorProductsPage() {
 
     const priceMinor = toMinorUnits(createFields.price);
     if (priceMinor === null) {
-      setCreateError('Enter a valid price.');
+      setCreateError(t('Enter a valid price.', 'أدخل سعرًا صحيحًا.'));
       return;
     }
     const input: CreateVendorProductInput = {
@@ -169,7 +175,7 @@ export default function VendorProductsPage() {
     if (createFields.inventoryMode === 'TRACKED') {
       const qty = Number(createFields.quantity);
       if (!Number.isInteger(qty) || qty < 0) {
-        setCreateError('Enter a valid, non-negative whole-number quantity.');
+        setCreateError(t('Enter a valid, non-negative whole-number quantity.', 'أدخل كمية صحيحة غير سالبة (عدد صحيح).'));
         return;
       }
       input.quantity = qty;
@@ -193,7 +199,7 @@ export default function VendorProductsPage() {
       setShowCreateForm(false);
       await refreshBranchData(selectedBranchId);
     } catch (err: any) {
-      setCreateError(apiErrorMessage(err, 'Failed to create product.'));
+      setCreateError(apiErrorMessage(err, t('Failed to create product.', 'تعذّر إنشاء المنتج.')));
     } finally {
       setIsCreating(false);
     }
@@ -222,7 +228,7 @@ export default function VendorProductsPage() {
 
     const priceMinor = toMinorUnits(editFields.price);
     if (priceMinor === null) {
-      setEditError('Enter a valid price.');
+      setEditError(t('Enter a valid price.', 'أدخل سعرًا صحيحًا.'));
       return;
     }
     const input: UpdateVendorProductInput = {
@@ -237,7 +243,7 @@ export default function VendorProductsPage() {
     if (editFields.inventoryMode === 'TRACKED') {
       const qty = Number(editFields.quantity);
       if (!Number.isInteger(qty) || qty < 0) {
-        setEditError('Enter a valid, non-negative whole-number quantity.');
+        setEditError(t('Enter a valid, non-negative whole-number quantity.', 'أدخل كمية صحيحة غير سالبة (عدد صحيح).'));
         return;
       }
       input.quantity = qty;
@@ -249,7 +255,7 @@ export default function VendorProductsPage() {
       setEditingId(null);
       await refreshBranchData(selectedBranchId);
     } catch (err: any) {
-      setEditError(apiErrorMessage(err, 'Failed to save changes.'));
+      setEditError(apiErrorMessage(err, t('Failed to save changes.', 'تعذّر حفظ التغييرات.')));
     } finally {
       setIsSaving(false);
     }
@@ -265,7 +271,7 @@ export default function VendorProductsPage() {
     } catch (err: any) {
       setToggleErrorById((prev) => ({
         ...prev,
-        [product.id]: apiErrorMessage(err, 'Failed to update status.'),
+        [product.id]: apiErrorMessage(err, t('Failed to update status.', 'تعذّر تحديث الحالة.')),
       }));
     } finally {
       setTogglingId(null);
@@ -285,7 +291,7 @@ export default function VendorProductsPage() {
     } catch (err: any) {
       setZeroErrorById((prev) => ({
         ...prev,
-        [product.id]: apiErrorMessage(err, 'Failed to set inventory to zero.'),
+        [product.id]: apiErrorMessage(err, t('Failed to set inventory to zero.', 'تعذّر تصفير المخزون.')),
       }));
     } finally {
       setSettingZeroId(null);
@@ -296,11 +302,11 @@ export default function VendorProductsPage() {
     if (!file) return;
     const allowed = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowed.includes(file.type)) {
-      setImageErrorById((prev) => ({ ...prev, [productId]: 'Only JPEG, PNG, or WebP images are allowed.' }));
+      setImageErrorById((prev) => ({ ...prev, [productId]: t('Only JPEG, PNG, or WebP images are allowed.', 'الصور المسموحة: JPEG وPNG وWebP فقط.') }));
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setImageErrorById((prev) => ({ ...prev, [productId]: 'Image exceeds the 5MB size limit.' }));
+      setImageErrorById((prev) => ({ ...prev, [productId]: t('Image exceeds the 5MB size limit.', 'حجم الصورة يتجاوز 5 ميغابايت.') }));
       return;
     }
     setUploadingImageId(productId);
@@ -313,7 +319,7 @@ export default function VendorProductsPage() {
       // image action shows an error, nothing else on the page changes.
       setImageErrorById((prev) => ({
         ...prev,
-        [productId]: apiErrorMessage(err, 'Image upload failed.'),
+        [productId]: apiErrorMessage(err, t('Image upload failed.', 'فشل رفع الصورة.')),
       }));
     } finally {
       setUploadingImageId(null);
@@ -332,7 +338,7 @@ export default function VendorProductsPage() {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      setImportError(apiErrorMessage(err, 'Failed to download template.'));
+      setImportError(apiErrorMessage(err, t('Failed to download template.', 'تعذّر تنزيل القالب.')));
     }
   }
 
@@ -352,7 +358,7 @@ export default function VendorProductsPage() {
       const summary = await validateVendorImport(importFile);
       setImportSummary(summary);
     } catch (err: any) {
-      setImportError(apiErrorMessage(err, 'Failed to validate file.'));
+      setImportError(apiErrorMessage(err, t('Failed to validate file.', 'تعذّر فحص الملف.')));
     } finally {
       setIsValidatingImport(false);
     }
@@ -369,7 +375,7 @@ export default function VendorProductsPage() {
       setImportFile(null);
       await refreshBranchData(selectedBranchId);
     } catch (err: any) {
-      setImportError(apiErrorMessage(err, 'Failed to apply import.'));
+      setImportError(apiErrorMessage(err, t('Failed to apply import.', 'تعذّر تطبيق الاستيراد.')));
     } finally {
       setIsApplyingImport(false);
     }
@@ -385,32 +391,32 @@ export default function VendorProductsPage() {
 
   if (branchError) {
     return (
-      <div className="mx-auto max-w-4xl rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      <div className="max-w-6xl rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
         {branchError}{' '}
         <button onClick={loadBranches} className="underline">
-          Retry
+          {t('Retry', 'إعادة المحاولة')}
         </button>
       </div>
     );
   }
-  if (branches === null) return <p className="mx-auto max-w-4xl text-gray-500">Loading...</p>;
+  if (branches === null) return <p className="max-w-6xl text-gray-500">{t('Loading...', 'جارٍ التحميل...')}</p>;
   if (branches.length === 0) {
     return (
-      <div className="mx-auto max-w-4xl rounded border bg-white p-4 text-sm text-gray-600">
-        No branches are available for your account yet. Contact your Admin.
+      <div className="max-w-6xl rounded-xl border bg-white p-4 text-sm text-gray-600 border-gray-200 shadow-sm">
+        {t('No branches are available for your account yet. Contact your Admin.', 'لا توجد فروع متاحة لحسابك بعد. تواصل مع الإدارة.')}
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="max-w-6xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Products</h1>
+        <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{t('Products', 'المنتجات')}</h1>
         {branches.length > 1 && (
           <select
             value={selectedBranchId}
             onChange={(e) => setSelectedBranchId(e.target.value)}
-            className="rounded border px-3 py-2 text-sm"
+            className="rounded-lg border px-3 py-2 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
           >
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
@@ -421,31 +427,40 @@ export default function VendorProductsPage() {
         )}
       </div>
 
+      {products !== null && !productError && (
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="vendor-products-kpis">
+          <KpiCard label={t('Products in this branch', 'منتجات هذا الفرع')} value={num(products.length)} icon={ICONS.box} />
+          <KpiCard label={t('Available to customers', 'متاحة للعملاء')} value={num(products.filter((p) => p.isAvailable).length)} icon={ICONS.check} />
+          <KpiCard label={t('Unavailable', 'غير متاحة')} value={num(products.filter((p) => !p.isAvailable).length)} icon={ICONS.empty} />
+          <KpiCard label={t('Without a photo', 'بلا صورة')} value={num(products.filter((p) => !p.imageUrl).length)} icon={ICONS.image} />
+        </div>
+      )}
+
       <div className="mt-4 flex justify-end gap-2">
         <button
           onClick={() => setShowImport((v) => !v)}
-          className="rounded border border-gray-300 px-4 py-2 text-sm font-medium"
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
           disabled={!selectedBranchId}
         >
-          {showImport ? 'Cancel' : 'Import Excel'}
+          {showImport ? t('Cancel', 'إلغاء') : t('Import Excel', 'استيراد Excel')}
         </button>
         <button
           onClick={() => setShowCreateForm((v) => !v)}
-          className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white"
+          className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
         >
-          {showCreateForm ? 'Cancel' : 'New Product'}
+          {showCreateForm ? t('Cancel', 'إلغاء') : t('New Product', 'منتج جديد')}
         </button>
       </div>
 
       {showImport && (
-        <div className="mt-3 space-y-3 rounded border bg-white p-4">
-          <h3 className="text-sm font-semibold">Import Excel</h3>
+        <div className="mt-3 space-y-3 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
+          <h3 className="text-sm font-semibold">{t('Import Excel', 'استيراد Excel')}</h3>
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => handleDownloadTemplate(true)} className="rounded border px-3 py-1.5 text-xs">
-              Download Current Catalog Template
+            <button onClick={() => handleDownloadTemplate(true)} className="rounded-lg border px-3 py-1.5 text-xs border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
+              {t('Download Current Catalog Template', 'تنزيل قالب الكتالوج الحالي')}
             </button>
-            <button onClick={() => handleDownloadTemplate(false)} className="rounded border px-3 py-1.5 text-xs">
-              Download Empty Template
+            <button onClick={() => handleDownloadTemplate(false)} className="rounded-lg border px-3 py-1.5 text-xs border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
+              {t('Download Empty Template', 'تنزيل قالب فارغ')}
             </button>
           </div>
 
@@ -460,9 +475,9 @@ export default function VendorProductsPage() {
             <button
               onClick={handleValidateImport}
               disabled={isValidatingImport}
-              className="rounded bg-hatly-orange px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+              className="rounded-lg bg-hatly-orange px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
             >
-              {isValidatingImport ? 'Validating…' : 'Validate'}
+              {isValidatingImport ? t('Validating…', 'جارٍ الفحص…') : t('Validate', 'فحص')}
             </button>
           )}
 
@@ -471,17 +486,17 @@ export default function VendorProductsPage() {
           {importSummary && (
             <div className="space-y-2">
               <p className="text-xs">
-                Status: <span className="font-semibold">{importSummary.status}</span> — {importSummary.totalRows} rows,{' '}
-                {importSummary.changedRows} changed, {importSummary.unchangedRows} unchanged
+                {t('Status:', 'الحالة:')} <span className="font-semibold">{importSummary.status}</span> — {importSummary.totalRows} {t('rows,', 'صفًّا،')}{' '}
+                {importSummary.changedRows} {t('changed,', 'متغيّر،')} {importSummary.unchangedRows} {t('unchanged', 'دون تغيير')}
               </p>
               <div className="max-h-64 overflow-y-auto rounded border">
                 <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 tracking-wide">
                     <tr>
-                      <th className="p-1.5 text-left">Row</th>
-                      <th className="p-1.5 text-left">Product</th>
-                      <th className="p-1.5 text-left">Changed Fields</th>
-                      <th className="p-1.5 text-left">Errors</th>
+                      <th className="p-1.5 text-left font-medium">{t('Row', 'الصف')}</th>
+                      <th className="p-1.5 text-left font-medium">{t('Product', 'المنتج')}</th>
+                      <th className="p-1.5 text-left font-medium">{t('Changed Fields', 'الحقول المتغيّرة')}</th>
+                      <th className="p-1.5 text-left font-medium">{t('Errors', 'الأخطاء')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -499,67 +514,67 @@ export default function VendorProductsPage() {
               <button
                 onClick={handleApplyImport}
                 disabled={importSummary.status !== 'READY' || isApplyingImport}
-                className="rounded bg-hatly-orange px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                className="rounded-lg bg-hatly-orange px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
               >
-                {isApplyingImport ? 'Applying…' : 'Confirm Apply'}
+                {isApplyingImport ? t('Applying…', 'جارٍ التطبيق…') : t('Confirm Apply', 'تأكيد التطبيق')}
               </button>
             </div>
           )}
 
           {importResult && (
             <p className="rounded bg-green-50 p-2 text-xs text-green-800">
-              Applied: {importResult.totalRows} total rows, {importResult.updatedRows} updated,{' '}
-              {importResult.unchangedRows} unchanged.
+              {t('Applied:', 'تم التطبيق:')} {importResult.totalRows} {t('total rows,', 'إجمالي الصفوف،')} {importResult.updatedRows} {t('updated,', 'محدَّث،')}{' '}
+              {importResult.unchangedRows} {t('unchanged.', 'دون تغيير.')}
             </p>
           )}
 
           <button onClick={handleCloseImport} className="text-xs text-gray-500 underline">
-            Close
+            {t('Close', 'إغلاق')}
           </button>
         </div>
       )}
 
       {showCreateForm && (
-        <form onSubmit={handleCreate} className="mt-3 space-y-3 rounded border bg-white p-4">
+        <form onSubmit={handleCreate} className="mt-3 space-y-3 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium">Name</label>
+              <label className="block text-sm font-medium">{t('Name', 'الاسم')}</label>
               <input
                 required
                 value={createFields.name}
                 onChange={(e) => setCreateFields((f) => ({ ...f, name: e.target.value }))}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium">Name (Arabic)</label>
+              <label className="block text-sm font-medium">{t('Name (Arabic)', 'الاسم (بالعربية)')}</label>
               <input
                 value={createFields.nameAr}
                 onChange={(e) => setCreateFields((f) => ({ ...f, nameAr: e.target.value }))}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
               />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium">Description</label>
+            <label className="block text-sm font-medium">{t('Description', 'الوصف')}</label>
             <textarea
               value={createFields.description}
               onChange={(e) => setCreateFields((f) => ({ ...f, description: e.target.value }))}
-              className="mt-1 w-full rounded border px-3 py-2"
+              className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium">Category</label>
+            <label className="block text-sm font-medium">{t('Category', 'التصنيف')}</label>
             {categories !== null && categories.length === 0 ? (
-              <p className="mt-1 text-sm text-gray-500">No categories yet — contact your Admin.</p>
+              <p className="mt-1 text-sm text-gray-500">{t('No categories yet — contact your Admin.', 'لا توجد تصنيفات بعد — تواصل مع الإدارة.')}</p>
             ) : (
               <select
                 required
                 value={createFields.categoryId}
                 onChange={(e) => setCreateFields((f) => ({ ...f, categoryId: e.target.value }))}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
               >
-                <option value="">Select a category...</option>
+                <option value="">{t('Select a category...', 'اختر تصنيفًا...')}</option>
                 {categories?.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -571,50 +586,50 @@ export default function VendorProductsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium">
-                {createFields.pricingUnit === 'WEIGHT' ? 'Price per kg' : 'Price'}
+                {createFields.pricingUnit === 'WEIGHT' ? t('Price per kg', 'السعر للكيلو') : t('Price', 'السعر')}
               </label>
               <input
                 required
                 value={createFields.price}
                 onChange={(e) => setCreateFields((f) => ({ ...f, price: e.target.value }))}
                 placeholder="0.00"
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium">Pricing Unit</label>
+              <label className="block text-sm font-medium">{t('Pricing Unit', 'وحدة التسعير')}</label>
               <select
                 value={createFields.pricingUnit}
                 onChange={(e) => setCreateFields((f) => ({ ...f, pricingUnit: e.target.value as PricingUnit }))}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
               >
-                <option value="PIECE">Piece</option>
-                <option value="WEIGHT">Weight (per kg)</option>
+                <option value="PIECE">{t('Piece', 'قطعة')}</option>
+                <option value="WEIGHT">{t('Weight (per kg)', 'بالوزن (للكيلو)')}</option>
               </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium">Inventory</label>
+              <label className="block text-sm font-medium">{t('Inventory', 'المخزون')}</label>
               <select
                 value={createFields.inventoryMode}
                 onChange={(e) => setCreateFields((f) => ({ ...f, inventoryMode: e.target.value as InventoryMode }))}
-                className="mt-1 w-full rounded border px-3 py-2"
+                className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
               >
-                <option value="OPEN">Open (no fixed stock)</option>
-                <option value="TRACKED">Tracked</option>
+                <option value="OPEN">{t('Open (no fixed stock)', 'مفتوح (بدون مخزون محدد)')}</option>
+                <option value="TRACKED">{t('Tracked', 'متتبَّع')}</option>
               </select>
             </div>
             {createFields.inventoryMode === 'TRACKED' && (
               <div>
                 <label className="block text-sm font-medium">
-                  {createFields.pricingUnit === 'WEIGHT' ? 'Quantity (grams)' : 'Quantity (pieces)'}
+                  {createFields.pricingUnit === 'WEIGHT' ? t('Quantity (grams)', 'الكمية (بالجرام)') : t('Quantity (pieces)', 'الكمية (بالقطع)')}
                 </label>
                 <input
                   required
                   value={createFields.quantity}
                   onChange={(e) => setCreateFields((f) => ({ ...f, quantity: e.target.value }))}
-                  className="mt-1 w-full rounded border px-3 py-2"
+                  className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                 />
               </div>
             )}
@@ -625,15 +640,15 @@ export default function VendorProductsPage() {
               checked={createFields.isAvailable}
               onChange={(e) => setCreateFields((f) => ({ ...f, isAvailable: e.target.checked }))}
             />
-            Available
+            {t('Available', 'متاح')}
           </label>
           {createError && <p className="text-sm text-red-600">{createError}</p>}
           <button
             type="submit"
             disabled={isCreating}
-            className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
           >
-            {isCreating ? 'Creating...' : 'Create Product'}
+            {isCreating ? t('Creating...', 'جارٍ الإنشاء...') : t('Create Product', 'إنشاء المنتج')}
           </button>
           <p className="text-xs text-gray-500">
             You can upload a photo for this product from the list below once it&apos;s created.
@@ -643,62 +658,62 @@ export default function VendorProductsPage() {
 
       <div className="mt-6">
         {productError && (
-          <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {productError}{' '}
             <button onClick={() => refreshBranchData(selectedBranchId)} className="underline">
-              Retry
+              {t('Retry', 'إعادة المحاولة')}
             </button>
           </div>
         )}
         {categoryError && (
-          <div className="mt-2 rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {categoryError}
           </div>
         )}
-        {!productError && products === null && <p className="text-gray-500">Loading...</p>}
+        {!productError && products === null && <p className="text-gray-500">{t('Loading...', 'جارٍ التحميل...')}</p>}
         {!productError && products !== null && products.length === 0 && (
-          <p className="text-gray-500">No products in this branch yet.</p>
+          <p className="text-gray-500">{t('No products in this branch yet.', 'لا توجد منتجات في هذا الفرع بعد.')}</p>
         )}
         {!productError && products !== null && products.length > 0 && (
           <div className="space-y-3">
             {products.map((p) => (
-              <div key={p.id} className="rounded border bg-white p-4">
+              <div key={p.id} className="rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
                 {editingId === p.id ? (
                   <form onSubmit={handleSaveEdit} className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-sm font-medium">Name</label>
+                        <label className="block text-sm font-medium">{t('Name', 'الاسم')}</label>
                         <input
                           required
                           value={editFields.name}
                           onChange={(e) => setEditFields((f) => ({ ...f, name: e.target.value }))}
-                          className="mt-1 w-full rounded border px-3 py-2"
+                          className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium">Name (Arabic)</label>
+                        <label className="block text-sm font-medium">{t('Name (Arabic)', 'الاسم (بالعربية)')}</label>
                         <input
                           value={editFields.nameAr}
                           onChange={(e) => setEditFields((f) => ({ ...f, nameAr: e.target.value }))}
-                          className="mt-1 w-full rounded border px-3 py-2"
+                          className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium">Description</label>
+                      <label className="block text-sm font-medium">{t('Description', 'الوصف')}</label>
                       <textarea
                         value={editFields.description}
                         onChange={(e) => setEditFields((f) => ({ ...f, description: e.target.value }))}
-                        className="mt-1 w-full rounded border px-3 py-2"
+                        className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium">Category</label>
+                      <label className="block text-sm font-medium">{t('Category', 'التصنيف')}</label>
                       <select
                         required
                         value={editFields.categoryId}
                         onChange={(e) => setEditFields((f) => ({ ...f, categoryId: e.target.value }))}
-                        className="mt-1 w-full rounded border px-3 py-2"
+                        className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                       >
                         {categories?.map((c) => (
                           <option key={c.id} value={c.id}>
@@ -709,40 +724,40 @@ export default function VendorProductsPage() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium">
-                        {editingPricingUnit === 'WEIGHT' ? 'Price per kg' : 'Price'}
+                        {editingPricingUnit === 'WEIGHT' ? t('Price per kg', 'السعر للكيلو') : t('Price', 'السعر')}
                       </label>
                       <input
                         required
                         value={editFields.price}
                         onChange={(e) => setEditFields((f) => ({ ...f, price: e.target.value }))}
-                        className="mt-1 w-full rounded border px-3 py-2"
+                        className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                       />
-                      <p className="mt-1 text-xs text-gray-500">Pricing unit ({editingPricingUnit}) cannot be changed after creation.</p>
+                      <p className="mt-1 text-xs text-gray-500">{t('Pricing unit', 'وحدة التسعير')} ({editingPricingUnit}) {t('cannot be changed after creation.', 'لا يمكن تغييرها بعد الإنشاء.')}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-sm font-medium">Inventory</label>
+                        <label className="block text-sm font-medium">{t('Inventory', 'المخزون')}</label>
                         <select
                           value={editFields.inventoryMode}
                           onChange={(e) =>
                             setEditFields((f) => ({ ...f, inventoryMode: e.target.value as InventoryMode }))
                           }
-                          className="mt-1 w-full rounded border px-3 py-2"
+                          className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                         >
-                          <option value="OPEN">Open (no fixed stock)</option>
-                          <option value="TRACKED">Tracked</option>
+                          <option value="OPEN">{t('Open (no fixed stock)', 'مفتوح (بدون مخزون محدد)')}</option>
+                          <option value="TRACKED">{t('Tracked', 'متتبَّع')}</option>
                         </select>
                       </div>
                       {editFields.inventoryMode === 'TRACKED' && (
                         <div>
                           <label className="block text-sm font-medium">
-                            {editingPricingUnit === 'WEIGHT' ? 'Quantity (grams)' : 'Quantity (pieces)'}
+                            {editingPricingUnit === 'WEIGHT' ? t('Quantity (grams)', 'الكمية (بالجرام)') : t('Quantity (pieces)', 'الكمية (بالقطع)')}
                           </label>
                           <input
                             required
                             value={editFields.quantity}
                             onChange={(e) => setEditFields((f) => ({ ...f, quantity: e.target.value }))}
-                            className="mt-1 w-full rounded border px-3 py-2"
+                            className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                           />
                         </div>
                       )}
@@ -752,16 +767,16 @@ export default function VendorProductsPage() {
                       <button
                         type="submit"
                         disabled={isSaving}
-                        className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
                       >
-                        {isSaving ? 'Saving...' : 'Save'}
+                        {isSaving ? t('Saving...', 'جارٍ الحفظ...') : t('Save', 'حفظ')}
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingId(null)}
                         className="rounded bg-gray-200 px-4 py-2 text-sm font-medium text-gray-700"
                       >
-                        Cancel
+                        {t('Cancel', 'إلغاء')}
                       </button>
                     </div>
                   </form>
@@ -773,7 +788,7 @@ export default function VendorProductsPage() {
                         <img src={p.imageUrl} alt={p.name} className="h-16 w-16 rounded object-cover" />
                       ) : (
                         <div className="flex h-16 w-16 items-center justify-center rounded bg-gray-100 text-xs text-gray-400">
-                          No image
+                          {t('No image', 'لا توجد صورة')}
                         </div>
                       )}
                       <div>
@@ -787,11 +802,11 @@ export default function VendorProductsPage() {
                         </p>
                         <p className="text-xs text-gray-500">
                           {p.inventoryMode === 'OPEN'
-                            ? 'Open stock'
+                            ? t('Open stock', 'مخزون مفتوح')
                             : `Tracked: ${p.quantity ?? 0} ${p.pricingUnit === 'WEIGHT' ? 'g' : 'pcs'}`}
                         </p>
                         <label className="mt-1 inline-block text-xs text-hatly-orange">
-                          {uploadingImageId === p.id ? 'Uploading...' : p.imageUrl ? 'Change Image' : 'Upload Image'}
+                          {uploadingImageId === p.id ? t('Uploading...', 'جارٍ الرفع...') : p.imageUrl ? t('Change Image', 'تغيير الصورة') : t('Upload Image', 'رفع صورة')}
                           <input
                             type="file"
                             accept="image/jpeg,image/png,image/webp"
@@ -814,7 +829,7 @@ export default function VendorProductsPage() {
                         disabled={togglingId === p.id}
                         className="text-xs text-gray-500 underline disabled:opacity-50"
                       >
-                        {p.isAvailable ? 'Deactivate' : 'Activate'}
+                        {p.isAvailable ? t('Deactivate', 'إلغاء التفعيل') : t('Activate', 'تفعيل')}
                       </button>
                       {toggleErrorById[p.id] && <p className="text-xs text-red-600">{toggleErrorById[p.id]}</p>}
                       {p.inventoryMode === 'TRACKED' && (
@@ -823,13 +838,21 @@ export default function VendorProductsPage() {
                           disabled={settingZeroId === p.id}
                           className="text-xs text-gray-500 underline disabled:opacity-50"
                         >
-                          Set Inventory to 0
+                          {t('Set Inventory to 0', 'تصفير المخزون')}
                         </button>
                       )}
                       {zeroErrorById[p.id] && <p className="text-xs text-red-600">{zeroErrorById[p.id]}</p>}
+                      <button
+                        data-testid={`product-options-toggle-${p.id}`}
+                        onClick={() => setOptionsOpenId((cur) => (cur === p.id ? null : p.id))}
+                        className="text-xs text-hatly-orange underline"
+                      >
+                        {optionsOpenId === p.id ? t('Hide options', 'إخفاء الخيارات') : t('Options', 'الخيارات')}
+                      </button>
                     </div>
                   </div>
                 )}
+                {editingId !== p.id && optionsOpenId === p.id && <ProductOptionsEditor scope="vendor" productId={p.id} />}
               </div>
             ))}
           </div>

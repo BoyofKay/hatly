@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../../shared_widgets/hatly_section_header.dart';
+import '../../../../shared_widgets/hatly_surface.dart';
 import '../../../../shared_widgets/skeleton_box.dart';
 import '../../../sectors/domain/sector.dart';
 import '../../../shell/presentation/shell_tab_provider.dart';
@@ -25,11 +26,17 @@ class HomeCategorySection extends ConsumerWidget {
 
     return categoriesAsync.when(
       loading: () => const CategoryGridSkeleton(),
-      // A failed category call must not blank Home; the snapshot owns the
-      // retry state.
-      error: (error, stackTrace) => const SizedBox.shrink(),
+      // A failed category call must not blank Home — and must not look like "no stores" either: say it failed, with a retry. (When the whole
+      // Home snapshot failed, Home shows its own full retry state instead and this section is not built.)
+      error: (error, stackTrace) => HomeCategoriesError(onRetry: () {
+        // The product rows below failed for the same reason (they are built from the same sectors call): retry both.
+        ref.invalidate(homeCategoriesProvider);
+        ref.invalidate(homeSnapshotProvider);
+      }),
       data: (categories) {
-        if (categories.isEmpty) return const SizedBox.shrink();
+        // Loaded fine but nothing to show (no active category yet, e.g. a market that has not opened): say so. A bare blank
+        // page next to the Hatly Service card reads as a broken app. (A FAILED load shows its own error + retry here; the product rows below do not repeat it.)
+        if (categories.isEmpty) return const HomeNoStoresNotice();
         final hasMore = categories.length > kHomeMaxCategories;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -78,7 +85,7 @@ class CategoryGrid extends StatelessWidget {
 
   static const int columns = 3;
   static const double columnGap = HatlySpacing.md;
-  static const double rowGap = HatlySpacing.lg;
+  static const double rowGap = HatlySpacing.md;
 
   @override
   Widget build(BuildContext context) {
@@ -143,6 +150,76 @@ class CategoryGridSkeleton extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Shown on Home when the marketplace answered successfully but has no active category/store yet. Never invents content.
+class HomeNoStoresNotice extends StatelessWidget {
+  const HomeNoStoresNotice({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final p = context.palette;
+    return Padding(
+      padding:
+          const EdgeInsets.symmetric(horizontal: HatlySpacing.screenPadding),
+      child: HatlySurface(
+        key: const Key('home-no-stores'),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.storefront_outlined, color: p.textMuted),
+            const SizedBox(width: HatlySpacing.ms),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l10n.homeNoStoresTitle, style: context.type.title),
+                  const SizedBox(height: HatlySpacing.xs),
+                  Text(l10n.homeNoStoresBody,
+                      style: context.type.small.copyWith(color: p.textMuted)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Categories could not be loaded (a network or server problem) — distinct from [HomeNoStoresNotice], which means the server
+/// answered and there is genuinely nothing to show yet.
+class HomeCategoriesError extends StatelessWidget {
+  const HomeCategoriesError({super.key, required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final p = context.palette;
+    return Padding(
+      padding:
+          const EdgeInsets.symmetric(horizontal: HatlySpacing.screenPadding),
+      child: HatlySurface(
+        key: const Key('home-categories-error'),
+        child: Row(
+          children: [
+            Icon(Icons.wifi_off_rounded, color: p.textMuted),
+            const SizedBox(width: HatlySpacing.ms),
+            Expanded(
+                child: Text(l10n.somethingWentWrong, style: context.type.body)),
+            TextButton(
+              key: const Key('home-categories-retry'),
+              onPressed: onRetry,
+              child: Text(l10n.retry),
+            ),
+          ],
+        ),
       ),
     );
   }

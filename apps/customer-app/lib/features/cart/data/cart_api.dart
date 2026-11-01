@@ -1,5 +1,7 @@
 import '../../../core/network/api_client.dart';
 import '../domain/cart.dart';
+import '../domain/cart_compatibility.dart';
+import '../../hatly_service/domain/route_endpoint.dart';
 import '../domain/delivery_fee_quote.dart';
 
 /// Calls the real `/cart` endpoints (cart.controller.ts) — every
@@ -29,6 +31,14 @@ class CartApi {
   /// `AddCartItemDto`/`CartService.addItem` XOR validation exactly;
   /// this method does not itself decide which is required, it just
   /// forwards whatever the caller supplies.
+  /// Asks whether [productId] could be added to the current cart, without adding it.
+  Future<CartCompatibility> checkAddItem(String productId) {
+    return _client.request(
+      (dio) => dio.post('/cart/items/check', data: {'productId': productId}),
+      (data) => CartCompatibility.fromJson(data['data'] as Map<String, dynamic>),
+    );
+  }
+
   Future<Cart> addItem({
     required String productId,
     required int quantity,
@@ -104,6 +114,8 @@ class CartApi {
     double? pickupLongitude,
     double? destinationLatitude,
     double? destinationLongitude,
+    String? pickupLabel,
+    String? destinationLabel,
     required String freeTextDescription,
     required int quantity,
     List<String>? imageUrls,
@@ -121,9 +133,32 @@ class CartApi {
             'destinationLatitude': destinationLatitude,
           if (destinationLongitude != null)
             'destinationLongitude': destinationLongitude,
+          if (pickupLabel != null) 'pickupLabel': pickupLabel,
+          if (destinationLabel != null) 'destinationLabel': destinationLabel,
           'freeTextDescription': freeTextDescription,
           'quantity': quantity,
           if (imageUrls != null) 'imageUrls': imageUrls,
+        },
+      ),
+      (data) => Cart.fromJson(data['data'] as Map<String, dynamic>),
+    );
+  }
+
+  /// Changes the route origin and/or destination of the cart's Hatly / Wasally request (`PATCH /cart/adhoc-route`, PD-012). Each end
+  /// is independent: an endpoint sets it, `clear…: true` returns it to the service's configured default, leaving it out changes
+  /// nothing. The server resolves and prices the route; this only stores the customer's choice.
+  Future<Cart> updateAdHocRoute({
+    RouteEndpoint? origin,
+    bool clearOrigin = false,
+    RouteEndpoint? destination,
+    bool clearDestination = false,
+  }) {
+    return _client.request(
+      (dio) => dio.patch(
+        '/cart/adhoc-route',
+        data: {
+          if (clearOrigin) 'origin': null else if (origin != null) 'origin': origin.toJson(),
+          if (clearDestination) 'destination': null else if (destination != null) 'destination': destination.toJson(),
         },
       ),
       (data) => Cart.fromJson(data['data'] as Map<String, dynamic>),

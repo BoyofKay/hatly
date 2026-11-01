@@ -23,6 +23,25 @@ class ProductConfiguration {
   /// The product screen's existing UX cap for piece quantity (the backend stays authoritative).
   static const int maxPieceQuantity = 50;
 
+  /// UX ceiling for a typed weight (50 kg); the backend validates every weight on its own.
+  static const int maxWeightGrams = 50000;
+
+  /// The heaviest weight offered: the known stock for a TRACKED listing, otherwise the UX ceiling.
+  int maxWeightFor(Product product) =>
+      product.isTracked && product.quantity != null
+          ? product.quantity!.clamp(0, maxWeightGrams)
+          : maxWeightGrams;
+
+  /// A weight the customer picked or typed, kept inside [minWeightGrams, maxWeightFor]. Any whole number of grams in range is
+  /// valid — 1 kg, 1.25 kg and 100 g all stay possible; nothing forces whole kilograms.
+  ProductConfiguration withWeight(Product product, int grams) {
+    final max = maxWeightFor(product);
+    final bounded = max < minWeightGrams
+        ? minWeightGrams
+        : grams.clamp(minWeightGrams, max);
+    return copyWith(requestedWeightGrams: bounded);
+  }
+
   /// optionId → selected value ids.
   final Map<String, Set<String>> selections;
   final int quantity;
@@ -47,9 +66,14 @@ class ProductConfiguration {
   ProductConfiguration toggle(ProductOption option, String valueId) {
     final current = {...selectedFor(option)};
     if (option.allowsMultiple) {
-      current.contains(valueId)
-          ? current.remove(valueId)
-          : current.add(valueId);
+      if (current.contains(valueId)) {
+        current.remove(valueId);
+      } else {
+        // At the group's maximum a further value is simply not added (the customer must untick one first).
+        final max = option.effectiveMax;
+        if (max != null && current.length >= max) return this;
+        current.add(valueId);
+      }
     } else {
       current
         ..clear()
@@ -64,7 +88,16 @@ class ProductConfiguration {
           if (option.isRequired && selectedFor(option).isEmpty) option,
       ];
 
-  bool isValid(Product product) => missingRequired(product).isEmpty;
+  /// Groups with something chosen, but fewer than their minimum (e.g. "choose at least 2", one chosen).
+  List<ProductOption> belowMinimum(Product product) => [
+        for (final option in product.options)
+          if (selectedFor(option).isNotEmpty &&
+              selectedFor(option).length < option.effectiveMin)
+            option,
+      ];
+
+  bool isValid(Product product) =>
+      missingRequired(product).isEmpty && belowMinimum(product).isEmpty;
 
   List<String> selectedValueIds() =>
       [for (final set in selections.values) ...set];
@@ -75,12 +108,31 @@ class ProductConfiguration {
       .fold<int>(0, (sum, v) => sum + v.priceDeltaMinor);
 
   /// Client-side ESTIMATE for immediate feedback only — never sent to the server. The authoritative price
-  /// always comes back from the cart. Weighted: price is per kg, scaled by the requested grams.
+  /// always comes back from the cart. Weighted: price is per kg, scaled by the requested grams (a weighed item is never
+  /// discounted).
+  ///
+  /// A piece product on a valid FLASH_SALE shows its special price in the header, so the estimate must use it too — it used
+  /// to show 90 up top and then 110 in the total. This mirrors how checkout plans a flash sale (`planFlashSaleForCart`):
+  /// the special price replaces the product's BASE price only (never below it) for up to `perOrderLimit` units (all units
+  /// when there is no cap); paid modifiers are added on top of the promotional base and are paid on every unit, and units
+  /// beyond the cap cost the normal base price. e.g. base 150, special 100, option +20 → 120 per promoted unit.
   int estimatedTotalMinor(Product product) {
     final unit = product.priceMinor + selectedDeltaMinor(product);
-    return product.isWeighted
-        ? ((unit * requestedWeightGrams) / 1000).round()
-        : unit * quantity;
+    if (product.isWeighted) {
+      // Integer arithmetic only (round half up), the same result as the server's Math.round(price × grams / 1000) — no floating point.
+      return (unit * requestedWeightGrams + 500) ~/ 1000;
+    }
+    final offer = product.activeOffer;
+    final special = offer?.specialPriceMinor;
+    if (offer != null && offer.isFlashSale && special != null) {
+      final perUnitDiscount =
+          product.priceMinor > special ? product.priceMinor - special : 0;
+      final cap = offer.perOrderLimit;
+      final discountedUnits =
+          cap == null ? quantity : (quantity < cap ? quantity : cap);
+      return unit * quantity - discountedUnits * perUnitDiscount;
+    }
+    return unit * quantity;
   }
 
   /// The highest piece quantity offered: known stock for a TRACKED listing (capped by the UX maximum),

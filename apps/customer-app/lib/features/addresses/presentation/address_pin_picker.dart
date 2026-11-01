@@ -35,6 +35,7 @@ class AddressPinPicker extends ConsumerStatefulWidget {
     this.longitude,
     required this.onChanged,
     this.mapEnabled = HatlyMaps.enabled,
+    this.showSearch = true,
   });
 
   final double? latitude;
@@ -44,11 +45,15 @@ class AddressPinPicker extends ConsumerStatefulWidget {
   /// Overridable so tests can exercise both modes without a native map.
   final bool mapEnabled;
 
+  /// The address-search box of the no-map fallback. The GPS address method turns it off: it shares the current location only and
+  /// never asks for typed address text.
+  final bool showSearch;
+
   @override
   ConsumerState<AddressPinPicker> createState() => _AddressPinPickerState();
 }
 
-class _AddressPinPickerState extends ConsumerState<AddressPinPicker> {
+class _AddressPinPickerState extends ConsumerState<AddressPinPicker> with WidgetsBindingObserver {
   final _search = TextEditingController();
   GoogleMapController? _map;
   LatLng? _cameraCenter;
@@ -56,11 +61,29 @@ class _AddressPinPickerState extends ConsumerState<AddressPinPicker> {
   bool _searching = false;
   String? _message;
   bool _offerSettings = false;
+  bool _offerLocationSettings = false;
+  /// The customer was sent to a Settings screen to fix the cause: when they come back to the app, try again for them.
+  bool _retryOnResume = false;
 
   bool get _hasPoint => widget.latitude != null && widget.longitude != null;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _retryOnResume && !_locating && mounted) {
+      _retryOnResume = false;
+      _useCurrentLocation();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _search.dispose();
     _map?.dispose();
     super.dispose();
@@ -72,6 +95,7 @@ class _AddressPinPickerState extends ConsumerState<AddressPinPicker> {
       _locating = true;
       _message = null;
       _offerSettings = false;
+      _offerLocationSettings = false;
     });
     try {
       final result =
@@ -87,6 +111,7 @@ class _AddressPinPickerState extends ConsumerState<AddressPinPicker> {
         setState(() {
           _message = _reasonMessage(l10n, e.reason);
           _offerSettings = e.canOpenSettings;
+          _offerLocationSettings = e.canOpenLocationSettings;
         });
       }
     } catch (_) {
@@ -193,6 +218,7 @@ class _AddressPinPickerState extends ConsumerState<AddressPinPicker> {
                             style: context.type.small)),
                   ],
                 ),
+                if (widget.showSearch) ...[
                 const SizedBox(height: HatlySpacing.md),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,6 +254,7 @@ class _AddressPinPickerState extends ConsumerState<AddressPinPicker> {
                     ),
                   ],
                 ),
+                ],
               ],
             ),
           ),
@@ -275,9 +302,23 @@ class _AddressPinPickerState extends ConsumerState<AddressPinPicker> {
                     padding: const EdgeInsets.only(top: HatlySpacing.xs),
                     child: TextButton(
                       key: const Key('address-open-settings'),
-                      onPressed: () =>
-                          ref.read(deviceLocationServiceProvider).openAppSettings(),
+                      onPressed: () {
+                        _retryOnResume = true;
+                        ref.read(deviceLocationServiceProvider).openAppSettings();
+                      },
                       child: Text(l10n.addressOpenSettings),
+                    ),
+                  ),
+                if (_offerLocationSettings)
+                  Padding(
+                    padding: const EdgeInsets.only(top: HatlySpacing.xs),
+                    child: TextButton(
+                      key: const Key('address-open-location-settings'),
+                      onPressed: () {
+                        _retryOnResume = true;
+                        ref.read(deviceLocationServiceProvider).openLocationSettings();
+                      },
+                      child: Text(l10n.addressOpenLocationSettings),
                     ),
                   ),
               ],

@@ -206,6 +206,12 @@ void main() {
     });
   });
 
+  testWidgets('a saved GPS address while distance pricing is off tells the customer what to do, not the generic blocker', (tester) async {
+    final gps = await inContext(tester, (c) => checkoutBlockerMessage(c, 'DISTANCE_PRICING_UNAVAILABLE'));
+    expect(gps, 'التوصيل إلى موقع GPS غير متاح حاليًا. اختر عنوانًا بمنطقة توصيل أو أضف عنوانًا جديدًا.');
+    expect(gps, isNot('لا يمكن إتمام الطلب حاليًا. راجع سلتك وحاول مرة أخرى.'));
+  });
+
   testWidgets('the pending-price sentence is the approved Arabic wording',
       (tester) async {
     final text = await inContext(

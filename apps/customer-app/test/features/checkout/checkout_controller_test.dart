@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hatly_customer/core/network/api_exception.dart';
+import 'package:hatly_customer/features/auth/presentation/auth_gate.dart';
 import 'package:hatly_customer/features/cart/data/cart_providers.dart';
 import 'package:hatly_customer/features/checkout/data/checkout_controller.dart';
 import 'package:hatly_customer/features/orders/data/orders_providers.dart';
@@ -16,6 +17,7 @@ ProviderContainer _container(
     checkoutApiProvider.overrideWithValue(checkout),
     ordersApiProvider.overrideWithValue(orders),
     cartApiProvider.overrideWithValue(cartApi),
+    isSignedInProvider.overrideWithValue(true),
   ]);
   addTearDown(container.dispose);
   return container;

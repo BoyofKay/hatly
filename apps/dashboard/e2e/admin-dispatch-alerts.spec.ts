@@ -22,7 +22,8 @@ test.describe('Admin Dispatch — alerts', () => {
     ]);
     const alerts = (await res.json()).data as Array<{ orderNumber: string | null }>;
     for (const alert of alerts.slice(0, 5)) {
-      if (alert.orderNumber) await expect(section.getByRole('link', { name: alert.orderNumber })).toBeVisible();
+      // an order can carry several alerts over time, so its number may be linked more than once
+      if (alert.orderNumber) await expect(section.getByRole('link', { name: alert.orderNumber }).first()).toBeVisible();
     }
     if (alerts.length === 0) await expect(section.getByTestId('ct-alerts-empty')).toHaveText('No dispatch alerts.');
   });

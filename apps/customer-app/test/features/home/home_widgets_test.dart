@@ -214,12 +214,12 @@ void main() {
       // equal width, generous spacing between rows
       expect({for (final r in rects) r.width.round()}.length, 1);
       expect(rects[3].top - rects[0].bottom, greaterThanOrEqualTo(16));
-      // tile is a big square (≥ 96px), and the label sits below it
+      // tile is a wide soft tile (≥ 96px, 1.25 : 1), and the label sits below it
       final tile = tester.getRect(find
           .descendant(of: cards.first, matching: find.byType(AspectRatio))
           .first);
       expect(tile.width, greaterThanOrEqualTo(96));
-      expect(tile.width, closeTo(tile.height, 0.5));
+      expect(tile.width / tile.height, closeTo(1.25, 0.01));
       expect(
           tester.getTopLeft(find.text('فئة 0')).dy, greaterThan(tile.bottom));
       // touch target

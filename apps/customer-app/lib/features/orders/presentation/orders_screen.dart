@@ -256,8 +256,8 @@ class _Thumbnails extends StatelessWidget {
     Widget placeholder() => Container(
           width: size,
           height: size,
-          color: p.surfaceSoft,
-          child: Icon(Icons.shopping_bag_outlined, color: p.textMuted),
+          color: p.accentSoft,
+          child: Icon(Icons.shopping_bag_outlined, color: p.accent),
         );
     if (urls.isEmpty) {
       return ClipRRect(

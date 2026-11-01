@@ -71,7 +71,12 @@ describe('configureApp — production HTTP hardening', () => {
         .set('Access-Control-Request-Headers', 'authorization,content-type');
       expect(preflight.headers['access-control-allow-origin']).toBe('https://ops.hatly.example');
       expect(preflight.headers['access-control-allow-headers']).toMatch(/Authorization/i);
-      expect(preflight.headers['access-control-allow-credentials']).toBeUndefined();
+      // Credentials are allowed for the exact allow-listed origin only (the dashboard's HttpOnly cookie session); the CSRF/custom headers are permitted.
+      expect(preflight.headers['access-control-allow-credentials']).toBe('true');
+      expect(preflight.headers['access-control-allow-headers']).toMatch(/X-CSRF-Token/i);
+      expect(preflight.headers['access-control-allow-headers']).toMatch(/X-Requested-With/i);
+      // Exports and settlement payments are idempotent through this header; the browser preflight must allow it.
+      expect(preflight.headers['access-control-allow-headers']).toMatch(/Idempotency-Key/i);
     });
 
     it('an unauthorized production origin gets NO CORS headers (so a browser blocks it), and never "*"', async () => {
@@ -99,7 +104,9 @@ describe('configureApp — production HTTP hardening', () => {
     it('development with no list keeps the open local workflow', async () => {
       app = await bootApp({ strict: false, corsAllowedOrigins: [] });
       const res = await request(app.getHttpServer()).get('/api/v1/ping').set('Origin', 'http://localhost:5173');
-      expect(res.headers['access-control-allow-origin']).toBeDefined();
+      // Reflected (a wildcard is invalid with credentials), so the cookie-based dashboard works locally.
+      expect(res.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+      expect(res.headers['access-control-allow-credentials']).toBe('true');
     });
   });
 

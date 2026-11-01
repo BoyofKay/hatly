@@ -1,3 +1,4 @@
+import { branchIdsUnderClosure, effectiveOpenSql } from '../../common/branch-availability';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -243,7 +244,7 @@ export class CatalogDiscoveryService {
     const rows: any[] = await this.dataSource.query(
       `SELECT p.id AS listing_id, p.vendor_branch_id, p.category_id, p.price_minor, p.pricing_unit,
               p.is_available, p.inventory_mode, p.quantity,
-              b.name AS branch_name, b.is_open, b.rating_count, b.rating_sum_stars,
+              b.name AS branch_name, ${effectiveOpenSql('b')} AS is_open, b.rating_count, b.rating_sum_stars,
               v.id AS vendor_id, v.name AS vendor_name, v.name_ar AS vendor_name_ar, v.logo_url AS vendor_logo_url
          ${ELIGIBLE_FROM}
         WHERE ${ELIGIBLE_WHERE} AND p.catalog_product_id = $1${areaFilter}
@@ -261,7 +262,7 @@ export class CatalogDiscoveryService {
       [...byBranch].map(async ([vendorBranchId, branchRows]) => {
         const offers = await this.offerConsumptionService.resolveActiveOffersForProducts({
           vendorBranchId,
-          products: branchRows.map((r) => ({ productId: r.listing_id, categoryId: r.category_id })),
+          products: branchRows.map((r) => ({ productId: r.listing_id, categoryId: r.category_id, priceMinor: Number(r.price_minor), pricingUnit: r.pricing_unit })),
         });
         for (const [listingId, offer] of offers) offersByListing.set(listingId, offer);
       }),

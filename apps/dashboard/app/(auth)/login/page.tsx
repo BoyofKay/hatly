@@ -16,6 +16,9 @@ export default function LoginPage() {
   const router = useRouter();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  // Second step: shown once the API says this admin account has an authenticator (MFA_REQUIRED). Never shown for vendors.
+  const [needsCode, setNeedsCode] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,9 +28,10 @@ export default function LoginPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const user = await loginWithPassword(phone, password);
+      const user = await loginWithPassword(phone, password, needsCode ? mfaCode.trim() : undefined);
       if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
-        router.push('/vendors');
+        // An admin the policy requires to have an authenticator is taken straight to enrolling it.
+        router.push(user.mfa.enrollmentRequired ? '/security' : '/home');
       } else if (user.role === 'VENDOR' || user.role === 'VENDOR_MANAGER') {
         router.push('/orders');
       } else {
@@ -35,6 +39,18 @@ export default function LoginPage() {
         setIsSubmitting(false);
       }
     } catch (err: any) {
+      const apiCode = err?.response?.data?.error?.details?.code;
+      if (apiCode === 'MFA_REQUIRED') {
+        setNeedsCode(true);
+        setError(null);
+        setIsSubmitting(false);
+        return;
+      }
+      if (needsCode && err?.response?.status === 401) {
+        setError('That verification code is not valid. Try the current code from your authenticator app, or a recovery code.');
+        setIsSubmitting(false);
+        return;
+      }
       // 401 = wrong phone/password (the backend's own "Invalid credentials." stays deliberately vague). Anything else — the
       // login rate limit / account lock (429), a validation error, an outage — shows its own reason: it used to read the
       // non-existent `response.data.message` and so told a throttled user their (correct) password was wrong.
@@ -77,6 +93,23 @@ export default function LoginPage() {
               className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
             />
           </div>
+          {needsCode && (
+            <div>
+              <label htmlFor="login-mfa" className="block text-sm font-medium text-gray-700">Verification code</label>
+              <input
+                id="login-mfa"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                required
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+                placeholder="6-digit code or recovery code"
+                className="mt-1 w-full rounded border border-gray-300 px-3 py-2"
+              />
+              <p className="mt-1 text-xs text-gray-500">Open your authenticator app and enter the current code for Hatly Admin.</p>
+            </div>
+          )}
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
             type="submit"

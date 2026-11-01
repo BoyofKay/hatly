@@ -30,14 +30,20 @@ class HatlySurface extends StatelessWidget {
             padding: padding ?? const EdgeInsets.all(HatlySpacing.md),
             child: child);
     // A real Material (not a bare DecoratedBox) so ink splashes and list tiles inside — e.g. an ExpansionTile — paint on it.
-    final surface = Material(
-      color: p.surface,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(color: borderColor ?? p.border),
+    final surface = DecoratedBox(
+      // The soft lift every premium card shares (the same shadow as the vendor and product cards), under a hairline border.
+      decoration:
+          BoxDecoration(borderRadius: radius, boxShadow: HatlyShadows.soft(p)),
+      child: Material(
+        color: p.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side:
+              BorderSide(color: borderColor ?? p.border.withValues(alpha: 0.7)),
+        ),
+        child: onTap == null ? inner : InkWell(onTap: onTap, child: inner),
       ),
-      child: onTap == null ? inner : InkWell(onTap: onTap, child: inner),
     );
     if (onTap == null) return surface;
     return Semantics(
@@ -69,6 +75,15 @@ class HatlySection extends StatelessWidget {
       children: [
         Row(
           children: [
+            // The same orange accent bar as the Home section headers, so every screen's headings read as one family.
+            Container(
+              width: 4,
+              height: 18,
+              margin: const EdgeInsetsDirectional.only(end: HatlySpacing.sm),
+              decoration: BoxDecoration(
+                  color: context.palette.accent,
+                  borderRadius: BorderRadius.circular(HatlyRadius.circular)),
+            ),
             Expanded(
               child: Semantics(
                 header: true,

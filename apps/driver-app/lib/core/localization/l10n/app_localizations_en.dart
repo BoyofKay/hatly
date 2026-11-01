@@ -18,15 +18,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get goOffline => 'Go offline';
 
   @override
-  String get incomingRequest => 'New delivery request';
-
-  @override
-  String get accept => 'Accept';
-
-  @override
-  String get reject => 'Reject';
-
-  @override
   String get pickupDetails => 'Pickup details';
 
   @override

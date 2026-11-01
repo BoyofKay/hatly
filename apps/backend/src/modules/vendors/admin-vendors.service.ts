@@ -8,6 +8,10 @@ import { CreateVendorDto } from './dto/create-vendor.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
 import { CreateVendorBranchDto } from './dto/create-vendor-branch.dto';
 import { UpdateVendorBranchDto } from './dto/update-vendor-branch.dto';
+import { UploadsService } from '../uploads/uploads.service';
+
+const MAX_LOGO_BYTES = 5 * 1024 * 1024;
+const LOGO_EXTENSIONS: Record<string, string> = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
 
 /**
  * CONFIRMED business decisions (Phase I-A, Chunk 1 — do not reopen):
@@ -27,6 +31,7 @@ export class AdminVendorsService {
     @InjectRepository(Vendor) private readonly vendorsRepository: Repository<Vendor>,
     @InjectRepository(VendorBranch) private readonly branchesRepository: Repository<VendorBranch>,
     @InjectRepository(ServiceArea) private readonly serviceAreasRepository: Repository<ServiceArea>,
+    private readonly uploads: UploadsService,
   ) {}
 
   async createVendor(dto: CreateVendorDto): Promise<Vendor> {
@@ -57,6 +62,26 @@ export class AdminVendorsService {
     if (dto.name !== undefined) vendor.name = dto.name;
     if (dto.nameAr !== undefined) vendor.nameAr = dto.nameAr;
     if (dto.logoUrl !== undefined) vendor.logoUrl = dto.logoUrl;
+    return this.vendorsRepository.save(vendor);
+  }
+
+  /**
+   * Same boundary as a product / banner image: JPEG/PNG/WebP only, 5 MB, the stored name comes from the VALIDATED type (never the client's
+   * filename), and the file goes through the project's upload provider (which also checks the real bytes). Only after storage succeeded
+   * is the vendor row updated, with the provider's stable `/uploads/files/...` reference — so a refused file leaves the old logo alone.
+   * The free-text `logoUrl` on create/update stays an absolute-URL field; this is the way to set an uploaded one.
+   */
+  async uploadLogo(id: string, file: { buffer: Buffer; mimetype: string; size: number }, uploadedByUserId: string): Promise<Vendor> {
+    const vendor = await this.getVendor(id);
+    const extension = LOGO_EXTENSIONS[file.mimetype];
+    if (!extension) {
+      throw new BadRequestException({ message: 'Only JPEG, PNG, or WebP images are allowed.', details: { code: 'UNSUPPORTED_IMAGE_TYPE' } });
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      throw new BadRequestException({ message: 'Image exceeds the maximum allowed size of 5MB.', details: { code: 'IMAGE_TOO_LARGE' } });
+    }
+    const upload = await this.uploads.upload(file.buffer.toString('base64'), `vendor-logo${extension}`, uploadedByUserId);
+    vendor.logoUrl = upload.url;
     return this.vendorsRepository.save(vendor);
   }
 

@@ -44,6 +44,7 @@ class _FakeAddressesApi implements AddressesApi {
   ({double latitude, double longitude})? searchResult = (latitude: 30.42, longitude: 31.56);
   List<SavedAddress> saved = [];
   Object? createFailure;
+  AddressCapabilities capabilities = const AddressCapabilities(manualAvailable: true, gpsAvailable: true);
   final reverseCalls = <(double, double)>[];
   final searchCalls = <String>[];
 
@@ -52,6 +53,9 @@ class _FakeAddressesApi implements AddressesApi {
 
   @override
   Future<List<SavedAddress>> getAddresses() async => saved;
+
+  @override
+  Future<AddressCapabilities> getCapabilities() async => capabilities;
 
   @override
   Future<List<DeliveryZone>> getDeliveryZones() async {
@@ -66,7 +70,8 @@ class _FakeAddressesApi implements AddressesApi {
     created.add(input);
     return SavedAddress(
         id: 'new-1',
-        line1: input.line1,
+        mode: input.mode,
+        line1: input.line1 ?? '',
         latitude: input.latitude,
         longitude: input.longitude,
         deliveryZoneId: input.deliveryZoneId,
@@ -77,7 +82,7 @@ class _FakeAddressesApi implements AddressesApi {
   Future<SavedAddress> updateAddress(String addressId, AddressInput input) async {
     updated.add((id: addressId, input: input));
     return SavedAddress(
-        id: addressId, line1: input.line1, latitude: input.latitude, longitude: input.longitude, deliveryZoneId: input.deliveryZoneId);
+        id: addressId, mode: input.mode, line1: input.line1 ?? '', latitude: input.latitude, longitude: input.longitude, deliveryZoneId: input.deliveryZoneId);
   }
 
   @override
@@ -106,6 +111,9 @@ class _FakeLocation implements DeviceLocationService {
 
   @override
   Future<bool> openAppSettings() async => true;
+
+  @override
+  Future<bool> openLocationSettings() async => true;
 }
 
 Future<({_FakeAddressesApi api, List<Object?> popped})> _pump(
@@ -118,6 +126,7 @@ Future<({_FakeAddressesApi api, List<Object?> popped})> _pump(
   double scale = 1.0,
   double width = 390,
   _FakeAddressesApi? api,
+  AddressMode? choose = AddressMode.manual,
 }) async {
   final fake = api ?? _FakeAddressesApi();
   final popped = <Object?>[];
@@ -156,6 +165,12 @@ Future<({_FakeAddressesApi api, List<Object?> popped})> _pump(
   await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('open')));
   await tester.pumpAndSettle();
+  // A NEW address starts on the method chooser: pick the manual method (this file covers the manual journey; GPS is in
+  // address_methods_test.dart). `choose: null` stays on the chooser.
+  if (existing == null && choose != null) {
+    await tester.tap(find.byKey(Key(choose == AddressMode.gps ? 'address-method-gps' : 'address-method-manual')));
+    await tester.pumpAndSettle();
+  }
   return (api: fake, popped: popped);
 }
 
@@ -202,7 +217,7 @@ void main() {
       await _enter(tester, 'address-line1', 'شارع أبو نصيب جنب جامع الكردي، منزل 15');
       await _save(tester);
       final json = r.api.created.single.toJson();
-      expect(json, {'line1': 'شارع أبو نصيب جنب جامع الكردي، منزل 15', 'deliveryZoneId': 'zone-1'});
+      expect(json, {'mode': 'MANUAL', 'line1': 'شارع أبو نصيب جنب جامع الكردي، منزل 15', 'deliveryZoneId': 'zone-1'});
       expect(r.api.reverseCalls, isEmpty, reason: 'no geocoding was needed');
       expect((r.popped.single as SavedAddress).id, 'new-1');
     });
@@ -332,7 +347,8 @@ void main() {
       expect(find.byKey(const Key('address-zone-banner')), findsNothing);
       await _save(tester);
       expect(r.api.updated.single.input.deliveryZoneId, 'zone-1');
-      expect(r.api.updated.single.input.latitude, 30.41, reason: 'the existing pin is kept');
+      expect(r.api.updated.single.input.latitude, isNull, reason: 'the manual method never sends coordinates (a pin needs the explicit GPS method)');
+      expect(r.api.updated.single.input.mode, AddressMode.manual);
     });
 
     testWidgets('an address whose zone was deactivated must choose another (the old zone is not offered)', (tester) async {
@@ -349,20 +365,6 @@ void main() {
       expect(r.api.updated, isEmpty);
     });
 
-    testWidgets('a pin can be removed on edit: both coordinates are sent as null (never half a pin)', (tester) async {
-      const pinned = SavedAddress(id: 'a1', line1: 'شارع', latitude: 30.41, longitude: 31.57, deliveryZoneId: 'zone-1', deliveryZone: _abuNaseeb);
-      final r = await _pump(tester, existing: pinned);
-      await tester.ensureVisible(find.byKey(const Key('address-remove-pin')));
-      await tester.tap(find.byKey(const Key('address-remove-pin')));
-      await tester.pumpAndSettle();
-      await _save(tester);
-      final json = r.api.updated.single.input.toJson();
-      expect(json.containsKey('latitude'), isTrue);
-      expect(json['latitude'], isNull);
-      expect(json['longitude'], isNull);
-      expect(json['deliveryZoneId'], 'zone-1');
-    });
-
     testWidgets('a server zone rejection is shown in plain words', (tester) async {
       final api = _FakeAddressesApi()
         ..createFailure = const ApiException(code: 'BAD_REQUEST', message: 'x', details: {'code': 'DELIVERY_ZONE_UNAVAILABLE'}, statusCode: 400);
@@ -374,137 +376,9 @@ void main() {
     });
   });
 
-  group('the optional map pin', () {
-    testWidgets('without a native map the picker offers GPS and address search, and says why', (tester) async {
-      await _pump(tester);
-      expect(find.byKey(const Key('address-no-map')), findsOneWidget);
-      expect(find.byKey(const Key('address-map')), findsNothing);
-      expect(find.byKey(const Key('address-use-current-location')), findsOneWidget);
-      expect(find.byKey(const Key('address-search-field')), findsOneWidget);
-    });
-
-    testWidgets('GPS sets the pin and asks for an assistive address suggestion', (tester) async {
-      final r = await _pump(tester);
-      await tester.tap(find.byKey(const Key('address-use-current-location')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('address-location-captured')), findsOneWidget);
-      expect(r.api.reverseCalls.single, (30.4, 31.5));
-      expect(find.byKey(const Key('address-suggestion')), findsOneWidget);
-    });
-
-    testWidgets('GPS refused: a clear message, nothing fabricated', (tester) async {
-      await _pump(tester, locationFails: true);
-      await tester.tap(find.byKey(const Key('address-use-current-location')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('address-picker-message')), findsOneWidget);
-      expect(find.byKey(const Key('address-location-captured')), findsNothing);
-    });
-
-    testWidgets('each of the 5 unavailable states gets its OWN message — never one generic string', (tester) async {
-      final messages = <String>{};
-      for (final reason in LocationUnavailableReason.values) {
-        await _pump(tester, locationFails: true, locationFailureReason: reason);
-        await tester.tap(find.byKey(const Key('address-use-current-location')));
-        await tester.pumpAndSettle();
-        final text = tester
-            .widget<Text>(find.byKey(const Key('address-picker-message')))
-            .data!;
-        expect(text, isNotEmpty);
-        messages.add(text);
-      }
-      expect(messages, hasLength(LocationUnavailableReason.values.length));
-    });
-
-    testWidgets('only "permanently denied" offers to open Settings — the one state the OS will never prompt for again',
-        (tester) async {
-      await _pump(tester,
-          locationFails: true,
-          locationFailureReason: LocationUnavailableReason.denied);
-      await tester.tap(find.byKey(const Key('address-use-current-location')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('address-open-settings')), findsNothing);
-
-      await _pump(tester,
-          locationFails: true,
-          locationFailureReason: LocationUnavailableReason.permanentlyDenied);
-      await tester.tap(find.byKey(const Key('address-use-current-location')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('address-open-settings')), findsOneWidget);
-      // tapping it never throws / crashes the picker
-      await tester.tap(find.byKey(const Key('address-open-settings')));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('address search moves the pin to the found point', (tester) async {
-      final r = await _pump(tester);
-      await tester.enterText(find.byKey(const Key('address-search-field')), 'بلبيس شارع الجمهورية');
-      await tester.tap(find.byKey(const Key('address-search-button')));
-      await tester.pumpAndSettle();
-      expect(r.api.searchCalls.single, 'بلبيس شارع الجمهورية');
-      expect(find.byKey(const Key('address-location-captured')), findsOneWidget);
-      expect(r.api.reverseCalls.single, (30.42, 31.56));
-    });
-
-    testWidgets('nothing found: says so, keeps no pin', (tester) async {
-      final api = _FakeAddressesApi()..searchResult = null;
-      await _pump(tester, api: api);
-      await tester.enterText(find.byKey(const Key('address-search-field')), 'مكان غير موجود');
-      await tester.tap(find.byKey(const Key('address-search-button')));
-      await tester.pumpAndSettle();
-      expect(find.text('لم نجد هذا العنوان. جرّب صياغة أخرى أو استخدم موقعك الحالي.'), findsOneWidget);
-      expect(find.byKey(const Key('address-location-captured')), findsNothing);
-    });
-  });
-
-  group('Google\'s text is only a suggestion', () {
-    testWidgets('it is offered, never applied silently; using it fills an EMPTY address line and is then stored as the formatted address', (tester) async {
-      final r = await _pump(tester);
-      await tester.tap(find.byKey(const Key('address-use-current-location')));
-      await tester.pumpAndSettle();
-      expect(find.text('شارع الجمهورية، بلبيس، الشرقية'), findsOneWidget);
-      expect(tester.widget<TextField>(find.byKey(const Key('address-line1'))).controller!.text, isEmpty,
-          reason: 'not applied without the customer choosing it');
-
-      await tester.tap(find.byKey(const Key('address-use-suggestion')));
-      await tester.pumpAndSettle();
-      expect(tester.widget<TextField>(find.byKey(const Key('address-line1'))).controller!.text, 'شارع الجمهورية، بلبيس، الشرقية');
-      await _selectZone(tester);
-
-      await tester.ensureVisible(find.byKey(const Key('address-save')));
-      await tester.tap(find.byKey(const Key('address-save')));
-      await tester.pumpAndSettle();
-      expect(r.api.created.single.formattedAddress, 'شارع الجمهورية، بلبيس، الشرقية');
-    });
-
-    testWidgets('an ignored suggestion is NOT stored', (tester) async {
-      final r = await _pump(tester);
-      await tester.tap(find.byKey(const Key('address-use-current-location')));
-      await tester.pumpAndSettle();
-      await _enter(tester, 'address-line1', 'عمارة 5 شارع النصر');
-      await _selectZone(tester);
-      await tester.ensureVisible(find.byKey(const Key('address-save')));
-      await tester.tap(find.byKey(const Key('address-save')));
-      await tester.pumpAndSettle();
-      expect(r.api.created.single.line1, 'عمارة 5 شارع النصر');
-      expect(r.api.created.single.formattedAddress, isNull);
-    });
-
-    testWidgets('a suggestion the provider could not give is simply absent — nothing blocks', (tester) async {
-      final api = _FakeAddressesApi()..suggestion = null;
-      await _pump(tester, api: api);
-      await tester.tap(find.byKey(const Key('address-use-current-location')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('address-suggestion')), findsNothing);
-      expect(find.byKey(const Key('address-location-captured')), findsOneWidget);
-    });
-  });
-
   group('manual details and saving', () {
     testWidgets('sends every structured field the customer typed, trimmed; blanks are dropped; returns the saved address', (tester) async {
       final r = await _pump(tester);
-      await tester.tap(find.byKey(const Key('address-use-current-location')));
-      await tester.pumpAndSettle();
       await _enter(tester, 'address-line1', '  شارع الجمهورية  ');
       await _selectZone(tester);
       await _enter(tester, 'address-building', '12');
@@ -522,10 +396,9 @@ void main() {
       final json = r.api.created.single.toJson();
       // Governorate / city are NOT sent — the server derives them from the zone, so they can never contradict it.
       expect(json, {
+        'mode': 'MANUAL',
         'line1': 'شارع الجمهورية',
         'deliveryZoneId': 'zone-1',
-        'latitude': 30.4,
-        'longitude': 31.5,
         'label': 'المنزل',
         'instructions': 'اتصل بي',
         'buildingNumber': '12',
@@ -539,8 +412,6 @@ void main() {
 
     testWidgets('the address line is required', (tester) async {
       final r = await _pump(tester);
-      await tester.tap(find.byKey(const Key('address-use-current-location')));
-      await tester.pumpAndSettle();
       await tester.ensureVisible(find.byKey(const Key('address-save')));
       await tester.tap(find.byKey(const Key('address-save')));
       await tester.pumpAndSettle();
@@ -551,8 +422,6 @@ void main() {
     testWidgets('a save failure is reported and the form stays', (tester) async {
       final api = _FakeAddressesApi()..createFailure = Exception('boom');
       await _pump(tester, api: api);
-      await tester.tap(find.byKey(const Key('address-use-current-location')));
-      await tester.pumpAndSettle();
       await _enter(tester, 'address-line1', 'شارع');
       await _selectZone(tester);
       await tester.ensureVisible(find.byKey(const Key('address-save')));
@@ -562,7 +431,7 @@ void main() {
       expect(find.byKey(const Key('address-save')), findsOneWidget);
     });
 
-    testWidgets('editing pre-fills everything (including the pin) and updates in place', (tester) async {
+    testWidgets('editing pre-fills every manual field and updates in place — never with coordinates', (tester) async {
       const existing = SavedAddress(
         id: 'a1',
         label: 'العمل',
@@ -582,7 +451,7 @@ void main() {
         isDefault: true,
       );
       final r = await _pump(tester, existing: existing);
-      expect(find.byKey(const Key('address-location-captured')), findsOneWidget, reason: 'the pin comes with the address');
+      expect(find.byKey(const Key('address-gps-detected')), findsNothing, reason: 'a manual address shows no GPS section at all');
       expect(find.text('أبو نصيب'), findsWidgets, reason: "the address's own zone is preselected");
       expect(tester.widget<Switch>(find.descendant(of: find.byKey(const Key('address-default')), matching: find.byType(Switch))).value, isTrue);
       await _enter(tester, 'address-floor', '5');
@@ -591,10 +460,9 @@ void main() {
       await tester.pumpAndSettle();
       final u = r.api.updated.single;
       expect(u.id, 'a1');
-      expect(u.input.latitude, 30.41);
+      expect(u.input.latitude, isNull);
       expect(u.input.floor, '5');
       expect(u.input.deliveryZoneId, 'zone-1');
-      expect(u.input.formattedAddress, 'شارع البحر، بلبيس', reason: 'an accepted suggestion is kept on edit');
     });
   });
 
@@ -604,8 +472,8 @@ void main() {
         for (final scale in [1.0, 2.0]) {
           testWidgets('no overflow: ${locale.languageCode} ${dark ? 'dark' : 'light'} 320 ${scale}x', (tester) async {
             await _pump(tester, dark: dark, locale: locale, scale: scale, width: 320);
-            await tester.tap(find.byKey(const Key('address-use-current-location')));
-            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+            await _pump(tester, dark: dark, locale: locale, scale: scale, width: 320, choose: null); // the method chooser
             expect(tester.takeException(), isNull);
           });
         }

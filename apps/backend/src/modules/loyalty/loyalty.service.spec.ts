@@ -31,6 +31,10 @@ function buildHarness() {
   return { service, store };
 }
 
+/** Fake-repository key match that understands TypeORM's In([...]) operator (conversions look up the namespaced AND the legacy raw key). */
+const keyMatches = (stored: unknown, wanted: any): boolean =>
+  wanted && typeof wanted === 'object' && Array.isArray(wanted.value) ? wanted.value.includes(stored) : stored === wanted;
+
 describe('LoyaltyService (Loyalty Ledger Foundation)', () => {
   it('creates a positive loyalty transaction (earning)', async () => {
     const { service, store } = buildHarness();
@@ -552,7 +556,7 @@ describe('LoyaltyService.convertPointsToWallet (Points -> Wallet Conversion, Chu
       find: async (opts: any) => [...loyaltyStore.values()].filter((t) => t.customerId === opts.where.customerId),
       findOne: async (opts: any) =>
         [...loyaltyStore.values()].find(
-          (t) => t.idempotencyKey === opts.where.idempotencyKey && (opts.where.customerId === undefined || t.customerId === opts.where.customerId),
+          (t) => keyMatches(t.idempotencyKey, opts.where.idempotencyKey) && (opts.where.customerId === undefined || t.customerId === opts.where.customerId),
         ) ?? null,
     };
     const businessConfigService = { getLoyaltyPointsPerEgp: jest.fn(async () => 1), getLoyaltyWalletConversionPointsPerEgp: jest.fn(async () => params.pointsPerEgp ?? 100) };
@@ -665,20 +669,37 @@ describe('LoyaltyService.convertPointsToWallet (Points -> Wallet Conversion, Chu
     await service.convertPointsToWallet('customer-1', 500, 'shared-key');
     const redemption = [...loyaltyStore.values()].find((t) => t.type === 'REDEMPTION');
     const credit = [...walletStore.values()][0];
-    expect(redemption.idempotencyKey).toBe('shared-key');
-    expect(credit.idempotencyKey).toBe('shared-key');
+    // the client's key, namespaced to the customer (it can never equal a system key such as `order-refund:<id>:cancel`)
+    expect(redemption.idempotencyKey).toBe('loyalty-convert:customer-1:shared-key');
+    expect(credit.idempotencyKey).toBe(redemption.idempotencyKey);
   });
 
-  it("a key already used by ANOTHER customer's conversion is refused with IDEMPOTENCY_KEY_IN_USE — never treated as this caller's replay (Group 8 regression)", async () => {
-    const { service, loyaltyStore, walletStore } = buildConversionHarness({ existingPoints: 500 });
-    loyaltyStore.set('other-redemption', { id: 'other-redemption', customerId: 'customer-2', pointsDelta: -300, type: 'REDEMPTION', idempotencyKey: 'idem-x' });
+  it("SECURITY: a client key equal to a SYSTEM ledger key cannot pre-occupy it — the stored key is namespaced to the customer", async () => {
+    const { service, walletStore } = buildConversionHarness({ existingPoints: 500 });
+    await service.convertPointsToWallet('customer-1', 500, 'order-refund:victim-order:cancel');
+    expect([...walletStore.values()].map((w) => w.idempotencyKey)).toEqual(['loyalty-convert:customer-1:order-refund:victim-order:cancel']);
+  });
 
-    await expect(service.convertPointsToWallet('customer-1', 500, 'idem-x')).rejects.toMatchObject({
-      response: { details: { code: 'IDEMPOTENCY_KEY_IN_USE' } },
-    });
-
-    expect([...loyaltyStore.values()].filter((t) => t.customerId === 'customer-1' && t.type === 'REDEMPTION')).toEqual([]);
+  it('a retry of a conversion stored BEFORE namespacing (raw key) is still recognised as a replay — no second conversion across the deploy', async () => {
+    const { service, loyaltyStore, walletStore } = buildConversionHarness({ existingPoints: 1000 });
+    loyaltyStore.set('legacy', { id: 'legacy', customerId: 'customer-1', pointsDelta: -500, type: 'REDEMPTION', idempotencyKey: 'legacy-key' });
+    const result = await service.convertPointsToWallet('customer-1', 500, 'legacy-key');
+    expect(result.convertedPoints).toBe(500);
+    expect([...loyaltyStore.values()].filter((t) => t.type === 'REDEMPTION')).toHaveLength(1);
     expect(walletStore.size).toBe(0);
+  });
+
+  it("the same key used by ANOTHER customer is independent: this caller's conversion happens under its own namespaced key, the other row is untouched (Group 8 regression, now impossible by construction)", async () => {
+    const { service, loyaltyStore, walletStore } = buildConversionHarness({ existingPoints: 500 });
+    loyaltyStore.set('other-redemption', { id: 'other-redemption', customerId: 'customer-2', pointsDelta: -300, type: 'REDEMPTION', idempotencyKey: 'loyalty-convert:customer-2:idem-x' });
+
+    const result = await service.convertPointsToWallet('customer-1', 500, 'idem-x');
+
+    expect(result.convertedPoints).toBe(500); // its OWN conversion — never customer-2's amounts
+    const mine = [...loyaltyStore.values()].filter((t) => t.customerId === 'customer-1' && t.type === 'REDEMPTION');
+    expect(mine.map((t) => t.idempotencyKey)).toEqual(['loyalty-convert:customer-1:idem-x']);
+    expect(loyaltyStore.get('other-redemption').pointsDelta).toBe(-300);
+    expect(walletStore.size).toBe(1);
   });
 
   it('CRITICAL: duplicate idempotency key cannot double-convert — the second call returns the existing result instead of creating new rows', async () => {
@@ -746,7 +767,7 @@ describe('LoyaltyService.convertPointsToWallet — structured business-event log
       find: async (opts: any) => [...loyaltyStore.values()].filter((t) => t.customerId === opts.where.customerId),
       findOne: async (opts: any) =>
         [...loyaltyStore.values()].find(
-          (t) => t.idempotencyKey === opts.where.idempotencyKey && (opts.where.customerId === undefined || t.customerId === opts.where.customerId),
+          (t) => keyMatches(t.idempotencyKey, opts.where.idempotencyKey) && (opts.where.customerId === undefined || t.customerId === opts.where.customerId),
         ) ?? null,
     };
     const walletRepository = {
@@ -770,7 +791,7 @@ describe('LoyaltyService.convertPointsToWallet — structured business-event log
       // find a "match" and short-circuit every conversion as an already-committed no-op.
       findOne: async (EntityClass: any, opts: any) => {
         if (EntityClass === LoyaltyPointsTransaction) {
-          return [...loyaltyStore.values()].find((t) => t.idempotencyKey === opts.where.idempotencyKey && t.customerId === opts.where.customerId) ?? null;
+          return [...loyaltyStore.values()].find((t) => keyMatches(t.idempotencyKey, opts.where.idempotencyKey) && t.customerId === opts.where.customerId) ?? null;
         }
         return { id: 'customer-1' };
       },
@@ -797,7 +818,7 @@ describe('LoyaltyService.convertPointsToWallet — structured business-event log
       customerId: 'customer-1',
       pointsRedeemed: 500,
       walletCreditMinor: 500,
-      idempotencyKey: 'idem-log-1',
+      idempotencyKey: 'loyalty-convert:customer-1:idem-log-1',
     });
     const creditEvent = events.find((e) => e.event === 'wallet.credit');
     expect(creditEvent).toMatchObject({ customerId: 'customer-1', amountDeltaMinor: 500, type: 'LOYALTY_REDEMPTION' });
@@ -815,6 +836,6 @@ describe('LoyaltyService.convertPointsToWallet — structured business-event log
     expect(logSpy.mock.calls.some((call) => (call[0] as string).includes('loyalty.redemption"'))).toBe(false);
     expect(warnSpy).toHaveBeenCalledTimes(1);
     const logged = JSON.parse(warnSpy.mock.calls[0][0] as string);
-    expect(logged).toEqual({ event: 'loyalty.redemption_duplicate', correlationId: 'corr-loyalty', customerId: 'customer-1', idempotencyKey: 'idem-log-2' });
+    expect(logged).toEqual({ event: 'loyalty.redemption_duplicate', correlationId: 'corr-loyalty', customerId: 'customer-1', idempotencyKey: 'loyalty-convert:customer-1:idem-log-2' });
   });
 });

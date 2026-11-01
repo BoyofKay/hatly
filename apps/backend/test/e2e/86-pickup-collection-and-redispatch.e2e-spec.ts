@@ -279,7 +279,7 @@ describe('E2E — pickup collection (U2) and redispatch after a driver hand-back
       }
       expect(await statusOf(done.order.id)).toBe('COLLECTED');
       const segment = (await q('SELECT id FROM order_vendor_segments WHERE order_id = $1', [done.order.id]))[0];
-      expect((await world.api('patch', `/vendor/orders/segments/${segment.id}/status`, { token: vendor.manager.accessToken, body: { status: 'CANCELLED' } })).status).toBeGreaterThanOrEqual(400);
+      expect((await world.api('patch', `/vendor/orders/segments/${segment.id}/status`, { token: vendor.manager.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } })).status).toBeGreaterThanOrEqual(400);
 
       // the generic endpoint can never hand a pickup to a driver either
       const pickup = await readyPickup();
@@ -419,13 +419,13 @@ describe('E2E — pickup collection (U2) and redispatch after a driver hand-back
       expect((await deliveries(next.id))[0].driver_id).toBe(d1.driverId);
     });
 
-    it('automatic dispatch OFF: a hand-back simply waits for an admin (no attempt, no alert)', async () => {
+    it('automatic dispatch OFF: a hand-back waits for an admin (no attempt) — and says so with ONE open AUTO_ASSIGN_DISABLED alert, never silently', async () => {
       const [d1, d2] = await onlyDrivers(near, mid);
       const order = await readyDelivery();
       expectData(await assign(order.id, d1.driverId), 201);
       expectData(await release(d1, order.id));
       expect(await statusOf(order.id)).toBe('READY_FOR_PICKUP');
-      expect(await openAlerts(order.id)).toBe(0);
+      expect(await openAlerts(order.id)).toBe(1);
       expect(await available(d2)).toBe(true);
     });
 

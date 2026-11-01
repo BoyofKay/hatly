@@ -67,13 +67,19 @@ describe('Real Nest application bootstrap (real PostgreSQL + real Redis)', () =>
     expect(res.status).toBe(400);
   });
 
-  it('unconfigured external providers (Unifonic/FCM/Google Maps) neither block startup nor can send anything: OTP request fails closed', async () => {
+  it('unconfigured external providers (Unifonic/FCM/Google Maps) neither block startup nor can send anything: the retired OTP registration stub answers 410, creates nothing and stores no code', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/register')
       .send({ phone: '+201000000001', fullName: 'Integration Test' });
-    // Unifonic has no credentials here, so the provider refuses to send and the request fails closed — never a 2xx "sent".
-    expect(res.status).toBe(400);
-    expect(res.body.error.details.code).toBe('SMS_PROVIDER_UNAVAILABLE');
+    // The legacy OTP registration route is retired (410, with a stable code older apps can map): it never creates an account,
+    // never stores a code and never calls a provider — so an unconfigured Unifonic cannot matter to it.
+    expect(res.status).toBe(410);
+    expect(res.body.error.details).toMatchObject({ code: 'LEGACY_OTP_REGISTRATION_RETIRED' });
+    expect(JSON.stringify(res.body)).not.toMatch(/SMS_PROVIDER|unifonic|appsid/i);
+    expect(await app.get<Redis>(REDIS_CLIENT).get('otp:+201000000001')).toBeNull();
+    // ...and the OTP-as-login endpoint no longer exists at all.
+    const verify = await request(app.getHttpServer()).post('/api/v1/auth/otp/verify').send({ phone: '+201000000001', code: '123456' });
+    expect(verify.status).toBe(404);
   });
 
   it('serves Swagger docs (configureApp ran exactly as in production)', async () => {

@@ -5,6 +5,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { ManualTransferService } from './manual-transfer.service';
+import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
 
 @ApiTags('manual-transfer')
 @Controller('payments/manual-transfer')
@@ -19,6 +20,7 @@ export class ManualTransferController {
     return { data: config };
   }
 
+  @Throttled(RateLimitPolicies.paymentClaim)
   @Post('orders/:orderId/claim')
   async claim(@CurrentUser() user: AuthenticatedUser, @Param('orderId') orderId: string) {
     const payment = await this.manualTransferService.claimTransfer(user.id, orderId);

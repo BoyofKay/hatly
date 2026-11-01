@@ -53,10 +53,9 @@ export class CartVendorGroup extends BaseEntity {
   adHocServiceType?: AdHocServiceType | null;
 
   /**
-   * BUY_FROM_PLACE only — the pickup location the customer chose for
-   * the place to buy from. Required at checkout: null is rejected
-   * (`BUY_FROM_PLACE_PICKUP_REQUIRED`), never replaced by a Hatly
-   * default.
+   * Route ORIGIN the customer chose (both service types, PD-012). Null = "use the default": Hatly's configured origin for
+   * BUY_FROM_PLACE; for DELIVER_TO_PLACE (Wasally) there is no default origin, so it is required at checkout
+   * (`DELIVER_TO_PLACE_ORIGIN_REQUIRED`). The columns keep their original "pickup" names (no rewrite of existing rows).
    */
   @Column({ name: 'ad_hoc_pickup_latitude', type: 'double precision', nullable: true })
   adHocPickupLatitude?: number | null;
@@ -64,19 +63,22 @@ export class CartVendorGroup extends BaseEntity {
   @Column({ name: 'ad_hoc_pickup_longitude', type: 'double precision', nullable: true })
   adHocPickupLongitude?: number | null;
 
+  /** Short display label of the customer-chosen origin (null when none, or for a row saved before PD-012). */
+  @Column({ name: 'ad_hoc_pickup_label', type: 'varchar', length: 120, nullable: true })
+  adHocPickupLabel?: string | null;
+
   /**
-   * DELIVER_TO_PLACE only — the destination the customer chose.
-   * Required at checkout: null is rejected
-   * (`DELIVER_TO_PLACE_DESTINATION_REQUIRED`), never replaced by a
-   * Hatly default. Not used for BUY_FROM_PLACE, whose
-   * "destination" is simply the customer's own delivery address,
-   * already captured normally at checkout.
+   * Route DESTINATION the customer chose (both service types, PD-012). Null = "use the default": Hatly's configured destination for
+   * BUY_FROM_PLACE, Wasally's own configured destination for DELIVER_TO_PLACE. Never the customer's home address unless they pick it.
    */
   @Column({ name: 'ad_hoc_destination_latitude', type: 'double precision', nullable: true })
   adHocDestinationLatitude?: number | null;
 
   @Column({ name: 'ad_hoc_destination_longitude', type: 'double precision', nullable: true })
   adHocDestinationLongitude?: number | null;
+
+  @Column({ name: 'ad_hoc_destination_label', type: 'varchar', length: 120, nullable: true })
+  adHocDestinationLabel?: string | null;
 
   @Column({ name: 'vendor_note', type: 'varchar', nullable: true })
   vendorNote?: string | null;

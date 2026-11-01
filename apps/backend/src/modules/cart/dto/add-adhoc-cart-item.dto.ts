@@ -9,6 +9,7 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
   MinLength,
 } from 'class-validator';
@@ -22,12 +23,10 @@ import { AdHocServiceType } from '../ad-hoc-service-type.enum';
  * cap and the pickup restriction — see cart.service.ts). Enforced in
  * the service, not here, since these are cross-field rules.
  *
- * `pickupLatitude`/`pickupLongitude` are only meaningful for a new
- * BUY_FROM_PLACE group; `destinationLatitude`/`destinationLongitude`
- * only for a new DELIVER_TO_PLACE group. They are optional on this endpoint
- * (the cart only stores them) but REQUIRED to check out: a missing pickup
- * (BUY_FROM_PLACE) or destination (DELIVER_TO_PLACE) is rejected by the
- * checkout planner — no configured default is ever substituted.
+ * `pickup*` is the route ORIGIN and `destination*` the route DESTINATION of a new group, for BOTH service types (PD-012). Each is
+ * optional and independent: an omitted end is resolved at checkout from the service's configured default (Hatly: origin and
+ * destination; Wasally: destination only — a Wasally origin has no default and is required). The customer's own address is never
+ * substituted. The cart only stores them; the checkout planner resolves and validates the route.
  *
  * `imageUrls` accepts plain strings here (not validated as arbitrary
  * URLs a client could fabricate) — CartService cross-checks every one
@@ -63,6 +62,16 @@ export class AddAdHocCartItemDto {
   @IsOptional()
   @IsLongitude()
   destinationLongitude?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  pickupLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  destinationLabel?: string;
 
   @IsString()
   @MinLength(1)

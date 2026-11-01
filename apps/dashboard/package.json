@@ -9,11 +9,12 @@
     "lint": "next lint",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "test:unit": "node --experimental-strip-types --test lib/legal/public-site.test.mts lib/banners/banner-form.test.mts lib/sectors/sector-form.test.mts lib/service-routes/route-defaults.test.mts lib/vendor/new-orders.test.mts lib/changes/change-feed.test.mts lib/ui/closures.test.mts"
   },
   "dependencies": {
     "axios": "^1.7.4",
-    "next": "14.2.35",
+    "next": "15.5.27",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "swr": "^2.2.5"

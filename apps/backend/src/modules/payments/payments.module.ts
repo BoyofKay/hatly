@@ -1,4 +1,6 @@
+import { NotificationsModule } from '../notifications/notifications.module';
 import { Module } from '@nestjs/common';
+import { RefundPayout } from './entities/refund-payout.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CodPaymentProvider } from './providers/cod-payment.provider';
 import { Payment } from './entities/payment.entity';
@@ -27,7 +29,7 @@ import { LoyaltyModule } from '../loyalty/loyalty.module';
  * inspection).
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Payment]), BusinessConfigModule, FinanceModule, LoyaltyModule],
+  imports: [NotificationsModule, TypeOrmModule.forFeature([Payment, RefundPayout]), BusinessConfigModule, FinanceModule, LoyaltyModule],
   controllers: [ManualTransferController, AdminManualTransferController],
   providers: [
     CodPaymentProvider,

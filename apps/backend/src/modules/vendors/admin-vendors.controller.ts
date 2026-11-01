@@ -1,5 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
+import { requireUploadedFile, singleFileMultipartLimits } from '../products/multipart-limits';
 import { RequiresPermission } from '../permissions/decorators/requires-permission.decorator';
 import { Permission } from '../permissions/permission.enum';
 import { AdminVendorsService } from './admin-vendors.service';
@@ -45,6 +49,20 @@ export class AdminVendorsController {
   @RequiresPermission(Permission.MANAGE_VENDORS)
   async update(@Param('id') id: string, @Body() dto: UpdateVendorDto) {
     const vendor = await this.adminVendorsService.updateVendor(id, dto);
+    return { data: vendor };
+  }
+
+  /** `multipart/form-data`, one file in the field `image` (JPEG/PNG/WebP, up to 5 MB) — the same contract as a product / banner image. */
+  @Post(':id/logo')
+  @RequiresPermission(Permission.MANAGE_VENDORS)
+  @Throttled(RateLimitPolicies.productImageUpload)
+  @UseInterceptors(FileInterceptor('image', { limits: singleFileMultipartLimits(5 * 1024 * 1024) }))
+  async uploadLogo(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const vendor = await this.adminVendorsService.uploadLogo(id, requireUploadedFile(file, 'image'), user.id);
     return { data: vendor };
   }
 

@@ -6,6 +6,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Firebase Cloud Messaging needs the Google Services plugin to turn android/app/google-services.json (git-ignored, supplied by the owner
+// from the Firebase console) into the app's Firebase options. Applied ONLY when that file exists, so a build without it — today's state,
+// and every developer build — is unchanged and push simply stays off (FcmService is wrapped defensively).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Release signing (M5 Batch 3). The upload/release keystore is NEVER in the repository: android/key.properties (git-ignored; see
 // key.properties.example) points at it. Without that file the release variant falls back to the debug key, so local
 // `flutter run --release` keeps working — such a build cannot be published (Play rejects debug-signed bundles), and a warning says so.

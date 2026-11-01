@@ -16,19 +16,38 @@ export interface VendorOrderItem {
   /** Vendor Custom Item Pricing (Chunk 4C backend addition). Sole source of truth for whether a Custom Request is priced yet — null = pending, non-null = final price recorded. Never substitute unitPriceMinor, which stays permanently null for a Custom Request regardless of pricing state. */
   actualAmountMinor: number | null;
 }
+/** One recorded change of a segment. The vendor sees roles, not staff names; `onBehalfOfVendor` = Hatly operations acted for the vendor. */
+export interface VendorSegmentHistoryEntry {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  at: string;
+  onBehalfOfVendor: boolean;
+  /** SYSTEM when the platform itself made the change (automatic acceptance). */
+  actorRole: string;
+  reason: string | null;
+}
+
 export interface VendorOrderSegment {
   id: string;
+  /** When the segment was created (the backend's `VendorOrderSegmentView.createdAt`). */
+  createdAt?: string;
   groupType: string;
   vendorBranchId: string;
   vendorNoteSnapshot: string | null;
   status: 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'READY_FOR_PICKUP' | 'PICKED_UP' | 'CANCELLED';
   subtotalMinor: number | null;
   expectedReadyAt: string | null;
+  history?: VendorSegmentHistoryEntry[];
   items: VendorOrderItem[];
+  /** Items taken off the order because they were unavailable (the customer chose to continue without them). */
+  removedItems?: Array<{ id: string; productNameSnapshot: string | null; quantity: number; removedAt: string }>;
 }
 
 export interface VendorOrder {
   id: string;
+  /** The customer-facing number (HT-…); optional only because a backend older than this field omits it. */
+  orderNumber?: string;
   status: string;
   fulfillmentType: string;
   orderNote: string | null;
@@ -62,8 +81,10 @@ export async function getVendorOrder(id: string): Promise<VendorOrder> {
 export async function updateSegmentStatus(
   segmentId: string,
   status: VendorOrderSegment['status'],
+  /** REQUIRED by the backend when `status` is CANCELLED (a rejection): shown to the customer and kept in the history. */
+  reason?: string,
 ): Promise<VendorOrderSegment> {
-  const res = await apiClient.patch(`/vendor/orders/segments/${segmentId}/status`, { status });
+  const res = await apiClient.patch(`/vendor/orders/segments/${segmentId}/status`, reason ? { status, reason } : { status });
   return res.data.data;
 }
 
@@ -90,5 +111,11 @@ export async function recordItemWeight(itemId: string, weightGrams: number): Pro
  */
 export async function priceCustomItem(itemId: string, amountMinor: number): Promise<unknown> {
   const res = await apiClient.post(`/vendor/orders/order-items/${itemId}/price`, { amountMinor });
+  return res.data.data;
+}
+
+/** PD-016. Tells the platform that items of THIS vendor's own part are unavailable; the customer then chooses to continue without them or cancel. */
+export async function markItemsUnavailable(segmentId: string, itemIds: string[], note?: string): Promise<{ id: string; status: string }> {
+  const res = await apiClient.post(`/vendor/orders/segments/${segmentId}/unavailable-items`, { itemIds, ...(note?.trim() ? { note: note.trim() } : {}) });
   return res.data.data;
 }

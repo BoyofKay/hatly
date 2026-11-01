@@ -163,4 +163,70 @@ void main() {
       expect(sessionExpiredCalls, 0);
     });
   });
+
+  // Regression (2026-10-27): the backend's refresh tokens are single-use with reuse detection (AuthService.refresh →
+  // RefreshTokenStore.rotate) — presenting an already-rotated refresh token REVOKES every session of that user. The driver app
+  // fires requests concurrently (the 20 s GPS ping, the 25 s deliveries poll, a screen refresh), so after the access token
+  // expires several 401s arrive together; each used to start its OWN /auth/refresh with the same refresh token, and every
+  // refresh after the first one was a "reuse" that logged the driver out. One shared refresh per expiry event, as in the
+  // customer app.
+  group('ApiClient — concurrent 401s share ONE refresh', () {
+    ResponseBody json(int status, String body) =>
+        ResponseBody.fromString(body, status, headers: {'content-type': ['application/json']});
+
+    test('three requests that hit 401 together call /auth/refresh once and all succeed with the new token', () async {
+      final tokenStorage = FakeTokenStorage()..seed(access: 'expired-access', refresh: 'refresh-1');
+      var refreshCalls = 0;
+      var sessionExpiredCalls = 0;
+      final client = _buildClient(
+        tokenStorage: tokenStorage,
+        onSessionExpired: () => sessionExpiredCalls++,
+        respond: (options, n) {
+          if (options.path == '/auth/refresh') {
+            refreshCalls++;
+            // the server accepts refresh-1 exactly once; a second use is reuse → 401
+            return refreshCalls == 1
+                ? json(200, '{"data":{"accessToken":"new-access","refreshToken":"refresh-2"}}')
+                : json(401, '{"error":"reuse"}');
+          }
+          return options.headers['Authorization'] == 'Bearer new-access' ? json(200, '{"data":[]}') : json(401, '{}');
+        },
+      );
+
+      final results = await Future.wait([
+        client.dio.get('/driver/deliveries'),
+        client.dio.patch('/driver/location'),
+        client.dio.get('/driver/deliveries/abc'),
+      ]);
+
+      expect(refreshCalls, 1, reason: 'a second refresh with the same token is a reuse the backend punishes by revoking the session');
+      expect(results.map((r) => r.statusCode), everyElement(200));
+      expect(sessionExpiredCalls, 0);
+      expect(tokenStorage.cleared, isFalse);
+      expect(await tokenStorage.refreshToken, 'refresh-2');
+    });
+
+    test('when that one shared refresh fails, the session-expired callback still fires exactly once', () async {
+      final tokenStorage = FakeTokenStorage()..seed(access: 'expired-access', refresh: 'refresh-1');
+      var refreshCalls = 0;
+      var sessionExpiredCalls = 0;
+      final client = _buildClient(
+        tokenStorage: tokenStorage,
+        onSessionExpired: () => sessionExpiredCalls++,
+        respond: (options, n) {
+          if (options.path == '/auth/refresh') refreshCalls++;
+          return json(401, '{}');
+        },
+      );
+
+      final outcomes = await Future.wait([
+        for (var i = 0; i < 3; i++) client.dio.get('/driver/deliveries').then((_) => 'ok', onError: (_) => 'error'),
+      ]);
+
+      expect(outcomes, everyElement('error'));
+      expect(refreshCalls, 1);
+      expect(sessionExpiredCalls, 1);
+      expect(tokenStorage.cleared, isTrue);
+    });
+  });
 }

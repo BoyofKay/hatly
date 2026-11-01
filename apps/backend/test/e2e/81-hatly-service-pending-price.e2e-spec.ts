@@ -40,6 +40,8 @@ describe('E2E — Hatly Service: pending price → confirmed price', () => {
     adHocServiceType: 'BUY_FROM_PLACE',
     pickupLatitude: 30.3,
     pickupLongitude: 31.45,
+    destinationLatitude: 30.31,
+    destinationLongitude: 31.46,
     freeTextDescription: description,
     quantity: 1,
     ...extra,
@@ -132,7 +134,8 @@ describe('E2E — Hatly Service: pending price → confirmed price', () => {
     it('creating the order succeeds with an explicit pending state: item PENDING, total/amount due unknown, COD, no payment row, and success is not payment', async () => {
       const { c, order } = await pendingOrder('Create Pending');
       expect(order).toMatchObject({
-        status: 'PENDING',
+        // Hatly/Wasally have no vendor: once the payment gate passes (COD) the order is dispatch-ready on its own, price still pending
+        status: 'READY_FOR_PICKUP',
         paymentMethod: 'COD',
         hasPendingPricing: true,
         totalMinor: null,
@@ -151,7 +154,7 @@ describe('E2E — Hatly Service: pending price → confirmed price', () => {
       expect(c.id).toBeDefined();
     });
 
-    it('both service types keep their own location semantics (BUY: customer place → customer address; DELIVER: customer address → customer place)', async () => {
+    it('both service types keep their own route semantics (origin → destination, each frozen in its own slot — PD-012)', async () => {
       const buy = await pendingOrder('Buy Semantics');
       const seg = (await world.ds.query('SELECT * FROM order_vendor_segments WHERE order_id = $1', [buy.order.id]))[0];
       expect(seg).toMatchObject({
@@ -159,13 +162,15 @@ describe('E2E — Hatly Service: pending price → confirmed price', () => {
         ad_hoc_pickup_latitude_snapshot: 30.3,
         ad_hoc_pickup_longitude_snapshot: 31.45,
       });
-      expect(seg.ad_hoc_destination_latitude_snapshot).toBeNull();
+      expect(seg).toMatchObject({ ad_hoc_destination_latitude_snapshot: 30.31, ad_hoc_destination_longitude_snapshot: 31.46 });
 
       const c = await s.customer('Deliver Semantics');
       expectData(
         await addItem(c, {
           adHocPlaceName: 'Friend Home',
           adHocServiceType: 'DELIVER_TO_PLACE',
+          pickupLatitude: 30.45,
+          pickupLongitude: 31.65,
           destinationLatitude: 30.5,
           destinationLongitude: 31.7,
           freeTextDescription: 'A parcel',
@@ -181,7 +186,7 @@ describe('E2E — Hatly Service: pending price → confirmed price', () => {
         ad_hoc_destination_latitude_snapshot: 30.5,
         ad_hoc_destination_longitude_snapshot: 31.7,
       });
-      expect(seg2.ad_hoc_pickup_latitude_snapshot).toBeNull();
+      expect(seg2).toMatchObject({ ad_hoc_pickup_latitude_snapshot: 30.45, ad_hoc_pickup_longitude_snapshot: 31.65 });
     });
 
     it('a missing customer address is rejected — never replaced by a Hatly location — and creates no order', async () => {
@@ -234,7 +239,8 @@ describe('E2E — Hatly Service: pending price → confirmed price', () => {
       });
       expect(res.status).toBe(201);
       expect(await details(c, res.body.data.id)).toMatchObject({
-        status: 'PENDING',
+        // Hatly/Wasally have no vendor: once the payment gate passes (COD) the order is dispatch-ready on its own, price still pending
+        status: 'READY_FOR_PICKUP',
         hasPendingPricing: true,
         totalMinor: null,
       });
@@ -388,11 +394,13 @@ describe('E2E — Hatly Service: pending price → confirmed price', () => {
 
     it('is refused for an order that was cancelled, and for an item that is not a Hatly Service request', async () => {
       const { c, order, itemIds } = await pendingOrder('Cancelled');
-      const cancelled = await world.api('post', `/orders/${order.id}/cancel`, {
-        token: c.accessToken,
-        body: { cancellationReason: 'changed my mind' },
+      // (the customer's own cancel window closes at READY_FOR_PICKUP; an admin cancels)
+      const superAdmin = await s.superAdmin();
+      const cancelled = await world.api('patch', `/orders/${order.id}/status`, {
+        token: superAdmin.accessToken,
+        body: { status: 'CANCELLED', cancellationReason: 'changed my mind' },
       });
-      expect(cancelled.status).toBe(201);
+      expect(cancelled.status).toBe(200);
       const res = await confirm(itemIds[0], 5000);
       expect(res.status).toBe(409);
       expect(res.body.error.details.code).toBe('ORDER_NOT_PRICEABLE');
@@ -542,8 +550,14 @@ describe('E2E — Hatly Service: pending price → confirmed price', () => {
         placeName: 'Corner Pharmacy',
         pickupLatitude: 30.3,
         pickupLongitude: 31.45,
-        destinationLatitude: null,
-        destinationLongitude: null,
+        destinationLatitude: 30.31,
+        destinationLongitude: 31.46,
+        // PD-012: the route as it was frozen at checkout (both ends were chosen by the customer here).
+        route: {
+          service: 'HATLY',
+          origin: { latitude: 30.3, longitude: 31.45, label: null, source: 'CUSTOMER' },
+          destination: { latitude: 30.31, longitude: 31.46, label: null, source: 'CUSTOMER' },
+        },
       });
       expect(pending.segments[0].items[0]).toMatchObject({
         priceStatus: 'PENDING',

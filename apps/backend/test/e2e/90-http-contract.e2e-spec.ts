@@ -81,8 +81,10 @@ describe('E2E — HTTP contract', () => {
     // Routes that are public BY DESIGN. Anything else answering without a token is a hole.
     const PUBLIC = [
       /^GET \/api\/v1\/health(\/ready)?$/,
-      /^POST \/api\/v1\/auth\/(register|login|otp\/verify|driver\/login|password\/login|refresh|customer\/password\/login|customer\/password\/register)$/,
+      /^POST \/api\/v1\/auth\/(register|driver\/login|password\/login|refresh|customer\/password\/login|customer\/password\/register|customer\/register\/request-code|dashboard\/(login|refresh|logout))$/,
       /^GET \/api\/v1\/sectors$/,
+      // Admin-managed Home banners (2026-10-28): public like /sectors — only banners eligible to be shown right now, nothing administrative.
+      /^GET \/api\/v1\/home-banners$/,
       // Consolidated customer-commerce milestone (Part E — Sector Subcategories): public, same discipline as /sectors.
       /^GET \/api\/v1\/sectors\/:sectorId\/subcategories$/,
       /^GET \/api\/v1\/vendors$/,
@@ -91,7 +93,13 @@ describe('E2E — HTTP contract', () => {
       /^GET \/api\/v1\/products\/:id$/,
       // Catalog Foundation: public product-first discovery (by design, like the vendor marketplace above)
       /^GET \/api\/v1\/products$/,
+      // Home aggregation (public catalogue composition); client telemetry intake and client config (public, throttled, no identifiers)
+      /^GET \/api\/v1\/home\/product-sections$/,
+      /^POST \/api\/v1\/telemetry\/client-metrics$/,
+      /^GET \/api\/v1\/config\/client$/,
       /^GET \/api\/v1\/catalog-products\/:id$/,
+      // Account deletion WITHOUT the app (Google Play): password-verified self-service, or a request that deletes nothing by itself
+      /^POST \/api\/v1\/account-deletion\/(delete|requests)$/,
     ];
     const isPublic = (r: RouteInfo) => PUBLIC.some((p) => p.test(`${r.method} ${r.path}`));
 
@@ -217,9 +225,10 @@ describe('E2E — HTTP contract', () => {
   });
 
   describe('CHARACTERIZATION — deliberately open / not yet hardened (reported, not changed)', () => {
-    it('CORS allows any origin (main.ts: "tighten to known origins before production launch")', async () => {
+    it('CORS in this (non-strict, no allow-list) configuration reflects the origin and allows credentials (a strict deployment allows only its listed origins)', async () => {
       const res = await raw(world, { method: 'OPTIONS', path: '/api/v1/cart', headers: { origin: 'https://any.example', 'access-control-request-method': 'GET' } });
-      expect(res.headers['access-control-allow-origin']).toBe('*');
+      expect(res.headers['access-control-allow-origin']).toBe('https://any.example');
+      expect(res.headers['access-control-allow-credentials']).toBe('true');
     });
 
     it('the Swagger UI is served publicly at /docs in this configuration', async () => {

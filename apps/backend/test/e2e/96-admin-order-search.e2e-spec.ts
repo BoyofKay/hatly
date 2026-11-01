@@ -15,11 +15,13 @@ describe('E2E — Admin Order Search', () => {
   let world: World;
   let s: Scenario;
   let viewer: Actor;
+  let piiViewer: Actor;
 
   beforeAll(async () => {
     world = await bootWorld();
     s = new Scenario(world);
     viewer = await s.admin([Permission.VIEW_ORDERS], 'Order Search Viewer');
+    piiViewer = await s.admin([Permission.VIEW_ORDERS, Permission.VIEW_CUSTOMER_PII], 'Order Search PII Viewer');
   });
   afterAll(async () => {
     await world.close();
@@ -39,7 +41,7 @@ describe('E2E — Admin Order Search', () => {
     const customer = await s.customer('Order Search E2E Customer');
     const orderId = await insertOrder(customer.id, { orderNumber: 'HT-900001' });
 
-    const res = await world.api('get', '/admin/orders?search=HT-900001', { token: viewer.accessToken });
+    const res = await world.api('get', '/admin/orders?search=HT-900001', { token: piiViewer.accessToken });
 
     expect(res.status).toBe(200);
     const body = res.body;
@@ -47,6 +49,12 @@ describe('E2E — Admin Order Search', () => {
       expect.objectContaining({ id: orderId, orderNumber: 'HT-900001', customer: expect.objectContaining({ phone: customer.phone }) }),
     ]);
     expect(body.meta).toEqual({ page: 1, limit: 20, total: 1 });
+
+    // Without VIEW_CUSTOMER_PII the same search never returns the raw phone number or full name (masking by permission).
+    const masked = await world.api('get', '/admin/orders?search=HT-900001', { token: viewer.accessToken });
+    expect(masked.status).toBe(200);
+    expect(masked.body.data[0].customer.phone).not.toBe(customer.phone);
+    expect(masked.body.data[0].customer.phone).toContain('•');
   });
 
   it('an invalid query parameter is rejected with a 400, never a 500', async () => {

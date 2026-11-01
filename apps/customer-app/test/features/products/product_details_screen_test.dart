@@ -182,6 +182,7 @@ Widget _app(
         ),
         probeRoute('/cart', visited: visited),
         probeRoute('/catalog-products/:id', visited: visited),
+        probeRoute('/vendors/:id', visited: visited),
       ],
     );
 
@@ -395,6 +396,96 @@ void main() {
       expect(api.calls.single['quantity'], 1);
       expect(api.calls.single['grams'], 200);
     });
+
+    testWidgets(
+        'weighted: ONE tap on "1 كجم" selects 1 kg (instead of ten "+" taps) and the request carries 1000 g',
+        (tester) async {
+      _phone(tester);
+      final api = _FakeCartApi();
+      await _open(tester, _app(_product(pricingUnit: 'WEIGHT'), cartApi: api));
+      expect(find.text('0.10 kg'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('weight-preset-1000')));
+      await tester.pump();
+      expect(find.text('1.00 kg'), findsOneWidget);
+      expect(find.text('100 ج.م'), findsWidgets); // 100 per kg × 1
+      await _tapAdd(tester);
+      expect(api.calls.single['grams'], 1000);
+      expect(api.calls.single['quantity'], 1);
+    });
+
+    testWidgets(
+        'weighted: the other presets work, and fractional weights stay possible with the stepper afterwards',
+        (tester) async {
+      _phone(tester);
+      final api = _FakeCartApi();
+      await _open(tester, _app(_product(pricingUnit: 'WEIGHT'), cartApi: api));
+      await tester.tap(find.byKey(const Key('weight-preset-500')));
+      await tester.pump();
+      expect(find.text('0.50 kg'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('qty-increase')));
+      await tester.pump();
+      expect(find.text('0.60 kg'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('weight-preset-2000')));
+      await tester.pump();
+      expect(find.text('2.00 kg'), findsOneWidget);
+      expect(find.text('200 ج.م'), findsWidgets);
+    });
+
+    testWidgets(
+        'weighted: tapping the value lets the customer TYPE a weight; 1.25 kg → 1250 g; an invalid entry is explained, not accepted',
+        (tester) async {
+      _phone(tester);
+      final api = _FakeCartApi();
+      await _open(tester, _app(_product(pricingUnit: 'WEIGHT'), cartApi: api));
+      await tester.tap(find.byKey(const Key('qty-value')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('weight-entry-field')),
+          '0.05'); // below the 100 g minimum
+      await tester.tap(find.byKey(const Key('weight-entry-confirm')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('weight-entry-field')),
+          findsOneWidget); // still open, with an error
+      expect(find.textContaining('أدخل وزنًا بين'), findsOneWidget);
+      await tester.enterText(
+          find.byKey(const Key('weight-entry-field')), 'abc');
+      await tester.tap(find.byKey(const Key('weight-entry-confirm')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('أدخل وزنًا بين'), findsOneWidget);
+
+      await tester.enterText(
+          find.byKey(const Key('weight-entry-field')), '1.25');
+      await tester.tap(find.byKey(const Key('weight-entry-confirm')));
+      await tester.pumpAndSettle();
+      expect(find.text('1.25 kg'), findsOneWidget);
+      await _tapAdd(tester);
+      expect(api.calls.single['grams'], 1250);
+    });
+
+    testWidgets(
+        'a TRACKED weighed listing disables presets above its stock and caps a typed weight',
+        (tester) async {
+      _phone(tester);
+      await _open(
+          tester,
+          _app(
+              _product(
+                  pricingUnit: 'WEIGHT',
+                  inventoryMode: 'TRACKED',
+                  quantity: 1500),
+              cartApi: _FakeCartApi()));
+      final big = tester
+          .widget<ChoiceChip>(find.byKey(const Key('weight-preset-2000')));
+      final fits = tester
+          .widget<ChoiceChip>(find.byKey(const Key('weight-preset-1000')));
+      expect(big.onSelected, isNull);
+      expect(fits.onSelected, isNotNull);
+    });
+
+    testWidgets('piece products show no weight presets', (tester) async {
+      _phone(tester);
+      await _open(tester, _app(_product(), cartApi: _FakeCartApi()));
+      expect(find.byKey(const Key('weight-preset-1000')), findsNothing);
+    });
   });
 
   group('add to cart', () {
@@ -527,6 +618,92 @@ void main() {
       expect(find.bySemanticsLabel('تقليل الكمية'), findsOneWidget);
       expect(find.bySemanticsLabel('أضف للسلة'), findsOneWidget);
       handle.dispose();
+    });
+  });
+
+  group('vendor link', () {
+    testWidgets(
+        'tapping the vendor name opens THAT vendor page, by the listing\'s own vendorBranchId (never by the displayed name)',
+        (tester) async {
+      _phone(tester);
+      final visited = <String>[];
+      await _open(
+          tester, _app(_product(), cartApi: _FakeCartApi(), visited: visited));
+      expect(find.byKey(const Key('product-vendor-link')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('product-vendor-link')));
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      expect(visited, ['/vendors/b1']);
+      expect(find.text('page /vendors/b1'), findsOneWidget);
+    });
+
+    testWidgets(
+        'the control is an accessible button with a 48px-high target, labelled with the vendor name',
+        (tester) async {
+      _phone(tester);
+      final handle = tester.ensureSemantics();
+      await _open(tester, _app(_product(), cartApi: _FakeCartApi()));
+      final semantics =
+          tester.getSemantics(find.byKey(const Key('product-vendor-link')));
+      expect(semantics.label, contains('ماركت وان'));
+      expect(
+          tester.getSize(find.byKey(const Key('product-vendor-link'))).height,
+          greaterThanOrEqualTo(44));
+      handle.dispose();
+    });
+
+    testWidgets(
+        'a product without a vendor block shows no vendor link and does not crash',
+        (tester) async {
+      _phone(tester);
+      await _open(
+          tester, _app(_product(vendor: null), cartApi: _FakeCartApi()));
+      expect(find.byKey(const Key('product-vendor-link')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group(
+      'flash-sale price is the same in the header and in the total (Kefta 90 vs 110)',
+      () {
+    testWidgets(
+        'header shows the special price and the total row shows it too; after "+" it doubles — never the normal price',
+        (tester) async {
+      _phone(tester);
+      await _open(
+          tester,
+          _app(
+            _product(
+                offer: const ActiveOffer(
+                    mechanism: 'FLASH_SALE', specialPriceMinor: 8000)),
+            cartApi: _FakeCartApi(),
+          ));
+      // header: the special price (80) with the normal price (100) struck out; the total row: 80 — not 100
+      expect(find.text('80 ج.م'), findsNWidgets(2));
+      expect(find.text('100 ج.م'), findsOneWidget,
+          reason:
+              'only as the struck-out normal price, never as the payable total');
+      await tester.tap(find.byKey(const Key('qty-increase')));
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      expect(find.text('160 ج.م'), findsOneWidget);
+    });
+
+    testWidgets(
+        'with a per-order cap of 1 the second unit costs the normal price',
+        (tester) async {
+      _phone(tester);
+      await _open(
+          tester,
+          _app(
+            _product(
+                offer: const ActiveOffer(
+                    mechanism: 'FLASH_SALE',
+                    specialPriceMinor: 8000,
+                    perOrderLimit: 1)),
+            cartApi: _FakeCartApi(),
+          ));
+      await tester.tap(find.byKey(const Key('qty-increase')));
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+      expect(find.text('180 ج.م'), findsOneWidget); // 80 + 100
     });
   });
 }

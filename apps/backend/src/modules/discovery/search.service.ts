@@ -1,3 +1,4 @@
+import { branchIdsUnderClosure, effectiveOpenSql } from '../../common/branch-availability';
 import { resolvePublicCatalogIds } from '../catalog/public-catalog-link';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -183,12 +184,13 @@ export class SearchService {
       .limit(limit)
       .getManyAndCount();
 
+    const underClosure = await branchIdsUnderClosure(this.branchesRepository.manager, branches.map((b) => b.id));
     const data = branches.map((branch) => ({
       id: branch.id,
       name: branch.vendor.name,
       nameAr: branch.vendor.nameAr ?? null,
       logoUrl: branch.vendor.logoUrl ?? null,
-      isOpen: branch.isOpen,
+      isOpen: branch.isOpen && !underClosure.has(branch.id),
       ratingAverage: branch.ratingCount > 0 ? branch.ratingSumStars / branch.ratingCount : 0,
       ratingCount: branch.ratingCount,
     }));
@@ -271,7 +273,7 @@ export class SearchService {
     for (const [vendorBranchId, branchProducts] of productsByBranch) {
       const resolved = await this.offerConsumptionService.resolveActiveOffersForProducts({
         vendorBranchId,
-        products: branchProducts.map((p) => ({ productId: p.id, categoryId: p.categoryId })),
+        products: branchProducts.map((p) => ({ productId: p.id, categoryId: p.categoryId, priceMinor: Number(p.priceMinor), pricingUnit: p.pricingUnit })),
       });
       for (const [productId, summary] of resolved) offersByProductId.set(productId, summary);
     }

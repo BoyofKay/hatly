@@ -1,3 +1,5 @@
+import { Optional } from '@nestjs/common';
+import { AdminAuditAction, AdminAuditService } from '../audit/admin-audit.service';
 import { Body, Controller, Get, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RequiresPermission } from '../permissions/decorators/requires-permission.decorator';
@@ -5,6 +7,7 @@ import { Permission } from '../permissions/permission.enum';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
 import { HatlyServicePricingService } from './hatly-service-pricing.service';
 import { UpsertHatlyServicePricingConfigDto } from './dto/upsert-hatly-service-pricing-config.dto';
+import { ExplicitlyAudited } from '../audit/admin-mutation-audit.interceptor';
 
 /**
  * Scaffold only — see hatly-service-pricing-config.entity.ts. This
@@ -15,7 +18,10 @@ import { UpsertHatlyServicePricingConfigDto } from './dto/upsert-hatly-service-p
 @ApiTags('admin-hatly-service-pricing')
 @Controller('admin/hatly-service-pricing-config')
 export class HatlyServicePricingController {
-  constructor(private readonly hatlyServicePricingService: HatlyServicePricingService) {}
+  constructor(
+    private readonly hatlyServicePricingService: HatlyServicePricingService,
+    @Optional() private readonly audit?: AdminAuditService,
+  ) {}
 
   @Get()
   @RequiresPermission(Permission.MANAGE_HATLY_SERVICE_PRICING)
@@ -25,9 +31,11 @@ export class HatlyServicePricingController {
   }
 
   @Put()
+  @ExplicitlyAudited()
   @RequiresPermission(Permission.MANAGE_HATLY_SERVICE_PRICING)
   async upsert(@Body() dto: UpsertHatlyServicePricingConfigDto, @CurrentUser() actor: AuthenticatedUser) {
     const row = await this.hatlyServicePricingService.upsert(dto.config, actor.id, dto.isActive);
+    await this.audit?.record({ actorUserId: actor.id, actorRole: actor.role, action: AdminAuditAction.BUSINESS_CONFIG_CHANGED, targetType: 'business_config', targetId: 'HATLY_SERVICE_PRICING' });
     return { data: row };
   }
 }

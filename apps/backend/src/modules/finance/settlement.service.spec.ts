@@ -45,6 +45,8 @@ function buildHarness(opts: {
   // "visible" from the SECOND periodStart-lookup onward (the post-failure
   // re-check) — the first (pre-check) genuinely sees nothing yet.
   const vendorPeriodsRepository = {
+    // The per-vendor settlement term lookup: none configured in these tests, so the platform-wide frequency applies as before.
+    manager: { query: jest.fn(async () => []) },
     findOne: jest.fn(async (query: any) => {
       if (query?.where?.status === 'CLOSED') return opts.previousVendorPeriod ?? null;
       if (opts.existingAtPeriodStart?.vendorBranchId && query?.where?.periodStart?.getTime() === opts.existingAtPeriodStart.periodStart.getTime()) {

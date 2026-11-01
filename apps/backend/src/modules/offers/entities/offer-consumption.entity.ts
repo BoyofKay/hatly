@@ -138,10 +138,9 @@ export class OfferConsumption extends BaseEntity {
    * OfferConsumptionService.sumCustomerConsumedQuantity and
    * findMatchingActiveOffers's callers of Offer.consumedUnitsCount,
    * which itself is decremented at reversal time — see
-   * reverseFlashSaleConsumptionForOrder's own comment). Currently
-   * SUBTOTAL_DISCOUNT rows are never reversed (this rule is scoped to
-   * FLASH_SALE only, per the approved instruction) — `isReversed`
-   * simply stays false for them, unused.
+   * reverseFlashSaleConsumptionForOrder's own comment). PD-014: SUBTOTAL_DISCOUNT rows (automatic
+   * offers and coupons) are reversed the same way when their segment is rejected or their order is cancelled — see
+   * reverseSubtotalDiscountConsumptionForOrder; the per-customer limit counts only rows with `is_reversed = false`.
    */
   @Column({ name: 'is_reversed', type: 'boolean', default: false })
   isReversed: boolean;

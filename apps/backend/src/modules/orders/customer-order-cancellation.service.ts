@@ -54,7 +54,7 @@ export class CustomerOrderCancellationService {
           details: { code: 'ORDER_ALREADY_CANCELLED' },
         });
       }
-      const block = customerCancellationBlock(order.status, segments.map((s) => s.status));
+      const block = customerCancellationBlock(order.status, segments);
       if (block === 'ORDER_STATUS') {
         throw new BadRequestException({
           message: `This order is ${order.status} and can no longer be cancelled by the customer.`,

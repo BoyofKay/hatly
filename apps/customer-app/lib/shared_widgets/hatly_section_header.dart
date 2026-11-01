@@ -24,6 +24,14 @@ class HatlySectionHeader extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: HatlyTouch.minTarget),
         child: Row(
           children: [
+            Container(
+              width: 4,
+              height: 20,
+              margin: const EdgeInsetsDirectional.only(end: HatlySpacing.sm),
+              decoration: BoxDecoration(
+                  color: p.accent,
+                  borderRadius: BorderRadius.circular(HatlyRadius.circular)),
+            ),
             Expanded(
               child: Semantics(
                 header: true,
@@ -34,28 +42,47 @@ class HatlySectionHeader extends StatelessWidget {
               ),
             ),
             if (showAction)
-              InkWell(
-                borderRadius: BorderRadius.circular(HatlyRadius.button),
-                onTap: onSeeAll,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                      minHeight: HatlyTouch.minTarget,
-                      minWidth: HatlyTouch.minTarget),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: HatlySpacing.sm),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          seeAllLabel!,
-                          style: context.type.small.copyWith(
-                              color: p.link, fontWeight: FontWeight.w700),
+              Flexible(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(HatlyRadius.button),
+                  onTap: onSeeAll,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                        minHeight: HatlyTouch.minTarget,
+                        minWidth: HatlyTouch.minTarget),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: HatlySpacing.xs,
+                          vertical: HatlySpacing.xs),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                            color: p.accentSoft,
+                            borderRadius:
+                                BorderRadius.circular(HatlyRadius.circular)),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: HatlySpacing.ms,
+                              vertical: HatlySpacing.xs),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  seeAllLabel!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: context.type.small.copyWith(
+                                      color: p.link,
+                                      fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                              const SizedBox(width: HatlySpacing.xs),
+                              Icon(Icons.arrow_forward_rounded,
+                                  size: 16, color: p.link),
+                            ],
+                          ),
                         ),
-                        const SizedBox(width: HatlySpacing.xs),
-                        Icon(Icons.arrow_forward_rounded,
-                            size: 18, color: p.link),
-                      ],
+                      ),
                     ),
                   ),
                 ),

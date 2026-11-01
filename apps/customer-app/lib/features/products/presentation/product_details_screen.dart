@@ -10,8 +10,12 @@ import '../../../shared_widgets/hatly_cta_button.dart';
 import '../../../shared_widgets/hatly_quantity_control.dart';
 import '../../../shared_widgets/hatly_soft_image.dart';
 import '../../../shared_widgets/ltr_text.dart';
+import '../../auth/presentation/auth_gate.dart';
+import '../../../shared_widgets/weight_selector.dart';
 import '../../cart/data/cart_providers.dart';
 import '../../cart/presentation/cart_error_messages.dart';
+import '../../cart/presentation/cart_compatibility_flow.dart';
+import 'widgets/weight_inline_input.dart';
 import '../../cart/presentation/widgets/cart_icon_button.dart';
 import '../../cart/presentation/widgets/cart_mini_sheet.dart';
 import '../../search/presentation/widgets/explore_message.dart';
@@ -223,6 +227,8 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
   }
 
   Future<void> _addToCart(Product product) async {
+    // A guest browses products freely, but the cart needs an account: sign in (and come back here) first.
+    if (!requireSignIn(context, ref)) return;
     final config = _config!;
     // Mirrors the backend's OPTION_REQUIRED rule so the customer learns it in words before a round trip.
     if (!config.isValid(product)) {
@@ -230,6 +236,12 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
       return;
     }
     setState(() => _isAdding = true);
+    // Ask the server whether this product fits the current cart BEFORE adding it (and offer the way out when it does not).
+    if (!await ensureCartCompatible(context, ref, product.id)) {
+      if (mounted) setState(() => _isAdding = false);
+      return;
+    }
+    if (!mounted) return;
 
     // Weighted vs piece split, exactly as before: never send the piece quantity as the weight, and never
     // invent a weight for a piece product.
@@ -319,11 +331,34 @@ class _VendorSummary extends StatelessWidget {
                 const SizedBox(width: HatlySpacing.sm),
                 Expanded(
                   flex: 2,
-                  child: Text(name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.type.body.copyWith(
-                          color: p.textPrimary, fontWeight: FontWeight.w700)),
+                  // The vendor's name (and logo) open the vendor page — by the listing's own vendorBranchId, never by guessing from
+                  // the displayed name. The route (`/vendors/:id`) is keyed by the branch id, exactly as the vendor list uses it.
+                  child: Semantics(
+                    button: true,
+                    label: name,
+                    excludeSemantics: true,
+                    child: InkWell(
+                      key: const Key('product-vendor-link'),
+                      borderRadius: BorderRadius.circular(HatlyRadius.chip),
+                      onTap: vendor.vendorBranchId.isEmpty
+                          ? null
+                          : () =>
+                              context.push('/vendors/${vendor.vendorBranchId}'),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(
+                            minHeight: HatlyTouch.minTarget),
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.type.body.copyWith(
+                                  color: p.textPrimary,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 if (onChangeStore != null)
                   Flexible(
@@ -396,7 +431,7 @@ class _QuantityRow extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final p = context.palette;
 
-    return Row(
+    final row = Row(
       children: [
         Expanded(
           child: Text(
@@ -413,6 +448,13 @@ class _QuantityRow extends StatelessWidget {
                 '${(config.requestedWeightGrams / 1000).toStringAsFixed(2)} kg',
             decreaseTooltip: l10n.quantityDecrease,
             increaseTooltip: l10n.quantityIncrease,
+            valueTapTooltip: l10n.weightEntryTooltip,
+            onValueTap: () async {
+              final grams = await showWeightEntryDialog(context,
+                  initialGrams: config.requestedWeightGrams,
+                  maxGrams: config.maxWeightFor(product));
+              if (grams != null) onChanged(config.withWeight(product, grams));
+            },
             onDecrease: config.canDecreaseWeight
                 ? () => onChanged(config.copyWith(
                     requestedWeightGrams: config.requestedWeightGrams -
@@ -438,6 +480,34 @@ class _QuantityRow extends StatelessWidget {
                     onChanged(config.copyWith(quantity: config.quantity + 1))
                 : null,
           ),
+      ],
+    );
+    if (!product.isWeighted) return row;
+    // Weighed products: the stepper moves in 100 g, so common amounts get one-tap presets (and the value can be typed).
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        row,
+        const SizedBox(height: HatlySpacing.sm),
+        WeightPresetChips(
+          selectedGrams: config.requestedWeightGrams,
+          maxGrams: config.maxWeightFor(product),
+          onSelected: (grams) => onChanged(config.withWeight(product, grams)),
+        ),
+        const SizedBox(height: HatlySpacing.sm),
+        WeightInlineInput(
+          grams: config.requestedWeightGrams,
+          minGrams: ProductConfiguration.minWeightGrams,
+          maxGrams: config.maxWeightFor(product),
+          onChanged: (grams) => onChanged(config.withWeight(product, grams)),
+        ),
+        const SizedBox(height: HatlySpacing.xs),
+        Text(
+          l10n.weightEstimateNote(
+              formatMinorUnits(config.estimatedTotalMinor(product), context)),
+          key: const Key('weight-estimate-note'),
+          style: context.type.small.copyWith(color: p.textMuted),
+        ),
       ],
     );
   }

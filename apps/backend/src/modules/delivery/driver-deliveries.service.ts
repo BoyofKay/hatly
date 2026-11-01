@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { FrozenRoute, readFrozenRoute } from '../orders/frozen-route';
 import { DeliveryAddressSnapshot } from '../orders/entities/order.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Not, Repository } from 'typeorm';
+import { OrderStatus } from '../orders/order-status.enum';
 import { Delivery } from './entities/delivery.entity';
 import { VendorBranch } from '../vendors/entities/vendor-branch.entity';
 import { DriverAuthorizationService } from './driver-authorization.service';
@@ -70,6 +72,8 @@ export interface DriverDeliverySegmentView {
 export interface DriverDeliveryView {
   id: string; // Delivery.id
   orderId: string;
+  /** The human order number (HT-…), never the internal id. */
+  orderNumber: string;
   orderStatus: string;
   fulfillmentType: string;
   orderNote: string | null;
@@ -89,12 +93,19 @@ export interface DriverDeliveryView {
   customerPhone: string;
   /** The order's frozen address snapshot, with the structured details drivers need to find the door. Null for a pickup order. */
   deliveryAddress: DeliveryAddressSnapshot | null;
+  /** Hatly / Wasally orders (PD-012): where to go first and where to deliver — the frozen route. Null for every other order. */
+  serviceRoute: FrozenRoute | null;
   assignedAt: Date | null;
   acceptDeadlineAt: Date | null;
   pickedUpAt: Date | null;
   deliveredAt: Date | null;
   segments: DriverDeliverySegmentView[];
 }
+
+/** Order states after which a delivery is history for the driver. */
+const FINISHED_ORDER_STATUSES = [OrderStatus.DELIVERED, OrderStatus.FAILED_DELIVERY, OrderStatus.CANCELLED, OrderStatus.COLLECTED];
+/** How many finished deliveries the driver's list carries (newest first). Active ones are never cut. */
+export const DRIVER_FINISHED_DELIVERIES_LIMIT = 200;
 
 @Injectable()
 export class DriverDeliveriesService {
@@ -104,13 +115,30 @@ export class DriverDeliveriesService {
     private readonly driverAuthorizationService: DriverAuthorizationService,
   ) {}
 
+  /**
+   * Security milestone — bounded. Every ACTIVE delivery is always returned; finished ones (delivered / failed / cancelled / collected)
+   * only the newest DRIVER_FINISHED_DELIVERIES_LIMIT. The list used to return the driver's whole history — each row carrying a past
+   * customer's name, phone and address — growing forever with every delivery (data minimisation + per-request cost).
+   */
   async listForUser(userId: string): Promise<DriverDeliveryView[]> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
-    const deliveries = await this.deliveriesRepository.find({
-      where: { driverId: driver.id },
-      relations: { order: { customer: true, segments: { items: true } } },
-      order: { createdAt: 'DESC' },
-    });
+    const relations = { order: { customer: true, segments: { items: true } } };
+    const [active, finished] = await Promise.all([
+      this.deliveriesRepository.find({
+        // A READY_FOR_PICKUP order is waiting for a driver: a delivery row may still name the driver it was RELEASED from (hand-back or
+        // timeout), who is no longer on the order and must not see it — nor the customer's name, phone and address on it.
+        where: { driverId: driver.id, order: { status: Not(In([...FINISHED_ORDER_STATUSES, OrderStatus.READY_FOR_PICKUP])) } },
+        relations,
+        order: { createdAt: 'DESC' },
+      }),
+      this.deliveriesRepository.find({
+        where: { driverId: driver.id, order: { status: In(FINISHED_ORDER_STATUSES) } },
+        relations,
+        order: { createdAt: 'DESC' },
+        take: DRIVER_FINISHED_DELIVERIES_LIMIT,
+      }),
+    ]);
+    const deliveries = [...active, ...finished].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     return this.buildViews(deliveries);
   }
 
@@ -122,7 +150,8 @@ export class DriverDeliveriesService {
       where: { id: deliveryId },
       relations: { order: { customer: true, segments: { items: true } } },
     });
-    if (!delivery) {
+    if (!delivery || delivery.order.status === OrderStatus.READY_FOR_PICKUP) {
+      // Same reason as the list: a released driver is no longer on the order.
       throw new NotFoundException('Delivery not found.');
     }
     return (await this.buildViews([delivery]))[0];
@@ -146,6 +175,7 @@ export class DriverDeliveriesService {
     return deliveries.map((delivery) => ({
       id: delivery.id,
       orderId: delivery.orderId,
+      orderNumber: delivery.order.orderNumber,
       orderStatus: delivery.order.status,
       fulfillmentType: delivery.order.fulfillmentType,
       orderNote: delivery.order.orderNote ?? null,
@@ -156,6 +186,7 @@ export class DriverDeliveriesService {
       customerName: delivery.order.customer.fullName,
       customerPhone: delivery.order.customer.phone,
       deliveryAddress: delivery.order.deliveryAddressSnapshot,
+      serviceRoute: readFrozenRoute(delivery.order.deliveryFeeBreakdownSnapshot),
       assignedAt: delivery.assignedAt ?? null,
       acceptDeadlineAt: delivery.acceptDeadlineAt ?? null,
       pickedUpAt: delivery.pickedUpAt ?? null,
@@ -178,7 +209,7 @@ export class DriverDeliveriesService {
           adHocDestinationLatitudeSnapshot: segment.adHocDestinationLatitudeSnapshot ?? null,
           adHocDestinationLongitudeSnapshot: segment.adHocDestinationLongitudeSnapshot ?? null,
           vendorNoteSnapshot: segment.vendorNoteSnapshot ?? null,
-          items: (segment.items ?? []).map((item) => ({
+          items: (segment.items ?? []).filter((item) => !item.removedAt).map((item) => ({
             id: item.id,
             productId: item.productId ?? null,
             productNameSnapshot: item.productNameSnapshot ?? null,

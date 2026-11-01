@@ -31,5 +31,7 @@ import { ServiceAreasModule } from '../service-areas/service-areas.module';
     MarketplaceVendorsController,
   ],
   providers: [SectorsService, SubcategoriesService, MarketplaceVendorsService],
+  // The Home aggregation (home-products module) reuses the customer sector list and the vendor listing instead of re-implementing them.
+  exports: [SectorsService, MarketplaceVendorsService],
 })
 export class SectorsModule {}

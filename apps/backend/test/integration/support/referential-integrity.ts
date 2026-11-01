@@ -58,6 +58,16 @@ export const ADDED_FOREIGN_KEYS: ExpectedForeignKey[] = [
  */
 export const INTENTIONALLY_UNCONSTRAINED: Array<{ ref: string; reason: string }> = [
   {
+    ref: 'demo_seed_records.entity_id',
+    reason:
+      'Polymorphic pointer (SECTOR / VENDOR / BRANCH / PRODUCT / … — the type is in entity_type) into the table the demo importer wrote to. A single FK cannot express that; the table is traceability metadata only (1700006300000-DemoSeedRecords), written by the demo importer script and never by the application, and a demo record that was later hard-deleted by an admin is simply reported as missing, never a dangling reference the app follows.',
+  },
+  {
+    ref: 'campaign_items.item_id',
+    reason:
+      'Polymorphic pointer (OFFER / BANNER / BROADCAST — the type is in item_type) to the thing a campaign switches on; one FK cannot express three targets. The service validates existence on write (marketing.service setCampaignItems) and the row is metadata about an orchestration, not financial history (1700006700000-MarketingCampaigns).',
+  },
+  {
     ref: 'order_items.product_id',
     reason:
       'Historical snapshot pointer: the order line stores product_name_snapshot/unit_price_minor and must stay readable if the catalog row is later changed or removed (order-item.entity.ts, InitialSchema). Set only from the loaded Product in the order-creation transaction.',
@@ -75,5 +85,20 @@ export const INTENTIONALLY_UNCONSTRAINED: Array<{ ref: string; reason: string }>
     ref: 'product_ratings.product_id',
     reason:
       'Rating must stay historically understandable independent of the live Product row; mirrors order_items.product_id (Ratings migration header).',
+  },
+  {
+    ref: 'change_events.entity_id',
+    reason:
+      'Polymorphic pointer (SEGMENT / ORDER / EXCEPTION — the type is in entity) written only by the hatly_emit_change() trigger (1700007100000-NotificationOutboxAndChangeFeed). The feed is a short-lived hint ("this changed, re-read it", pruned after days) and carries no history of its own; order_id and vendor_branch_id, which scope it, DO have foreign keys.',
+  },
+  {
+    ref: 'stock_movements.reference_id',
+    reason:
+      'Polymorphic pointer (ORDER / STOCKTAKE — the type is in reference_type) written by the hatly_record_stock_movement() trigger from the transaction-local context a writer supplies (1700007200000-VendorOperationsFoundations). It is a traceability link on an append-only ledger, not an ownership relation; product_id and vendor_branch_id, which scope it, DO have foreign keys.',
+  },
+  {
+    ref: 'home_banners.action_target_id',
+    reason:
+      'Polymorphic destination: it points at a product, a vendor branch or a sector depending on action_type, so no single foreign key can express it. The database CHECK ties it to action_type, and HomeBannersService checks the target exists when the banner is saved and the public list drops a banner whose target is gone or inactive (home-banners.service.ts, HomeBanners migration header).',
   },
 ];

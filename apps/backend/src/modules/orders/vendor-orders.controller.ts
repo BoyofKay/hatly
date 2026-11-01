@@ -4,7 +4,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
-import { VendorOrdersService } from './vendor-orders.service';
+import { VENDOR_ORDERS_LIST_MAX_SEGMENTS, VendorOrdersService } from './vendor-orders.service';
 import { OrderVendorSegmentStateMachineService } from './order-vendor-segment-state-machine.service';
 import { UpdateSegmentStatusDto } from './dto/update-segment-status.dto';
 import { VendorWeightRecordService } from './vendor-weight-record.service';
@@ -36,7 +36,7 @@ export class VendorOrdersController {
   @Get()
   async list(@CurrentUser() user: AuthenticatedUser) {
     const orders = await this.vendorOrdersService.listForUser(user.id);
-    return { data: orders };
+    return { data: orders, meta: { maxSegments: VENDOR_ORDERS_LIST_MAX_SEGMENTS } };
   }
 
   @Get(':id')
@@ -57,6 +57,7 @@ export class VendorOrdersController {
       actorUserId: user.id,
       actorRole: user.role as Role,
       expectedReadyAt: dto.expectedReadyAt ? new Date(dto.expectedReadyAt) : undefined,
+      reason: dto.reason,
     });
     return { data: segment };
   }

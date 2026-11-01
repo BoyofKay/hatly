@@ -16,8 +16,12 @@ import { DEFAULT_BELBEIS_OPTIONS, DEFAULT_BELBEIS_ZONES, parseZoneDefinitions, s
 async function assertDevDatabase(dataSource: DataSource): Promise<void> {
   const rows: Array<{ current_database: string }> = await dataSource.query('SELECT current_database()');
   const name = rows[0]?.current_database;
-  if (name !== 'hatly_dev') {
-    throw new Error(`Refusing to seed: connected database is "${name}", not "hatly_dev". This script must only ever run against the development database.`);
+  // Default: only `hatly_dev`. An isolated non-production environment (e.g. Sales Staging) may opt in by naming its database
+  // EXACTLY in SEED_ALLOW_DATABASE; a name that looks like production is never accepted, whatever the variable says.
+  const allowed = process.env.SEED_ALLOW_DATABASE?.trim();
+  const optedIn = !!allowed && allowed === name && !/prod/i.test(name ?? '');
+  if (name !== 'hatly_dev' && !optedIn) {
+    throw new Error(`Refusing to seed: connected database is "${name}", not "hatly_dev". This script must only ever run against the development database (or an isolated one named exactly in SEED_ALLOW_DATABASE).`);
   }
   console.log(`Connected database verified: "${name}" (development only).`);
 }

@@ -56,7 +56,9 @@ import { DEFAULT_BELBEIS_ZONES } from './delivery-zones-seed';
  * exists and creates nothing twice — see `findOrCreate()`.
  */
 
-const DEV_CUSTOMER_PHONE = '+201000863694';
+// The existing customer that receives the fixture default address. Default = the operator's dev customer; an isolated environment
+// (Sales Staging) points this at one of its own tester customers instead of the operator's number.
+const DEV_CUSTOMER_PHONE = process.env.SEED_DEV_CUSTOMER_PHONE?.trim() || '+201000863694';
 
 // Belbeis, Sharqia — a clearly-fixture development location, not the operator's real location.
 const BELBEIS_CENTER = { latitude: 30.4181, longitude: 31.5622 };
@@ -65,10 +67,14 @@ const SERVICE_AREA_RADIUS_METERS = 15000;
 async function assertDevDatabase(dataSource: DataSource): Promise<void> {
   const rows: Array<{ current_database: string }> = await dataSource.query('SELECT current_database()');
   const name = rows[0]?.current_database;
-  if (name !== 'hatly_dev') {
+  // Default: only `hatly_dev`. An isolated non-production environment (e.g. Sales Staging) may opt in by naming its database
+  // EXACTLY in SEED_ALLOW_DATABASE; a name that looks like production is never accepted, whatever the variable says.
+  const allowed = process.env.SEED_ALLOW_DATABASE?.trim();
+  const optedIn = !!allowed && allowed === name && !/prod/i.test(name ?? '');
+  if (name !== 'hatly_dev' && !optedIn) {
     throw new Error(
       `Refusing to seed: connected database is "${name}", not "hatly_dev". ` +
-        'This script must only ever run against the development database.',
+        'This script must only ever run against the development database (or an isolated one named exactly in SEED_ALLOW_DATABASE).',
     );
   }
   console.log(`Connected database verified: "${name}" (development only).`);
@@ -239,16 +245,18 @@ async function seed(manager: EntityManager): Promise<SeedSummary> {
   // 2. Marketplace sectors (Level 1 taxonomy — Admin-managed, dynamic).
   // ---------------------------------------------------------------------
   console.log('Step 2: marketplace sectors');
-  const sectorDefs = [
+  // `customRequests`: whether customers may send a free-text/photo request to a vendor of this sector ("لا تجد ما تبحث عنه؟").
+  // Off by default — restaurants (menu-only), bakery, meat and produce stay off; an admin changes it in the dashboard.
+  const sectorDefs: Array<{ slug: string; name: string; nameAr: string; sortOrder: number; customRequests?: boolean }> = [
     { slug: 'restaurants', name: 'Restaurants', nameAr: 'مطاعم', sortOrder: 0 },
-    { slug: 'groceries', name: 'Groceries', nameAr: 'بقالة', sortOrder: 1 },
-    { slug: 'pharmacy', name: 'Pharmacy', nameAr: 'صيدليات', sortOrder: 2 },
+    { slug: 'groceries', name: 'Groceries', nameAr: 'بقالة', sortOrder: 1, customRequests: true },
+    { slug: 'pharmacy', name: 'Pharmacy', nameAr: 'صيدليات', sortOrder: 2, customRequests: true },
     { slug: 'bakery', name: 'Bakery', nameAr: 'مخبوزات', sortOrder: 3 },
     // DEV MARKETPLACE EXPANSION (pre-demo dataset) — three additional sectors, same existing
     // MarketplaceSector model/conventions, no schema change.
     { slug: 'meat-poultry', name: 'Meat & Poultry', nameAr: 'لحوم ودواجن', sortOrder: 4 },
     { slug: 'produce', name: 'Fruits & Vegetables', nameAr: 'خضار وفاكهة', sortOrder: 5 },
-    { slug: 'household', name: 'Household', nameAr: 'أدوات منزلية', sortOrder: 6 },
+    { slug: 'household', name: 'Household', nameAr: 'أدوات منزلية', sortOrder: 6, customRequests: true },
   ];
   const sectors: Record<string, MarketplaceSector> = {};
   for (const def of sectorDefs) {
@@ -258,6 +266,7 @@ async function seed(manager: EntityManager): Promise<SeedSummary> {
       slug: def.slug,
       sortOrder: def.sortOrder,
       isActive: true,
+      customRequestsEnabled: def.customRequests === true,
     }));
     sectors[def.slug] = row;
     if (created) summary.sectors++;
@@ -528,10 +537,14 @@ async function seed(manager: EntityManager): Promise<SeedSummary> {
     ratingCount: 42,
     ratingSumStars: 189, // avg ≈ 4.5
   });
+  // PRICING MODEL: a customer pays `product.priceMinor + Σ selected option deltas`. The product price (9000 = EGP 90) IS the whole
+  // chicken, so the options are deltas FROM it: whole = +0, two whole = +9000 (→ EGP 180). They used to be written as absolute
+  // prices (+9000 / +18000), which made one chicken EGP 180 and two EGP 270 (the "Beit El Sharqeya 90 → 270" bug).
+  // There is deliberately no half-chicken option: a half portion needs a real price from the vendor, and the model cannot express
+  // a cheaper-than-base choice without a negative delta.
   await ensureOption(grilledChicken, 'Size', 'الحجم', true, false, [
-    { name: 'Half chicken', nameAr: 'نص فرخة', priceDeltaMinor: 0 },
-    { name: 'Whole chicken', nameAr: 'فرخة كاملة', priceDeltaMinor: 9000 },
-    { name: 'Two whole chickens', nameAr: 'فرختين', priceDeltaMinor: 18000 },
+    { name: 'Whole chicken', nameAr: 'فرخة كاملة', priceDeltaMinor: 0 },
+    { name: 'Two whole chickens', nameAr: 'فرختين', priceDeltaMinor: 9000 },
   ]);
   await ensureProduct(restaurantBranch, grillsCategory, { name: 'Mixed Grill', nameAr: 'مشاوي مشكلة', priceMinor: 15000 });
   await ensureProduct(restaurantBranch, startersCategory, { name: 'Rice with Vermicelli', nameAr: 'أرز بالشعرية', priceMinor: 2000 });
@@ -1304,6 +1317,10 @@ async function seed(manager: EntityManager): Promise<SeedSummary> {
   console.log('Step 5: branch subcategory assignments');
   const branchSubcategoryAssignments: Array<[VendorBranch, MarketplaceSubcategory]> = [
     [restaurantBranch, subcategories['restaurants:Oriental']],
+    // The other seeded restaurants used to be left unassigned, so they never appeared under ANY restaurant subcategory (the list is
+    // an exact match on `vendor_branch_subcategories`; an unassigned branch is correctly excluded from a subcategory filter).
+    [grillsBranch, subcategories['restaurants:Oriental']],
+    [pizzaBranch, subcategories['restaurants:Fast Food']],
     [marketMain, subcategories['groceries:Fresh Produce']],
     [marketMain, subcategories['groceries:Dairy & Eggs']], // same branch, a second subcategory — genuine many-to-many
     [marketStation, subcategories['groceries:Beverages']],
@@ -1339,7 +1356,9 @@ async function seed(manager: EntityManager): Promise<SeedSummary> {
       if (target.currentUrl && !isSeededMediaUrl(target.currentUrl)) continue; // a real upload — never overwritten
       const url = await stageMediaFile({ mediaDir, uploadsDir, key: target.key });
       if (!url) {
-        if (target.currentUrl && !(await localUploadExists(uploadsDir, target.currentUrl))) {
+        // The pack no longer delivers this asset: a seed-owned URL is withdrawn even if its old staged copy is still on disk
+        // (an asset is removed from the pack deliberately — e.g. a trademarked photo — and must stop being shown).
+        if (target.currentUrl) {
           await target.save(null);
           summary.mediaCleared++;
           console.log(`  ${target.kind} "${target.label}": asset no longer in the pack — stale URL cleared`);

@@ -1,6 +1,7 @@
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger } from '@nestjs/common';
 import Redis from 'ioredis';
+import { DataSource } from 'typeorm';
 import request = require('supertest');
 import { createIntegrationApp } from './support/app';
 import { REDIS_CLIENT } from '../../src/common/redis/redis.constants';
@@ -43,10 +44,12 @@ describe('Application behaviour when Redis is unavailable', () => {
 
   it('a Redis-dependent request FAILS FAST (bounded retries, not the ~10s ioredis default) with a sanitized 503 envelope and correlation id', async () => {
     const t0 = Date.now();
+    const phone = `+2010${String(Date.now()).slice(-8)}`;
     const res = await request(app.getHttpServer())
-      .post('/api/v1/auth/register')
+      .post('/api/v1/auth/customer/password/register')
       .set('x-correlation-id', 'redis-down-1')
-      .send({ phone: '+201000000003', fullName: 'Integration Test' });
+      // OTP is on by default, so registration checks its code in Redis FIRST — before any account row could be written
+      .send({ phone, fullName: 'Integration Test', password: 'Integration-Test-1', code: '123456' });
     const elapsed = Date.now() - t0;
 
     expect(elapsed).toBeLessThan(4000);
@@ -55,6 +58,8 @@ describe('Application behaviour when Redis is unavailable', () => {
     expect(res.body).toEqual({
       error: { code: 'SERVICE_UNAVAILABLE', message: 'A required service is temporarily unavailable. Please try again shortly.', correlationId: 'redis-down-1' },
     });
+    // ...and nothing was persisted: the failure happened before the account insert, so a retry is a clean retry
+    expect(await app.get(DataSource).query('SELECT 1 FROM users WHERE phone = $1', [phone])).toEqual([]);
   });
 
   it('nothing sensitive leaks: neither the connection password nor URL reaches an HTTP response or a log line', async () => {

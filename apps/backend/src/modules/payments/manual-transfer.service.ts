@@ -1,4 +1,6 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { StaffAlertsService } from '../notifications/staff-alerts.service';
+import { Permission } from '../permissions/permission.enum';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Payment } from './entities/payment.entity';
@@ -20,6 +22,8 @@ export class ManualTransferService {
     @InjectRepository(Payment) private readonly paymentsRepository: Repository<Payment>,
     private readonly paymentStateMachine: PaymentStateMachineService,
     private readonly businessConfigService: BusinessConfigService,
+    // Staff inbox (Operations notification centre). Optional so unit tests that build this service by hand keep working unchanged.
+    @Optional() private readonly staffAlerts?: StaffAlertsService,
   ) {}
 
   /**
@@ -91,11 +95,21 @@ export class ManualTransferService {
       // Automatic — the confirmed rule that this is not a separate Admin
       // action, only ever system-driven, using the same "system actor"
       // convention (Role.ADMIN) already established by OrderReadinessService.
-      return await this.paymentStateMachine.transition({
+      const reviewed = await this.paymentStateMachine.transition({
         paymentId: payment.id,
         to: PaymentStatus.UNDER_REVIEW,
         actorRole: Role.ADMIN,
       });
+      // The staff who verify transfers are told it is waiting for them (one row per payment; never blocks the customer's claim).
+      if (this.staffAlerts) {
+        const manager = this.paymentsRepository.manager;
+        await this.staffAlerts.alert(manager, {
+          eventKey: `transfer-review:${payment.id}`, category: 'OPS_TRANSFER_TO_VERIFY', requiredAction: 'VERIFY_TRANSFER',
+          recipients: await this.staffAlerts.recipientsHolding(manager, [Permission.VERIFY_MANUAL_PAYMENTS]),
+          orderId: payment.orderId, orderNumber: payment.order.orderNumber,
+        });
+      }
+      return reviewed;
     } catch (error) {
       if (error instanceof ConflictException) {
         // A concurrent call already advanced this payment past the state

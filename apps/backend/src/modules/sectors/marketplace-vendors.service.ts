@@ -1,4 +1,6 @@
+import { branchIdsUnderClosure, effectiveOpenSql } from '../../common/branch-availability';
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { DeliveryZone } from '../delivery-zones/entities/delivery-zone.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MarketplaceSector } from './entities/marketplace-sector.entity';
@@ -104,6 +106,8 @@ export class MarketplaceVendorsService {
       limit?: number;
       latitude?: number;
       longitude?: number;
+      /** Manual-address customers: narrow by the zone's service area (see ListVendorsQueryDto). */
+      deliveryZoneId?: string;
       subcategoryId?: string;
       /** Filters V1. Real `VendorBranch.isOpen` — never inferred from opening-hours schedule data. */
       openNow?: boolean;
@@ -143,6 +147,15 @@ export class MarketplaceVendorsService {
         return { data: [], page, limit, total: 0 };
       }
       resolvedServiceAreaId = resolved.id;
+    } else if (params.deliveryZoneId) {
+      const zone = await this.branchesRepository.manager
+        .getRepository(DeliveryZone)
+        .findOne({ where: { id: params.deliveryZoneId, isActive: true }, relations: { serviceArea: true } });
+      if (!zone || !zone.serviceArea?.isActive) {
+        // Same rule as a point outside every area: correctly empty, never an unfiltered fallback.
+        return { data: [], page, limit, total: 0 };
+      }
+      resolvedServiceAreaId = zone.serviceAreaId;
     }
 
     let qb = this.branchesRepository
@@ -174,7 +187,7 @@ export class MarketplaceVendorsService {
 
     // Filters V1 additions — all additive, all optional, all real data (no fabricated/inferred values).
     if (params.openNow) {
-      qb = qb.andWhere('branch.is_open = true');
+      qb = qb.andWhere(effectiveOpenSql('branch')); // the manual switch AND no active closure
     }
     if (params.hasOffers) {
       qb = qb.andWhere(hasActiveOfferSql());
@@ -237,12 +250,13 @@ export class MarketplaceVendorsService {
       for (const row of rows) branchIdsWithOffer.add(row.vendor_branch_id);
     }
 
+    const underClosure = await branchIdsUnderClosure(this.branchesRepository.manager, branches.map((b) => b.id));
     const data = branches.map((branch) => ({
       id: branch.id,
       name: branch.vendor.name,
       nameAr: branch.vendor.nameAr ?? null,
       logoUrl: branch.vendor.logoUrl ?? null,
-      isOpen: branch.isOpen,
+      isOpen: branch.isOpen && !underClosure.has(branch.id),
       ratingAverage: branch.ratingCount > 0 ? branch.ratingSumStars / branch.ratingCount : 0,
       ratingCount: branch.ratingCount,
       hasOffer: branchIdsWithOffer.has(branch.id),

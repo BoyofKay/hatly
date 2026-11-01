@@ -40,6 +40,7 @@ class _Repo implements VendorRepository {
       int limit = 20,
       double? latitude,
       double? longitude,
+      String? deliveryZoneId,
       String? subcategoryId,
       bool? openNow,
       bool? hasOffers,

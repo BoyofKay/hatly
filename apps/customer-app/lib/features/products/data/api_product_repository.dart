@@ -87,7 +87,10 @@ class ApiProductRepository implements ProductRepository {
     );
   }
 
-  Product _toProduct(Map<String, dynamic> json) {
+  /// The one mapping from a backend product JSON to [Product] — also used by the Home aggregation response, whose product items carry the same field names.
+  static Product productFromJson(Map<String, dynamic> json) => _toProduct(json);
+
+  static Product _toProduct(Map<String, dynamic> json) {
     return Product(
       id: json['id'] as String,
       vendorBranchId: json['vendorBranchId'] as String,
@@ -108,6 +111,13 @@ class ApiProductRepository implements ProductRepository {
       activeOffer: json['activeOffer'] != null
           ? ActiveOffer.fromJson(json['activeOffer'] as Map<String, dynamic>)
           : null,
+      deliveredQuantityCount:
+          (json['deliveredQuantityCount'] as num?)?.toInt() ?? 0,
+      deliveredWeightGramsCount:
+          (json['deliveredWeightGramsCount'] as num?)?.toInt() ?? 0,
+      createdAt: json['createdAt'] is String
+          ? DateTime.tryParse(json['createdAt'] as String)
+          : null,
       // Additive fields (only present on GET /products/:id).
       catalogProductId: json['catalogProductId'] as String?,
       vendor: json['vendor'] != null
@@ -117,20 +127,22 @@ class ApiProductRepository implements ProductRepository {
     );
   }
 
-  ProductOption _toOption(Map<String, dynamic> json) {
+  static ProductOption _toOption(Map<String, dynamic> json) {
     return ProductOption(
       id: json['id'] as String,
       name: json['name'] as String,
       nameAr: json['nameAr'] as String?,
       isRequired: json['isRequired'] as bool,
       allowsMultiple: json['allowsMultiple'] as bool,
+      minSelections: (json['minSelections'] as num?)?.toInt() ?? 0,
+      maxSelections: (json['maxSelections'] as num?)?.toInt(),
       values: ((json['values'] as List?) ?? [])
           .map((e) => _toOptionValue(e as Map<String, dynamic>))
           .toList(),
     );
   }
 
-  ProductOptionValue _toOptionValue(Map<String, dynamic> json) {
+  static ProductOptionValue _toOptionValue(Map<String, dynamic> json) {
     return ProductOptionValue(
       id: json['id'] as String,
       name: json['name'] as String,

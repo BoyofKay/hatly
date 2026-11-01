@@ -180,6 +180,7 @@ export function collectEnvIssues(env: Env): EnvIssues {
   }
   checkBoolean(env, 'OTP_LOG_CODE_FOR_LOCAL_DEV', errors);
   checkBoolean(env, 'ENABLE_API_DOCS', errors);
+  checkBoolean(env, 'ALLOW_UNAUTHENTICATED_REDIS', errors);
 
   const redisUrl = str(env, 'REDIS_URL');
   if (redisUrl !== undefined) {
@@ -187,6 +188,12 @@ export function collectEnvIssues(env: Env): EnvIssues {
       const u = new URL(redisUrl);
       if (u.protocol !== 'redis:' && u.protocol !== 'rediss:') errors.push('REDIS_URL must be a redis:// or rediss:// URL.');
       if (strict && isLocalHost(u.hostname)) errors.push('REDIS_URL must not point at localhost in production/staging.');
+      // Security milestone: Redis holds the refresh-token sessions, OTP state and the rate-limit counters. In a deployed environment it
+      // must require a password (or the operator must acknowledge a private, unauthenticated instance explicitly).
+      if (strict && !u.password && str(env, 'ALLOW_UNAUTHENTICATED_REDIS') !== 'true') {
+        errors.push('REDIS_URL must carry a password in production/staging (redis://:<password>@host:6379 or rediss://…). Only for a private-network instance without AUTH, set ALLOW_UNAUTHENTICATED_REDIS=true to acknowledge it explicitly.');
+      }
+      if (strict && u.protocol === 'redis:') warnings.push('REDIS_URL is not TLS (redis://): acceptable only on a private network (e.g. the staging compose network); use rediss:// for a managed/remote Redis.');
     } catch {
       errors.push('REDIS_URL is not a valid URL.');
     }
@@ -227,7 +234,7 @@ export function collectEnvIssues(env: Env): EnvIssues {
   }
 
   const maps = str(env, 'MAPS_PROVIDER');
-  if (maps !== undefined && maps !== 'google' && maps !== 'deterministic') errors.push('MAPS_PROVIDER must be "google" or "deterministic".');
+  if (maps !== undefined && maps !== 'google' && maps !== 'deterministic' && maps !== 'none') errors.push('MAPS_PROVIDER must be "google", "none" or "deterministic".');
 
   const prefix = str(env, 'UPLOADS_PUBLIC_URL_PREFIX');
   if (prefix !== undefined && !(prefix.startsWith('/') && !prefix.includes('..') && !prefix.includes('//')) && !/^https:\/\/[^/\s]+(\/[^\s]*)?$/.test(prefix)) {
@@ -236,6 +243,23 @@ export function collectEnvIssues(env: Env): EnvIssues {
 
   const cors = parseAllowedOrigins(str(env, 'CORS_ALLOWED_ORIGINS'));
   if (cors.invalid.length > 0) errors.push(`CORS_ALLOWED_ORIGINS contains ${cors.invalid.length} invalid entr${cors.invalid.length === 1 ? 'y' : 'ies'}; each must be an exact http(s) origin such as https://dashboard.example.com (no wildcard, no path).`);
+
+  // Two-factor secrets at rest. A dedicated key is validated wherever it is set; when the admin MFA policy is ON in a deployed
+  // environment it is REQUIRED (otherwise the key would be derived from JWT_REFRESH_SECRET and a routine secret rotation would silently
+  // orphan every enrolled authenticator).
+  const mfaKey = str(env, 'MFA_ENCRYPTION_KEY');
+  if (mfaKey !== undefined && Buffer.from(mfaKey, 'base64').length !== 32) errors.push('MFA_ENCRYPTION_KEY must be 32 random bytes, base64-encoded (e.g. `openssl rand -base64 32`).');
+  const mfaPolicyOn = str(env, 'DASHBOARD_ADMIN_MFA_REQUIRED') === 'true';
+  // Security milestone: required in production/staging even with the policy OFF — admins can enrol voluntarily at any time, and an
+  // authenticator enrolled under the JWT_REFRESH_SECRET-derived key becomes unusable after a routine secret rotation (or after a key is
+  // introduced later). The key must exist BEFORE the first enrolment (docs/security/mfa-rollout.md).
+  if (strict && mfaKey === undefined) {
+    errors.push(
+      mfaPolicyOn
+        ? 'DASHBOARD_ADMIN_MFA_REQUIRED=true needs MFA_ENCRYPTION_KEY in production/staging (so rotating JWT_REFRESH_SECRET cannot orphan enrolled authenticators).'
+        : 'MFA_ENCRYPTION_KEY is required in production/staging (`openssl rand -base64 32`): admins can enrol an authenticator at any time, and without a dedicated key a JWT_REFRESH_SECRET rotation would orphan it. Set it before the first enrolment and never change it.',
+    );
+  }
 
   const trust = parseTrustProxy(str(env, 'TRUST_PROXY'));
   if (trust.error) errors.push(`TRUST_PROXY: ${trust.error}.`);
@@ -270,8 +294,15 @@ export function collectEnvIssues(env: Env): EnvIssues {
       else if (!path.isAbsolute(uploadsDir)) errors.push('UPLOADS_LOCAL_DIR must be an absolute path in production/staging.');
     }
 
-    if ((maps ?? 'google') !== 'google') errors.push('MAPS_PROVIDER=deterministic is a development stub and must not be used in production/staging.');
-    else if (!str(env, 'GOOGLE_MAPS_API_KEY')) errors.push('GOOGLE_MAPS_API_KEY is required in production/staging when MAPS_PROVIDER is google.');
+    // `none` = Maps deliberately deferred (PD-009 G): no map provider at all, so nothing can be priced or ranked on a distance that
+    // was never measured — every delivery is priced and bounded by its active Delivery Zone, dispatch ranks by straight-line distance.
+    if (maps === 'deterministic') errors.push('MAPS_PROVIDER=deterministic is a development stub and must not be used in production/staging.');
+    else if (maps === 'none') {
+      warnings.push(
+        'MAPS_PROVIDER=none: Google Maps is disabled — delivery fees and serviceability come from the selected Delivery Zone only, address search/suggestions are off, and dispatch ranks drivers by straight-line distance (bicycle drivers are not auto-ranked).',
+      );
+      if (str(env, 'GOOGLE_MAPS_API_KEY')) warnings.push('GOOGLE_MAPS_API_KEY is set but unused while MAPS_PROVIDER=none.');
+    } else if (!str(env, 'GOOGLE_MAPS_API_KEY')) errors.push('GOOGLE_MAPS_API_KEY is required in production/staging when MAPS_PROVIDER is google (or set MAPS_PROVIDER=none to run without Maps).');
 
     if (unifonicSet === 0) {
       if (str(env, 'ALLOW_MISSING_SMS_PROVIDER') === 'true') warnings.push('SMS provider (Unifonic) is not configured (ALLOW_MISSING_SMS_PROVIDER=true): OTP/phone-verification messages cannot be sent.');

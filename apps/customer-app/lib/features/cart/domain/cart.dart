@@ -175,6 +175,8 @@ class CartGroup {
     this.adHocPickupLongitude,
     this.adHocDestinationLatitude,
     this.adHocDestinationLongitude,
+    this.adHocPickupLabel,
+    this.adHocDestinationLabel,
     this.vendorNote,
     required this.items,
     this.subtotalMinor,
@@ -193,6 +195,10 @@ class CartGroup {
   final double? adHocPickupLongitude;
   final double? adHocDestinationLatitude;
   final double? adHocDestinationLongitude;
+
+  /// Labels of the origin / destination the CUSTOMER chose (null = the configured default is used).
+  final String? adHocPickupLabel;
+  final String? adHocDestinationLabel;
   final String? vendorNote;
   final List<CartItem> items;
 
@@ -208,6 +214,11 @@ class CartGroup {
 
   bool get isAdHocService => groupType == 'AD_HOC_SERVICE';
 
+  /// "وصّلي لمكان" (Wasally): no product at all — the customer pays the DELIVERY FEE only. (Hatly's "هاتلي من مكان" is the
+  /// other ad-hoc type: its purchase price is pending until bought.)
+  bool get isDeliveryOnly =>
+      isAdHocService && adHocServiceType == 'DELIVER_TO_PLACE';
+
   factory CartGroup.fromJson(Map<String, dynamic> json) {
     return CartGroup(
       id: json['id'] as String,
@@ -222,6 +233,8 @@ class CartGroup {
           (json['adHocDestinationLatitude'] as num?)?.toDouble(),
       adHocDestinationLongitude:
           (json['adHocDestinationLongitude'] as num?)?.toDouble(),
+      adHocPickupLabel: json['adHocPickupLabel'] as String?,
+      adHocDestinationLabel: json['adHocDestinationLabel'] as String?,
       vendorNote: json['vendorNote'] as String?,
       items: (json['items'] as List)
           .map((e) => CartItem.fromJson(e as Map<String, dynamic>))
@@ -257,6 +270,19 @@ class Cart {
   /// True if any group is AD_HOC_SERVICE.
   final bool hasUnpricedItems;
   final bool readyForCheckout;
+
+  /// What a GUEST has: nothing. No cart exists for a visitor without an account (and none is created or fetched).
+  static const empty = Cart(
+      id: '',
+      fulfillmentType: 'DELIVERY',
+      groups: [],
+      subtotalMinor: 0,
+      hasUnpricedItems: false,
+      readyForCheckout: false);
+
+  /// Every group is a delivery-only service: there is no merchandise subtotal to show, only the delivery fee.
+  bool get isDeliveryOnly =>
+      groups.isNotEmpty && groups.every((g) => g.isDeliveryOnly);
 
   int get itemCount => groups.fold(
       0, (sum, g) => sum + g.items.fold(0, (s, i) => s + i.quantity));

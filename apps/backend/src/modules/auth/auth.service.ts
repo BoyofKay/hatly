@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, GoneException, Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -11,11 +11,15 @@ import { User } from '../users/entities/user.entity';
 import { Role } from '../../common/enums/role.enum';
 import { BusinessConfigService } from '../business-config/business-config.service';
 import { LoginAttemptLimiter } from './login-attempt-limiter';
+import { MFA_ROLES, StaffMfaService } from './mfa/staff-mfa.service';
 
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
 }
+
+/** Mirrors the DTO's `@MinLength(8)` — the account-creation path re-checks it so no passwordless account can slip through. */
+const MIN_CUSTOMER_PASSWORD_LENGTH = 8;
 
 @Injectable()
 export class AuthService {
@@ -29,71 +33,45 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly businessConfigService: BusinessConfigService,
     private readonly loginAttemptLimiter: LoginAttemptLimiter,
+    @Optional() private readonly staffMfa?: StaffMfaService,
   ) {}
 
   /**
-   * Customer Authentication Modes addition. The gate is checked FIRST
-   * — before the existing user-creation/OTP-send logic below runs at
-   * all, so OTP-OFF never creates a Redis OTP record and never
-   * reaches OtpService (and, later, an SMS provider) in any way.
-   * `CUSTOMER_OTP_DISABLED` is a GLOBAL system-state fact, not an
-   * account-specific secret — revealing it does not weaken the
-   * existing "do not reveal whether this phone has an account"
-   * enumeration protection below, which is unrelated and unchanged.
+   * THE CUSTOMER AUTH CONTRACT (do not weaken):
+   *  - Every persistent customer account has a PASSWORD, set when it is created (`registerCustomerWithPassword`). Guests who
+   *    only browse have no account; checkout needs an account, which is created with a password.
+   *  - Normal sign-in is phone + password. A one-time code is NEVER a way to sign in, and never creates an account or attaches/
+   *    replaces a password on its own.
+   *  - OTP is only for PHONE VERIFICATION, and only while `CUSTOMER_OTP_ENABLED` is on:
+   *      · registration — the code proves the caller owns the phone BEFORE the account exists (`requestRegistrationCode`, then
+   *        `registerCustomerWithPassword` with that code), so a phone cannot be registered by someone who does not hold it;
+   *      · later — a signed-in customer whose phone is still unverified asks for a code to their OWN phone and confirms it
+   *        (`requestPhoneVerificationOtp` / `verifyPhoneOtp`).
+   *    With OTP off no SMS is needed; the account works with phone + password and the phone stays unverified until a real proof.
    */
-  async requestRegistrationOtp(phone: string, fullName: string): Promise<void> {
-    if (!(await this.businessConfigService.isCustomerOtpEnabled())) {
-      throw new BadRequestException({
-        message: 'OTP authentication is currently unavailable. Please use password sign-in.',
-        details: { code: 'CUSTOMER_OTP_DISABLED' },
-      });
-    }
 
-    const existing = await this.usersService.findByPhone(phone);
-    if (!existing) {
-      await this.usersService.createCustomer({ phone, fullName });
+  /** The `CUSTOMER_OTP_ENABLED` gate (existing BusinessConfig setting). */
+  private async assertOtpEnabled(message: string): Promise<void> {
+    if (!(await this.businessConfigService.isCustomerOtpEnabled())) {
+      throw new BadRequestException({ message, details: { code: 'CUSTOMER_OTP_DISABLED' } });
     }
-    await this.otpService.sendOtp(phone);
   }
 
   /**
-   * Deliberately does NOT distinguish "no account for this phone" from
-   * "OTP sent" in its response or error behavior — both return
-   * successfully with an identical message. Revealing account
-   * existence via a login endpoint is a classic enumeration vector
-   * (spec section 16 / this hardening pass, item 2). If no account
-   * exists, this is a silent no-op: no OTP is generated, no SMS
-   * "would" be sent, but the caller can't tell that from the
-   * response.
+   * RETIRED legacy OTP registration (`POST auth/register`). It used to create a passwordless customer and text a code that
+   * `auth/otp/verify` exchanged for a session — a kind of account the product no longer has. It now never creates anything,
+   * never sends an SMS and never issues a session:
+   *  - OTP off  -> the SAME `CUSTOMER_OTP_DISABLED` answer as before. Older apps treat it as "use the password form", so they
+   *               keep working with phone + password while OTP is off;
+   *  - OTP on   -> 410 `LEGACY_OTP_REGISTRATION_RETIRED`: an older app that only knows OTP registration must be updated to
+   *               register with a password.
    */
-  async requestLoginOtp(phone: string): Promise<void> {
-    const user = await this.usersService.findByPhone(phone);
-    if (!user) {
-      return;
-    }
-    await this.otpService.sendOtp(phone);
-  }
-
-  async verifyOtpAndIssueTokens(phone: string, code: string): Promise<TokenPair> {
-    const isValid = await this.otpService.verifyOtp(phone, code);
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid code.');
-    }
-
-    const user = await this.usersService.findByPhone(phone);
-    if (!user) {
-      // Only reachable if a verified OTP existed for a phone with no
-      // user record, which shouldn't happen given the register/login
-      // flows above — but fail closed rather than issuing tokens for
-      // a non-existent user.
-      throw new UnauthorizedException('Invalid code.');
-    }
-
-    if (!user.isPhoneVerified) {
-      await this.usersService.markPhoneVerified(user.id);
-    }
-
-    return this.issueTokens(user);
+  async rejectLegacyOtpRegistration(): Promise<never> {
+    await this.assertOtpEnabled('OTP authentication is currently unavailable. Please use password sign-in.');
+    throw new GoneException({
+      message: 'OTP registration has been retired. Update the app and register with your phone number and a password.',
+      details: { code: 'LEGACY_OTP_REGISTRATION_RETIRED' },
+    });
   }
 
   /**
@@ -163,7 +141,13 @@ export class AuthService {
    * to every password-authenticated role, closing that gap rather
    * than leaving it Driver-specific.
    */
-  private async authenticateWithPassword(phone: string, password: string, allowedRoles: Role[]): Promise<TokenPair> {
+  private async authenticateWithPassword(
+    phone: string,
+    password: string,
+    allowedRoles: Role[],
+    /** Runs after the password is proven and before any token exists — the place for a second factor. May throw. */
+    secondFactor?: (user: User) => Promise<void>,
+  ): Promise<TokenPair> {
     // Per-account failed-attempt brake: refused BEFORE any password hashing, whatever IP the guesses come from.
     await this.loginAttemptLimiter.assertAllowed(phone);
 
@@ -179,6 +163,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials.');
     }
 
+    if (secondFactor) await secondFactor(user);
     await this.loginAttemptLimiter.clear(phone);
     return this.issueTokens(user);
   }
@@ -198,13 +183,16 @@ export class AuthService {
    * reveals that a phone belongs to a Customer account attempting
    * this endpoint versus any other rejection reason.
    */
-  async loginStaffWithPassword(phone: string, password: string): Promise<TokenPair> {
-    return this.authenticateWithPassword(phone, password, [
-      Role.VENDOR,
-      Role.VENDOR_MANAGER,
-      Role.ADMIN,
-      Role.SUPER_ADMIN,
-    ]);
+  async loginStaffWithPassword(phone: string, password: string, options: { mfaCode?: string; ip?: string } = {}): Promise<TokenPair> {
+    return this.authenticateWithPassword(phone, password, [Role.VENDOR, Role.VENDOR_MANAGER, Role.ADMIN, Role.SUPER_ADMIN], async (user) => {
+      // Second factor: an admin with an authenticator can NOT get tokens from the password alone — through ANY staff sign-in route
+      // (this method backs both `auth/password/login` and `auth/dashboard/login`), so the legacy route cannot be used to skip it.
+      if (!this.staffMfa || !MFA_ROLES.includes(user.role) || !(await this.staffMfa.isEnabledFresh(user.id))) return;
+      if (!options.mfaCode) {
+        throw new UnauthorizedException({ message: 'A verification code is required.', details: { code: 'MFA_REQUIRED' } });
+      }
+      await this.staffMfa.verifyLoginCode(user, options.mfaCode, options.ip);
+    });
   }
 
   /**
@@ -221,83 +209,114 @@ export class AuthService {
   }
 
   /**
-   * Customer Authentication Modes addition (MODE B registration +
-   * Case C/D passwordless-row attachment — the SAME operation, per the
-   * approved design: "equivalent to creating a new unverified Customer
-   * during OTP-OFF mode"). CRITICAL SECURITY RULE, do not weaken:
+   * Step 1 of registration while `CUSTOMER_OTP_ENABLED` is on: texts a one-time code to the phone being registered.
    *
-   *  - no existing row for this phone      -> create a new CUSTOMER
-   *                                            with this password,
-   *                                            isPhoneVerified=false
-   *  - existing row, passwordHash IS NULL   -> attach this password to
-   *                                            THAT row; isPhoneVerified
-   *                                            is left completely
-   *                                            untouched (Case C stays
-   *                                            true if it already was)
-   *  - existing row, passwordHash IS SET    -> REJECT, generically —
-   *                                            this is the sole
-   *                                            mechanism that prevents
-   *                                            account takeover by
-   *                                            anyone who knows another
-   *                                            Customer's phone number.
-   *                                            The failure is
-   *                                            indistinguishable from
-   *                                            any other rejection —
-   *                                            it must never reveal
-   *                                            "this account already
-   *                                            has a password."
-   *
-   * This method NEVER calls `usersService.setPasswordHash` on a row
-   * that already has one — that branch throws before any write.
+   *  - OTP off      -> 400 `CUSTOMER_OTP_DISABLED` (the app then registers with a password alone; the phone stays unverified);
+   *  - phone already has an account -> NOTHING is sent, yet the caller gets the same answer as for a fresh phone, so the route
+   *                    cannot be used to find out which numbers are registered;
+   *  - SMS provider down -> also the same uniform answer (fail closed: no code is stored, so nothing can be verified; the
+   *                    customer simply requests again). The failure is logged for operators.
+   * Throttling: 5/min per client (controller) + the per-phone resend cooldown and attempt limits inside `OtpService`.
    */
-  async registerOrAttachCustomerPassword(phone: string, fullName: string, password: string): Promise<TokenPair> {
-    const existing = await this.usersService.findByPhoneWithPasswordHash(phone);
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    if (!existing) {
-      const user = await this.usersService.createCustomer({ phone, fullName, passwordHash });
-      return this.issueTokens(user);
+  async requestRegistrationCode(phone: string): Promise<void> {
+    await this.assertOtpEnabled('Phone verification is currently unavailable. You can register with your phone number and a password.');
+    if (await this.usersService.findByPhone(phone)) return;
+    try {
+      await this.otpService.sendOtp(phone);
+    } catch (error) {
+      const code = (error as { getResponse?: () => { details?: { code?: string } } })?.getResponse?.()?.details?.code;
+      if (code !== 'SMS_PROVIDER_UNAVAILABLE') throw error;
+      this.logger.error('Registration code could not be sent: the SMS provider is unavailable.');
     }
-
-    if (existing.role !== Role.CUSTOMER || existing.passwordHash) {
-      // Generic failure — indistinguishable from any other rejection.
-      // Covers both "this phone belongs to a non-Customer role" (should
-      // be structurally unreachable via this endpoint's own DTO, but
-      // checked defensively) and "this Customer already has a
-      // password" — the critical anti-takeover rule.
-      throw new UnauthorizedException('Unable to complete registration.');
-    }
-
-    if (!existing.isActive) {
-      throw new UnauthorizedException('Unable to complete registration.');
-    }
-
-    await this.usersService.setPasswordHash(existing.id, passwordHash);
-    // isPhoneVerified is deliberately never read or written here —
-    // Case C (already true) stays true, Case D (already false) stays
-    // false. Re-fetch to get a full, correctly-typed User for
-    // issueTokens (findByPhoneWithPasswordHash's own select list is a
-    // narrow subset).
-    const fullUser = await this.usersService.findById(existing.id);
-    return this.issueTokens(fullUser!);
   }
 
   /**
-   * Customer Authentication Modes addition. Authenticated password
-   * setup/change (Section 8 of the approved design) — the caller's
-   * identity comes from an already-verified session (`userId`
-   * resolved from `@CurrentUser()` at the controller layer, never
-   * client-supplied), so no phone lookup or ownership check is needed
-   * here beyond confirming the account is still a CUSTOMER and active.
-   * Never touches `isPhoneVerified` or phone ownership state.
+   * Customer registration — the one place a customer account is created, and always WITH a password. SECURITY CONTRACT:
+   *
+   *  - `CUSTOMER_OTP_ENABLED` ON: a valid one-time `code` for this phone (from `requestRegistrationCode`) is REQUIRED and is
+   *    consumed BEFORE anything is written, so the caller has proven they hold the phone. The account is then created with the
+   *    phone VERIFIED — decided here, never by the client. Missing code -> 400 `PHONE_VERIFICATION_REQUIRED`; wrong/expired/
+   *    used code -> 401, the same answer whether or not the phone already has an account.
+   *  - `CUSTOMER_OTP_ENABLED` OFF: no SMS and no code; the account is created with the phone UNVERIFIED (a supplied `code` is
+   *    ignored, never trusted). Nothing about verification is fabricated.
+   *  - no account for this phone  -> create a CUSTOMER with this password (bcrypt) and issue a session;
+   *  - ANY existing account       -> REJECT with one generic failure, whatever it is. Registration NEVER sets or changes the
+   *                                  password of an existing account, so knowing a phone number is never enough to take it
+   *                                  over, and the response does not reveal which case applied.
+   *
+   * A missing/short password is rejected at the HTTP edge (DTO) and again here, so a passwordless account can never be created
+   * by mistake.
+   *
+   * ORDER matters: every step that needs Redis (the code check and the refresh-token jti) happens BEFORE the database insert, so
+   * a Redis outage fails the request with nothing persisted — a retry is a clean retry, never a 401 for an account the client
+   * never received a session for. After the insert only local work (signing the JWTs) remains. If the insert itself loses a
+   * race (unique phone), the jti stored for the never-created id is revoked best-effort and otherwise expires with its TTL.
    */
-  async setCustomerPassword(userId: string, newPassword: string): Promise<void> {
-    const user = await this.usersService.findById(userId);
-    if (!user || user.role !== Role.CUSTOMER || !user.isActive) {
+  async registerCustomerWithPassword(phone: string, fullName: string, password: string, code?: string): Promise<TokenPair> {
+    if (typeof password !== 'string' || password.length < MIN_CUSTOMER_PASSWORD_LENGTH) {
+      throw new BadRequestException({ message: 'A password of at least 8 characters is required.', details: { code: 'PASSWORD_REQUIRED' } });
+    }
+
+    let phoneVerified = false;
+    if (await this.businessConfigService.isCustomerOtpEnabled()) {
+      if (typeof code !== 'string' || code.length === 0) {
+        throw new BadRequestException({
+          message: 'Verify your phone number to register: request a code and enter it.',
+          details: { code: 'PHONE_VERIFICATION_REQUIRED' },
+        });
+      }
+      if (!(await this.otpService.verifyOtp(phone, code))) {
+        throw new UnauthorizedException('Invalid or expired code.');
+      }
+      phoneVerified = true;
+    }
+
+    const existing = await this.usersService.findByPhoneWithPasswordHash(phone);
+    if (existing) {
+      throw new UnauthorizedException('Unable to complete registration.');
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    const id = randomUUID();
+    const jti = await this.refreshTokenStore.issue(id, this.refreshTtlSeconds()); // Redis: before the irreversible write
+    try {
+      const user = await this.usersService.createCustomer({ id, phone, fullName, passwordHash, phoneVerified });
+      return await this.issueTokens(user, jti);
+    } catch (error) {
+      await this.refreshTokenStore.revoke(id).catch(() => undefined); // nobody holds this session: no account was created
+      // Two simultaneous registrations of the same phone: the unique index lets exactly one win; the other gets the same
+      // generic refusal as any existing account (never a 500, never a second account).
+      if ((error as { code?: string })?.code === '23505') {
+        throw new UnauthorizedException('Unable to complete registration.');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Authenticated password CHANGE. Identity comes from an already-verified session (`userId` from `@CurrentUser()`), but a
+   * session alone is NOT enough to change a password — a stolen or left-open session must not lock the owner out:
+   *
+   *  - the CURRENT password is required and checked (bcrypt), under the same per-account failed-attempt brake as sign-in;
+   *    missing -> 400 `CURRENT_PASSWORD_REQUIRED`, wrong -> 403 `CURRENT_PASSWORD_INVALID`;
+   *  - an account with no password cannot exist under the product contract; if a leftover one is ever found it is refused
+   *    (generic) rather than completed — a password is never attached by a session or by a one-time code.
+   */
+  async setCustomerPassword(userId: string, newPassword: string, currentPassword?: string): Promise<void> {
+    const user = await this.usersService.findByIdWithPasswordHash(userId);
+    if (!user || user.role !== Role.CUSTOMER || !user.isActive || !user.passwordHash) {
       throw new UnauthorizedException('Unable to update password.');
     }
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await this.usersService.setPasswordHash(userId, passwordHash);
+    if (!currentPassword) {
+      throw new BadRequestException({ message: 'Enter your current password to change it.', details: { code: 'CURRENT_PASSWORD_REQUIRED' } });
+    }
+    await this.loginAttemptLimiter.assertAllowed(user.phone);
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      await this.loginAttemptLimiter.recordFailure(user.phone);
+      throw new ForbiddenException({ message: 'The current password is incorrect.', details: { code: 'CURRENT_PASSWORD_INVALID' } });
+    }
+    await this.loginAttemptLimiter.clear(user.phone);
+    await this.usersService.setPasswordHash(userId, await bcrypt.hash(newPassword, 10));
   }
 
   /**
@@ -368,6 +387,17 @@ export class AuthService {
       throw new UnauthorizedException('User not found.');
     }
     return user.isPhoneVerified;
+  }
+
+  /**
+   * `GET auth/customer/me`: whether the phone is verified AND whether verifying it is possible right now (`CUSTOMER_OTP_ENABLED`).
+   * The app needs the second part to avoid inviting an unverified customer to "verify your phone" while OTP is off — an
+   * instruction that cannot be followed. `phoneVerificationAvailable` says nothing about whether the phone IS verified: with OTP
+   * off an unverified phone simply stays unverified.
+   */
+  async getPhoneVerificationStatus(userId: string): Promise<{ isPhoneVerified: boolean; phoneVerificationAvailable: boolean }> {
+    const isPhoneVerified = await this.getIsPhoneVerified(userId);
+    return { isPhoneVerified, phoneVerificationAvailable: await this.businessConfigService.isCustomerOtpEnabled() };
   }
 
   private refreshTtlSeconds(): number {

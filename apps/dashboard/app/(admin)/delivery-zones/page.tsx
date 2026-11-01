@@ -16,6 +16,8 @@ import {
 import { ServiceArea, listServiceAreas } from '../../../lib/api/admin-service-areas';
 import { useAdminPermission } from '../../../lib/auth/use-admin-permission';
 import { formatMinor, parseEgpToMinorAllowZero } from '../../../lib/money';
+import { useLang } from '../../../lib/ui/lang';
+import { useIsMobile } from '../../../lib/ui/use-media-query';
 
 /**
  * PD-009 — Delivery Zones. A zone is a named local delivery area inside a Service Area ("بلبيس — أبو نصيب"). For an address
@@ -130,7 +132,7 @@ function Field({ label, value, onChange, testId, dir, placeholder }: { label: st
   return (
     <label className="block text-sm">
       <span className="font-medium">{label}</span>
-      <input data-testid={testId} dir={dir} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="mt-1 w-full rounded border px-3 py-2" />
+      <input data-testid={testId} dir={dir} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
     </label>
   );
 }
@@ -175,10 +177,10 @@ function ZoneForm({
   }
 
   return (
-    <form onSubmit={submit} data-testid="zone-form" className="mt-4 space-y-3 rounded border bg-white p-4">
+    <form onSubmit={submit} data-testid="zone-form" className="mt-4 space-y-3 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
       <label className="block text-sm">
         <span className="font-medium">Service area</span>
-        <select data-testid="zone-service-area" value={form.serviceAreaId} onChange={(e) => set('serviceAreaId')(e.target.value)} className="mt-1 w-full rounded border px-3 py-2">
+        <select data-testid="zone-service-area" value={form.serviceAreaId} onChange={(e) => set('serviceAreaId')(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm">
           <option value="">Choose…</option>
           {areas.map((a) => (
             <option key={a.id} value={a.id}>
@@ -212,10 +214,10 @@ function ZoneForm({
         </p>
       )}
       <div className="flex gap-2">
-        <button type="submit" disabled={busy} className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+        <button type="submit" disabled={busy} className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
           {busy ? 'Saving…' : submitLabel}
         </button>
-        <button type="button" onClick={onCancel} className="rounded border px-4 py-2 text-sm">
+        <button type="button" onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
           Cancel
         </button>
       </div>
@@ -270,8 +272,8 @@ function FeeEditor({ zone, canEdit, onSaved }: { zone: DeliveryZone; canEdit: bo
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-1">
-        <input data-testid="zone-fee-input" value={value} onChange={(e) => setValue(e.target.value)} className="w-24 rounded border px-2 py-1 text-sm" />
-        <button data-testid="zone-fee-save" onClick={save} disabled={busy} className="rounded bg-hatly-orange px-2 py-1 text-xs text-white disabled:opacity-50">
+        <input data-testid="zone-fee-input" value={value} onChange={(e) => setValue(e.target.value)} className="w-24 rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+        <button data-testid="zone-fee-save" onClick={save} disabled={busy} className="rounded-lg bg-hatly-orange px-2 py-1 text-xs text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
           {busy ? '…' : 'Save'}
         </button>
         <button onClick={() => setEditing(false)} className="text-xs underline">
@@ -289,6 +291,8 @@ function FeeEditor({ zone, canEdit, onSaved }: { zone: DeliveryZone; canEdit: bo
 }
 
 export default function DeliveryZonesPage() {
+  const { t: tl } = useLang();
+  const isPhone = useIsMobile();
   const [zones, setZones] = useState<DeliveryZone[] | null>(null);
   const [areas, setAreas] = useState<ServiceArea[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -314,10 +318,15 @@ export default function DeliveryZonesPage() {
   }, []);
 
   const areaName = useMemo(() => new Map(areas.map((a) => [a.id, a.nameAr ? `${a.name} / ${a.nameAr}` : a.name])), [areas]);
-  const sorted = useMemo(
-    () => [...(zones ?? [])].sort((a, b) => a.cityAr.localeCompare(b.cityAr) || a.displayOrder - b.displayOrder || a.nameAr.localeCompare(b.nameAr)),
-    [zones],
-  );
+  const [q, setQ] = useState('');
+  const [stateFilter, setStateFilter] = useState<'' | 'active' | 'inactive'>('');
+  const sorted = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return [...(zones ?? [])]
+      .filter((z) => (!stateFilter || (stateFilter === 'active') === z.isActive) && (!needle || [z.name, z.nameAr, z.city, z.cityAr, z.governorate, z.governorateAr].some((v) => (v ?? '').toLowerCase().includes(needle))))
+      .sort((a, b) => a.cityAr.localeCompare(b.cityAr) || a.displayOrder - b.displayOrder || a.nameAr.localeCompare(b.nameAr));
+  }, [zones, q, stateFilter]);
+  const activeCount = (zones ?? []).filter((z) => z.isActive).length;
 
   async function toggle(zone: DeliveryZone) {
     setError(null);
@@ -330,15 +339,15 @@ export default function DeliveryZonesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="max-w-6xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Delivery Zones</h1>
+        <div className="min-w-0"><h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{tl('Delivery Zones', 'مناطق التوصيل')}</h1><p className="mt-1 max-w-3xl text-sm text-gray-500">{tl('The areas you deliver to and the delivery fee of each.', 'المناطق التي توصّل إليها ورسوم التوصيل لكل منها.')}</p></div>
         <button
           data-testid="zone-new"
           onClick={() => setCreating((v) => !v)}
           disabled={!canCreate}
           title={canCreate ? undefined : 'Requires MANAGE_SERVICE_AREAS and MANAGE_DELIVERY_FEE_MULTIPLIER'}
-          className="rounded bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
         >
           {creating ? 'Cancel' : 'New Delivery Zone'}
         </button>
@@ -349,7 +358,7 @@ export default function DeliveryZonesPage() {
           delivery fee (plus the additional-vendor fee for multi-vendor orders).
         </p>
         <p data-testid="zones-hatly-rule">
-          Hatly Service: fee = Delivery Zone fee × Hatly Service multiplier (Settings), with or without a map pin.
+          Hatly &amp; Wasally: fee = base fee × the Hatly &amp; Wasally multiplier (Settings). For a manually chosen area the base fee is this zone&apos;s fee; a GPS address uses road distance instead.
         </p>
         <p>Changes never alter orders that were already placed.</p>
       </div>
@@ -371,7 +380,7 @@ export default function DeliveryZonesPage() {
 
       <div className="mt-6">
         {error && (
-          <div data-testid="zones-error" className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div data-testid="zones-error" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {error}{' '}
             <button onClick={refresh} className="underline">
               Retry
@@ -381,16 +390,29 @@ export default function DeliveryZonesPage() {
         {!error && zones === null && <p className="text-gray-500">Loading...</p>}
         {!error && zones !== null && zones.length === 0 && <p className="text-gray-500">No delivery zones yet.</p>}
         {zones !== null && zones.length > 0 && (
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" data-testid="zones-toolbar">
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl('Search zone, city or governorate', 'ابحث بالمنطقة أو المدينة أو المحافظة')} aria-label={tl('Search zones', 'البحث في المناطق')} className="min-h-[44px] w-full rounded-lg border border-gray-300 px-3 text-sm sm:max-w-sm" />
+            <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value as typeof stateFilter)} aria-label={tl('Status', 'الحالة')} className="min-h-[44px] rounded-lg border border-gray-300 px-2 text-sm">
+              <option value="">{tl('Any status', 'أي حالة')}</option>
+              <option value="active">{tl('Active', 'نشط')}</option>
+              <option value="inactive">{tl('Inactive', 'غير نشط')}</option>
+            </select>
+            <span className="text-xs text-gray-500" aria-live="polite">{tl(`${sorted.length} of ${zones.length} zones · ${activeCount} active`, `${sorted.length} من ${zones.length} منطقة · ${activeCount} نشطة`)}</span>
+          </div>
+        )}
+        {zones !== null && zones.length > 0 && sorted.length === 0 && <p className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-500">{tl('No zone matches these filters.', 'لا توجد منطقة مطابقة.')}</p>}
+        {zones !== null && sorted.length > 0 && !isPhone && (
+          <div className="overflow-x-auto">
           <table data-testid="zones-table" className="mt-2 w-full divide-y rounded border bg-white text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+            <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 tracking-wide">
               <tr>
-                <th className="px-3 py-2">Zone</th>
-                <th className="px-3 py-2">City / service area</th>
-                <th className="px-3 py-2">Delivery fee</th>
-                <th className="px-3 py-2">Order</th>
-                <th className="px-3 py-2">Point</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2" />
+                <th className="px-3 py-2 text-start font-medium">Zone</th>
+                <th className="px-3 py-2 text-start font-medium">City / service area</th>
+                <th className="px-3 py-2 text-start font-medium">Delivery fee</th>
+                <th className="px-3 py-2 text-start font-medium">Order</th>
+                <th className="px-3 py-2 text-start font-medium">Point</th>
+                <th className="px-3 py-2 text-start font-medium">Status</th>
+                <th className="px-3 py-2 text-start font-medium" />
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -451,6 +473,37 @@ export default function DeliveryZonesPage() {
               )}
             </tbody>
           </table>
+          </div>
+        )}
+        {zones !== null && sorted.length > 0 && isPhone && (
+          <ul className="space-y-3" data-testid="zones-cards">
+            {sorted.map((z) => (
+              <li key={`card-${z.id}`} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                {editingId === z.id ? (
+                  <ZoneForm initial={toForm(z)} areas={areas} showFee={false} submitLabel="Save changes" onCancel={() => setEditingId(null)} onSubmit={async (v) => { await updateDeliveryZone(z.id, v.details); setEditingId(null); await refresh(); }} />
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold" dir="rtl">{z.nameAr}</p>
+                        <p className="text-xs text-gray-500">{z.name}</p>
+                        <p className="mt-1 text-xs text-gray-600" dir="rtl">{z.governorateAr} — {z.cityAr}</p>
+                        <p className="text-xs text-gray-400">{areaName.get(z.serviceAreaId) ?? z.serviceAreaId}</p>
+                      </div>
+                      <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${z.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>{z.isActive ? tl('Active', 'نشط') : tl('Inactive', 'غير نشط')}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                      <FeeEditor zone={z} canEdit={canPrice === true && canManage === true} onSaved={refresh} />
+                      <span className="flex gap-2">
+                        <button disabled={canManage !== true} onClick={() => setEditingId(z.id)} className="min-h-[44px] px-2 text-sm font-medium text-hatly-orangeDark disabled:opacity-40">{tl('Edit', 'تعديل')}</button>
+                        <button disabled={canManage !== true} onClick={() => toggle(z)} className="min-h-[44px] px-2 text-sm font-medium text-gray-700 disabled:opacity-40">{z.isActive ? tl('Deactivate', 'إيقاف') : tl('Activate', 'تفعيل')}</button>
+                      </span>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

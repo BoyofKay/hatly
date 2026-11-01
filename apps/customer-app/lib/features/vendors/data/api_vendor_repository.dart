@@ -87,6 +87,8 @@ class ApiVendorRepository implements VendorRepository {
             latitude: (json['latitude'] as num).toDouble(),
             longitude: (json['longitude'] as num).toDouble(),
             isOpen: json['isOpen'] as bool,
+            allowsCustomRequests:
+                json['allowsCustomRequests'] as bool? ?? false,
             openingHours: openingHoursJson.map(
               (day, hours) => MapEntry(
                 day,
@@ -121,6 +123,7 @@ class ApiVendorRepository implements VendorRepository {
     int limit = 20,
     double? latitude,
     double? longitude,
+    String? deliveryZoneId,
     String? subcategoryId,
     bool? openNow,
     bool? hasOffers,
@@ -145,6 +148,7 @@ class ApiVendorRepository implements VendorRepository {
           'limit': limit,
           if (hasCoordinates) 'latitude': latitude,
           if (hasCoordinates) 'longitude': longitude,
+          if (deliveryZoneId != null) 'deliveryZoneId': deliveryZoneId,
           if (subcategoryId != null) 'subcategoryId': subcategoryId,
           // Filters V1.
           if (openNow == true) 'openNow': 'true',
@@ -174,7 +178,10 @@ class ApiVendorRepository implements VendorRepository {
   /// scope) — placeholders are used for those specific fields only,
   /// clearly not real business values, so the existing `VendorCard`
   /// widget (which expects them as non-nullable) doesn't break.
-  Vendor _toVendor(Map<String, dynamic> json) {
+  /// The one mapping from a backend vendor-listing JSON to [Vendor] — also used by the Home aggregation response.
+  static Vendor vendorFromJson(Map<String, dynamic> json) => _toVendor(json);
+
+  static Vendor _toVendor(Map<String, dynamic> json) {
     return Vendor(
       id: json['id'] as String,
       name: json['name'] as String,

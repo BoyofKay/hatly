@@ -86,7 +86,9 @@ function buildHarness(seed: { sectors?: any[]; branches?: any[] }) {
     return qb;
   }
 
+  // `manager.query` answers the branch-closure lookup: no branch is under a closure in these tests.
   const branchesRepository = {
+    manager: { query: jest.fn(async () => []) },
     createQueryBuilder: jest.fn(() => makeQb()),
   };
 
@@ -329,7 +331,9 @@ describe('MarketplaceVendorsService — ServiceArea filtering (Phase I-B)', () =
       };
       return qb;
     }
-    const branchesRepository = { createQueryBuilder: jest.fn(() => makeQb()) };
+    // `manager.query` answers the branch-closure lookup: no branch is under a closure in these tests.
+  const branchesRepository = {
+    manager: { query: jest.fn(async () => []) }, createQueryBuilder: jest.fn(() => makeQb()) };
     const serviceAreaResolverService = { resolveForPoint: jest.fn(async () => opts.resolvedZone) };
     const subcategoriesRepository = {
       findOne: jest.fn(async () => {

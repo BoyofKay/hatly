@@ -1,3 +1,5 @@
+import { branchIdsUnderClosure } from '../../../common/branch-availability';
+import { AddressMode } from '../../addresses/address-mode';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { EntityManager } from 'typeorm';
@@ -11,7 +13,8 @@ import { VendorBranch } from '../../vendors/entities/vendor-branch.entity';
 import { BusinessConfigService } from '../../business-config/business-config.service';
 import { BusinessConfigKey } from '../../business-config/business-config-key.enum';
 import { DeliveryFeeCalculationService } from '../../delivery-fee/delivery-fee-calculation.service';
-import { HatlyServicePricingService } from '../../finance/hatly-service-pricing.service';
+import { HatlyServicePricingService, RouteEndpoint } from '../../finance/hatly-service-pricing.service';
+import { assertNonNegativeUnitPrice, validateOptionSelection } from '../../products/option-selection';
 import { OfferCandidateItem, OfferConsumptionService, OfferSegmentPlan } from '../../offers/offer-consumption.service';
 import { PricingUnit } from '../../products/pricing-unit.enum';
 import { InventoryMode } from '../../products/inventory-mode.enum';
@@ -54,6 +57,8 @@ export class CheckoutPlannerService {
         ? await manager.find(VendorBranch, { where: catalogBranchIds.map((id) => ({ id })), relations: { vendor: true } })
         : [];
     const branchById = new Map(branches.map((b) => [b.id, b]));
+    // A scheduled / temporary closure (not the manual open switch, which stays display-only as before) stops new orders for that branch.
+    const underClosure = await branchIdsUnderClosure(manager, catalogBranchIds);
 
     for (const group of cart.groups) {
       if (group.groupType !== CartGroupType.CATALOG) continue;
@@ -65,6 +70,12 @@ export class CheckoutPlannerService {
           details: { code: 'BRANCH_UNAVAILABLE' },
         });
       }
+      if (underClosure.has(branch.id)) {
+        throw new BadRequestException({
+          message: 'This branch is closed at the moment and is not taking orders.',
+          details: { code: 'BRANCH_TEMPORARILY_CLOSED', vendorBranchId: branch.id },
+        });
+      }
       for (const item of group.items) {
         // A custom (product-less) item is intentionally never "unavailable"; a real product that vanished still is.
         if (!item.productId) continue;
@@ -74,6 +85,11 @@ export class CheckoutPlannerService {
             details: { code: 'PRODUCT_UNAVAILABLE' },
           });
         }
+        // The cart is never trusted to still be valid: an option group may have been edited (or its values removed) after the item
+        // was added. Re-check the chosen options against the product's CURRENT groups — required / min / max / foreign values.
+        const chosenValueIds = (item.selectedOptionValues ?? []).map((sov) => sov.productOptionValueId ?? sov.optionValue?.id).filter((id): id is string => !!id);
+        validateOptionSelection(item.product.options ?? [], chosenValueIds);
+        assertNonNegativeUnitPrice(item.product.priceMinor, item.product.options ?? [], chosenValueIds);
         if (!isOrder && item.product.inventoryMode === InventoryMode.TRACKED) {
           // Read-only hint for the quote; the authoritative check is the atomic decrement at order creation.
           const requested = item.product.pricingUnit === PricingUnit.WEIGHT ? item.requestedWeightGrams ?? 0 : item.quantity;
@@ -120,7 +136,15 @@ export class CheckoutPlannerService {
     // ---- 3. pricing view -----------------------------------------------------------------------------------------
     const vendorNameByBranchId = new Map(branches.map((b) => [b.id, b.vendor?.name ?? b.name]));
     const view = this.cartPricingService.buildCartView(cart, vendorNameByBranchId);
-    const hasPendingAdHocPricing = cart.groups.some((g) => g.groupType === CartGroupType.AD_HOC_SERVICE);
+    // A Hatly Service cart is priced by ZONE (PD-009), not by vendor distance — whichever of its two types it holds.
+    const isAdHocCart = cart.groups.some((g) => g.groupType === CartGroupType.AD_HOC_SERVICE);
+    // ...but only "هاتلي من مكان" (BUY_FROM_PLACE) has a price that is unknown at checkout: Hatly buys something and the amount is
+    // confirmed afterwards. "وصّلي لمكان" (DELIVER_TO_PLACE, Wasally) buys nothing — there is no product price at all, so the
+    // customer pays the DELIVERY FEE ONLY, known right now, under the same payment rules as any ordinary order. Treating it as
+    // "pending" used to null its total and force cash-only.
+    const hasPendingAdHocPricing = cart.groups.some(
+      (g) => g.groupType === CartGroupType.AD_HOC_SERVICE && g.adHocServiceType !== AdHocServiceType.DELIVER_TO_PLACE,
+    );
     const hasWeightedItem = cart.groups.some((g) => g.items.some((i) => i.product?.pricingUnit === PricingUnit.WEIGHT));
 
     // ---- 4. payment-method rules that do not depend on the total --------------------------------------------------
@@ -184,14 +208,19 @@ export class CheckoutPlannerService {
       .filter((b): b is VendorBranch => b !== undefined);
     let address = isPickup ? null : input.address;
     let eligibility: CheckoutPlan['eligibility'] = null;
+    let gpsDistanceUnavailable = false;
 
     // Registered vendors (PD-009): a pin → service-area radius; no pin → the selected active Delivery Zone.
     // Hatly Service (PD-009 amended): the active Delivery Zone is ALWAYS the serviceability source, pin or not (no vendor
     // branch to check, only the address).
     if (!isPickup) {
-      eligibility = hasPendingAdHocPricing
+      eligibility = isAdHocCart
         ? await this.addressValidationService.checkEligibility(address, [], { zoneAuthoritative: true })
-        : await this.addressValidationService.checkEligibility(address, catalogBranches);
+        : // PD-009 G: with Maps disabled the active zone is the ONLY serviceability and pricing source, pin or not (the Hatly
+          // Service rule) — a pin stays on the order for the driver but is never priced; no zone -> ADDRESS_ZONE_REQUIRED.
+          this.deliveryFeeCalculationService.roadDistancePricingAvailable === false
+          ? await this.addressValidationService.checkEligibility(address, catalogBranches, { zoneAuthoritative: true })
+          : await this.addressValidationService.checkEligibility(address, catalogBranches);
       if (!eligibility.serviceable) {
         if (isOrder) {
           throw new BadRequestException({
@@ -200,6 +229,16 @@ export class CheckoutPlannerService {
           });
         }
         blockers.push({ code: eligibility.code ?? 'ADDRESS_NOT_SERVICEABLE', message: eligibility.message ?? '', details: { vendors: eligibility.vendors } });
+      }
+      // GPS METHOD needs the road-distance provider. When it is disabled the customer is told so — the fee is never taken from a zone.
+      if (address?.mode === AddressMode.GPS && eligibility.serviceable && this.deliveryFeeCalculationService.roadDistancePricingAvailable === false) {
+        const unavailable = {
+          message: 'Delivery to a GPS location is not available right now. Please use a manually entered address.',
+          code: 'DISTANCE_PRICING_UNAVAILABLE',
+        };
+        if (isOrder) throw new BadRequestException({ message: unavailable.message, details: { code: unavailable.code } });
+        gpsDistanceUnavailable = true;
+        blockers.push(unavailable);
       }
       // The zone as it is NOW is frozen into the address snapshot (names resolved server-side, never sent by the client);
       // governorate/city follow the zone so the snapshot can never contradict it.
@@ -210,7 +249,10 @@ export class CheckoutPlannerService {
     }
 
     // ---- 5. fingerprint of everything a quote depends on ----------------------------------------------------------
-    const inputsHash = this.fingerprint(input.customerId, cart, view, address, input.couponCode, eligibility);
+    // Hatly / Wasally (PD-012): the resolved route endpoints are part of what a quote depends on, so changing an endpoint — or the
+    // Admin default it fell back to — makes an earlier quote stale. Resolved here (a missing endpoint throws its own clear code).
+    const adHocLocations = isAdHocCart && !isPickup ? await this.resolveAdHocLocations(cart.groups[0], manager) : null;
+    const inputsHash = this.fingerprint(input.customerId, cart, view, address, input.couponCode, eligibility, adHocLocations?.route ?? null);
 
     // ---- 6. delivery fee ------------------------------------------------------------------------------------------
     const delivery: CheckoutPlan['delivery'] = { applicable: !isPickup, feeMinor: null, breakdown: null, source: 'NONE', adHocLocations: null };
@@ -218,7 +260,7 @@ export class CheckoutPlannerService {
     if (isPickup) {
       // PICKUP: nothing is delivered, so the fee is 0 (not an invented price) and no address / service area is involved.
       delivery.feeMinor = 0;
-    } else if (!hasPendingAdHocPricing) {
+    } else if (!isAdHocCart) {
       const eligibleForFee = eligibility?.serviceable === true && address !== null;
       if (eligibleForFee) {
         if (input.frozen && input.frozen.inputsHash === inputsHash) {
@@ -245,21 +287,28 @@ export class CheckoutPlannerService {
         }
       }
     } else {
-      // Hatly Service (ad-hoc): the active zone's fee × the Hatly Service multiplier — never distance, pin or not.
+      // Hatly / Wasally (ad-hoc): base fee by the customer's address method (MANUAL: the zone's fixed fee; GPS: road distance of the
+      // ORIGIN → DESTINATION route) × the multiplier. The route endpoints were resolved above.
       const adHocGroup = cart.groups[0];
-      const locations = await this.resolveAdHocLocations(adHocGroup);
-      if (address && eligibility?.serviceable) {
+      const locations = adHocLocations!;
+      if (address && eligibility?.serviceable && !gpsDistanceUnavailable) {
+       try {
         const charge = await this.hatlyServicePricingService.calculateCharge({
           serviceType: adHocGroup.adHocServiceType!,
-          resolvedPickup:
-            locations.pickupLatitude != null ? { latitude: locations.pickupLatitude, longitude: locations.pickupLongitude! } : null,
-          resolvedDestination:
-            locations.destinationLatitude != null ? { latitude: locations.destinationLatitude, longitude: locations.destinationLongitude! } : null,
+          origin: locations.route!.origin,
+          destination: locations.route!.destination,
           deliveryZone: eligibility.deliveryZone,
+          // Only an address with a method passes it (a legacy address calls exactly as before).
+          ...(address.mode ? { addressMode: address.mode } : {}),
         });
         delivery.breakdown = charge;
         delivery.feeMinor = charge.chargeMinor;
         delivery.source = 'FRESH';
+       } catch (error) {
+        // A quote reports a GPS fee that cannot be measured right now as data; an order (and every other failure) still throws.
+        if (isOrder || address.mode !== AddressMode.GPS) throw error;
+        blockers.push({ code: 'DELIVERY_FEE_UNAVAILABLE', message: 'Delivery fee could not be calculated right now. Please try again shortly.' });
+       }
       }
       delivery.adHocLocations = locations;
     }
@@ -284,6 +333,7 @@ export class CheckoutPlannerService {
           categoryId: item.product.categoryId,
           quantity: item.quantity,
           unitPriceMinor: itemView.unitPriceMinor,
+          basePriceMinor: item.product.priceMinor,
           pricingUnit: item.product.pricingUnit,
         };
         offerCandidateItems.push(candidate);
@@ -466,6 +516,7 @@ export class CheckoutPlannerService {
     address: CheckoutInput['address'],
     couponCode?: string,
     eligibility?: CheckoutPlan['eligibility'],
+    adHocRoute?: { origin: RouteEndpoint; destination: RouteEndpoint } | null,
   ): string {
     const lines = view.groups.flatMap((g) =>
       g.items.map((i) => [
@@ -493,49 +544,80 @@ export class CheckoutPlannerService {
       address?.deliveryZoneId ?? null,
       eligibility?.deliveryZone?.deliveryFeeMinor ?? null,
       eligibility?.pricingSource ?? null,
+      // The address method (only when there is one, so legacy quotes keep their fingerprint): switching between GPS and manual can
+      // never keep an old quote valid.
+      ...(address?.mode ? [address.mode] : []),
+      // Hatly / Wasally route (PD-012), only when there is one so every other quote keeps its fingerprint.
+      ...(adHocRoute
+        ? [[adHocRoute.origin, adHocRoute.destination].map((e) => [Number(e.latitude.toFixed(5)), Number(e.longitude.toFixed(5)), e.source])]
+        : []),
       (couponCode ?? '').trim().toUpperCase(),
     ];
     return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
   }
 
   /**
-   * Hatly Service location semantics (single source of truth — the quote AND the order both come through here):
+   * Hatly / Wasally route semantics (PD-012 — single source of truth: the quote AND the order both come through here). Every request
+   * has a route ORIGIN → DESTINATION; each end is the customer's own choice, else the service's configured default:
    *
-   *  - BUY_FROM_PLACE ("هاتلي من مكان"): the PICKUP is the place the customer specified, and it is resolved here. Its
-   *    destination is the customer's own delivery address (`customerLocation`, taken from the request/their saved address
-   *    and handled by `HatlyServicePricingService.calculateCharge`) — never resolved from configuration.
-   *  - DELIVER_TO_PLACE ("وصّلي لمكان"): the ORIGIN is the customer's own delivery address (same `calculateCharge` input) and
-   *    the DESTINATION is the place the customer specified, resolved here.
+   *  - BUY_FROM_PLACE ("هاتلي من مكان", Hatly): origin = the customer's choice, else `HATLY_SERVICE_DEFAULT_PICKUP_LOCATION`;
+   *    destination = the customer's choice, else `HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION`.
+   *  - DELIVER_TO_PLACE ("وصّلي لمكان", Wasally): origin = ALWAYS the customer's choice (current GPS, a saved address or a map point —
+   *    never assumed to be home); destination = the customer's choice, else `WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION`.
    *
-   * Hatly's own configured locations are NEVER a fallback for a location the customer did not supply. A missing customer
-   * place is rejected with a clear, actionable code instead of being silently replaced:
-   *  - DELIVER_TO_PLACE_DESTINATION_REQUIRED (earlier Launch-Readiness fix),
-   *  - BUY_FROM_PLACE_PICKUP_REQUIRED (this change — the pickup used to fall back to
-   *    `HATLY_SERVICE_DEFAULT_PICKUP_LOCATION`, i.e. a courier sent to Hatly's own office to "buy from a place").
-   * Neither `HATLY_SERVICE_DEFAULT_PICKUP_LOCATION` nor `HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION` is read anywhere in the
-   * order/checkout path any more. A missing customer ADDRESS is rejected separately (`DELIVERY_ADDRESS_REQUIRED`).
+   * The two services never share a default, and the customer's own delivery address is NEVER substituted for a missing end (they may
+   * pick it explicitly). A missing end with no configured default is refused with its own actionable code instead of guessing:
+   * `DELIVER_TO_PLACE_ORIGIN_REQUIRED`, `HATLY_DEFAULT_PICKUP_NOT_CONFIGURED`, `HATLY_DEFAULT_DESTINATION_NOT_CONFIGURED`,
+   * `WASALLY_DEFAULT_DESTINATION_NOT_CONFIGURED`. A missing customer ADDRESS is rejected separately (`DELIVERY_ADDRESS_REQUIRED`) — it
+   * decides the pricing method (zone fee vs road distance), not the route.
    */
-  async resolveAdHocLocations(group: CartVendorGroup): Promise<NonNullable<CheckoutPlan['delivery']['adHocLocations']>> {
-    const empty = { pickupLatitude: null, pickupLongitude: null, destinationLatitude: null, destinationLongitude: null };
+  async resolveAdHocLocations(group: CartVendorGroup, manager?: EntityManager): Promise<NonNullable<CheckoutPlan['delivery']['adHocLocations']>> {
+    const isBuy = group.adHocServiceType === AdHocServiceType.BUY_FROM_PLACE;
+    const isDeliver = group.adHocServiceType === AdHocServiceType.DELIVER_TO_PLACE;
+    if (!isBuy && !isDeliver) {
+      return { pickupLatitude: null, pickupLongitude: null, destinationLatitude: null, destinationLongitude: null, route: null };
+    }
 
-    if (group.adHocServiceType === AdHocServiceType.BUY_FROM_PLACE) {
-      if (group.adHocPickupLatitude != null && group.adHocPickupLongitude != null) {
-        return { ...empty, pickupLatitude: group.adHocPickupLatitude, pickupLongitude: group.adHocPickupLongitude };
-      }
+    const customerEnd = (lat: number | null | undefined, lng: number | null | undefined, label: string | null | undefined): RouteEndpoint | null =>
+      lat != null && lng != null ? { latitude: lat, longitude: lng, label: label ?? null, source: 'CUSTOMER' } : null;
+    const defaultEnd = async (key: BusinessConfigKey): Promise<RouteEndpoint | null> => {
+      const loc = await this.businessConfigService.getServiceLocation(key, manager);
+      return loc ? { latitude: loc.latitude, longitude: loc.longitude, label: loc.label, source: 'DEFAULT' } : null;
+    };
+
+    const origin =
+      customerEnd(group.adHocPickupLatitude, group.adHocPickupLongitude, group.adHocPickupLabel) ??
+      (isBuy ? await defaultEnd(BusinessConfigKey.HATLY_SERVICE_DEFAULT_PICKUP_LOCATION) : null);
+    if (!origin) {
+      throw new BadRequestException(
+        isBuy
+          ? {
+              message: 'Hatly\'s default starting point has not been set up yet. Please choose where to start.',
+              details: { code: 'HATLY_DEFAULT_PICKUP_NOT_CONFIGURED' },
+            }
+          : {
+              message: 'Please choose where to pick up from for this "وصّلي لمكان" request before checking out.',
+              details: { code: 'DELIVER_TO_PLACE_ORIGIN_REQUIRED' },
+            },
+      );
+    }
+    const destination =
+      customerEnd(group.adHocDestinationLatitude, group.adHocDestinationLongitude, group.adHocDestinationLabel) ??
+      (await defaultEnd(
+        isBuy ? BusinessConfigKey.HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION : BusinessConfigKey.WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION,
+      ));
+    if (!destination) {
       throw new BadRequestException({
-        message: 'Please choose the location of the place to buy from for this "هاتلي من مكان" request before checking out.',
-        details: { code: 'BUY_FROM_PLACE_PICKUP_REQUIRED' },
+        message: 'The default destination has not been set up yet. Please choose a destination.',
+        details: { code: isBuy ? 'HATLY_DEFAULT_DESTINATION_NOT_CONFIGURED' : 'WASALLY_DEFAULT_DESTINATION_NOT_CONFIGURED' },
       });
     }
-    if (group.adHocServiceType === AdHocServiceType.DELIVER_TO_PLACE) {
-      if (group.adHocDestinationLatitude != null && group.adHocDestinationLongitude != null) {
-        return { ...empty, destinationLatitude: group.adHocDestinationLatitude, destinationLongitude: group.adHocDestinationLongitude };
-      }
-      throw new BadRequestException({
-        message: 'Please choose a destination for this "وصّلي لمكان" request before checking out.',
-        details: { code: 'DELIVER_TO_PLACE_DESTINATION_REQUIRED' },
-      });
-    }
-    return empty;
+    return {
+      pickupLatitude: origin.latitude,
+      pickupLongitude: origin.longitude,
+      destinationLatitude: destination.latitude,
+      destinationLongitude: destination.longitude,
+      route: { origin, destination },
+    };
   }
 }

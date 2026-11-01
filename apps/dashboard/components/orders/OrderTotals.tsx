@@ -32,7 +32,7 @@ export function OrderTotals({ detail }: { detail: AdminOrderDetail }) {
   );
 
   return (
-    <div className="rounded border bg-white p-4 text-sm" data-testid="order-totals" data-total-pending={totalPending ? 'true' : 'false'}>
+    <div className="rounded-xl border bg-white p-4 text-sm border-gray-200 shadow-sm" data-testid="order-totals" data-total-pending={totalPending ? 'true' : 'false'}>
       <h2 className="font-medium">{t('totalsTitle')}</h2>
       <dl className="mt-2 space-y-1">
         {vendorSegments.length > 0 && row(t('totalsVendorItems'), money(sumSegments(vendorSegments)), 'totals-vendor')}

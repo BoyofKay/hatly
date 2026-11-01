@@ -28,3 +28,18 @@ describe('resolveMapProvider (MAPS_PROVIDER selection)', () => {
     expect(() => resolveMapProvider('bing', 'development', google, deterministic)).toThrow(/Unknown MAPS_PROVIDER/);
   });
 });
+
+describe('resolveMapProvider — MAPS_PROVIDER=none (PD-009 G)', () => {
+  const google = { name: 'google' } as any;
+  const deterministic = { name: 'deterministic' } as any;
+  const unavailable = { name: 'unavailable', available: false } as any;
+
+  it('selects the unavailable provider in production (and any other environment)', () => {
+    expect(resolveMapProvider('none', 'production', google, deterministic, unavailable)).toBe(unavailable);
+    expect(resolveMapProvider('none', 'development', google, deterministic, unavailable)).toBe(unavailable);
+  });
+
+  it('refuses to start rather than fall back when the unavailable provider is not wired', () => {
+    expect(() => resolveMapProvider('none', 'production', google, deterministic)).toThrow(/UnavailableMapProvider/);
+  });
+});

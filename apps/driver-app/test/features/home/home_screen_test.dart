@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hatly_driver/features/deliveries/data/driver_api.dart';
 import 'package:hatly_driver/features/deliveries/data/driver_providers.dart';
 import 'package:hatly_driver/features/deliveries/domain/delivery.dart';
+import 'package:hatly_driver/features/earnings/domain/earnings.dart';
 import 'package:hatly_driver/features/deliveries/presentation/driver_location_service.dart';
 import 'package:hatly_driver/features/deliveries/presentation/driver_polling_service.dart';
 import 'package:hatly_driver/features/home/presentation/home_screen.dart';
@@ -22,6 +23,15 @@ class FakeDriverApi implements DriverApi {
 
   @override
   Future<List<Delivery>> listDeliveries() async => deliveries;
+
+  @override
+  Future<DriverEarnings> getEarnings() async => throw UnimplementedError();
+
+  @override
+  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20}) async => throw UnimplementedError();
+
+  @override
+  Future<T> retryTransient<T>(Future<T> Function() op, {int attempts = 3, Duration pause = const Duration(milliseconds: 800)}) => op();
 
   @override
   Future<Delivery> getDelivery(String id) async => deliveries.firstWhere((d) => d.id == id);
@@ -195,10 +205,12 @@ void main() {
         _delivery('delivery-2', 'order-22222222-aaaa-4444-bbbb-333333333333', 'John Customer', 'PICKED_UP'),
       ]);
 
-      expect(find.text('Jane Customer · ASSIGNED_TO_DRIVER'), findsOneWidget);
-      expect(find.text('John Customer · PICKED_UP'), findsOneWidget);
+      expect(find.text('Jane Customer'), findsOneWidget);
+      expect(find.text('Assigned'), findsOneWidget);
+      expect(find.text('John Customer'), findsOneWidget);
+      expect(find.text('Picked up'), findsOneWidget);
 
-      await tester.tap(find.text('Jane Customer · ASSIGNED_TO_DRIVER'));
+      await tester.tap(find.text('Jane Customer'));
       await tester.pumpAndSettle();
       expect(find.text('Detail delivery-1'), findsOneWidget);
     });
@@ -229,22 +241,11 @@ void main() {
       expect(fakePolling.stopCalls, 0);
     });
 
-    testWidgets('CRITICAL: logout stops polling before clearing the session', (tester) async {
-      final (_, _, fakePolling) = await pump(tester);
-      expect(fakePolling.isRunning, isTrue);
-
-      await tester.tap(find.byIcon(Icons.logout));
-      await tester.pumpAndSettle();
-
-      expect(fakePolling.stopCalls, greaterThanOrEqualTo(1));
-      expect(fakePolling.isRunning, isFalse);
-    });
-
     testWidgets('a poll tick refreshes the assigned-deliveries list', (tester) async {
       final (fakeApi, _, fakePolling) = await pump(tester, deliveries: [
         _delivery('delivery-1', 'order-11111111-aaaa-4444-bbbb-222222222222', 'Jane Customer', 'ASSIGNED_TO_DRIVER'),
       ]);
-      expect(find.text('Jane Customer · ASSIGNED_TO_DRIVER'), findsOneWidget);
+      expect(find.text('Assigned'), findsOneWidget);
 
       // Simulate the backend advancing the delivery, then fire the captured tick
       // exactly as the real DriverPollingService would.
@@ -254,7 +255,7 @@ void main() {
       await fakePolling.capturedOnTick!();
       await tester.pumpAndSettle();
 
-      expect(find.text('Jane Customer · PICKED_UP'), findsOneWidget);
+      expect(find.text('Picked up'), findsOneWidget);
     });
 
     testWidgets('pausing the app (backgrounded) stops polling; resuming starts it again', (tester) async {

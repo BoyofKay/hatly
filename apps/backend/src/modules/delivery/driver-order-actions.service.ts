@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { OrderStateMachineService } from '../orders/order-state-machine.service';
 import { OrderStatus } from '../orders/order-status.enum';
 import { Order } from '../orders/entities/order.entity';
@@ -24,6 +25,7 @@ export class DriverOrderActionsService {
     private readonly orderStateMachine: OrderStateMachineService,
     private readonly proofOfDeliveryService: ProofOfDeliveryService,
     private readonly automaticDispatchService: AutomaticDispatchService,
+    @Optional() private readonly dataSource?: DataSource,
   ) {}
 
   async updateStatus(params: {
@@ -53,6 +55,14 @@ export class DriverOrderActionsService {
 
     const driver = await this.driverAuthorizationService.getDriverForUser(params.userId);
     const delivery = await this.driverAuthorizationService.assertOwnsDelivery(driver.id, params.deliveryId);
+
+    // Retries are safe: a phone that lost the connection mid-request repeats it. If the order is ALREADY in the requested status and this
+    // driver still owns the delivery, the change was applied the first time — answer with the order as it is. Nothing runs twice (no second
+    // proof-of-delivery record, no second side effect), and the app does not have to guess whether its first attempt got through.
+    if (this.dataSource) {
+      const current = await this.dataSource.getRepository(Order).findOne({ where: { id: delivery.orderId } });
+      if (current && current.status === params.to) return current;
+    }
 
     // M4 — Proof of Delivery. Required and validated BEFORE the transition below ever
     // runs: a driver can never reach DELIVERED without first passing this check, since

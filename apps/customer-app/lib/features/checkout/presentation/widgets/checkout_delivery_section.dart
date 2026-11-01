@@ -86,8 +86,9 @@ class CheckoutDeliverySection extends StatelessWidget {
               ),
             ),
             children: [
-              // PD-009: say where the fee comes from — the selected area (no map pin needed) and, for Hatly Service, that area's
-              // fee times the configured multiplier. Both numbers come from the server; nothing is computed here.
+              // PD-009: say where the fee comes from — the selected area (no map pin needed). The customer sees the FINAL fee the
+              // server calculated (above); the zone fee × multiplier it is derived from stays inside the pricing logic and is never
+              // shown as a formula.
               if (delivery.pricedByZone && delivery.deliveryZone != null)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
@@ -95,23 +96,10 @@ class CheckoutDeliverySection extends StatelessWidget {
                     alignment: AlignmentDirectional.centerStart,
                     child: Text(
                       l10n.checkoutDeliveryZonePricing(delivery.deliveryZone!
-                          .areaLabel(Localizations.localeOf(context).languageCode == 'ar')),
+                          .areaLabel(
+                              Localizations.localeOf(context).languageCode ==
+                                  'ar')),
                       key: const Key('checkout-delivery-zone'),
-                      style: context.type.small,
-                    ),
-                  ),
-                ),
-              if (delivery.hatlyService != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: Text(
-                      l10n.checkoutHatlyServiceFeeFormula(
-                        formatMinorUnits(delivery.hatlyService!.zoneDeliveryFeeMinor, context),
-                        delivery.hatlyService!.multiplierText,
-                      ),
-                      key: const Key('checkout-hatly-service-fee'),
                       style: context.type.small,
                     ),
                   ),

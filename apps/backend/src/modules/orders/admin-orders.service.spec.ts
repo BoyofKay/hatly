@@ -26,6 +26,7 @@ function buildHarness(seed: {
   dispatchAlerts?: any[];
 }) {
   const dataSource = {
+    query: async (sql: string) => (/SUM\(amount_delta_minor\)/.test(sql) ? [{ n: 0 }] : []),
     getRepository: (EntityClass: any) => {
       if (EntityClass === Order) return { findOne: async () => seed.order ?? null };
       if (EntityClass === OrderVendorSegment) return { find: async () => seed.segments ?? [] };
@@ -232,7 +233,7 @@ describe('AdminOrdersService.getOne — operational facts (Control Tower milesto
     const detail = await service.getOne('order-1');
     expect(detail.timeline.map((t) => t.status)).toEqual(['PENDING', 'READY_FOR_PICKUP', 'ASSIGNED_TO_DRIVER']);
     expect(detail.delivery).toMatchObject({ assignedAt: delivery.assignedAt, acceptDeadlineAt: delivery.acceptDeadlineAt, reassignmentCount: 1 });
-    expect(detail.dispatchAlerts).toEqual([{ id: 'alert-1', reason: 'NO_ELIGIBLE_DRIVER', createdAt: new Date('2026-10-03T09:31:00Z'), resolvedAt: new Date('2026-10-03T10:00:00Z') }]);
+    expect(detail.dispatchAlerts).toEqual([{ id: 'alert-1', reason: 'NO_ELIGIBLE_DRIVER', detail: null, createdAt: new Date('2026-10-03T09:31:00Z'), resolvedAt: new Date('2026-10-03T10:00:00Z') }]);
     expect(detail.driver).toMatchObject({ id: 'driver-1', fullName: 'Driver One' });
   });
 

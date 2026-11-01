@@ -169,6 +169,102 @@ describe('E2E — offers', () => {
       expect(Number((await offerRow(offer.id)).consumed_units_count)).toBe(2);
     });
 
+    it('DISPLAY = PAYABLE: the price shown on the product list and details is exactly what the cart previews and the order charges (the Kefta 90-vs-110 bug)', async () => {
+      const v = await newVendor('Kefta Vendor');
+      const p = await s.product(v, { name: 'Kefta', priceMinor: 11000 });
+      await createOffer({ vendorBranchId: v.branchId, name: 'Kefta 90', mechanism: 'FLASH_SALE', specialPriceMinor: 9000, productIds: [p.id], ...window() });
+
+      const list = expectData<any[]>(await world.api('get', `/vendor-branches/${v.branchId}/products`));
+      const listed = list.find((x) => x.id === p.id);
+      const detail = expectData<any>(await world.api('get', `/products/${p.id}`));
+      for (const shown of [listed, detail]) {
+        expect(shown.priceMinor).toBe(11000);
+        expect(shown.activeOffer).toEqual({ mechanism: 'FLASH_SALE', specialPriceMinor: 9000 }); // no cap → no perOrderLimit
+      }
+
+      const c = await s.customer();
+      const cart = await s.addToCart(c, p.id, 1);
+      expect(cart.groups[0].items[0]).toMatchObject({ unitPriceMinor: 11000, specialPriceMinor: 9000, payableLineTotalMinor: 9000 });
+      const order = await s.checkout(c, home);
+      expect(order.subtotalMinor - order.discountMinor).toBe(9000); // what the product card promised
+      expect(order.segments[0].items[0]).toMatchObject({ offerSpecialPriceMinorSnapshot: 9000 });
+    });
+
+    it('advertises the per-order cap, and the capped quantity total the app estimates equals the cart and the order', async () => {
+      const v = await newVendor('Capped Vendor');
+      const p = await s.product(v, { priceMinor: 11000 });
+      await createOffer({ vendorBranchId: v.branchId, name: 'Cap 2', mechanism: 'FLASH_SALE', specialPriceMinor: 9000, productIds: [p.id], perOrderLimit: 2, ...window() });
+      const detail = expectData<any>(await world.api('get', `/products/${p.id}`));
+      expect(detail.activeOffer).toEqual({ mechanism: 'FLASH_SALE', specialPriceMinor: 9000, perOrderLimit: 2 });
+      const estimate = (qty: number) => 11000 * qty - Math.min(qty, detail.activeOffer.perOrderLimit) * (11000 - detail.activeOffer.specialPriceMinor); // the app's formula
+      const c = await s.customer();
+      const cart = await s.addToCart(c, p.id, 3);
+      expect(cart.groups[0].items[0].payableLineTotalMinor).toBe(estimate(3));
+      const order = await s.checkout(c, home);
+      expect(order.subtotalMinor - order.discountMinor).toBe(estimate(3)); // 2 × 90 + 1 × 110 = 290
+    });
+
+    it('OPTIONS ARE ADDED ON TOP of the promotional base: base 150 → promo 100, option +20 → 120 per unit in the cart preview, the quote and the persisted order (never 100)', async () => {
+      const v = await newVendor('Promo Options Vendor');
+      const p = await s.product(v, { name: 'Burger', priceMinor: 15000 });
+      const [opt] = await world.ds.query('INSERT INTO product_options (product_id, name, is_required, allows_multiple) VALUES ($1, $2, true, false) RETURNING id', [p.id, 'Extra']);
+      const [plain] = await world.ds.query('INSERT INTO product_option_values (option_id, name, price_delta_minor) VALUES ($1, $2, 0) RETURNING id', [opt.id, 'Plain']);
+      const [paid] = await world.ds.query('INSERT INTO product_option_values (option_id, name, price_delta_minor) VALUES ($1, $2, 2000) RETURNING id', [opt.id, 'Extra cheese']);
+      const offer = expectData(await createOffer({ vendorBranchId: v.branchId, name: 'Burger 100', mechanism: 'FLASH_SALE', specialPriceMinor: 10000, productIds: [p.id], ...window() }), 201);
+
+      // The card still promises the promotional BASE only.
+      const detail = expectData<any>(await world.api('get', `/products/${p.id}`));
+      expect(detail.priceMinor).toBe(15000);
+      expect(detail.activeOffer).toEqual({ mechanism: 'FLASH_SALE', specialPriceMinor: 10000 });
+
+      const c = await s.customer();
+      const withPaid = await world.api('post', '/cart/items', { token: c.accessToken, body: { productId: p.id, quantity: 1, selectedOptionValueIds: [paid.id] } });
+      const cart = expectData<any>(withPaid, 201);
+      expect(cart.groups[0].items[0]).toMatchObject({ unitPriceMinor: 17000, offerDiscountAmountMinor: 5000, payableLineTotalMinor: 12000 });
+
+      const order = await s.checkout(c, home);
+      expect(order.subtotalMinor).toBe(17000);
+      expect(order.discountMinor).toBe(5000);
+      expect(order.subtotalMinor - order.discountMinor).toBe(12000);
+      expect(order.segments[0].items[0]).toMatchObject({ unitPriceMinor: 17000, offerDiscountAmountMinor: 5000, offerSpecialPriceMinorSnapshot: 10000 });
+      expect(Number((await offerRow(offer.id)).consumed_units_count)).toBe(1);
+
+      // The free option: the same promo, no extra amount.
+      await world.api('delete', '/cart', { token: c.accessToken });
+      const free = expectData<any>(await world.api('post', '/cart/items', { token: c.accessToken, body: { productId: p.id, quantity: 2, selectedOptionValueIds: [plain.id] } }), 201);
+      expect(free.groups[0].items[0]).toMatchObject({ unitPriceMinor: 15000, offerDiscountAmountMinor: 10000, payableLineTotalMinor: 20000 });
+    });
+
+    it('a WEIGHT product is never advertised with an offer, and checkout charges its normal price (the card would otherwise promise a price that is never charged)', async () => {
+      const v = await newVendor('Weighed Vendor');
+      const p = await s.product(v, { priceMinor: 11000, pricingUnit: 'WEIGHT' });
+      await createOffer({ vendorBranchId: v.branchId, name: 'Weighed 90', mechanism: 'FLASH_SALE', specialPriceMinor: 9000, productIds: [p.id], ...window() });
+      const detail = expectData<any>(await world.api('get', `/products/${p.id}`));
+      expect(detail.activeOffer).toBeNull();
+      const list = expectData<any[]>(await world.api('get', `/vendor-branches/${v.branchId}/products`));
+      expect(list.find((x) => x.id === p.id).activeOffer).toBeNull();
+      const c = await s.customer();
+      const cart = await s.addToCart(c, p.id, 1, { requestedWeightGrams: 1000 });
+      expect(cart.groups[0].items[0].lineTotalMinor).toBe(11000);
+      expect(cart.groups[0].items[0].payableLineTotalMinor ?? 11000).toBe(11000);
+    });
+
+    it('an exhausted flash sale (global allocation used up) is no longer advertised, and a special price that is not below the price is never shown', async () => {
+      const v = await newVendor('Exhausted Vendor');
+      const p = await s.product(v, { priceMinor: 10000, inventoryMode: 'TRACKED', quantity: 50 });
+      const offer = expectData<any>(await createOffer({ vendorBranchId: v.branchId, name: 'One unit', mechanism: 'FLASH_SALE', specialPriceMinor: 5000, productIds: [p.id], totalAllocationLimit: 1, ...window() }), 201);
+      expect(expectData<any>(await world.api('get', `/products/${p.id}`)).activeOffer).toMatchObject({ mechanism: 'FLASH_SALE', specialPriceMinor: 5000 });
+      const c = await s.customer();
+      await s.addToCart(c, p.id, 1);
+      await s.checkout(c, home); // consumes the single allocated unit
+      expect(Number((await offerRow(offer.id)).consumed_units_count)).toBe(1);
+      expect(expectData<any>(await world.api('get', `/products/${p.id}`)).activeOffer).toBeNull();
+
+      const noDiscount = await s.product(v, { priceMinor: 4000 });
+      await createOffer({ vendorBranchId: v.branchId, name: 'Not a discount', mechanism: 'FLASH_SALE', specialPriceMinor: 4000, productIds: [noDiscount.id], ...window() });
+      expect(expectData<any>(await world.api('get', `/products/${noDiscount.id}`)).activeOffer).toBeNull();
+    });
+
     it('perCustomerLifetimeLimit: the second order over the limit is refused with FLASH_SALE_LIMIT_EXCEEDED and creates nothing', async () => {
       const v = await newVendor('Lifetime Vendor');
       const p = await s.product(v, { priceMinor: 10000, inventoryMode: 'TRACKED', quantity: 50 });
@@ -242,8 +338,8 @@ describe('E2E — offers', () => {
     });
   });
 
-  describe('CHARACTERIZATION — subtotal-discount consumption on cancellation', () => {
-    it('cancelling an order that used a SUBTOTAL_DISCOUNT does not return its consumption/budget (only flash-sale allocation is reversed today)', async () => {
+  describe('subtotal-discount consumption on cancellation (PD-014: it is returned, once)', () => {
+    it('cancelling an order that used a SUBTOTAL_DISCOUNT returns its consumption and budget (superseding the earlier "never returned" characterization)', async () => {
       const v = await newVendor('Sub Reversal Vendor');
       const p = await s.product(v, { priceMinor: 10000 });
       const offer = expectData(await createOffer({ vendorBranchId: v.branchId, name: 'Cap', mechanism: 'SUBTOTAL_DISCOUNT', discountType: 'FIXED', discountValue: 1000, budgetCapMinor: 1000, ...window() }), 201);
@@ -252,7 +348,9 @@ describe('E2E — offers', () => {
       const order = await s.checkout(c, home);
       expect(order.discountMinor).toBe(1000);
       expectData(await world.api('patch', `/orders/${order.id}/status`, { token: superAdmin.accessToken, body: { status: 'CANCELLED', cancellationReason: 'x' } }));
-      expect(Number((await offerRow(offer.id)).consumed_discount_minor)).toBe(1000); // budget stays consumed
+      expect(Number((await offerRow(offer.id)).consumed_discount_minor)).toBe(0); // the budget comes back with the cancelled order
+      expect(Number((await offerRow(offer.id)).consumed_units_count)).toBe(0);
+      expect(await world.ds.query('SELECT is_reversed FROM offer_consumptions WHERE order_id = $1', [order.id])).toEqual([{ is_reversed: true }]);
     });
   });
 });

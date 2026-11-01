@@ -44,6 +44,7 @@ const PROD_ENV = {
   FCM_CLIENT_EMAIL: 'svc@hatly-prod.iam.gserviceaccount.com',
   FCM_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n',
   TRUST_PROXY: '1',
+  MFA_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString('base64'),
 };
 
 const errorsOf = (env: Record<string, unknown>) => collectEnvIssues(env).errors;
@@ -320,5 +321,66 @@ describe('database TLS options', () => {
 
   it('only an explicit DB_SSL_REJECT_UNAUTHORIZED=false disables verification (which production rejects at boot)', () => {
     expect(buildDatabaseSslOptions({ DB_SSL: 'true', DB_SSL_REJECT_UNAUTHORIZED: 'false' })).toEqual({ rejectUnauthorized: false });
+  });
+});
+
+describe('environment validation — two-factor encryption key', () => {
+  const key = Buffer.alloc(32, 7).toString('base64');
+  it('development keeps working without it (secrets are then derived from the refresh secret)', () => {
+    expect(errorsOf(without(DEV_ENV, 'MFA_ENCRYPTION_KEY'))).toEqual([]);
+  });
+  it('production/staging refuse to boot WITHOUT the dedicated key even with the policy OFF (admins can enrol voluntarily; the key must predate the first enrolment)', () => {
+    for (const NODE_ENV of ['production', 'staging']) {
+      for (const policy of [undefined, 'false', 'true']) {
+        const env = { ...without(PROD_ENV, 'MFA_ENCRYPTION_KEY'), NODE_ENV, ...(policy ? { DASHBOARD_ADMIN_MFA_REQUIRED: policy } : {}) };
+        expect(errorsOf(env).join('\n')).toMatch(/MFA_ENCRYPTION_KEY/);
+        expect(() => validateEnvironment(env)).toThrow(ConfigurationError);
+      }
+    }
+    expect(errorsOf(PROD_ENV)).toEqual([]);
+    expect(errorsOf({ ...PROD_ENV, DASHBOARD_ADMIN_MFA_REQUIRED: 'false' })).toEqual([]);
+  });
+  it('when the admin MFA policy is ON in production/staging the dedicated key is required', () => {
+    expect(errorsOf({ ...without(PROD_ENV, 'MFA_ENCRYPTION_KEY'), DASHBOARD_ADMIN_MFA_REQUIRED: 'true' }).join('\n')).toMatch(/MFA_ENCRYPTION_KEY/);
+    expect(errorsOf({ ...PROD_ENV, DASHBOARD_ADMIN_MFA_REQUIRED: 'true', MFA_ENCRYPTION_KEY: key })).toEqual([]);
+  });
+  it('a malformed key is rejected wherever it is set', () => {
+    expect(errorsOf({ ...PROD_ENV, MFA_ENCRYPTION_KEY: 'too-short' }).join('\n')).toMatch(/32 random bytes/);
+    expect(errorsOf({ ...DEV_ENV, MFA_ENCRYPTION_KEY: 'AAAA' }).join('\n')).toMatch(/32 random bytes/);
+    expect(errorsOf({ ...DEV_ENV, MFA_ENCRYPTION_KEY: key })).toEqual([]);
+  });
+});
+
+describe('environment validation — Redis authentication (security milestone)', () => {
+  it('production/staging refuse an unauthenticated Redis unless explicitly acknowledged; a password (or rediss with a password) passes', () => {
+    const noPass = { ...PROD_ENV, REDIS_URL: 'rediss://cache.internal.example:6380' };
+    expect(errorsOf(noPass).join('\n')).toMatch(/REDIS_URL must carry a password/);
+    expect(errorsOf({ ...noPass, ALLOW_UNAUTHENTICATED_REDIS: 'true' })).toEqual([]);
+    expect(errorsOf(PROD_ENV)).toEqual([]); // rediss://:<password>@…
+    expect(errorsOf({ ...PROD_ENV, REDIS_URL: 'redis://:pw-123456@redis:6379' })).toEqual([]); // the staging compose shape
+  });
+  it('a plain (non-TLS) redis:// in production/staging is a warning, not an error; development is unaffected', () => {
+    expect(collectEnvIssues({ ...PROD_ENV, REDIS_URL: 'redis://:pw-123456@redis:6379' }).warnings.join('\n')).toMatch(/not TLS/);
+    expect(errorsOf({ ...DEV_ENV, REDIS_URL: 'redis://localhost:6379' })).toEqual([]);
+  });
+});
+
+describe('environment validation — MAPS_PROVIDER=none (PD-009 G: Maps deferred)', () => {
+  it('boots in production without a Google key, with a visible warning', () => {
+    const env = { ...without(PROD_ENV, 'GOOGLE_MAPS_API_KEY'), MAPS_PROVIDER: 'none' };
+    expect(errorsOf(env)).toEqual([]);
+    expect(collectEnvIssues(env).warnings.join('\n')).toMatch(/MAPS_PROVIDER=none: Google Maps is disabled/);
+  });
+
+  it('warns (does not fail) when a Google key is configured but unused', () => {
+    const issues = collectEnvIssues({ ...PROD_ENV, MAPS_PROVIDER: 'none' });
+    expect(issues.errors).toEqual([]);
+    expect(issues.warnings.join('\n')).toMatch(/GOOGLE_MAPS_API_KEY is set but unused/);
+  });
+
+  it('still requires the key for google and still refuses the deterministic stub and unknown values in production', () => {
+    expect(errorsOf(without(PROD_ENV, 'GOOGLE_MAPS_API_KEY')).join('\n')).toMatch(/GOOGLE_MAPS_API_KEY is required .*\(or set MAPS_PROVIDER=none/);
+    expect(errorsOf({ ...PROD_ENV, MAPS_PROVIDER: 'deterministic' }).join('\n')).toMatch(/MAPS_PROVIDER=deterministic/);
+    expect(errorsOf({ ...PROD_ENV, MAPS_PROVIDER: 'off' }).join('\n')).toMatch(/MAPS_PROVIDER must be "google", "none" or "deterministic"/);
   });
 });

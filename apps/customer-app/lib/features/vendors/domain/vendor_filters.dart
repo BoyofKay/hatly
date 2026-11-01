@@ -49,7 +49,9 @@ class VendorFilters {
       // parameter keeps its literal `int` type at runtime (Dart's int->double
       // literal promotion only applies when the target type is `double`
       // itself, not when erased to `Object?` first) — a bare cast would throw.
-      minRating: minRating == _unset ? this.minRating : (minRating as num?)?.toDouble(),
+      minRating: minRating == _unset
+          ? this.minRating
+          : (minRating as num?)?.toDouble(),
     );
   }
 

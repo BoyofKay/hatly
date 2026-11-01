@@ -6,13 +6,20 @@ import '../../../../core/theme/hatly_theme.dart';
 import '../../../../core/utils/egypt_phone_number.dart';
 import '../../../../shared_widgets/hatly_primary_button.dart';
 import '../auth_error_messages.dart';
+import '../auth_gate.dart';
 import '../otp_flow_controller.dart';
 import '../widgets/auth_error_notice.dart';
 import '../widgets/egypt_phone_field.dart';
 import '../../../../shared_widgets/hatly_logo.dart';
 
+enum _EntryForm { login, register }
+
 class PhoneEntryScreen extends ConsumerStatefulWidget {
-  const PhoneEntryScreen({super.key});
+  /// [returnTo]: where the customer was headed when sign-in was required (already sanitised by the router); the code step
+  /// carries it so the redirect after a successful sign-in/registration can honour it.
+  const PhoneEntryScreen({super.key, this.returnTo});
+
+  final String? returnTo;
 
   @override
   ConsumerState<PhoneEntryScreen> createState() => _PhoneEntryScreenState();
@@ -22,24 +29,26 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
   final _phoneController = TextEditingController();
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
 
   // Local (client-side) validation error, kept separate from the
   // flow controller's server-side errorCode — they're shown the same
   // way but come from different sources and shouldn't be conflated.
   String? _localValidationError;
 
-  /// Customer Authentication Modes (master implementation). Only
-  /// meaningful once `flowState.mode == AuthMode.password` — toggles
-  /// between the register/attach sub-form (phone+fullName+password,
-  /// the default) and the plain login sub-form (phone+password only),
-  /// both on this same screen, no new route.
-  bool _isLoginSubForm = false;
+  /// Which form is showing: sign in (phone + password — the default, and the ONLY way to sign in) or register (full name +
+  /// phone + password + confirmation; every account is created with a password). Whether a verification code follows a
+  /// registration is decided by the backend afterwards; nothing here depends on the OTP setting.
+  _EntryForm _form = _EntryForm.login;
+
+  bool get _registering => _form == _EntryForm.register;
 
   @override
   void dispose() {
     _phoneController.dispose();
     _nameController.dispose();
     _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
@@ -47,22 +56,23 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final flowState = ref.watch(otpFlowControllerProvider);
-    final isPasswordMode = flowState.mode == AuthMode.password;
 
+    leaveAuthFlowWhenSignedIn(context, ref, isMounted: () => mounted);
     ref.listen(otpFlowControllerProvider, (previous, next) {
       if (previous?.step != OtpFlowStep.otpSent &&
           next.step == OtpFlowStep.otpSent) {
-        context.push('/otp');
+        context.push(signInLocation(returnTo: widget.returnTo)
+            .replaceFirst(kSignInPath, kOtpPath));
       }
     });
 
     final displayedError = _localValidationError ??
         (flowState.errorCode != null
-            ? localizedErrorMessage(context, flowState.errorCode)
+            ? localizedPasswordAuthError(context, flowState.errorCode,
+                registering: _registering)
             : null);
 
     final p = context.palette;
-    final isLoginForm = isPasswordMode && _isLoginSubForm;
 
     return Scaffold(
       body: SafeArea(
@@ -80,7 +90,17 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: HatlySpacing.xl),
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: TextButton(
+                        key: const Key('browse-as-guest'),
+                        onPressed: flowState.isSubmitting
+                            ? null
+                            : () => context.go('/'),
+                        child: Text(l10n.guestBrowseAction),
+                      ),
+                    ),
+                    const SizedBox(height: HatlySpacing.md),
                     const Center(child: HatlyLogo(size: 88)),
                     const SizedBox(height: HatlySpacing.lg),
                     Text(l10n.authWelcomeTitle, style: context.type.h1),
@@ -90,7 +110,7 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                       style: context.type.body.copyWith(color: p.textMuted),
                     ),
                     const SizedBox(height: HatlySpacing.xl),
-                    if (!isLoginForm) ...[
+                    if (_registering) ...[
                       _FieldLabel(l10n.fullNameLabel),
                       TextField(
                         controller: _nameController,
@@ -104,31 +124,56 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                     _FieldLabel(l10n.phoneNumberLabel),
                     EgyptPhoneField(
                         controller: _phoneController, autofocus: false),
-                    if (isPasswordMode) ...[
+                    const SizedBox(height: HatlySpacing.md),
+                    _FieldLabel(l10n.passwordLabel),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      enableSuggestions: false,
+                      autocorrect: false,
+                      autofillHints: [
+                        _form == _EntryForm.login
+                            ? AutofillHints.password
+                            : AutofillHints.newPassword
+                      ],
+                      textInputAction: _registering
+                          ? TextInputAction.next
+                          : TextInputAction.done,
+                      onSubmitted: _registering ? null : (_) => _submit(l10n),
+                      style: context.type.body.copyWith(color: p.textPrimary),
+                      decoration: InputDecoration(hintText: l10n.passwordHint),
+                    ),
+                    if (_registering) ...[
                       const SizedBox(height: HatlySpacing.md),
-                      _FieldLabel(l10n.passwordLabel),
+                      _FieldLabel(l10n.passwordConfirmLabel),
                       TextField(
-                        controller: _passwordController,
+                        controller: _confirmController,
                         obscureText: true,
+                        enableSuggestions: false,
+                        autocorrect: false,
                         textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _submit(l10n),
                         style: context.type.body.copyWith(color: p.textPrimary),
                         decoration:
                             InputDecoration(hintText: l10n.passwordHint),
                       ),
-                      const SizedBox(height: HatlySpacing.sm),
-                      Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: TextButton(
-                          onPressed: () => setState(
-                              () => _isLoginSubForm = !_isLoginSubForm),
-                          child: Text(
-                            _isLoginSubForm
-                                ? l10n.passwordCreateAccountInstead
-                                : l10n.passwordHaveAccountInstead,
-                          ),
+                    ],
+                    const SizedBox(height: HatlySpacing.sm),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton(
+                        onPressed: flowState.isSubmitting
+                            ? null
+                            : () => _switchTo(_form == _EntryForm.login
+                                ? _EntryForm.register
+                                : _EntryForm.login),
+                        child: Text(
+                          _form == _EntryForm.login
+                              ? l10n.passwordCreateAccountInstead
+                              : l10n.passwordHaveAccountInstead,
                         ),
                       ),
-                    ],
+                    ),
                     if (displayedError != null) ...[
                       const SizedBox(height: HatlySpacing.md),
                       AuthErrorNotice(message: displayedError),
@@ -150,43 +195,57 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
     );
   }
 
+  /// Switches form. Typed passwords are dropped (never carried between forms) and stale errors cleared; the phone is kept.
+  void _switchTo(_EntryForm form) {
+    ref.read(otpFlowControllerProvider.notifier).clearError();
+    setState(() {
+      _form = form;
+      _localValidationError = null;
+      _passwordController.clear();
+      _confirmController.clear();
+    });
+  }
+
+  /// Minimum password length, mirroring the backend's `@MinLength(8)` on registration. Sign-in only requires a value so an
+  /// older, shorter password can still be used to sign in.
+  static const _minPasswordLength = 8;
+
   void _submit(AppLocalizations l10n) {
-    final isPasswordMode =
-        ref.read(otpFlowControllerProvider).mode == AuthMode.password;
     final fullName = _nameController.text.trim();
     final normalizedPhone = EgyptPhoneNumber.normalize(_phoneController.text);
     final password = _passwordController.text;
 
-    setState(() {
-      if (normalizedPhone == null) {
-        _localValidationError = l10n.phoneInvalid;
-      } else if (!(isPasswordMode && _isLoginSubForm) && fullName.isEmpty) {
-        _localValidationError = l10n.fullNameRequired;
-      } else if (isPasswordMode && password.isEmpty) {
-        _localValidationError = l10n.passwordRequired;
-      } else {
-        _localValidationError = null;
-      }
-    });
-
-    if (_localValidationError != null) return;
-
-    if (!isPasswordMode) {
-      ref
-          .read(otpFlowControllerProvider.notifier)
-          .requestOtp(normalizedPhone: normalizedPhone!, fullName: fullName);
-      return;
-    }
-
-    if (_isLoginSubForm) {
-      ref
-          .read(otpFlowControllerProvider.notifier)
-          .passwordLogin(normalizedPhone: normalizedPhone!, password: password);
+    final String? error;
+    if (normalizedPhone == null) {
+      // A number with another country's code (e.g. +966…) is not accepted — say so plainly rather than "doesn't look right".
+      error = EgyptPhoneNumber.looksInternational(_phoneController.text)
+          ? l10n.phoneEgyptOnly
+          : l10n.phoneInvalid;
+    } else if (_registering && fullName.isEmpty) {
+      error = l10n.fullNameRequired;
+    } else if (password.isEmpty) {
+      error = l10n.passwordRequired;
+    } else if (_form != _EntryForm.login &&
+        password.length < _minPasswordLength) {
+      error = l10n.passwordTooShort;
+    } else if (_form != _EntryForm.login &&
+        password != _confirmController.text) {
+      error = l10n.passwordMismatch;
     } else {
-      ref.read(otpFlowControllerProvider.notifier).passwordRegister(
+      error = null;
+    }
+    setState(() => _localValidationError = error);
+    if (error != null) return;
+
+    final controller = ref.read(otpFlowControllerProvider.notifier);
+    if (_registering) {
+      controller.passwordRegister(
           normalizedPhone: normalizedPhone!,
           fullName: fullName,
           password: password);
+    } else {
+      controller.passwordLogin(
+          normalizedPhone: normalizedPhone!, password: password);
     }
   }
 }

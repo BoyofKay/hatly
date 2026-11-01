@@ -489,6 +489,36 @@ void main() {
     });
 
     testWidgets(
+        'weighted lines: tap the value, type 1 kg → ONE updateItemWeight call with 1000 g (not ten "+" taps); an invalid entry sends nothing',
+        (tester) async {
+      _phone(tester);
+      final api = _FakeCartApi([
+        _vendor('g1', 'ماركت السلام', [
+          _item(
+              id: 'w',
+              name: 'طماطم',
+              weighted: true,
+              grams: 300,
+              unitPrice: 2800)
+        ])
+      ]);
+      await _open(tester, _app(api));
+      await tester.tap(find.byKey(const Key('qty-value')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+          find.byKey(const Key('weight-entry-field')), '0.01');
+      await tester.tap(find.byKey(const Key('weight-entry-confirm')));
+      await tester.pumpAndSettle();
+      expect(api.calls, isEmpty,
+          reason: 'below the minimum: refused in the dialog');
+      await tester.enterText(find.byKey(const Key('weight-entry-field')), '1');
+      await tester.tap(find.byKey(const Key('weight-entry-confirm')));
+      await tester.pumpAndSettle();
+      expect(api.calls, ['weight:w=1000']);
+      expect(find.text('1.00 kg'), findsOneWidget);
+    });
+
+    testWidgets(
         'while a line is updating its controls are disabled (no duplicate taps) but the rest of the cart works',
         (tester) async {
       _phone(tester);

@@ -142,7 +142,7 @@ test.describe('Admin — pickup collection fallback', () => {
       const [res] = await Promise.all([page.waitForResponse((r) => STATUS_URL.test(r.url())), ops.getByTestId('od-mark-collected').click()]);
       expect(res.status()).toBe(200);
       await expect(ops.getByTestId('od-collected')).toHaveText(`${order.orderNumber} marked as collected.`);
-      await expect(page.getByTestId('od-timeline').locator('li').last()).toContainText('COLLECTED');
+      await expect(page.getByTestId('od-timeline').locator('li').last()).toContainText('Collected');
       await expect(ops.getByTestId('od-mark-collected')).toHaveCount(0);
       expect(await backendStatus(order.orderId)).toBe('COLLECTED');
     } finally {
@@ -174,7 +174,7 @@ test.describe('Admin — pickup collection fallback', () => {
     expect(new URL(request.url()).searchParams.get('status')).toBe('COLLECTED');
     const rows = page.locator('tbody tr');
     const n = await rows.count();
-    for (let i = 0; i < n; i++) await expect(rows.nth(i)).toContainText('COLLECTED');
+    for (let i = 0; i < n; i++) await expect(rows.nth(i)).toContainText('Collected');
   });
 
   test('Arabic: the admin collect action is translated', async ({ page }) => {

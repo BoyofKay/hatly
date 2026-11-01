@@ -10,6 +10,8 @@ import { DeliveryAddressSnapshot, DeliveryZoneSnapshot } from '../entities/order
 import { OrderPaymentMethod } from '../order-payment-method';
 
 /** What the customer asked for at checkout. Nothing here is an authoritative amount. */
+import { RouteEndpoint } from '../../finance/hatly-service-pricing.service';
+
 export interface CheckoutInput {
   customerId: string;
   /** The resolved delivery address (a saved address is turned into a snapshot by the caller). Null for pickup. */
@@ -105,10 +107,13 @@ export interface CheckoutPlan {
     breakdown: unknown | null;
     source: 'NONE' | 'FRESH' | 'FROZEN_QUOTE';
     adHocLocations: {
+      // The resolved route ORIGIN / DESTINATION coordinates (both always set from PD-012 on; the "pickup" name is the original column name).
       pickupLatitude: number | null;
       pickupLongitude: number | null;
       destinationLatitude: number | null;
       destinationLongitude: number | null;
+      /** The resolved route with labels and sources (customer's choice or the service default). Null only for a plan without an ad-hoc group. */
+      route: { origin: RouteEndpoint; destination: RouteEndpoint } | null;
     } | null;
   };
   segments: CheckoutSegmentPlan[];

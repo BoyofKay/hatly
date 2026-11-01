@@ -22,6 +22,17 @@ export interface UploadProvider {
    * omit it. See private-media-redirect.ts.
    */
   createReadUrl?(fileName: string): string | null;
+
+  remove?(storedUrl: string): Promise<boolean>;
+}
+
+/**
+ * Removes a file this provider stored, given the reference `store` returned. Account deletion uses it to erase a customer's own photos.
+ * Resolves `true` when the file is gone afterwards (also when it was already absent), `false` when the reference is not one of this
+ * provider's own generated names (never touched) or the removal failed. Never throws.
+ */
+export interface RemovableUploadProvider {
+  remove(storedUrl: string): Promise<boolean>;
 }
 
 export const UPLOAD_PROVIDER = Symbol('UPLOAD_PROVIDER');

@@ -113,6 +113,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         isCustomRequest:
                             item.isAdHoc && !cart.groups[g].isAdHocService,
                         isHatlyService: cart.groups[g].isAdHocService,
+                        isDeliveryOnly: cart.groups[g].isDeliveryOnly,
                         // "Edit" = open the product again (the backend cannot change options in place).
                         onEdit: item.productId == null
                             ? null

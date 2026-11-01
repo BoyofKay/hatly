@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../hatly_service/presentation/widgets/route_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +25,7 @@ import '../../../shared_widgets/hatly_key_value_row.dart';
 import '../../../shared_widgets/hatly_surface.dart';
 import 'order_status_label.dart';
 import 'order_widgets.dart';
+import 'item_unavailability_card.dart';
 
 /// Real customer Order Details (this phase). Every product name/price
 /// shown here comes from the OrderItem's own historical snapshot
@@ -160,6 +162,10 @@ class _OrderDetailsContent extends ConsumerWidget {
                 : order.failureReason!,
           ),
         ],
+        if (order.partialRejection != null) ...[
+          const SizedBox(height: HatlySpacing.ms),
+          _PartialRejectionCard(order: order),
+        ],
         const SizedBox(height: HatlySpacing.md),
         SizedBox(
           width: double.infinity,
@@ -183,6 +189,8 @@ class _OrderDetailsContent extends ConsumerWidget {
           const SizedBox(height: HatlySpacing.md),
           _DriverCard(driver: order.driver!),
         ],
+        // 2b. A product turned out to be unavailable: the customer's one question (PD-016) — absent unless there is one.
+        ItemUnavailabilityCard(orderId: order.id),
         // 3. Vendors + products (with options)
         const SizedBox(height: HatlySpacing.lg),
         HatlySection(
@@ -200,10 +208,24 @@ class _OrderDetailsContent extends ConsumerWidget {
             ],
           ),
         ),
+        RemovedItemsSection(items: [for (final segment in order.segments) ...segment.removedItems]),
         // 4. Pricing (+ 6. discount / coupon)
         const SizedBox(height: HatlySpacing.sm),
         _PricingCard(order: order),
         // 5. Delivery breakdown
+        if (order.deliveryRoute != null) ...[
+          const SizedBox(height: HatlySpacing.md),
+          HatlySection(
+            title: AppLocalizations.of(context).routeOrderSectionTitle,
+            child: HatlySurface(
+              child: RouteSummary(
+                key: const Key('order-route'),
+                origin: order.deliveryRoute!.origin,
+                destination: order.deliveryRoute!.destination,
+              ),
+            ),
+          ),
+        ],
         if (order.deliveryBreakdown != null) ...[
           const SizedBox(height: HatlySpacing.md),
           _DeliveryBreakdownCard(order: order),
@@ -237,6 +259,47 @@ class _OrderDetailsContent extends ConsumerWidget {
 
 /// The Order Details card surface: the same flat, bordered, card-radius look as the legacy `HatlyCard` in Light Mode,
 /// but built from the theme palette so it is also correct in Dark Mode (the legacy card is a fixed white).
+/// "Part of your order was cancelled": which part, why (on each vendor card), what continues, and what has really been given back.
+/// Refund lines come from the server's ledger summary only — a transfer refund is "sent" only once Hatly marked it sent.
+class _PartialRejectionCard extends StatelessWidget {
+  const _PartialRejectionCard({required this.order});
+
+  final OrderDetails order;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final partial = order.partialRejection!;
+    final refund = order.refundSummary;
+    final lines = <String>[
+      l10n.orderPartCancelledBody(
+          partial.rejectedSegmentCount, partial.totalSegmentCount),
+      if (refund.walletRefundedMinor > 0)
+        l10n.orderRefundWalletLine(
+            formatMinorUnits(refund.walletRefundedMinor, context)),
+      if (refund.transferRefundSentMinor > 0)
+        l10n.orderRefundTransferSentLine(
+            formatMinorUnits(refund.transferRefundSentMinor, context)),
+      if (refund.transferRefundAwaitingMinor > 0)
+        l10n.orderRefundTransferPendingLine(
+            formatMinorUnits(refund.transferRefundAwaitingMinor, context)),
+      if (refund.pendingRefundMinor > 0)
+        l10n.orderRefundReviewLine(
+            formatMinorUnits(refund.pendingRefundMinor, context)),
+      if (refund.isEmpty) l10n.orderPartCancelledNoCharge,
+    ];
+    return Container(
+      key: const Key('order-partial-rejection'),
+      child: _InfoCard(
+        icon: Icons.info_outline,
+        iconColor: context.palette.urgent,
+        title: l10n.orderPartCancelledTitle,
+        subtitle: lines.join('\n'),
+      ),
+    );
+  }
+}
+
 class _OrderSurface extends StatelessWidget {
   const _OrderSurface({required this.child});
 
@@ -372,6 +435,17 @@ class _SegmentCard extends ConsumerWidget {
               const SizedBox(height: HatlySpacing.xs),
               _AdHocServiceInfo(segment: segment),
             ],
+            if (segment.isRejected && segment.rejectionReason != null) ...[
+              const SizedBox(height: HatlySpacing.xs),
+              Text(
+                l10n.orderRejectionReasonLine(segment.rejectionReason!),
+                key: Key('segment-rejection-${segment.id}'),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: context.palette.urgent),
+              ),
+            ],
             if (segment.hadSubtotalDiscount) ...[
               const SizedBox(height: HatlySpacing.xs),
               Text(
@@ -406,6 +480,7 @@ class _SegmentCard extends ConsumerWidget {
                 item: item,
                 orderId: orderId,
                 isHatlyService: segment.isAdHocService,
+                isDeliveryOnly: segment.isDeliveryOnly,
                 ratingState:
                     _findProductItemRating(productRatingStates, item.id),
               ),
@@ -470,6 +545,7 @@ class _OrderItemRow extends ConsumerWidget {
       {required this.item,
       required this.orderId,
       this.isHatlyService = false,
+      this.isDeliveryOnly = false,
       this.ratingState});
 
   final OrderItemDetails item;
@@ -478,6 +554,9 @@ class _OrderItemRow extends ConsumerWidget {
   /// The item belongs to a Hatly Service request (not a vendor's own custom request) — only changes the wording of its
   /// pending-price text.
   final bool isHatlyService;
+
+  /// Wasally: the item has no price — the delivery fee is the whole charge.
+  final bool isDeliveryOnly;
   final ProductItemRatingState? ratingState;
 
   @override
@@ -614,7 +693,17 @@ class _OrderItemRow extends ConsumerWidget {
                   ],
                 ),
               ),
-              if (item.displayAmountMinor != null)
+              if (isDeliveryOnly)
+                Flexible(
+                  child: Text(l10n.hatlyServiceDeliveryOnly,
+                      key: const Key('order-item-delivery-only'),
+                      textAlign: TextAlign.end,
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelLarge
+                          ?.copyWith(color: context.palette.textMuted)),
+                )
+              else if (item.displayAmountMinor != null)
                 item.isWeighted
                     ? HatlyPriceLabel(
                         finalAmountMinor: item.displayAmountMinor,

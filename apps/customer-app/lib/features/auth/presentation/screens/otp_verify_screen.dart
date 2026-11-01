@@ -5,6 +5,7 @@ import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../../shared_widgets/hatly_primary_button.dart';
 import '../auth_error_messages.dart';
+import '../auth_gate.dart';
 import '../otp_flow_controller.dart';
 import '../widgets/auth_error_notice.dart';
 import '../widgets/otp_code_field.dart';
@@ -21,6 +22,10 @@ String maskPhoneForDisplay(String phone) {
   return '\u2066$masked\u2069';
 }
 
+/// The registration code step, shown while the backend has OTP enabled: the customer proves they hold the phone BEFORE the
+/// account exists. Entering the right code creates the account (with the password already chosen) and signs the new customer
+/// in; it never signs in an existing account. "Change phone number" (and the back button) cancels the registration — nothing
+/// was created — and returns to the form.
 class OtpVerifyScreen extends ConsumerStatefulWidget {
   const OtpVerifyScreen({super.key});
 
@@ -37,6 +42,7 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
     final p = context.palette;
     final flowState = ref.watch(otpFlowControllerProvider);
     final controller = ref.read(otpFlowControllerProvider.notifier);
+    leaveAuthFlowWhenSignedIn(context, ref, isMounted: () => mounted);
 
     // If the phone/flow state got reset (e.g. app restarted mid-flow),
     // there's nothing to verify against — send the user back rather
@@ -48,127 +54,114 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
       return const Scaffold(body: SizedBox.shrink());
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: p.background,
-        surfaceTintColor: Colors.transparent,
-        leading: BackButton(
-          onPressed: () {
-            controller.changePhoneNumber();
-            context.pop();
-          },
-        ),
-      ),
-      body: SafeArea(
-        // Scrollable so the code field and CTA stay reachable with the
-        // keyboard open on small screens; the CTA still sits at the bottom
-        // on tall screens.
-        child: CustomScrollView(
-          slivers: [
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  HatlySpacing.lg,
-                  HatlySpacing.sm,
-                  HatlySpacing.lg,
-                  HatlySpacing.lg,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(l10n.otpTitle, style: context.type.h1),
-                    const SizedBox(height: HatlySpacing.sm),
-                    Text(
-                      l10n.otpSubtitleWithPhone(
-                          maskPhoneForDisplay(flowState.phone!)),
-                      style: context.type.body.copyWith(color: p.textMuted),
+    return PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) controller.skipVerification();
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            backgroundColor: p.background,
+            surfaceTintColor: Colors.transparent,
+            leading: BackButton(onPressed: controller.skipVerification),
+          ),
+          body: SafeArea(
+            // Scrollable so the code field and CTA stay reachable with the
+            // keyboard open on small screens; the CTA still sits at the bottom
+            // on tall screens.
+            child: CustomScrollView(
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      HatlySpacing.lg,
+                      HatlySpacing.sm,
+                      HatlySpacing.lg,
+                      HatlySpacing.lg,
                     ),
-                    Align(
-                      // AlignmentDirectional (not Alignment) so this sits on
-                      // the leading edge regardless of LTR/RTL.
-                      alignment: AlignmentDirectional.centerStart,
-                      child: TextButton.icon(
-                        onPressed: () {
-                          controller.changePhoneNumber();
-                          context.pop();
-                        },
-                        icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: Text(
-                          l10n.otpChangeNumber,
-                          style: context.type.small.copyWith(
-                            color: p.link,
-                            fontWeight: FontWeight.w700,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(l10n.otpTitle, style: context.type.h1),
+                        const SizedBox(height: HatlySpacing.sm),
+                        Text(
+                          l10n.otpSubtitleWithPhone(
+                              maskPhoneForDisplay(flowState.phone!)),
+                          style: context.type.body.copyWith(color: p.textMuted),
+                        ),
+                        const SizedBox(height: HatlySpacing.lg),
+                        OtpCodeField(
+                          hasError: flowState.errorCode != null,
+                          onChanged: (value) =>
+                              setState(() => _currentCode = value),
+                          onCompleted: (code) =>
+                              controller.confirmPhoneVerification(code),
+                        ),
+                        if (flowState.errorCode != null) ...[
+                          const SizedBox(height: HatlySpacing.md),
+                          AuthErrorNotice(
+                            message: localizedErrorMessage(
+                                context, flowState.errorCode),
                           ),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: HatlySpacing.sm),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: HatlySpacing.lg),
-                    OtpCodeField(
-                      hasError: flowState.errorCode != null,
-                      onChanged: (value) =>
-                          setState(() => _currentCode = value),
-                      onCompleted: (code) => controller.verifyOtp(code),
-                    ),
-                    if (flowState.errorCode != null) ...[
-                      const SizedBox(height: HatlySpacing.md),
-                      AuthErrorNotice(
-                        message:
-                            localizedErrorMessage(context, flowState.errorCode),
-                      ),
-                    ],
-                    const SizedBox(height: HatlySpacing.lg),
-                    Center(
-                      child: flowState.resendCooldownSeconds > 0
-                          ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.timer_outlined,
-                                    size: 18, color: p.textMuted),
-                                const SizedBox(width: HatlySpacing.xs),
-                                Flexible(
-                                  child: Text(
-                                    l10n.otpResendIn(
-                                        flowState.resendCooldownSeconds),
-                                    textAlign: TextAlign.center,
-                                    style: context.type.small
-                                        .copyWith(color: p.textMuted),
+                        ],
+                        const SizedBox(height: HatlySpacing.lg),
+                        Center(
+                          child: flowState.resendCooldownSeconds > 0
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.timer_outlined,
+                                        size: 18, color: p.textMuted),
+                                    const SizedBox(width: HatlySpacing.xs),
+                                    Flexible(
+                                      child: Text(
+                                        l10n.otpResendIn(
+                                            flowState.resendCooldownSeconds),
+                                        textAlign: TextAlign.center,
+                                        style: context.type.small
+                                            .copyWith(color: p.textMuted),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : TextButton.icon(
+                                  onPressed: controller.resendVerification,
+                                  icon: const Icon(Icons.refresh_rounded,
+                                      size: 18),
+                                  label: Text(
+                                    l10n.otpResendAction,
+                                    style: context.type.small.copyWith(
+                                      color: p.link,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
-                              ],
-                            )
-                          : TextButton.icon(
-                              onPressed: controller.resendOtp,
-                              icon: const Icon(Icons.refresh_rounded, size: 18),
-                              label: Text(
-                                l10n.otpResendAction,
-                                style: context.type.small.copyWith(
-                                  color: p.link,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
+                        ),
+                        const Spacer(),
+                        const SizedBox(height: HatlySpacing.lg),
+                        HatlyPrimaryButton(
+                          label: l10n.otpVerifyButton,
+                          isLoading: flowState.isSubmitting,
+                          onPressed: _currentCode.length == 6
+                              ? () => controller
+                                  .confirmPhoneVerification(_currentCode)
+                              : null,
+                        ),
+                        const SizedBox(height: HatlySpacing.sm),
+                        TextButton(
+                          onPressed: flowState.isSubmitting
+                              ? null
+                              : controller.skipVerification,
+                          child: Text(l10n.otpChangeNumber),
+                        ),
+                      ],
                     ),
-                    const Spacer(),
-                    const SizedBox(height: HatlySpacing.lg),
-                    HatlyPrimaryButton(
-                      label: l10n.otpVerifyButton,
-                      isLoading: flowState.isSubmitting,
-                      onPressed: _currentCode.length == 6
-                          ? () => controller.verifyOtp(_currentCode)
-                          : null,
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
+          ),
+        ));
   }
 }
