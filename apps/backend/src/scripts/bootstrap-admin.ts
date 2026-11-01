@@ -125,7 +125,12 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error('Bootstrap failed due to an unexpected error:', error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+// Runs only when executed (`npm run bootstrap:admin`, `prod.sh bootstrap-admin`). Importing this file — the unit test imports `runBootstrap` —
+// must not run it: without the BOOTSTRAP_ADMIN_* variables it would set `process.exitCode = 1` in the importing process, which made a fully
+// green in-band jest run (the CI runner) exit 1.
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('Bootstrap failed due to an unexpected error:', error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}
