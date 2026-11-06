@@ -9,7 +9,7 @@ import {
   pinAutomaticDispatch,
   placeReadyOrder,
   reassignViaApi,
-  releaseByDriver,
+  expectDriverReleaseRefused, releaseByOperations,
   takeOffline,
   withAutomaticDispatch,
 } from './control-tower-fixtures';
@@ -188,11 +188,12 @@ test.describe('Admin — Control Tower', () => {
     }
   });
 
-  test('automatic dispatch OFF: an order handed back by its driver waits for a driver; it is assigned from the ORDER DETAIL page, whose timeline shows what happened', async ({ page }) => {
+  test('R17 — automatic dispatch OFF: the driver cannot hand it back; an order released by Operations waits for a driver and is assigned from the ORDER DETAIL page, whose timeline shows what happened', async ({ page }) => {
     const order = await placeReadyOrder();
     try {
       await ensureAssignedTo(order.orderId, driverA);
-      await withAutomaticDispatch(false, () => releaseByDriver(order.orderId, driverA));
+      await expectDriverReleaseRefused(order.orderId, driverA);
+      await withAutomaticDispatch(false, () => releaseByOperations(order.orderId));
 
       await openTower(page);
       await page.getByTestId('ct-stage-AWAITING_ASSIGNMENT').click();
@@ -218,17 +219,17 @@ test.describe('Admin — Control Tower', () => {
     const order = await placeReadyOrder();
     try {
       await ensureAssignedTo(order.orderId, driverA);
-      await withAutomaticDispatch(false, () => releaseByDriver(order.orderId, driverA));
+      await withAutomaticDispatch(false, () => releaseByOperations(order.orderId));
 
       await openTower(page);
       const released = page.getByTestId('ct-released');
-      await expect(released).toContainText('released by a driver — waiting for a manual assignment');
+      await expect(released).toContainText('released from a driver — waiting for a manual assignment');
       expect(Number(await released.locator('b').innerText())).toBeGreaterThanOrEqual(1);
       await released.getByRole('button').click();
       await expect(page.getByTestId('ct-released-filter')).toBeVisible();
       await expect(page.getByTestId('ct-stage-AWAITING_ASSIGNMENT')).toHaveAttribute('aria-selected', 'true');
       const row = await findRow(page, order.orderNumber); // found WITHIN the released-only list
-      await expect(row.getByTestId('ct-flag-released')).toContainText('Released by the driver');
+      await expect(row.getByTestId('ct-flag-released')).toContainText('Released by Operations');
 
       await row.getByTestId('dispatch-driver-select').selectOption(driverB.id);
       const [res] = await Promise.all([page.waitForResponse((r) => ASSIGN_URL.test(r.url())), row.getByTestId('dispatch-submit').click()]);
@@ -244,26 +245,19 @@ test.describe('Admin — Control Tower', () => {
     }
   });
 
-  test('U3 — automatic dispatch ON: a driver hand-back is redispatched at once and NEVER back to the driver who handed it back', async ({ page }) => {
+  test('R13/R17 — automatic dispatch ON: the driver cannot hand it back and nothing re-dispatches it; the order stays with its driver', async ({ page }) => {
     const order = await placeReadyOrder();
     try {
       await ensureAssignedTo(order.orderId, driverA);
-      await withAutomaticDispatch(true, () => releaseByDriver(order.orderId, driverA));
+      await withAutomaticDispatch(true, () => expectDriverReleaseRefused(order.orderId, driverA));
       const detail = await orderDetail(order.orderId);
-      expect(detail.driver?.id ?? null).not.toBe(driverA.id);
+      expect(detail.status).toBe('ASSIGNED_TO_DRIVER');
+      expect(detail.driver?.id).toBe(driverA.id);
 
       await openTower(page);
       const row = await findRow(page, order.orderNumber);
-      if (detail.status === 'ASSIGNED_TO_DRIVER') {
-        // another eligible driver (driverB, or any eligible dev driver) got it — shown as a normal assignment, not "released"
-        await expect(row.getByTestId('ct-row-driver')).toContainText(detail.driver.fullName);
-        await expect(row.getByTestId('ct-flag-released')).toHaveCount(0);
-      } else {
-        // nobody else was eligible: it waits, flagged released, carried by the existing "no eligible driver" alert
-        expect(detail.status).toBe('READY_FOR_PICKUP');
-        await expect(row.getByTestId('ct-flag-released')).toContainText('Released by the driver');
-        await expect(row.getByTestId('ct-flag-alert')).toBeVisible();
-      }
+      await expect(row.getByTestId('ct-row-driver')).toContainText(driverA.fullName);
+      await expect(row.getByTestId('ct-flag-released')).toHaveCount(0);
     } finally {
       await cancelTestOrder(order);
     }

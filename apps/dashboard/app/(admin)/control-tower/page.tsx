@@ -52,6 +52,15 @@ interface SavedView {
  * panel per order, a CSV export of the visible rows (no customer data), and a selected-orders "assign" that is only offered while
  * automatic dispatch is OFF and only for orders waiting for a driver — each order is still assigned by the same backend endpoint.
  */
+/**
+ * Who released an order (back to "waiting for a driver"). R17 (2026-11-06): only Operations release now. Older rows may still show a
+ * driver hand-back (DRIVER) or the former automatic accept-window release (recorded as ADMIN by the system — indistinguishable from an
+ * Operations release after the fact, so any admin role reads as Operations).
+ */
+function releasedKey(released: { byRole: string | null }): 'ctFlagReleasedByDriver' | 'ctFlagReleasedByOperations' {
+  return released.byRole === 'DRIVER' ? 'ctFlagReleasedByDriver' : 'ctFlagReleasedByOperations';
+}
+
 export default function ControlTowerPage() {
   // This is where every admin lands after sign-in. An admin whose role has no order permission has nothing to run here: send them to the
   // overview, which lists the areas they can open.
@@ -318,7 +327,7 @@ function ControlTowerScreen() {
     <>
       {row.released && (
         <span className={`block rounded-md px-1.5 py-0.5 ${row.openDispatchAlert ? 'bg-amber-100 text-amber-900' : 'bg-red-100 font-medium text-red-800'}`} data-testid="ct-flag-released">
-          {t(row.released.byRole === 'DRIVER' ? 'ctFlagReleasedByDriver' : 'ctFlagReleasedBySystem', { time: since(row.released.at, locale) })}
+          {t(releasedKey(row.released), { time: since(row.released.at, locale) })}
         </span>
       )}
       {row.openDispatchAlert && <span className="block rounded-md bg-amber-100 px-1.5 py-0.5 text-amber-900" data-testid="ct-flag-alert">{t('ctFlagAlert', { time: since(row.openDispatchAlert.createdAt, locale) })}</span>}
@@ -767,7 +776,7 @@ function ControlTowerScreen() {
               <div><dt className="text-xs text-gray-500">{t('ctColSince')}</dt><dd>{since(panel.statusSince, locale)}</dd></div>
               <div><dt className="text-xs text-gray-500">{t('ctColArea')}</dt><dd>{panel.deliveryAddress ? deliveryAddressText(panel.deliveryAddress, locale) : '—'}</dd></div>
               <div><dt className="text-xs text-gray-500">{t('ctColDriver')}</dt><dd>{panel.driver ? `${panel.driver.fullName} · ${panel.driver.phone}` : t('ctNoDriver')}</dd></div>
-              {panel.released && <div><dt className="text-xs text-gray-500">{t('ctColFlags')}</dt><dd className="text-red-800">{t(panel.released.byRole === 'DRIVER' ? 'ctFlagReleasedByDriver' : 'ctFlagReleasedBySystem', { time: since(panel.released.at, locale) })}</dd></div>}
+              {panel.released && <div><dt className="text-xs text-gray-500">{t('ctColFlags')}</dt><dd className="text-red-800">{t(releasedKey(panel.released), { time: since(panel.released.at, locale) })}</dd></div>}
               {panel.openDispatchAlert && <div><dd className="text-amber-900">{t('ctFlagAlert', { time: since(panel.openDispatchAlert.createdAt, locale) })}</dd></div>}
             </dl>
             {canAssign && drivers && canAct(panel) && (

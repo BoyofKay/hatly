@@ -81,12 +81,18 @@ export async function ensureAssignedTo(orderId: string, driver: TestDriver) {
   else if (detail.driver?.id !== driver.id) must(await reassignViaApi(orderId, driver.id), 'reassign');
 }
 
-/** The assigned test driver hands the order back (the existing driver release: ASSIGNED_TO_DRIVER → READY_FOR_PICKUP). */
-export async function releaseByDriver(orderId: string, driver: TestDriver) {
+/** R17: a driver can NOT hand an order back — the attempt is refused with 400 and nothing changes. */
+export async function expectDriverReleaseRefused(orderId: string, driver: TestDriver) {
   const deliveries = must<any[]>(await driver.api.get('/driver/deliveries'), 'driver deliveries');
   const delivery = deliveries.find((d) => d.orderId === orderId);
   if (!delivery) throw new Error(`Driver ${driver.fullName} has no delivery for order ${orderId}`);
-  must(await driver.api.patch(`/driver/deliveries/${delivery.id}/status`, { status: 'READY_FOR_PICKUP' }), 'driver release');
+  const res = await driver.api.patch(`/driver/deliveries/${delivery.id}/status`, { status: 'READY_FOR_PICKUP' });
+  if (res.status !== 400) throw new Error(`driver release should be refused (R17): HTTP ${res.status}`);
+}
+
+/** R17: Operations release the order (ASSIGNED_TO_DRIVER → READY_FOR_PICKUP, admin only). */
+export async function releaseByOperations(orderId: string) {
+  must(await adminApi().patch(`/orders/${orderId}/status`, { status: 'READY_FOR_PICKUP' }), 'operations release');
 }
 
 /**
