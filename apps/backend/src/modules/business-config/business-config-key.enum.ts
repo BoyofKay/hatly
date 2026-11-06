@@ -121,6 +121,12 @@ export enum BusinessConfigKey {
   CUSTOMER_SERVICE_WHATSAPP_NUMBER = 'CUSTOMER_SERVICE_WHATSAPP_NUMBER',
 
   /**
+   * R17 (2026-11-06): the phone number drivers call when they have a problem with an assignment ("contact Operations").
+   * Optional; when unset the driver app falls back to CUSTOMER_SERVICE_WHATSAPP_NUMBER, and hides the action if both are unset.
+   */
+  OPERATIONS_CONTACT_PHONE = 'OPERATIONS_CONTACT_PHONE',
+
+  /**
    * PHASE F addition. CONFIRMED: Hatly Service pricing = real road
    * distance (reusing the existing MapProvider, no separate distance
    * engine) × this configurable multiplier. Deliberately NOT seeded —

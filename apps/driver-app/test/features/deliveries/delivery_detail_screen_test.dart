@@ -23,6 +23,20 @@ class FakeDriverApi implements DriverApi {
   @override
   Future<Delivery> getDelivery(String id) async => _delivery;
 
+  final List<String> acknowledgeCalls = [];
+  Delivery Function()? afterAcknowledge;
+  String? operationsPhone = '+201000000777';
+
+  @override
+  Future<Delivery> acknowledgeDelivery(String id) async {
+    acknowledgeCalls.add(id);
+    if (afterAcknowledge != null) _delivery = afterAcknowledge!();
+    return _delivery;
+  }
+
+  @override
+  Future<String?> getOperationsPhone() async => operationsPhone;
+
   @override
   Future<DriverEarnings> getEarnings() async => throw UnimplementedError();
 
@@ -107,6 +121,7 @@ Future<FakeDriverApi> pump(WidgetTester tester, Delivery delivery) async {
 }
 
 void main() {
+  ackTests();
   group('Driver Core + Dispatch Foundation milestone', () {
     testWidgets('COD: shows "Amount to collect" using amountDueMinor, distinct from Total', (tester) async {
       await pump(tester, _codDelivery(totalMinor: 10000, amountDueMinor: 4000));
@@ -332,6 +347,72 @@ void main() {
 
       expect(find.text('Cash Collection'), findsNothing);
       expect(find.text('Proof of Delivery'), findsOneWidget);
+    });
+  });
+}
+
+Delivery _assigned({DateTime? acknowledgedAt, DateTime? acceptDeadlineAt}) {
+  return Delivery(
+    id: 'delivery-1',
+    orderId: 'order-1',
+    orderStatus: 'ASSIGNED_TO_DRIVER',
+    fulfillmentType: 'DELIVERY',
+    paymentMethod: 'COD',
+    totalMinor: 10000,
+    amountDueMinor: 10000,
+    customerName: 'Jane Customer',
+    customerPhone: '+201000000099',
+    deliveryAddress: const DeliveryAddress(line1: '12 Market St', latitude: 30.1, longitude: 31.2),
+    acceptDeadlineAt: acceptDeadlineAt ?? DateTime.now().add(const Duration(minutes: 5)),
+    acknowledgedAt: acknowledgedAt,
+    segments: const [],
+  );
+}
+
+void ackTests() {
+  group('R16 acknowledgement', () {
+    testWidgets('an unacknowledged assignment offers ONLY "I\'ve seen this order", with the deadline and Call Operations', (tester) async {
+      await pump(tester, _assigned());
+      expect(find.byKey(const Key('acknowledge-button')), findsOneWidget);
+      expect(find.byKey(const Key('action-bar')), findsNothing); // no Picked-up step before the acknowledgement
+      expect(find.byKey(const Key('acknowledge-deadline')), findsOneWidget);
+      expect(find.textContaining('Confirm by'), findsOneWidget);
+      expect(find.byKey(const Key('call-operations')), findsOneWidget);
+      expect(find.textContaining('Reject'), findsNothing);
+      expect(find.textContaining('Decline'), findsNothing);
+    });
+
+    testWidgets('tapping it acknowledges once, then the normal steps appear', (tester) async {
+      final api = await pump(tester, _assigned());
+      api.afterAcknowledge = () => _assigned(acknowledgedAt: DateTime.now());
+      await tester.tap(find.byKey(const Key('acknowledge-button')));
+      await tester.pumpAndSettle();
+      expect(api.acknowledgeCalls, ['delivery-1']);
+      expect(find.byKey(const Key('acknowledge-button')), findsNothing);
+      expect(find.byKey(const Key('acknowledged-at')), findsOneWidget);
+      expect(find.byKey(const Key('action-bar')), findsOneWidget);
+    });
+
+    testWidgets('an overdue confirmation says Operations were told (nothing is taken away)', (tester) async {
+      await pump(tester, _assigned(acceptDeadlineAt: DateTime.now().subtract(const Duration(minutes: 1))));
+      expect(find.textContaining('Operations have been told'), findsOneWidget);
+      expect(find.byKey(const Key('acknowledge-button')), findsOneWidget);
+    });
+
+    testWidgets('no Operations number configured: the call button is hidden, the advice stays', (tester) async {
+      final fakeApi = FakeDriverApi(_assigned())..operationsPhone = null;
+      await tester.pumpWidget(ProviderScope(
+        overrides: [driverApiProvider.overrideWithValue(fakeApi), proofOfDeliveryPhotoPickerProvider.overrideWithValue(_fakePickPhoto)],
+        child: const MaterialApp(home: DeliveryDetailScreen(deliveryId: 'delivery-1')),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('call-operations')), findsNothing);
+      expect(find.textContaining('Call Operations'), findsWidgets);
+    });
+
+    testWidgets('an order already picked up shows no acknowledgement card', (tester) async {
+      await pump(tester, _codDelivery());
+      expect(find.byKey(const Key('acknowledgement-card')), findsNothing);
     });
   });
 }

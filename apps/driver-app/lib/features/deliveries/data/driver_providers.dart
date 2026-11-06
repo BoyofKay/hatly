@@ -92,6 +92,15 @@ final deliveriesProvider = FutureProvider.autoDispose<List<Delivery>>((ref) {
   return ref.watch(driverApiProvider).listDeliveries();
 });
 
+/// R17: Operations phone for the "Call Operations" button (null hides it). Cached for the session; a failure just hides the button.
+final operationsPhoneProvider = FutureProvider<String?>((ref) async {
+  try {
+    return await ref.watch(driverApiProvider).getOperationsPhone();
+  } catch (_) {
+    return null;
+  }
+});
+
 final deliveryDetailProvider =
     FutureProvider.autoDispose.family<Delivery, String>((ref, deliveryId) {
   return ref.watch(driverApiProvider).getDelivery(deliveryId);

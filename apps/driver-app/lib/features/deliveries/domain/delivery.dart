@@ -278,6 +278,7 @@ class Delivery {
     required this.deliveryAddress,
     this.assignedAt,
     this.acceptDeadlineAt,
+    this.acknowledgedAt,
     this.pickedUpAt,
     this.deliveredAt,
     required this.segments,
@@ -316,10 +317,17 @@ class Delivery {
   final String? customerPhone;
   final DeliveryAddress deliveryAddress;
   final DateTime? assignedAt;
+  /// R16: acknowledge the assignment by this time (Operations are alerted after it — nothing is taken away automatically).
   final DateTime? acceptDeadlineAt;
+
+  /// R16: when this driver confirmed having seen the assignment; null = not yet.
+  final DateTime? acknowledgedAt;
   final DateTime? pickedUpAt;
   final DateTime? deliveredAt;
   final List<DeliverySegment> segments;
+
+  /// R16: an assigned order the driver has not confirmed yet — the only action offered is the acknowledgement.
+  bool get needsAcknowledgement => orderStatus == 'ASSIGNED_TO_DRIVER' && acknowledgedAt == null;
 
   /// Hatly / Wasally orders only: where to go first and where to deliver (the customer's address is then only who to contact). Null for
   /// every other order and for one placed before PD-012.
@@ -348,6 +356,7 @@ class Delivery {
       deliveryAddress: DeliveryAddress.fromJson(json['deliveryAddress'] as Map<String, dynamic>),
       assignedAt: json['assignedAt'] != null ? DateTime.parse(json['assignedAt'] as String) : null,
       acceptDeadlineAt: json['acceptDeadlineAt'] != null ? DateTime.parse(json['acceptDeadlineAt'] as String) : null,
+      acknowledgedAt: json['acknowledgedAt'] != null ? DateTime.parse(json['acknowledgedAt'] as String) : null,
       pickedUpAt: json['pickedUpAt'] != null ? DateTime.parse(json['pickedUpAt'] as String) : null,
       deliveredAt: json['deliveredAt'] != null ? DateTime.parse(json['deliveredAt'] as String) : null,
       segments: (json['segments'] as List).map((e) => DeliverySegment.fromJson(e as Map<String, dynamic>)).toList(),

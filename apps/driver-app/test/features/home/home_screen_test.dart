@@ -15,6 +15,12 @@ import 'package:hatly_driver/features/home/presentation/home_screen.dart';
 /// assigned-deliveries list) without a dedicated test — this closes that gap. Reuses the exact
 /// `FakeDriverApi` shape `delivery_detail_screen_test.dart` already establishes for this app.
 class FakeDriverApi implements DriverApi {
+  @override
+  Future<Delivery> acknowledgeDelivery(String id) async => throw UnimplementedError();
+
+  @override
+  Future<String?> getOperationsPhone() async => null;
+
   FakeDriverApi({this.deliveries = const [], this.setOnlineError});
 
   List<Delivery> deliveries;

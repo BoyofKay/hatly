@@ -26,6 +26,8 @@ class ApiClient {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          // R16: this build has the "I've seen this order" button, so opening an order must not count as acknowledging it.
+          options.headers['X-Hatly-Driver-Ack'] = 'explicit';
           handler.next(options);
         },
         onError: (error, handler) async {

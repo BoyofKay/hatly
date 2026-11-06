@@ -21,6 +21,12 @@ import 'package:hatly_driver/features/shell/driver_shell.dart';
 const _delegates = [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate];
 
 class _Api implements DriverApi {
+  @override
+  Future<Delivery> acknowledgeDelivery(String id) async => throw UnimplementedError();
+
+  @override
+  Future<String?> getOperationsPhone() async => null;
+
   _Api({Delivery? delivery}) : delivery = delivery ?? _delivery();
   Delivery delivery;
   DriverEarnings? earnings;
@@ -70,7 +76,9 @@ class _Api implements DriverApi {
   Future<T> retryTransient<T>(Future<T> Function() op, {int attempts = 3, Duration pause = const Duration(milliseconds: 800)}) => op();
 }
 
+// R16: these tests exercise the steps AFTER the driver confirmed having seen the order (an unacknowledged one offers only that button).
 Delivery _delivery({String status = 'ASSIGNED_TO_DRIVER'}) => Delivery(
+      acknowledgedAt: DateTime(2026, 11, 6, 12),
       id: 'd1',
       orderId: 'o1',
       orderNumber: 'HT-1001',

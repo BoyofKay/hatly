@@ -144,12 +144,15 @@ export class DriverDeliveriesService {
     return this.buildViews(deliveries);
   }
 
-  async getForUser(userId: string, deliveryId: string): Promise<DriverDeliveryView> {
+  /**
+   * `options.implicitAcknowledgement` (default true): driver-app builds WITHOUT an acknowledge button (≤ 1.0.0+5) acknowledge by opening
+   * the assignment — backward compatibility (R38). Builds that send `X-Hatly-Driver-Ack: explicit` acknowledge only with the button
+   * (`POST …/acknowledge`, R16), so opening the order never acknowledges it for them.
+   */
+  async getForUser(userId: string, deliveryId: string, options: { implicitAcknowledgement?: boolean } = {}): Promise<DriverDeliveryView> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
     await this.driverAuthorizationService.assertOwnsDelivery(driver.id, deliveryId);
-    // R16: the driver opening the assignment IS the acknowledgement ("acknowledges having viewed it"). This also covers driver-app
-    // builds that have no acknowledge button (backward compatibility, R38): their delivery screen loads exactly this endpoint.
-    await this.markAcknowledged(deliveryId, driver.id);
+    if (options.implicitAcknowledgement !== false) await this.markAcknowledged(deliveryId, driver.id);
 
     const delivery = await this.deliveriesRepository.findOne({
       where: { id: deliveryId },
@@ -164,7 +167,10 @@ export class DriverDeliveriesService {
 
   /** R16: explicit acknowledgement (newer driver apps). Same effect as opening the assignment; returns the delivery. */
   async acknowledgeForUser(userId: string, deliveryId: string): Promise<DriverDeliveryView> {
-    return this.getForUser(userId, deliveryId);
+    const driver = await this.driverAuthorizationService.getDriverForUser(userId);
+    await this.driverAuthorizationService.assertOwnsDelivery(driver.id, deliveryId);
+    await this.markAcknowledged(deliveryId, driver.id);
+    return this.getForUser(userId, deliveryId, { implicitAcknowledgement: false });
   }
 
   /**

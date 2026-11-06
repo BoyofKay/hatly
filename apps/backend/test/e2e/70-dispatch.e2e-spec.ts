@@ -458,6 +458,31 @@ describe('E2E — dispatch & drivers', () => {
       expect(await ackAlerts(order.id)).toHaveLength(0); // acknowledged in time → no alert
     });
 
+    it('a driver app WITH the acknowledge button (X-Hatly-Driver-Ack: explicit): opening the order does not acknowledge; only the button does', async () => {
+      const d = await s.driver({ ...near });
+      const order = await readyOrder();
+      const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: d.accessToken })).find((x) => x.orderId === order.id);
+      const opened = await world.api('get', `/driver/deliveries/${delivery.id}`, { token: d.accessToken, headers: { 'X-Hatly-Driver-Ack': 'explicit' } });
+      expect(opened.status).toBe(200);
+      expect(opened.body.data.acknowledgedAt).toBeNull();
+      expect((await deliveryRow(order.id)).acknowledged_at).toBeNull();
+      const acked = expectData<any>(await world.api('post', `/driver/deliveries/${delivery.id}/acknowledge`, { token: d.accessToken }), 201);
+      expect(acked.acknowledgedAt).not.toBeNull();
+      expect((await deliveryRow(order.id)).acknowledged_at).not.toBeNull();
+    });
+
+    it('R17: GET /driver/support-contact gives the Operations phone, falling back to the customer-service number, else null', async () => {
+      const d = await s.driver({ ...near });
+      const read = async () => expectData<any>(await world.api('get', '/driver/support-contact', { token: d.accessToken })).operationsPhone;
+      await world.ds.query("DELETE FROM business_config WHERE key IN ('OPERATIONS_CONTACT_PHONE', 'CUSTOMER_SERVICE_WHATSAPP_NUMBER')");
+      expect(await read()).toBeNull();
+      await s.setConfig('CUSTOMER_SERVICE_WHATSAPP_NUMBER', '+201000000111');
+      expect(await read()).toBe('+201000000111');
+      await s.setConfig('OPERATIONS_CONTACT_PHONE', '+201000000222');
+      expect(await read()).toBe('+201000000222');
+      await world.ds.query("DELETE FROM business_config WHERE key = 'OPERATIONS_CONTACT_PHONE'");
+    });
+
     it('picking up records the acknowledgement and closes the alert; a reassignment starts a fresh window for the new driver', async () => {
       const a = await s.driver({ ...near });
       const order = await readyOrder();

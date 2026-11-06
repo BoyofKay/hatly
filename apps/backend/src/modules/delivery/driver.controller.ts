@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -10,6 +10,7 @@ import { DriverOrderActionsService } from './driver-order-actions.service';
 import { DriverPurchaseService } from './driver-purchase.service';
 import { DriverWeightRecordService } from './driver-weight-record.service';
 import { DriverEarningsService } from './driver-earnings.service';
+import { BusinessConfigService } from '../business-config/business-config.service';
 import { UpdateDriverOnlineStatusDto } from './dto/update-driver-online-status.dto';
 import { UpdateDriverLocationDto } from './dto/update-driver-location.dto';
 import { UpdateOrderStatusDto } from '../orders/dto/update-order-status.dto';
@@ -38,6 +39,7 @@ export class DriverController {
     private readonly driverPurchaseService: DriverPurchaseService,
     private readonly driverWeightRecordService: DriverWeightRecordService,
     private readonly driverEarningsService: DriverEarningsService,
+    private readonly businessConfigService: BusinessConfigService,
   ) {}
 
   @Patch('online-status')
@@ -72,9 +74,16 @@ export class DriverController {
   }
 
   @Get('deliveries/:id')
-  async getDelivery(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    const delivery = await this.driverDeliveriesService.getForUser(user.id, id);
+  async getDelivery(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Headers('x-hatly-driver-ack') ackMode?: string) {
+    // R16/R38: an app with the acknowledge button says so; older apps acknowledge by opening the order.
+    const delivery = await this.driverDeliveriesService.getForUser(user.id, id, { implicitAcknowledgement: ackMode !== 'explicit' });
     return { data: delivery };
+  }
+
+  /** R17: how a driver reaches Operations (they call; there is no release button). `null` hides the action in the app. */
+  @Get('support-contact')
+  async supportContact() {
+    return { data: { operationsPhone: await this.businessConfigService.getOperationsContactPhone() } };
   }
 
   /** R16: acknowledge an assignment (no accept/reject exists). Opening the delivery acknowledges it too. */

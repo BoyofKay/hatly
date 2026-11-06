@@ -229,6 +229,15 @@ export class BusinessConfigService {
     return ELECTRONIC_PAYMENT_METHODS.filter((m) => configured.includes(m));
   }
 
+  /** R17: the number a driver calls to reach Operations — OPERATIONS_CONTACT_PHONE, else the customer-service number, else null. */
+  async getOperationsContactPhone(): Promise<string | null> {
+    for (const key of [BusinessConfigKey.OPERATIONS_CONTACT_PHONE, BusinessConfigKey.CUSTOMER_SERVICE_WHATSAPP_NUMBER]) {
+      const value = await this.get<unknown>(key, null);
+      if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+    }
+    return null;
+  }
+
   /** R16: the driver acknowledgement window in minutes (default 5, bounds 1–30). */
   async getAcknowledgementWindowMinutes(manager?: EntityManager): Promise<number> {
     const repo = manager ? manager.getRepository(BusinessConfig) : this.repo;

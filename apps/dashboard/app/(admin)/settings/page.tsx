@@ -71,6 +71,7 @@ const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'CHECKOUT_QUOTE_TTL_SECONDS', label: 'Checkout Quote TTL', type: 'integer', unit: 'seconds' },
   { key: 'ETA_RANGE_BUFFER_MINUTES', label: 'ETA Range Buffer', type: 'integer', unit: 'minutes' },
   { key: 'CUSTOMER_SERVICE_WHATSAPP_NUMBER', label: 'Customer Service WhatsApp Number', type: 'string' },
+  { key: 'OPERATIONS_CONTACT_PHONE', label: 'Operations Phone (for drivers)', type: 'string', help: 'The number the driver app\'s "Call Operations" button dials. Empty: the Customer Service number above is used; if both are empty the button is hidden.' },
 ];
 
 function ConfigRow({ field }: { field: ConfigFieldDef }) {

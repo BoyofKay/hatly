@@ -98,6 +98,24 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
     }
   }
 
+  /// R16: confirm having seen the assignment. Repeating is harmless (the server keeps the first confirmation).
+  Future<void> _acknowledge() async {
+    if (_isSubmitting) return;
+    setState(() {
+      _isSubmitting = true;
+      _actionError = null;
+    });
+    try {
+      await ref.read(driverApiProvider).acknowledgeDelivery(widget.deliveryId);
+      ref.invalidate(deliveryDetailProvider(widget.deliveryId));
+      ref.invalidate(deliveriesProvider);
+    } on DioException catch (error) {
+      if (mounted) setState(() => _actionError = _serverMessage(error, context.t('Could not confirm. Please try again.', 'تعذّر التأكيد. حاول مرة أخرى.')));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
   Future<bool> _statusAlreadyApplied(String status) async {
     try {
       final fresh = await ref.refresh(deliveryDetailProvider(widget.deliveryId).future);
@@ -255,7 +273,8 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
     ref.watch(driverPollingServiceProvider);
     final deliveryAsync = ref.watch(deliveryDetailProvider(widget.deliveryId));
     final delivery = deliveryAsync.valueOrNull;
-    final actions = delivery == null ? const <(String, String, String)>[] : _nextActions(delivery.orderStatus);
+    // R16: an unacknowledged assignment offers only the acknowledgement; the normal steps follow once it is confirmed.
+    final actions = delivery == null || delivery.needsAcknowledgement ? const <(String, String, String)>[] : _nextActions(delivery.orderStatus);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
@@ -274,7 +293,22 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
         ),
         data: (d) => _buildContent(d),
       ),
-      bottomNavigationBar: actions.isEmpty
+      bottomNavigationBar: delivery != null && delivery.needsAcknowledgement
+          ? SafeArea(
+              child: Container(
+                key: const Key('ack-bar'),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFE9E9E9)))),
+                child: FilledButton.icon(
+                  key: const Key('acknowledge-button'),
+                  onPressed: _isSubmitting ? null : _acknowledge,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: Text(context.t("I've seen this order", 'اطّلعت على الطلب')),
+                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                ),
+              ),
+            )
+          : actions.isEmpty
           ? null
           : SafeArea(
               child: Container(
@@ -326,6 +360,7 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
             decoration: BoxDecoration(color: const Color(0xFFFDECEA), borderRadius: BorderRadius.circular(12)),
             child: Text(_actionError!, style: const TextStyle(color: Color(0xFFB71C1C))),
           ),
+        if (delivery.orderStatus == 'ASSIGNED_TO_DRIVER') _AcknowledgementCard(delivery: delivery),
         _SectionCard(
           title: context.t('Order', 'الطلب'),
           icon: Icons.receipt_long_outlined,
@@ -545,4 +580,69 @@ String? _addressDetails(BuildContext context, DeliveryAddress a) {
     if (a.landmark != null) a.landmark!,
   ];
   return parts.isEmpty ? null : parts.join(' · ');
+}
+
+
+/// R16/R17: the assignment card — acknowledge-by time (or when it was acknowledged) and how to reach Operations. Drivers cannot release an
+/// order themselves: if there is a problem, they call Operations.
+class _AcknowledgementCard extends ConsumerWidget {
+  const _AcknowledgementCard({required this.delivery});
+
+  final Delivery delivery;
+
+  String _time(BuildContext context, DateTime at) => TimeOfDay.fromDateTime(at.toLocal()).format(context);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final phone = ref.watch(operationsPhoneProvider).valueOrNull;
+    final acknowledged = delivery.acknowledgedAt;
+    final deadline = delivery.acceptDeadlineAt;
+    final overdue = acknowledged == null && deadline != null && deadline.isBefore(DateTime.now());
+    return Container(
+      key: const Key('acknowledgement-card'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: acknowledged != null ? const Color(0xFFE8F5E9) : (overdue ? const Color(0xFFFFF3E0) : const Color(0xFFE3F2FD)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (acknowledged != null)
+            Text(context.t('Seen at ${_time(context, acknowledged)}', 'تم الاطلاع الساعة ${_time(context, acknowledged)}'),
+                key: const Key('acknowledged-at'), style: const TextStyle(fontWeight: FontWeight.w600))
+          else ...[
+            Text(context.t('New assignment — please confirm you have seen it', 'إسناد جديد — أكّد اطلاعك عليه'),
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            if (deadline != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  overdue
+                      ? context.t('Confirmation was due at ${_time(context, deadline)} — Operations have been told', 'كان التأكيد مطلوبًا قبل ${_time(context, deadline)} — تم إبلاغ العمليات')
+                      : context.t('Confirm by ${_time(context, deadline)}', 'أكّد قبل ${_time(context, deadline)}'),
+                  key: const Key('acknowledge-deadline'),
+                ),
+              ),
+          ],
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(context.t('A problem with this order? Call Operations — they can reassign it.', 'مشكلة في هذا الطلب؟ اتصل بالعمليات — يمكنهم إعادة إسناده.'),
+                style: const TextStyle(fontSize: 13)),
+          ),
+          if (phone != null)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                key: const Key('call-operations'),
+                onPressed: () => launchUrl(Uri(scheme: 'tel', path: phone)),
+                icon: const Icon(Icons.support_agent),
+                label: Text(context.t('Call Operations', 'اتصل بالعمليات')),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

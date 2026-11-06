@@ -67,6 +67,19 @@ class DriverApi {
     return Delivery.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
+  /// R16: the driver confirms having seen the assignment (no accept/reject exists). Safe to repeat: the first confirmation is kept.
+  Future<Delivery> acknowledgeDelivery(String id) async {
+    final response = await retryTransient(() => _apiClient.dio.post('/driver/deliveries/$id/acknowledge'));
+    return Delivery.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
+  /// R17: the Operations phone number drivers call with a problem (null = not configured; the app hides the button).
+  Future<String?> getOperationsPhone() async {
+    final response = await retryTransient(() => _apiClient.dio.get('/driver/support-contact'));
+    final phone = (response.data['data'] as Map<String, dynamic>?)?['operationsPhone'] as String?;
+    return phone == null || phone.trim().isEmpty ? null : phone.trim();
+  }
+
   /// `status` is one of the approved Order-level lifecycle targets
   /// (`PICKED_UP`, `ON_THE_WAY`, `DELIVERED`, `FAILED_DELIVERY`) —
   /// CONFIRMED: never `ASSIGNED_TO_DRIVER` (that's an Admin/system
