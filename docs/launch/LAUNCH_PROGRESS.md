@@ -369,6 +369,22 @@ Release **`20261101T191813Z-084657feb275`** (bundle 1,733 entries, 73 migrations
 **Rollback:** `ssh ubuntu@152.228.240.4 "cd /opt/hatly-prod && echo 20261101T102911Z-6abe9a04c7d9 > RELEASE && ln -sfn releases/20261101T102911Z-6abe9a04c7d9 current && current/deploy/production/prod.sh apps"` — schema unchanged, so the previous code is safe.
 **NOT verified live:** any signed-in screen (the agent must not enter production credentials). Owner: sign in once and open Home, the Notifications tab, a vendor's Home and Notifications.
 
+## 3ah. Decision-register release 1 (2026-11-06) — DEPLOYED and verified; signed-in click-through NOT performed
+
+Source: branch `feature/register-release-1` (commits `8110c54`, `dc4a364`, pushed), built in a separate worktree so the uncommitted customer-app work in the main checkout was untouched. Rules from `HATLY_FINAL_DECISION_REGISTER_2026-11-06.md`:
+* **R16/R13 acknowledgement:** default 5 min (`DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES`, 1–30, Settings); overdue → one `ACKNOWLEDGEMENT_OVERDUE` alert in both dispatch modes; the 30-second automatic release/re-offer is gone (switching dispatch never touches assignments). Opening the delivery in the driver app, `POST /driver/deliveries/:id/acknowledge` or picking up acknowledges. Migration `1700007300000-DeliveryAcknowledgement` (nullable `deliveries.acknowledged_at`).
+* **R17:** drivers cannot release/hand back an assignment (admin only).
+* **R3/R40/R45:** customer cancel until driver pickup (Hatly Service: until the purchase is recorded); admin cancel at ASSIGNED_TO_DRIVER; `OPS_CANCELLED_AFTER_ASSIGNMENT` staff alert.
+* **R2:** InstaPay/Vodafone Cash orders hidden from vendors (lists, detail, stats, change feed, notifications, actions) until PAID; vendor new-order alert sent at approval.
+* **R28/R31/R40:** driver commission only on driver compensation; Hatly Service multiplier premium recorded as `HATLY_SERVICE_CHARGE_RECOGNIZED` (new deliveries only).
+* Dashboard: driver commission editor (Drivers page), acknowledgement labels/setting, alert wording, no vendor-part actions on locked orders.
+
+**Gates:** backend unit 2,444 ✔; e2e 82 suites / 1,123 (first full run 23 failures, all tests encoding superseded rules, rewritten; the 9 affected suites re-run 199/199 ✔); integration 27 / 314 ✔; dashboard unit 45 ✔, `tsc` ✔, `next build` ✔. Playwright NOT run (ports 3000/3001 belong to the owner's running stack and tunnels). `npm run lint` has no ESLint config (pre-existing).
+**Production:** release `20261106T195428Z-50ef7fbe7cd6` LIVE (previous `20261101T191813Z-084657feb275` kept for rollback; first bundle `20261106T195227Z-1b323dab4ea2` failed to build — empty `packages/` not in git — never switched to). env-check PASSED (4 known warnings); plan = exactly 1 pending; backup `hatly-prod-20261106T195942Z.dump` (sha256 `b585c9ba…`) + uploads, restore drill OK (98 tables, 73 migrations, 16 users), off-host copy in `~/Downloads/hatly-backups/prod/` (sha match); guarded migrate (own backup `…T200037Z.dump`) 73 → 74; apps healthy in ~5 s.
+**Verified live (no credentials):** `/health/ready` db+redis up; `/sectors`, `/home-banners`, `/config/client` 200; new/changed routes 401 without a session; 9 dashboard routes 200; public drivers chunk contains the commission editor; `deliveries.acknowledged_at` present; counts after (users 16, orders 29, vendors 34, products 226, payments 3); 0 backend errors.
+**Rollback:** `ssh ubuntu@152.228.240.4 "cd /opt/hatly-prod && echo 20261101T191813Z-084657feb275 > RELEASE && ln -sfn releases/20261101T191813Z-084657feb275 current && current/deploy/production/prod.sh apps"` — the migration is additive, the old code ignores the column.
+**Owner:** sign in once: Drivers → set each driver's commission (1 driver has none, so nothing is recorded for them); Settings → acknowledgement window if not 5; one order is UNDER_REVIEW and is now hidden from its vendor until approved.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
