@@ -127,7 +127,8 @@ describe('E2E — order lifecycle', () => {
       CONFIRMED: { PREPARING: ['ADMIN'], CANCELLED: ['VENDOR', 'ADMIN'] },
       PREPARING: { READY_FOR_PICKUP: ['ADMIN'], CANCELLED: ['VENDOR', 'ADMIN'] },
       READY_FOR_PICKUP: { ASSIGNED_TO_DRIVER: ['ADMIN'], CANCELLED: ['VENDOR', 'ADMIN'] },
-      ASSIGNED_TO_DRIVER: { PICKED_UP: ['DRIVER'], READY_FOR_PICKUP: ['DRIVER', 'ADMIN'] },
+      // R17: only Operations release; R3: Operations may cancel before pickup (the customer through its own endpoint).
+      ASSIGNED_TO_DRIVER: { PICKED_UP: ['DRIVER'], READY_FOR_PICKUP: ['ADMIN'], CANCELLED: ['ADMIN'] },
       PICKED_UP: { ON_THE_WAY: ['DRIVER'], FAILED_DELIVERY: ['DRIVER', 'ADMIN'] },
       ON_THE_WAY: { FAILED_DELIVERY: ['DRIVER', 'ADMIN'], DELIVERED: ['DRIVER'] },
     };

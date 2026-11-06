@@ -1,3 +1,4 @@
+import { vendorVisibleOrderSql } from './vendor-order-visibility';
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { AdminAuditAction, AdminAuditService } from '../audit/admin-audit.service';
@@ -51,11 +52,11 @@ export class VendorFinanceService {
 
     const v1: unknown[] = [ids];
     const completed = `g.vendor_branch_id = ANY($1) AND g.group_type = 'CATALOG' AND g.status <> 'CANCELLED' AND o.status IN ('DELIVERED','COLLECTED') AND ${range('coalesce(d.at, o.updated_at)', v1)}`;
-    const [sales] = await this.ds.query(`SELECT count(*)::int AS parts, coalesce(sum(g.subtotal_minor),0) AS goods, coalesce(sum(${commission}),0) AS commission FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id ${done} WHERE ${completed}`, v1);
-    const byMethod = await this.ds.query(`SELECT o.payment_method AS method, count(*)::int AS parts, coalesce(sum(g.subtotal_minor),0) AS goods FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id ${done} WHERE ${completed} GROUP BY o.payment_method ORDER BY goods DESC`, v1);
+    const [sales] = await this.ds.query(`SELECT count(*)::int AS parts, coalesce(sum(g.subtotal_minor),0) AS goods, coalesce(sum(${commission}),0) AS commission FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} ${done} WHERE ${completed}`, v1);
+    const byMethod = await this.ds.query(`SELECT o.payment_method AS method, count(*)::int AS parts, coalesce(sum(g.subtotal_minor),0) AS goods FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} ${done} WHERE ${completed} GROUP BY o.payment_method ORDER BY goods DESC`, v1);
 
     const v2: unknown[] = [ids];
-    const [cancelled] = await this.ds.query(`SELECT count(*)::int AS parts, coalesce(sum(g.subtotal_minor),0) AS goods FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id WHERE g.vendor_branch_id = ANY($1) AND g.group_type = 'CATALOG' AND g.status = 'CANCELLED' AND ${range('g.updated_at', v2)}`, v2);
+    const [cancelled] = await this.ds.query(`SELECT count(*)::int AS parts, coalesce(sum(g.subtotal_minor),0) AS goods FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} WHERE g.vendor_branch_id = ANY($1) AND g.group_type = 'CATALOG' AND g.status = 'CANCELLED' AND ${range('g.updated_at', v2)}`, v2);
 
     const settlements = await this.ds.query(
       `SELECT s.id, b.name AS branch_name, s.frequency, s.period_start, s.period_end, s.gross_sales_minor, s.total_commission_owed_minor, s.closed_at,
@@ -67,7 +68,7 @@ export class VendorFinanceService {
 
     const history = await this.ds.query(
       `SELECT to_char((coalesce(d.at, o.updated_at) AT TIME ZONE '${CAIRO}'), 'YYYY-MM') AS month, count(*)::int AS parts, coalesce(sum(g.subtotal_minor),0) AS goods, coalesce(sum(${commission}),0) AS commission
-         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id ${done}
+         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} ${done}
         WHERE g.vendor_branch_id = ANY($1) AND g.group_type = 'CATALOG' AND g.status <> 'CANCELLED' AND o.status IN ('DELIVERED','COLLECTED') AND coalesce(d.at, o.updated_at) >= now() - interval '12 months'
         GROUP BY 1 ORDER BY 1 DESC`,
       [ids],
@@ -132,7 +133,7 @@ export class VendorFinanceService {
     const commission = `(SELECT sum(f.amount_minor) FROM financial_events f WHERE f.order_vendor_segment_id = g.id AND f.type = 'VENDOR_COMMISSION_RECOGNIZED' AND f.direction = 'RECEIVABLE')`;
     const rows = await this.ds.query(
       `SELECT o.order_number, to_char((coalesce(d.at, o.updated_at) AT TIME ZONE '${CAIRO}')::date, 'YYYY-MM-DD') AS completed_on, b.name AS branch, o.payment_method, g.subtotal_minor, ${commission} AS commission_minor
-         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id JOIN vendor_branches b ON b.id = g.vendor_branch_id
+         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} JOIN vendor_branches b ON b.id = g.vendor_branch_id
          LEFT JOIN LATERAL (SELECT min(created_at) AS at FROM order_status_events WHERE order_id = o.id AND to_status IN ('DELIVERED','COLLECTED')) d ON true
         WHERE g.vendor_branch_id = ANY($1) AND g.group_type = 'CATALOG' AND g.status <> 'CANCELLED' AND o.status IN ('DELIVERED','COLLECTED')
           AND (coalesce(d.at, o.updated_at) AT TIME ZONE '${CAIRO}')::date >= COALESCE($2::date, ((now() AT TIME ZONE '${CAIRO}')::date - 30))

@@ -24,8 +24,8 @@ export interface ControlTowerSummary {
   drivers: { approved: number; onlineAndAvailable: number; onlineBusy: number; offline: number; pendingVerification: number } | null;
 }
 
-export type DispatchAlertReason = 'NO_ELIGIBLE_DRIVER' | 'AUTO_ASSIGN_DISABLED' | 'ASSIGNMENT_ERROR' | 'DRIVER_NOT_RESPONDING';
-export const DISPATCH_ALERT_REASONS: DispatchAlertReason[] = ['NO_ELIGIBLE_DRIVER', 'AUTO_ASSIGN_DISABLED', 'ASSIGNMENT_ERROR', 'DRIVER_NOT_RESPONDING'];
+export type DispatchAlertReason = 'NO_ELIGIBLE_DRIVER' | 'AUTO_ASSIGN_DISABLED' | 'ASSIGNMENT_ERROR' | 'DRIVER_NOT_RESPONDING' | 'ACKNOWLEDGEMENT_OVERDUE';
+export const DISPATCH_ALERT_REASONS: DispatchAlertReason[] = ['NO_ELIGIBLE_DRIVER', 'AUTO_ASSIGN_DISABLED', 'ASSIGNMENT_ERROR', 'DRIVER_NOT_RESPONDING', 'ACKNOWLEDGEMENT_OVERDUE'];
 
 /** Mirrors `AdminControlTowerService` `operations` — counts only; every number is computed by the backend. */
 export interface OperationsFacts {
@@ -50,6 +50,8 @@ export interface ControlTowerDeliveryRow {
   driver: { id: string; fullName: string; phone: string } | null;
   assignedAt: string | null;
   acceptDeadlineAt: string | null;
+  /** R16: when the current driver acknowledged (null = not yet). */
+  acknowledgedAt?: string | null;
   acceptDeadlinePassed: boolean;
   reassignmentCount: number;
   openDispatchAlert: { id: string; reason: string; createdAt: string } | null;

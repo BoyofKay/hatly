@@ -15,7 +15,7 @@ import { Order } from '../orders/entities/order.entity';
  * logic (untouched by this chunk).
  */
 function buildHarness(
-  opts: { driver?: any; transitionSucceeds?: boolean; existingDelivery?: any; orderStatus?: string; drivers?: Record<string, any>; fulfillmentType?: string } = {},
+  opts: { driver?: any; transitionSucceeds?: boolean; existingDelivery?: any; orderStatus?: string; drivers?: Record<string, any>; fulfillmentType?: string; ackWindowMinutes?: unknown } = {},
 ) {
   const driver = opts.driver ?? { id: 'driver-1', userId: 'user-1', isAvailable: true, isOnline: true };
   const writes: string[] = [];
@@ -28,6 +28,7 @@ function buildHarness(
         return row ? { ...row } : null;
       }
       if (EntityClass === Delivery) return opts.existingDelivery ? { ...opts.existingDelivery } : null; // deliveries.order_id is UNIQUE
+      if (EntityClass?.name === 'BusinessConfig') return opts.ackWindowMinutes !== undefined ? { value: opts.ackWindowMinutes } : null;
       throw new Error('unhandled findOne');
     },
     save: async (entity: any) => {
@@ -328,5 +329,34 @@ describe('DeliveryAssignmentService — atomic assignment (Control Tower milesto
       expect(code(error)).toBe('DRIVER_UNAVAILABLE');
       expect(h.writes).toEqual([]);
     });
+  });
+});
+
+describe('DeliveryAssignmentService — R16 acknowledgement deadline', () => {
+  const savedDelivery = (writesHarness: any) => writesHarness;
+  it.each([
+    [undefined, 5],
+    [10, 10],
+    [1, 1],
+    [30, 30],
+    [0, 5],
+    [31, 5],
+    ['7', 5],
+  ])('window %p minutes stored -> acknowledge-by is %p minutes after assignment (default 5, bounds 1-30)', async (stored, expectedMinutes) => {
+    const { service } = buildHarness({ ackWindowMinutes: stored });
+    const before = Date.now();
+    const delivery: any = await service.assignDriver({ orderId: 'order-1', candidateDriverIds: ['driver-1'] });
+    const deltaMin = (delivery.acceptDeadlineAt.getTime() - before) / 60_000;
+    expect(deltaMin).toBeGreaterThanOrEqual(expectedMinutes - 0.05);
+    expect(deltaMin).toBeLessThanOrEqual(expectedMinutes + 0.05);
+    expect(delivery.acknowledgedAt).toBeNull();
+    savedDelivery(delivery);
+  });
+
+  it('a reassignment (existing delivery row) resets the acknowledgement of the previous driver', async () => {
+    const { service } = buildHarness({ existingDelivery: { id: 'delivery-1', orderId: 'order-1', driverId: 'old', acknowledgedAt: new Date() } });
+    const delivery: any = await service.assignDriver({ orderId: 'order-1', candidateDriverIds: ['driver-1'] });
+    expect(delivery.driverId).toBe('driver-1');
+    expect(delivery.acknowledgedAt).toBeNull();
   });
 });

@@ -44,6 +44,9 @@ describe('E2E — wallet + Manual Transfer (PD-001 amended)', () => {
     q("INSERT INTO wallet_transactions (customer_id, amount_delta_minor, type, idempotency_key, reason) VALUES ($1, $2, 'ADMIN_CREDIT', $3, 'e2e seed')", [c.id, amountMinor, `e2e-wtm-${c.id}-${seed++}`]);
   const segmentOf = async (orderId: string, v: VendorFixture): Promise<string> => (await q('SELECT id FROM order_vendor_segments WHERE order_id = $1 AND vendor_branch_id = $2', [orderId, v.branchId]))[0].id;
   const vendorStatus = (v: VendorFixture, segmentId: string, status: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status, ...(status === 'CANCELLED' ? { reason: 'Out of stock' } : {}) } });
+  // R2: until Operations verify an InstaPay / Vodafone Cash payment the vendor cannot see the order; Operations act on its behalf.
+  let opsToken = '';
+  const opsStatus = (segmentId: string, status: string) => world.api('patch', `/admin/orders/segments/${segmentId}/status`, { token: opsToken, body: { status, ...(status === 'CANCELLED' ? { reason: 'Out of stock' } : {}) } });
   const cancelCustomer = (c: Actor, id: string) => world.api('post', `/orders/${id}/cancel`, { token: c.accessToken, body: {} });
   const claim = (c: Actor, orderId: string) => world.api('post', `/payments/manual-transfer/orders/${orderId}/claim`, { token: c.accessToken, body: {} });
   const approve = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/approve`, { token: reviewer.accessToken });
@@ -79,6 +82,7 @@ describe('E2E — wallet + Manual Transfer (PD-001 amended)', () => {
     area = await s.serviceArea({ radiusMeters: 50000 });
     superAdmin = await s.superAdmin();
     reviewer = await s.admin([Permission.VERIFY_MANUAL_PAYMENTS]);
+    opsToken = (await s.superAdmin()).accessToken;
     issuesAdmin = await s.admin([Permission.MANAGE_ORDER_ISSUES, Permission.VERIFY_MANUAL_PAYMENTS]);
     v1 = await s.vendor({ name: 'WTM 1', serviceAreaId: area.id, lat: 30.421, lng: 31.561 });
     v2 = await s.vendor({ name: 'WTM 2', serviceAreaId: area.id, lat: 30.431, lng: 31.571 });
@@ -158,12 +162,18 @@ describe('E2E — wallet + Manual Transfer (PD-001 amended)', () => {
     it('pending transfer blocks PREPARING/dispatch; approval unlocks ONLY that remainder-payment gate — the order was never paid twice', async () => {
       const { c, order, payment } = await walletTransferOrder([p1], 3000);
       const seg = await segmentOf(order.id, v1);
-      expectData(await vendorStatus(v1, seg, 'CONFIRMED'));
-      const blocked = await vendorStatus(v1, seg, 'PREPARING');
+      expect((await vendorStatus(v1, seg, 'CONFIRMED')).status).toBe(404); // R2: the vendor cannot see or act on it yet
+      const vendorList = async () => expectData<any[]>(await world.api('get', '/vendor/orders', { token: v1.manager.accessToken })).map((o) => o.id);
+      expect(await vendorList()).not.toContain(order.id);
+      expect((await world.api('get', `/vendor/orders/${order.id}`, { token: v1.manager.accessToken })).status).toBe(404);
+      const unseen = await q(`SELECT count(*)::int AS n FROM staff_notifications WHERE order_id = $1 AND category = 'VENDOR_NEW_ORDER'`, [order.id]);
+      expect(unseen[0].n).toBe(0); // and is not told about it
+      expectData(await opsStatus(seg, 'CONFIRMED'));
+      const blocked = await opsStatus(seg, 'PREPARING');
       expect(blocked.status).toBe(409);
       expect(blocked.body.error.details).toMatchObject({ code: 'PAYMENT_NOT_APPROVED', paymentStatus: 'PENDING' });
       await claim(c, order.id);
-      expect((await vendorStatus(v1, seg, 'PREPARING')).status).toBe(409); // under review still blocks
+      expect((await opsStatus(seg, 'PREPARING')).status).toBe(409); // under review still blocks
 
       const before = num(payment.amount_minor);
       expectData(await approve(payment.id), 201);
@@ -172,6 +182,7 @@ describe('E2E — wallet + Manual Transfer (PD-001 amended)', () => {
       expect(num(after.amount_minor)).toBe(before); // approval unlocks exactly what the payment is: the remainder
       expect(num(after.amount_minor)).toBe(num((await orderRow(order.id)).total_minor) - 3000);
       expectData(await vendorStatus(v1, seg, 'PREPARING'));
+      expect(await vendorList()).toContain(order.id); // visible from the verification on
       expect(await transferRefunded(order.id)).toBe(0); // approving refunds nothing
     });
 
@@ -179,8 +190,9 @@ describe('E2E — wallet + Manual Transfer (PD-001 amended)', () => {
       const { c, order, payment } = await walletTransferOrder([p1], 3000, { claimed: true });
       expectData(await reject(payment.id), 201);
       const seg = await segmentOf(order.id, v1);
-      expectData(await vendorStatus(v1, seg, 'CONFIRMED'));
-      expect((await vendorStatus(v1, seg, 'PREPARING')).body.error.details.code).toBe('PAYMENT_NOT_APPROVED');
+      expect((await vendorStatus(v1, seg, 'CONFIRMED')).status).toBe(404); // R2: still hidden from the vendor
+      expectData(await opsStatus(seg, 'CONFIRMED'));
+      expect((await opsStatus(seg, 'PREPARING')).body.error.details.code).toBe('PAYMENT_NOT_APPROVED');
       expect(c).toBeDefined();
     });
   });
@@ -285,7 +297,9 @@ describe('E2E — wallet + Manual Transfer (PD-001 amended)', () => {
     it('a partial cancellation while UNVERIFIED: the entitlement is net of the wallet share (owed − wallet), and approval later refunds exactly that once; net == owed', async () => {
       const { c, order, payment } = await walletTransferOrder([p1, p2], 3000, { claimed: true });
       const removed = 20500;
-      expectData(await vendorStatus(v2, await segmentOf(order.id, v2), 'CANCELLED'));
+      // R2: before verification only Operations (on the vendor's behalf) can cancel a vendor part.
+      expect((await vendorStatus(v2, await segmentOf(order.id, v2), 'CANCELLED')).status).toBe(404);
+      expectData(await opsStatus(await segmentOf(order.id, v2), 'CANCELLED'));
       const pending = await paymentOf(order.id);
       expect(num(pending.pending_refund_minor)).toBe(removed); // NOT (transfer − whole total)
       expect(await transferRefunds(order.id)).toEqual([]);

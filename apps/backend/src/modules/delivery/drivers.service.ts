@@ -26,6 +26,8 @@ export interface AdminDriverView {
   lastLocationAt: Date | null;
   /** The order this driver is currently on (ASSIGNED_TO_DRIVER / PICKED_UP / ON_THE_WAY), if any. */
   activeDelivery: { orderId: string; orderNumber: string; status: string } | null;
+  /** R28: Hatly's commission on this driver's delivery compensation, basis points (null = not set yet — nothing is recognised). */
+  commissionRateBasisPoints: number | null;
 }
 
 @Injectable()
@@ -117,6 +119,7 @@ export class DriversService {
       vehicleTypeId: driver.vehicleTypeId ?? null,
       lastLocationAt: driver.lastLocationAt ?? null,
       activeDelivery: activeByDriver.get(driver.id) ?? null,
+      commissionRateBasisPoints: driver.commissionRateBasisPoints ?? null,
     }));
   }
 

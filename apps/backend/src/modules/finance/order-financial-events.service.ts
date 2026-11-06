@@ -1,3 +1,4 @@
+import { splitDriverCompensation } from './driver-compensation-split';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -140,7 +141,22 @@ export class OrderFinancialEventsService {
   private async handleDelivered(order: Order): Promise<void> {
     if (order.deliveryFeeMinor == null) return;
 
+    // R28/R31/R40 (U1): the driver's % applies only to the driver's delivery compensation; a Hatly Service multiplier premium is
+    // Hatly's own service revenue — recorded as its own entry (never merged with the driver's), whatever the driver's rate.
+    const split = splitDriverCompensation(Number(order.deliveryFeeMinor), order.deliveryFeeBreakdownSnapshot);
+
     const delivery = await this.deliveriesRepository.findOne({ where: { orderId: order.id } });
+    if (split.hatlyServiceRevenueMinor > 0) {
+      await this.financialEventService.record({
+        type: FinancialEventType.HATLY_SERVICE_CHARGE_RECOGNIZED,
+        direction: FinancialEventDirection.INFORMATIONAL,
+        idempotencyKey: `hatly-service-charge:${order.id}`,
+        amountMinor: split.hatlyServiceRevenueMinor,
+        orderId: order.id,
+        deliveryId: delivery?.id,
+        rateSnapshot: { ...split.hatlyService, driverCompensationMinor: split.driverCompensationMinor },
+      });
+    }
     if (!delivery?.driverId) return;
 
     const driver = await this.driversRepository.findOne({ where: { id: delivery.driverId } });
@@ -148,7 +164,7 @@ export class OrderFinancialEventsService {
       return; // fails closed — no rate configured yet
     }
 
-    const commissionMinor = Math.round((order.deliveryFeeMinor * driver.commissionRateBasisPoints) / 10000);
+    const commissionMinor = Math.round((split.driverCompensationMinor * driver.commissionRateBasisPoints) / 10000);
     await this.financialEventService.record({
       type: FinancialEventType.DRIVER_COMMISSION_RECOGNIZED,
       direction: FinancialEventDirection.RECEIVABLE,
@@ -164,7 +180,11 @@ export class OrderFinancialEventsService {
       // (commissionMinor, rate), which is mathematically impossible
       // whenever rate is exactly 0% (0 / 0 is undefined) — caught and
       // fixed before this was ever saved, not a live bug.
-      rateSnapshot: { commissionRateBasisPoints: driver.commissionRateBasisPoints, baseAmountMinor: order.deliveryFeeMinor },
+      rateSnapshot: {
+        commissionRateBasisPoints: driver.commissionRateBasisPoints,
+        baseAmountMinor: split.driverCompensationMinor,
+        ...(split.hatlyService ? { deliveryChargeMinor: Number(order.deliveryFeeMinor), hatlyServiceRevenueMinor: split.hatlyServiceRevenueMinor } : {}),
+      },
     });
   }
 

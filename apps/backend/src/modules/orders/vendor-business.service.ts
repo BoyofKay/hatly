@@ -1,3 +1,4 @@
+import { vendorVisibleOrderSql } from './vendor-order-visibility';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
@@ -63,7 +64,7 @@ export class VendorBusinessService {
     const empty = { live: {}, today: { received: 0, cancelled: 0, goodsMinor: 0 }, yesterday: { received: 0, cancelled: 0, goodsMinor: 0 }, productCount: 0, vendorName: null, rating: null, branches: [], openExceptions: 0, awaitingAcceptance: 0 };
     if (ids.length === 0) return empty;
     const live = await this.ds.query(
-      `SELECT g.status, count(*)::int AS n FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id
+      `SELECT g.status, count(*)::int AS n FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()}
         WHERE g.vendor_branch_id = ANY($1) AND g.group_type = 'CATALOG' AND g.status <> 'CANCELLED' AND o.status NOT IN ${TERMINAL_ORDER} GROUP BY g.status`,
       [ids],
     );
@@ -71,7 +72,7 @@ export class VendorBusinessService {
     const day = async (offsetDays: number) => (await this.ds.query(
       `SELECT count(*)::int AS received, count(*) FILTER (WHERE g.status = 'CANCELLED')::int AS cancelled,
               coalesce(sum(g.subtotal_minor) FILTER (WHERE g.status <> 'CANCELLED'), 0) AS goods
-         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id
+         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()}
         WHERE g.vendor_branch_id = ANY($1) AND g.group_type = 'CATALOG' AND (o.created_at AT TIME ZONE '${CAIRO}')::date = (now() AT TIME ZONE '${CAIRO}')::date - $2::int`,
       [ids, offsetDays],
     ))[0];
@@ -125,7 +126,7 @@ export class VendorBusinessService {
       values.push(`%${q.q.replace(/[%_\\]/g, '\\$&').slice(0, 40)}%`);
       where.push(`o.order_number ILIKE $${values.length} ESCAPE '\\'`);
     }
-    const from = `FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id JOIN vendor_branches b ON b.id = g.vendor_branch_id WHERE ${where.join(' AND ')}`;
+    const from = `FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} JOIN vendor_branches b ON b.id = g.vendor_branch_id WHERE ${where.join(' AND ')}`;
     const [{ total }] = await this.ds.query(`SELECT count(*)::int AS total ${from}`, values);
     const rows = await this.ds.query(
       `SELECT o.id AS order_id, g.id AS segment_id, o.order_number, o.status AS order_status, g.status, g.subtotal_minor, o.payment_method, o.fulfillment_type, o.created_at, b.id AS branch_id, b.name AS branch_name,
@@ -154,34 +155,34 @@ export class VendorBusinessService {
     const [t] = await this.ds.query(
       `SELECT count(*)::int AS received, count(*) FILTER (WHERE g.status = 'CANCELLED')::int AS cancelled,
               coalesce(sum(g.subtotal_minor) FILTER (WHERE g.status <> 'CANCELLED'), 0) AS goods, count(*) FILTER (WHERE g.status <> 'CANCELLED')::int AS kept
-         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id WHERE ${where}`,
+         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} WHERE ${where}`,
       v,
     );
-    const byStatus = Object.fromEntries((await this.ds.query(`SELECT g.status, count(*)::int AS n FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id WHERE ${where} GROUP BY g.status`, v)).map((x: any) => [x.status, x.n]));
+    const byStatus = Object.fromEntries((await this.ds.query(`SELECT g.status, count(*)::int AS n FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} WHERE ${where} GROUP BY g.status`, v)).map((x: any) => [x.status, x.n]));
     const daily = await this.ds.query(
       `SELECT (o.created_at AT TIME ZONE '${CAIRO}')::date::text AS day, count(*)::int AS orders, coalesce(sum(g.subtotal_minor) FILTER (WHERE g.status <> 'CANCELLED'), 0) AS goods
-         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id WHERE ${where} GROUP BY 1 ORDER BY 1`,
+         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} WHERE ${where} GROUP BY 1 ORDER BY 1`,
       v,
     );
     const byHour = await this.ds.query(
-      `SELECT extract(hour FROM o.created_at AT TIME ZONE '${CAIRO}')::int AS hour, count(*)::int AS orders FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id WHERE ${where} GROUP BY 1 ORDER BY 1`,
+      `SELECT extract(hour FROM o.created_at AT TIME ZONE '${CAIRO}')::int AS hour, count(*)::int AS orders FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} WHERE ${where} GROUP BY 1 ORDER BY 1`,
       v,
     );
     const topProducts = await this.ds.query(
       `SELECT i.product_name_snapshot AS name, i.product_name_ar_snapshot AS name_ar, sum(i.quantity)::int AS quantity
-         FROM order_items i JOIN order_vendor_segments g ON g.id = i.order_vendor_segment_id JOIN orders o ON o.id = g.order_id
+         FROM order_items i JOIN order_vendor_segments g ON g.id = i.order_vendor_segment_id JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()}
         WHERE ${where} AND g.status <> 'CANCELLED' AND i.removed_at IS NULL GROUP BY 1, 2 ORDER BY 3 DESC, 1 LIMIT 8`,
       v,
     );
     const [acc] = await this.ds.query(
       `SELECT round((percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM e.created_at - g.created_at) / 60))::numeric, 1) AS m
-         FROM order_vendor_segment_events e JOIN order_vendor_segments g ON g.id = e.segment_id JOIN orders o ON o.id = g.order_id
+         FROM order_vendor_segment_events e JOIN order_vendor_segments g ON g.id = e.segment_id JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()}
         WHERE ${where} AND e.from_status = 'PENDING' AND e.to_status = 'CONFIRMED' AND e.on_behalf_of_vendor = false`,
       v,
     );
     const [prep] = await this.ds.query(
       `SELECT round((percentile_cont(0.5) WITHIN GROUP (ORDER BY extract(epoch FROM r.created_at - c.created_at) / 60))::numeric, 1) AS m
-         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id
+         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()}
          JOIN LATERAL (SELECT min(created_at) AS created_at FROM order_vendor_segment_events WHERE segment_id = g.id AND to_status = 'CONFIRMED') c ON true
          JOIN LATERAL (SELECT min(created_at) AS created_at FROM order_vendor_segment_events WHERE segment_id = g.id AND to_status = 'READY_FOR_PICKUP') r ON true
         WHERE ${where} AND c.created_at IS NOT NULL AND r.created_at IS NOT NULL`,
@@ -215,10 +216,10 @@ export class VendorBusinessService {
     const done = `LEFT JOIN LATERAL (SELECT min(created_at) AS at FROM order_status_events WHERE order_id = o.id AND to_status IN ('DELIVERED','COLLECTED')) d ON true`;
     const where = `g.vendor_branch_id = ANY($1) AND g.group_type = 'CATALOG' AND g.status <> 'CANCELLED' AND o.status IN ('DELIVERED','COLLECTED') AND ${this.rangeSql('coalesce(d.at, o.updated_at)', r, values)}`;
     const commission = `(SELECT sum(f.amount_minor) FROM financial_events f WHERE f.order_vendor_segment_id = g.id AND f.type = 'VENDOR_COMMISSION_RECOGNIZED' AND f.direction = 'RECEIVABLE')`;
-    const [tot] = await this.ds.query(`SELECT count(*)::int AS n, coalesce(sum(g.subtotal_minor), 0) AS goods, coalesce(sum(${commission}), 0) AS commission FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id ${done} WHERE ${where}`, values);
+    const [tot] = await this.ds.query(`SELECT count(*)::int AS n, coalesce(sum(g.subtotal_minor), 0) AS goods, coalesce(sum(${commission}), 0) AS commission FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} ${done} WHERE ${where}`, values);
     const rows = await this.ds.query(
       `SELECT o.id AS order_id, o.order_number, coalesce(d.at, o.updated_at) AS completed_at, g.subtotal_minor, ${commission} AS commission_minor, b.name AS branch_name, o.payment_method
-         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id JOIN vendor_branches b ON b.id = g.vendor_branch_id ${done}
+         FROM order_vendor_segments g JOIN orders o ON o.id = g.order_id AND ${vendorVisibleOrderSql()} JOIN vendor_branches b ON b.id = g.vendor_branch_id ${done}
         WHERE ${where} ORDER BY completed_at DESC, g.id LIMIT ${limit} OFFSET ${(page - 1) * limit}`,
       values,
     );

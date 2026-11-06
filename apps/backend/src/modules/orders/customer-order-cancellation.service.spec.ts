@@ -10,13 +10,15 @@ import { Role } from '../../common/enums/role.enum';
  * Customer cancellation of a whole order (PD-005) on a mocked transaction. The state-machine money/stock handling has its
  * own specs and the real-database behaviour (locks, concurrency, refunds) is in test/e2e/64-customer-cancellation.e2e-spec.ts.
  */
-function build(params: { order: any | null; visibleOrder?: any | null; segments?: any[] }) {
+function build(params: { order: any | null; visibleOrder?: any | null; segments?: any[]; purchasedOrderIds?: string[] }) {
   const calls: string[] = [];
   const segmentUpdates: any[] = [];
   const afterCommit = jest.fn(async () => {
     calls.push('afterCommit');
   });
   const manager: any = {
+    // R40: purchase-record lookup (Hatly Service) — `params.purchasedOrderIds` lists orders whose driver already bought the items.
+    query: jest.fn(async () => (params.purchasedOrderIds ?? []).map((order_id: string) => ({ order_id }))),
     find: jest.fn(async (E: any, opts: any) => {
       if (E === OrderVendorSegment) {
         calls.push('lock-segments');
@@ -75,7 +77,7 @@ const order = (status: OrderStatus, customerId = 'cust-1') => ({ id: 'order-1', 
 const seg = (id: string, status: OrderVendorSegmentStatus) => ({ id, status });
 
 describe('CustomerOrderCancellationService', () => {
-  it.each([OrderStatus.PENDING, OrderStatus.CONFIRMED])('cancels a %s order: state machine (as the CUSTOMER, customer path) then every active segment, then post-commit effects', async (status) => {
+  it.each([OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP, OrderStatus.ASSIGNED_TO_DRIVER])('R3: cancels a %s order: state machine (as the CUSTOMER, customer path) then every active segment, then post-commit effects', async (status) => {
     const h = build({ order: order(status), segments: [seg('s1', OrderVendorSegmentStatus.PENDING), seg('s2', OrderVendorSegmentStatus.CONFIRMED)] });
     await h.service.cancel('cust-1', 'order-1', 'changed my mind');
 
@@ -123,9 +125,6 @@ describe('CustomerOrderCancellationService', () => {
   });
 
   it.each([
-    OrderStatus.PREPARING,
-    OrderStatus.READY_FOR_PICKUP,
-    OrderStatus.ASSIGNED_TO_DRIVER,
     OrderStatus.PICKED_UP,
     OrderStatus.ON_THE_WAY,
     OrderStatus.DELIVERED,
@@ -155,17 +154,35 @@ describe('CustomerOrderCancellationService', () => {
   });
 });
 
-describe('CustomerOrderCancellationService — a vendor already preparing blocks the customer (PD-006)', () => {
-  it.each(['PREPARING', 'READY_FOR_PICKUP', 'PICKED_UP'] as const)('order PENDING but one active vendor segment %s → refused with the vendor-segment reason, nothing changes', async (segStatus) => {
+describe('CustomerOrderCancellationService — R3: preparation no longer blocks; R40: a recorded Hatly Service purchase does', () => {
+  it.each(['PREPARING', 'READY_FOR_PICKUP'] as const)('order PENDING with one vendor segment %s → cancelled (Hatly bears the preparation cost)', async (segStatus) => {
     const h = build({ order: order(OrderStatus.PENDING), segments: [seg('s1', OrderVendorSegmentStatus.CONFIRMED), seg('s2', segStatus as OrderVendorSegmentStatus)] });
+    await expect(h.service.cancel('cust-1', 'order-1')).resolves.toEqual({ orderId: 'order-1' });
+    expect(h.segmentUpdates).toEqual([{ set: { status: OrderVendorSegmentStatus.CANCELLED }, ids: ['s1', 's2'] }]);
+  });
+
+  it('a Hatly Service order whose driver already recorded the purchase → refused with SERVICE_PURCHASE_RECORDED, nothing changes', async () => {
+    const h = build({
+      order: order(OrderStatus.ASSIGNED_TO_DRIVER),
+      segments: [{ id: 's1', status: OrderVendorSegmentStatus.READY_FOR_PICKUP, groupType: 'AD_HOC_SERVICE' }],
+      purchasedOrderIds: ['order-1'],
+    });
     await expect(h.service.cancel('cust-1', 'order-1')).rejects.toMatchObject({
-      response: { details: { code: 'ORDER_NOT_CANCELLABLE_BY_CUSTOMER', status: OrderStatus.PENDING, reason: 'VENDOR_SEGMENT_PREPARING' } },
+      response: { details: { code: 'ORDER_NOT_CANCELLABLE_BY_CUSTOMER', reason: 'SERVICE_PURCHASE_RECORDED' } },
     });
     expect(h.orderStateMachine.transitionInTransaction).not.toHaveBeenCalled();
     expect(h.segmentUpdates).toEqual([]);
   });
 
-  it('a CANCELLED segment that was preparing does not block: the customer can still cancel what is left', async () => {
+  it('the same Hatly Service order before any purchase is recorded → cancelled', async () => {
+    const h = build({
+      order: order(OrderStatus.ASSIGNED_TO_DRIVER),
+      segments: [{ id: 's1', status: OrderVendorSegmentStatus.READY_FOR_PICKUP, groupType: 'AD_HOC_SERVICE' }],
+    });
+    await expect(h.service.cancel('cust-1', 'order-1')).resolves.toEqual({ orderId: 'order-1' });
+  });
+
+  it('a CANCELLED segment is left as it is: the customer cancels what is left', async () => {
     const h = build({ order: order(OrderStatus.PENDING), segments: [seg('s1', OrderVendorSegmentStatus.CANCELLED), seg('s2', OrderVendorSegmentStatus.CONFIRMED)] });
     await expect(h.service.cancel('cust-1', 'order-1')).resolves.toEqual({ orderId: 'order-1' });
   });

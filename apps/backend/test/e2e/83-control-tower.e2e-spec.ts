@@ -215,11 +215,10 @@ describe('E2E — Admin Control Tower & operational dispatch', () => {
       expect(expectData<any[]>(await api(dispatcher, 'get', '/admin/dispatch-alerts?open=true')).find((a) => a.id === alert.id)).toBeUndefined();
     });
 
-    it('an order released by its driver no longer reports that driver anywhere (dispatch list, Control Tower, order detail)', async () => {
+    it('an order released by Operations (R17: drivers cannot release) no longer reports that driver anywhere (dispatch list, Control Tower, order detail)', async () => {
       const d1 = await s.driver({ ...near });
       const order = await assignedTo(d1);
-      const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: d1.accessToken })).find((x) => x.orderId === order.id);
-      expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: d1.accessToken, body: { status: 'READY_FOR_PICKUP' } }));
+      expectData(await world.api('patch', `/orders/${order.id}/status`, { token: superAdmin.accessToken, body: { status: 'READY_FOR_PICKUP' } }));
       const listed = expectData<any[]>(await api(dispatcher, 'get', '/admin/orders/dispatchable')).find((o) => o.orderId === order.id);
       expect(listed).toMatchObject({ status: 'READY_FOR_PICKUP', currentDriverId: null, orderNumber: order.orderNumber });
       const row = expectData<any[]>(await api(viewer, 'get', `/admin/control-tower/deliveries?stage=AWAITING_ASSIGNMENT&search=${order.orderNumber}`))[0];

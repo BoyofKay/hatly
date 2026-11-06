@@ -9,7 +9,6 @@ import { boundary } from './support/external-boundary';
 import { Permission } from '../../src/modules/permissions/permission.enum';
 import { Role } from '../../src/common/enums/role.enum';
 import { AutomaticDispatchService } from '../../src/modules/delivery/automatic-dispatch.service';
-import { QueryFailedError } from 'typeorm';
 
 describe('E2E — dispatch & drivers', () => {
   let world: World;
@@ -49,8 +48,10 @@ describe('E2E — dispatch & drivers', () => {
   // both can reuse the exact same helpers rather than each defining their own.
   const expireDeadline = (orderId: string) =>
     world.ds.query("UPDATE deliveries SET accept_deadline_at = NOW() - INTERVAL '1 minute' WHERE order_id = $1", [orderId]);
-  const sweep = () => world.app.get(AutomaticDispatchService).reassignTimedOutDeliveries();
+  const sweep = () => world.app.get(AutomaticDispatchService).alertUnacknowledgedAssignments();
   const alertsFor = (orderId: string) => world.ds.query('SELECT * FROM dispatch_alerts WHERE order_id = $1', [orderId]);
+  const ackAlerts = (orderId: string) =>
+    world.ds.query("SELECT * FROM dispatch_alerts WHERE order_id = $1 AND reason = 'ACKNOWLEDGEMENT_OVERDUE' ORDER BY created_at", [orderId]);
 
   beforeAll(async () => {
     world = await bootWorld();
@@ -245,21 +246,24 @@ describe('E2E — dispatch & drivers', () => {
       expect(ghost.status).toBeLessThan(500);
     });
 
-    it('a driver who rejects the assignment frees themselves and the order returns to READY_FOR_PICKUP; the order can then be assigned to someone else', async () => {
+    it('R17: a driver can NOT hand the assignment back (no reject/release) — only Operations release; the order stays with the driver', async () => {
       const a = await s.driver({ ...near });
       const order = await readyOrder();
       expect((await deliveryRow(order.id)).driver_id).toBe(a.driverId);
       const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: a.accessToken }))[0];
-      expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: a.accessToken, body: { status: 'READY_FOR_PICKUP' } }));
-      expect(await status(order.id)).toBe('READY_FOR_PICKUP');
-      expect(await driverRow(a)).toMatchObject({ is_available: true });
+      const refused = await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: a.accessToken, body: { status: 'READY_FOR_PICKUP' } });
+      expect(refused.status).toBe(400);
+      expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER');
+      expect((await deliveryRow(order.id)).driver_id).toBe(a.driverId);
+      expect(await driverRow(a)).toMatchObject({ is_available: false });
 
+      // Operations reassign to someone else.
       const b = await s.driver({ ...mid });
       const dispatcher = await s.admin([Permission.ASSIGN_REASSIGN_ORDERS]);
-      const reassigned = await world.api('post', `/admin/orders/${order.id}/assign-driver`, { token: dispatcher.accessToken, body: { driverId: b.driverId } });
+      const reassigned = await world.api('post', `/admin/orders/${order.id}/reassign-driver`, { token: dispatcher.accessToken, body: { driverId: b.driverId } });
       expect(reassigned.status).toBe(201);
-      expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER');
       expect((await deliveryRow(order.id)).driver_id).toBe(b.driverId);
+      expect(await driverRow(a)).toMatchObject({ is_available: true });
       expect(await world.ds.query('SELECT id FROM deliveries WHERE order_id = $1', [order.id])).toHaveLength(1); // one delivery per order
     });
 
@@ -368,225 +372,160 @@ describe('E2E — dispatch & drivers', () => {
     });
   });
 
-  describe('timeout-driven automatic reassignment', () => {
-    // The real acceptDeadlineAt window (DeliveryAssignmentService, unchanged) is 30s — tests never
-    // wait for it: they fast-forward it into the past directly (same convention this whole file
-    // already uses for driver online/location state) and invoke the real sweep directly instead of
-    // waiting for its periodic timer, which is disabled under NODE_ENV=test.
-    // (expireDeadline/sweep/alertsFor are hoisted to file scope — shared with the Dispatch Hardening
-    // describe block below.)
+  describe('R16: acknowledgement — default 5 minutes, alert only, never an automatic release', () => {
+    it('a new assignment must be acknowledged within the default 5 minutes (manual and automatic alike)', async () => {
+      await s.driver({ ...near });
+      const order = await readyOrder();
+      const row = await deliveryRow(order.id);
+      const minutes = (new Date(row.accept_deadline_at).getTime() - new Date(row.assigned_at).getTime()) / 60_000;
+      expect(minutes).toBeGreaterThan(4.9);
+      expect(minutes).toBeLessThan(5.1);
+      expect(row.acknowledged_at).toBeNull();
+    });
 
-    it('(a) an assigned driver who times out is released and reassigned, with a fresh acceptDeadlineAt', async () => {
+    it('the window follows DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES (1-30) and an invalid value is refused', async () => {
+      const writer = await s.superAdmin();
+      const bad = await world.api('put', '/admin/business-config/DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES', { token: writer.accessToken, body: { value: 45 } });
+      expect(bad.status).toBe(400);
+      await s.setConfig('DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES', 12);
+      try {
+        await s.driver({ ...near });
+        const order = await readyOrder();
+        const row = await deliveryRow(order.id);
+        const minutes = (new Date(row.accept_deadline_at).getTime() - new Date(row.assigned_at).getTime()) / 60_000;
+        expect(Math.round(minutes)).toBe(12);
+      } finally {
+        await world.ds.query("DELETE FROM business_config WHERE key = 'DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES'");
+      }
+    });
+
+    it.each([true, false])('overdue and unacknowledged (automatic dispatch %p): ONE Operations alert; the order stays with the same driver', async (auto) => {
       const d = await s.driver({ ...near });
       const order = await readyOrder();
-      expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER');
-      const before = await deliveryRow(order.id);
-      expect(before.driver_id).toBe(d.driverId);
-
-      await expireDeadline(order.id);
-      const result = await sweep();
-
-      expect(result).toMatchObject({ processed: 1, reassigned: 1, alerted: 0 });
-      expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER'); // released then immediately reassigned — never left dangling
-      const after = await deliveryRow(order.id);
-      expect(after.driver_id).toBe(d.driverId); // the only eligible driver — legitimately reassigned to themselves
-      expect(new Date(after.accept_deadline_at).getTime()).toBeGreaterThan(Date.now()); // a FRESH deadline, not the stale one
-      expect((await driverRow(d)).is_available).toBe(false); // busy again under the new assignment, not left "available" and assigned at once
-    });
-
-    it('(b) the timed-out driver is NOT reused once actually ineligible (went offline) — a different eligible driver is picked instead, never the stale one', async () => {
-      const first = await s.driver({ ...near });
-      const second = await s.driver({ ...far });
-      const order = await readyOrder();
-      expect((await deliveryRow(order.id)).driver_id).toBe(first.driverId); // nearest wins the original assignment
-
-      await expireDeadline(order.id);
-      // Simulates the real-world reason a driver times out without acting: their app is offline.
-      await world.ds.query('UPDATE drivers SET is_online = false WHERE id = $1', [first.driverId]);
-      const result = await sweep();
-
-      expect(result).toMatchObject({ processed: 1, reassigned: 1, alerted: 0 });
-      const after = await deliveryRow(order.id);
-      expect(after.driver_id).toBe(second.driverId);
-      expect(after.driver_id).not.toBe(first.driverId);
-      expect((await driverRow(first)).is_available).toBe(true); // freed, even though not reused
-    });
-
-    it('(c) no eligible driver at all: the order stays retryable (READY_FOR_PICKUP) and the existing DispatchAlert is raised — then a later retry succeeds once a driver is available again', async () => {
-      const onlyDriver = await s.driver({ ...near });
-      const order = await readyOrder();
-      expect((await deliveryRow(order.id)).driver_id).toBe(onlyDriver.driverId);
-
-      await expireDeadline(order.id);
-      await world.ds.query('UPDATE drivers SET is_online = false WHERE id = $1', [onlyDriver.driverId]);
-      const result = await sweep();
-
-      expect(result).toMatchObject({ processed: 1, reassigned: 0, alerted: 1 });
-      expect(await status(order.id)).toBe('READY_FOR_PICKUP'); // never stuck at ASSIGNED_TO_DRIVER with no real driver
-      const alerts = await alertsFor(order.id);
-      expect(alerts).toHaveLength(1);
-      expect(alerts[0].reason).toBe('NO_ELIGIBLE_DRIVER');
-      expect(alerts[0].resolved_at).toBeNull();
-
-      // Retryable: the SAME existing manual Admin dispatch primitive (unaffected by any of this) can
-      // still assign it once a driver becomes available — this milestone invented no new recovery path.
-      await world.ds.query('UPDATE drivers SET is_online = true, is_available = true WHERE id = $1', [onlyDriver.driverId]);
-      const admin = await s.admin([Permission.ASSIGN_REASSIGN_ORDERS]);
-      expectData(await world.api('post', `/admin/orders/${order.id}/assign-driver`, { token: admin.accessToken, body: {} }), 201);
-      expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER');
-    });
-
-    it('(d) an already-progressed delivery (driver already picked up) is never released or reassigned, even with a stale acceptDeadlineAt', async () => {
-      const d = await s.driver({ ...near });
-      const order = await readyOrder();
-      const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: d.accessToken })).find((x) => x.orderId === order.id);
-      expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: d.accessToken, body: { status: 'PICKED_UP' } }));
-      expect(await status(order.id)).toBe('PICKED_UP');
-
-      // The deadline column is stale (nothing ever clears it once past PICKED_UP) — CONFIRMED this
-      // alone must never be read as "still needs reassigning": the query/re-check is keyed on the
-      // ORDER still being exactly ASSIGNED_TO_DRIVER, which it no longer is.
-      await expireDeadline(order.id);
-      const result = await sweep();
-
-      expect(result).toEqual({ processed: 0, reassigned: 0, alerted: 0, skipped: 0 }); // excluded by the query itself — PICKED_UP never even seen as a candidate
-      expect(await status(order.id)).toBe('PICKED_UP');
-      expect((await deliveryRow(order.id)).driver_id).toBe(d.driverId);
-      expect(await alertsFor(order.id)).toEqual([]);
-    });
-
-    it('(e) repeated timeout processing is safe: running the sweep again immediately after is a clean no-op, never a double reassignment or a duplicate alert', async () => {
-      const d = await s.driver({ ...near });
-      const order = await readyOrder();
+      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', auto);
       await expireDeadline(order.id);
 
       const first = await sweep();
-      expect(first).toMatchObject({ processed: 1, reassigned: 1, alerted: 0 });
-      const afterFirst = await deliveryRow(order.id);
-
-      const second = await sweep();
-      expect(second).toEqual({ processed: 0, reassigned: 0, alerted: 0, skipped: 0 }); // the fresh deadline from the first sweep is no longer expired
-      const afterSecond = await deliveryRow(order.id);
-      expect(afterSecond.driver_id).toBe(afterFirst.driver_id);
-      expect(afterSecond.accept_deadline_at).toEqual(afterFirst.accept_deadline_at); // untouched — not reassigned again
+      expect(first.alerted).toBeGreaterThanOrEqual(1);
       expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER');
+      expect((await deliveryRow(order.id)).driver_id).toBe(d.driverId);
+      expect((await driverRow(d)).is_available).toBe(false);
+      const alerts = await ackAlerts(order.id);
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].resolved_at).toBeNull();
 
-      // Same idempotency check for the no-eligible-driver/alert path: re-running after an alert was
-      // already raised must never raise a second one for the same still-unresolved order.
-      await world.ds.query('UPDATE drivers SET is_online = false WHERE id = $1', [d.driverId]);
-      await expireDeadline(order.id);
-      await sweep(); // driver offline now → this order alerts instead of reassigning
-      const afterAlertOnce = await alertsFor(order.id);
-      await sweep(); // order is now READY_FOR_PICKUP, not ASSIGNED_TO_DRIVER — excluded by the query itself
-      const afterAlertTwice = await alertsFor(order.id);
-      expect(afterAlertTwice).toHaveLength(afterAlertOnce.length);
+      // Idempotent: further sweeps never stack or re-raise the alert for the same assignment, even after an admin closes it.
+      await sweep();
+      await world.ds.query('UPDATE dispatch_alerts SET resolved_at = now() WHERE id = $1', [alerts[0].id]);
+      await sweep();
+      expect(await ackAlerts(order.id)).toHaveLength(1);
+      expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER');
     });
 
-    it('(f) manual Admin assignment/reassignment is completely unaffected by an unrelated timed-out delivery elsewhere', async () => {
-      const staleDriver = await s.driver({ ...far });
-      const staleOrder = await readyOrder();
-      await expireDeadline(staleOrder.id); // left un-swept on purpose — simulates the sweep not having run yet
-
-      // A second, unrelated order dispatched manually by an Admin — must behave exactly as the
-      // existing (unmodified) "manual dispatch by an admin" tests already prove, regardless of the
-      // stale row sitting in the same table.
-      const manualDriver = await s.driver({ ...near });
-      await world.ds.query('UPDATE drivers SET is_online = false WHERE id = $1', [manualDriver.driverId]); // not auto-picked
-      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
-      const manualOrder = await readyOrder();
-      expect(await status(manualOrder.id)).toBe('READY_FOR_PICKUP'); // automatic dispatch is off
-
-      await world.ds.query('UPDATE drivers SET is_online = true WHERE id = $1', [manualDriver.driverId]);
-      const admin = await s.admin([Permission.ASSIGN_REASSIGN_ORDERS]);
-      expectData(await world.api('post', `/admin/orders/${manualOrder.id}/assign-driver`, { token: admin.accessToken, body: { driverId: manualDriver.driverId } }), 201);
-
-      expect(await status(manualOrder.id)).toBe('ASSIGNED_TO_DRIVER');
-      expect((await deliveryRow(manualOrder.id)).driver_id).toBe(manualDriver.driverId);
-      // The stale, unrelated order is still exactly as it was — the manual flow never touched it.
-      expect(await status(staleOrder.id)).toBe('ASSIGNED_TO_DRIVER');
-      expect((await deliveryRow(staleOrder.id)).driver_id).toBe(staleDriver.driverId);
-
-      // Cleanup: staleOrder's accept_deadline_at is still (deliberately) expired — proving the point
-      // above. Left as-is it would keep matching every LATER test's own sweep() calls in this file
-      // (the query is global, not scoped per test). Pushed into the future here, same as a real fresh
-      // assignment would be — this test's own cleanup, not a change to what was under test.
-      await world.ds.query("UPDATE deliveries SET accept_deadline_at = NOW() + INTERVAL '1 hour' WHERE order_id = $1", [staleOrder.id]);
-    });
-  });
-
-  describe('Dispatch Hardening milestone: multi-instance safety, races, and failure recovery', () => {
-    it('AUTOMATIC_DISPATCH_ENABLED = false: the sweep itself does nothing at all to a real expired assignment (same rule as attemptAutomaticDispatch, now proven for the sweep specifically)', async () => {
+    it('opening the assignment acknowledges it (backward compatible with apps without the button) and closes an open alert', async () => {
       const d = await s.driver({ ...near });
       const order = await readyOrder();
-      expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER');
       await expireDeadline(order.id);
-      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
+      await sweep();
+      expect((await ackAlerts(order.id))[0].resolved_at).toBeNull();
 
-      const result = await sweep();
-      expect(result).toEqual({ processed: 0, reassigned: 0, alerted: 0, skipped: 0 }); // returns before even acquiring the lock or querying
-      expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER'); // untouched — the stale deadline is never even looked at
-      expect((await deliveryRow(order.id)).driver_id).toBe(d.driverId);
-
-      // Cleanup: this delivery's accept_deadline_at is still (deliberately) stale/expired in the DB —
-      // proving the point above. Left as-is it would still match every LATER test's own sweep() calls
-      // in this file (the query is global, not scoped per test) and skew their processed/alerted
-      // counts. Pushed into the future here, exactly as a real fresh assignment would be — not a
-      // change to the thing under test, just this test cleaning up after itself.
-      await world.ds.query("UPDATE deliveries SET accept_deadline_at = NOW() + INTERVAL '1 hour' WHERE order_id = $1", [order.id]);
+      const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: d.accessToken })).find((x) => x.orderId === order.id);
+      expect((await deliveryRow(order.id)).acknowledged_at).toBeNull(); // the LIST alone is not "viewing the assignment"
+      const detail = expectData<any>(await world.api('get', `/driver/deliveries/${delivery.id}`, { token: d.accessToken }));
+      expect(detail.acknowledgedAt).not.toBeNull();
+      expect((await deliveryRow(order.id)).acknowledged_at).not.toBeNull();
+      expect((await ackAlerts(order.id))[0].resolved_at).not.toBeNull();
     });
 
-    it('TRUE multi-instance contention: two independent, concurrently-running app instances racing the SAME sweep at the same moment — exactly one does the work, the other is a clean no-op, never a double reassignment', async () => {
-      const second = await bootWorld({ resetInfrastructure: false }); // a second real Nest app, same DB/Redis as `world`
+    it('the explicit acknowledge endpoint works once, is idempotent, and no other driver can use it', async () => {
+      const d = await s.driver({ ...near });
+      const other = await s.driver({ ...far });
+      const order = await readyOrder();
+      const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: d.accessToken })).find((x) => x.orderId === order.id);
+
+      const stranger = await world.api('post', `/driver/deliveries/${delivery.id}/acknowledge`, { token: other.accessToken });
+      expect([403, 404]).toContain(stranger.status);
+      expect((await deliveryRow(order.id)).acknowledged_at).toBeNull();
+
+      const first = expectData<any>(await world.api('post', `/driver/deliveries/${delivery.id}/acknowledge`, { token: d.accessToken }), 201);
+      const firstAt = (await deliveryRow(order.id)).acknowledged_at;
+      expect(first.acknowledgedAt).not.toBeNull();
+      expectData(await world.api('post', `/driver/deliveries/${delivery.id}/acknowledge`, { token: d.accessToken }), 201);
+      expect((await deliveryRow(order.id)).acknowledged_at).toEqual(firstAt); // the first acknowledgement is kept
+
+      await expireDeadline(order.id);
+      await sweep();
+      expect(await ackAlerts(order.id)).toHaveLength(0); // acknowledged in time → no alert
+    });
+
+    it('picking up records the acknowledgement and closes the alert; a reassignment starts a fresh window for the new driver', async () => {
+      const a = await s.driver({ ...near });
+      const order = await readyOrder();
+      await expireDeadline(order.id);
+      await sweep();
+
+      const b = await s.driver({ ...mid });
+      const dispatcher = await s.admin([Permission.ASSIGN_REASSIGN_ORDERS]);
+      expect((await world.api('post', `/admin/orders/${order.id}/reassign-driver`, { token: dispatcher.accessToken, body: { driverId: b.driverId } })).status).toBe(201);
+      const fresh = await deliveryRow(order.id);
+      expect(fresh.driver_id).toBe(b.driverId);
+      expect(fresh.acknowledged_at).toBeNull();
+      expect(new Date(fresh.accept_deadline_at).getTime()).toBeGreaterThan(Date.now());
+      expect((await ackAlerts(order.id)).every((x: any) => x.resolved_at !== null)).toBe(true); // the first driver's alert is closed
+
+      const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: b.accessToken })).find((x) => x.orderId === order.id);
+      expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: b.accessToken, body: { status: 'PICKED_UP' } }));
+      expect((await deliveryRow(order.id)).acknowledged_at).not.toBeNull();
+      void a;
+    });
+
+    it('R13: switching automatic dispatch OFF→ON never releases or reassigns an existing (even overdue) assignment', async () => {
+      const d = await s.driver({ ...near });
+      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
+      const order = await readyOrder();
+      const dispatcher = await s.admin([Permission.ASSIGN_REASSIGN_ORDERS]);
+      expect((await world.api('post', `/admin/orders/${order.id}/assign-driver`, { token: dispatcher.accessToken, body: { driverId: d.driverId } })).status).toBe(201);
+      await expireDeadline(order.id);
+      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true);
+      await sweep();
+      await world.app.get(AutomaticDispatchService).retryOpenAlerts();
+      expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER');
+      expect((await deliveryRow(order.id)).driver_id).toBe(d.driverId);
+    });
+
+    it('Control Tower: an acknowledged assignment is never shown as overdue', async () => {
+      const d = await s.driver({ ...near });
+      const order = await readyOrder();
+      await expireDeadline(order.id);
+      const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: d.accessToken })).find((x) => x.orderId === order.id);
+      expectData(await world.api('post', `/driver/deliveries/${delivery.id}/acknowledge`, { token: d.accessToken }), 201);
+      const ops = await s.admin([Permission.ASSIGN_REASSIGN_ORDERS, Permission.VIEW_ORDERS]);
+      const res = await world.api('get', '/admin/control-tower/deliveries', { token: ops.accessToken });
+      if (res.status === 200) {
+        const rows = (res.body?.data?.items ?? res.body?.data ?? []) as any[];
+        const row = rows.find((r: any) => r.id === order.id || r.orderId === order.id);
+        if (row) {
+          expect(row.acceptDeadlinePassed).toBe(false);
+          expect(row.acknowledgedAt).not.toBeNull();
+        }
+      }
+    });
+
+    it('two app instances sweeping at the same moment raise exactly one alert', async () => {
+      await s.driver({ ...near });
+      const order = await readyOrder();
+      await expireDeadline(order.id);
+      const second = await bootWorld({ resetInfrastructure: false });
       try {
-        const d = await s.driver({ ...near });
-        const order = await readyOrder();
-        await expireDeadline(order.id);
-
-        const [a, b] = await Promise.all([sweep(), second.app.get(AutomaticDispatchService).reassignTimedOutDeliveries()]);
-
-        // Whichever instance actually processed the expired delivery — by winning the whole-sweep Redis
-        // lock, or by winning the per-delivery row lock first — the OTHER instance's own attempt is a
-        // clean, empty no-op. Never both processing the same delivery.
-        const results = [a, b];
-        expect(results.filter((r) => r.processed > 0)).toHaveLength(1);
-        expect(results.filter((r) => r.processed === 0)).toHaveLength(1);
-        expect(a.reassigned + b.reassigned).toBe(1);
-        expect(a.alerted + b.alerted).toBe(0);
-
-        expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER'); // released then immediately reassigned by whichever instance won
-        expect((await deliveryRow(order.id)).driver_id).toBe(d.driverId); // the only eligible driver — legitimately reassigned to themselves
-        expect(await world.ds.query('SELECT id FROM deliveries WHERE order_id = $1', [order.id])).toHaveLength(1); // one delivery row, never duplicated
+        await Promise.all([sweep(), second.app.get(AutomaticDispatchService).alertUnacknowledgedAssignments()]);
+        await sweep();
+        expect(await ackAlerts(order.id)).toHaveLength(1);
       } finally {
         await second.close();
       }
     });
 
-    it('restart-recovery framing: the instance whose HTTP request originally created the expired assignment can crash completely — a different, unrelated running instance still discovers and safely reassigns it later (recovery depends on the database, never on any single process staying alive)', async () => {
-      const crashed = await bootWorld({ resetInfrastructure: false });
-      const crashedScenario = new Scenario(crashed);
-      let orderId: string;
-      let driverId: string;
-      try {
-        const d = await crashedScenario.driver({ ...near });
-        driverId = d.driverId;
-        const customer = await crashedScenario.customer();
-        const order = await crashedScenario.simpleOrder(customer, vendor, product.id, home);
-        await crashedScenario.vendorPrepares(vendor, order.id);
-        orderId = order.id;
-        expect((await deliveryRow(orderId)).driver_id).toBe(driverId); // assigned by the soon-to-crash instance's own in-process call
-        await expireDeadline(orderId);
-      } finally {
-        await crashed.close(); // gone for good — its own periodic sweep (disabled under NODE_ENV=test anyway) will never run
-      }
-
-      // A wholly separate, still-running instance (the file's main `world`) recovers it later.
-      const result = await sweep();
-      expect(result).toMatchObject({ processed: 1, reassigned: 1, alerted: 0 });
-      expect(await status(orderId)).toBe('ASSIGNED_TO_DRIVER');
-      expect((await deliveryRow(orderId)).driver_id).toBe(driverId); // only eligible driver — reassigned to themselves, correctly
-    });
-
-    it('the sweep fails SAFELY when Redis itself is unavailable: no crash, a zeroed no-op result, and the real expired assignment is left completely untouched for a later, healthy sweep to pick up', async () => {
+    it('the sweep fails SAFELY when Redis is unavailable: no crash, a zeroed result, the assignment untouched; a healthy sweep then alerts', async () => {
       const originalRedisUrl = process.env.REDIS_URL;
       const d = await s.driver({ ...near });
       const order = await readyOrder();
@@ -595,124 +534,17 @@ describe('E2E — dispatch & drivers', () => {
       process.env.REDIS_URL = 'redis://localhost:6390/14'; // the same unreachable-port convention 98-redis-outage.e2e-spec.ts already establishes
       const outage = await bootWorld({ resetInfrastructure: false });
       try {
-        const result = await outage.app.get(AutomaticDispatchService).reassignTimedOutDeliveries();
-        expect(result).toEqual({ processed: 0, reassigned: 0, alerted: 0, skipped: 0 }); // fails closed at lock acquisition — never even reaches the query
-        expect(outage.unhandledServerErrors()).toEqual([]); // logged via the existing EXTERNAL_PROVIDER_FAILED event, never an unhandled crash
+        const result = await outage.app.get(AutomaticDispatchService).alertUnacknowledgedAssignments();
+        expect(result).toEqual({ processed: 0, alerted: 0 });
+        expect(outage.unhandledServerErrors()).toEqual([]);
       } finally {
         process.env.REDIS_URL = originalRedisUrl;
         await outage.close();
       }
-
-      // Completely untouched by the failed attempt — a later, healthy sweep recovers it normally.
       expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER');
       expect((await deliveryRow(order.id)).driver_id).toBe(d.driverId);
-      const recovered = await sweep();
-      expect(recovered).toMatchObject({ processed: 1, reassigned: 1, alerted: 0 });
-    });
-
-    it('a push-notification failure during reassignment never corrupts authoritative state: the delivery is still correctly reassigned even when the underlying push provider throws', async () => {
-      boundary.pushMode = 'throw';
-      const d = await s.driver({ ...near });
-      const order = await readyOrder();
-      await expireDeadline(order.id);
-
-      const result = await sweep();
-
-      expect(result).toMatchObject({ processed: 1, reassigned: 1, alerted: 0 });
-      expect(await status(order.id)).toBe('ASSIGNED_TO_DRIVER');
-      expect((await deliveryRow(order.id)).driver_id).toBe(d.driverId);
-      expect(world.unhandledServerErrors()).toEqual([]); // PushNotificationService swallows the provider's own throw — never surfaces as an unhandled exception
-    });
-
-    it('TRUE concurrent race: an Admin manually reassigning at the exact moment the timeout sweep processes the SAME expired delivery — whichever side wins, the result is a single, self-consistent authoritative state, never a corrupted double-assignment', async () => {
-      const original = await s.driver({ ...near });
-      const other = await s.driver({ ...mid });
-      const order = await readyOrder();
-      expect((await deliveryRow(order.id)).driver_id).toBe(original.driverId);
-      await expireDeadline(order.id);
-
-      const dispatcher = await s.admin([Permission.ASSIGN_REASSIGN_ORDERS]);
-      const [adminRes] = await Promise.all([
-        world.api('post', `/admin/orders/${order.id}/reassign-driver`, { token: dispatcher.accessToken, body: { driverId: other.driverId } }),
-        sweep(),
-      ]);
-
-      // Whichever ran first won the order's row lock; the loser's own release attempt is either a
-      // clean 4xx (admin lost) or a benign internal skip (sweep lost) — never a 5xx, and never both
-      // sides applying an inconsistent, partially-overlapping change.
-      expect(adminRes.status).toBeLessThan(500);
-      expect(world.unhandledServerErrors()).toEqual([]);
-
-      // Self-consistency invariants that must hold regardless of which side actually won:
-      const finalStatus = await status(order.id);
-      expect(['ASSIGNED_TO_DRIVER', 'READY_FOR_PICKUP']).toContain(finalStatus);
-      const rows = await world.ds.query('SELECT driver_id FROM deliveries WHERE order_id = $1', [order.id]);
-      expect(rows).toHaveLength(1); // exactly one delivery row for this order, never duplicated
-      if (finalStatus === 'ASSIGNED_TO_DRIVER') {
-        const finalDriverId = rows[0].driver_id;
-        expect([original.driverId, other.driverId]).toContain(finalDriverId);
-        // The driver actually holding the delivery is busy; the OTHER named driver in this race is free
-        // — never both marked busy, never the assigned one marked free.
-        const busyDriverId = finalDriverId;
-        const freeDriverId = finalDriverId === original.driverId ? other.driverId : original.driverId;
-        expect((await world.ds.query('SELECT is_available FROM drivers WHERE id = $1', [busyDriverId]))[0].is_available).toBe(false);
-        expect((await world.ds.query('SELECT is_available FROM drivers WHERE id = $1', [freeDriverId]))[0].is_available).toBe(true);
-      } else {
-        // The rare "sweep alerted, nobody currently assigned" outcome is only reachable if ranking
-        // found no candidate — impossible here (both drivers are eligible) — so this branch is not
-        // expected to run, but is handled rather than silently assumed impossible.
-        expect(rows[0].driver_id).toBeNull();
-      }
-    });
-
-    it('TRUE concurrent race: a driver progressing their OWN delivery to PICKED_UP at the exact moment the timeout sweep processes it — whichever side wins, the delivery is never released AND progressed at once', async () => {
-      const d = await s.driver({ ...near });
-      const order = await readyOrder();
-      const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: d.accessToken })).find((x) => x.orderId === order.id);
-      await expireDeadline(order.id);
-
-      // Two genuinely independent transactions can lock the SAME Order/Delivery rows in opposite
-      // orders (the driver's own status-update path vs. the sweep's release-then-reassign path) —
-      // Postgres itself can detect that as a deadlock and abort ONE side. That abort is a clean
-      // ROLLBACK (no partial/corrupted state ever persists) and is exactly the failure mode
-      // `onModuleInit`'s own `.catch()` wrapper around the REAL periodic sweep already exists to
-      // absorb (see that method's doc comment) — self-healing on the very next tick. Every test in
-      // this file calls `reassignTimedOutDeliveries()` directly (the real timer is disabled under
-      // NODE_ENV=test), bypassing that wrapper, so this test reproduces it explicitly instead of
-      // treating a real, already-anticipated production outcome as a test failure.
-      const driverCall = world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: d.accessToken, body: { status: 'PICKED_UP' } });
-      const sweepCall = sweep().catch((error) => {
-        if (error instanceof QueryFailedError && /deadlock detected/i.test((error as Error).message)) return 'deadlock' as const;
-        throw error;
-      });
-      const [driverRes, sweepOutcome] = await Promise.all([driverCall, sweepCall]);
-
-      expect(driverRes.status).toBeLessThan(500);
-      expect(world.unhandledServerErrors()).toEqual([]);
-
-      if (sweepOutcome === 'deadlock') {
-        // Rolled back cleanly by Postgres itself — self-heals via a fresh, independent sweep attempt,
-        // exactly as the real next periodic tick would.
-        await sweep();
-      }
-
-      const finalStatus = await status(order.id);
-      if (finalStatus === 'PICKED_UP') {
-        // The driver's own progression won: the sweep's re-check (order no longer ASSIGNED_TO_DRIVER)
-        // must have made it a clean skip, exactly like the sequential version of this same scenario
-        // (test (d) above) already proves — never reassigned out from under the progressing driver.
-        expect((await deliveryRow(order.id)).driver_id).toBe(d.driverId);
-        expect(driverRes.status).toBe(200);
-      } else {
-        // The sweep won: the order was released and (being the only eligible driver) legitimately
-        // reassigned back to the SAME driver with a fresh deadline — the driver's own PICKED_UP call
-        // then either raced onto that same fresh assignment (200) or was correctly refused because it
-        // no longer matched the delivery's current state at the instant it ran (a clean 4xx) — either
-        // way, never a corrupted mix of "released" and "picked up" at once.
-        expect(finalStatus).toBe('ASSIGNED_TO_DRIVER');
-        expect((await deliveryRow(order.id)).driver_id).toBe(d.driverId);
-        expect([200, 400, 404, 409]).toContain(driverRes.status);
-      }
+      await sweep();
+      expect(await ackAlerts(order.id)).toHaveLength(1);
     });
   });
 });

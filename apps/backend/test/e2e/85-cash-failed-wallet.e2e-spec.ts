@@ -399,14 +399,14 @@ describe('E2E — cash remainder, failed delivery, wallet & loyalty, cancellatio
       expect((await q('SELECT status FROM order_vendor_segments WHERE id = $1', [segment.id]))[0].status).not.toBe('CONFIRMED');
     });
 
-    it('once a driver is assigned the order can no longer be cancelled by vendor or admin (only reassigned/failed) — and after pickup nothing but the driver can move it', async () => {
+    it('R3: once a driver is assigned the VENDOR can no longer cancel; Operations (admin) still can before pickup', async () => {
       const c = await s.customer();
       const { order } = await orderThrough(c, 'ASSIGNED');
-      for (const actor of [vendor.manager, superAdmin]) {
-        const res = await world.api('patch', `/orders/${order.id}/status`, { token: actor.accessToken, body: { status: 'CANCELLED', cancellationReason: 'x' } });
-        expect(res.status).toBe(400);
-      }
+      const byVendor = await world.api('patch', `/orders/${order.id}/status`, { token: vendor.manager.accessToken, body: { status: 'CANCELLED', cancellationReason: 'x' } });
+      expect(byVendor.status).toBe(400);
       expect(await orderStatus(order.id)).toBe('ASSIGNED_TO_DRIVER');
+      expectData(await world.api('patch', `/orders/${order.id}/status`, { token: superAdmin.accessToken, body: { status: 'CANCELLED', cancellationReason: 'customer called operations' } }));
+      expect(await orderStatus(order.id)).toBe('CANCELLED');
     });
   });
 });

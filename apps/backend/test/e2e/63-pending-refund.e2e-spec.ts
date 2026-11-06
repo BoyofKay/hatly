@@ -37,8 +37,10 @@ describe('E2E — Manual Transfer pending refund entitlement (PD-004)', () => {
   const refundedTotal = async (orderId: string) => (await refundEvents(orderId)).reduce((sum: number, e: any) => sum + num(e.amount_minor), 0);
   const segmentOf = async (orderId: string, v: VendorFixture): Promise<string> =>
     (await world.ds.query('SELECT id FROM order_vendor_segments WHERE order_id = $1 AND vendor_branch_id = $2', [orderId, v.branchId]))[0].id;
+  // R2: an InstaPay / Vodafone Cash order is invisible to its vendor until Operations verify the money, so a vendor part of a transfer
+  // order is cancelled by Operations on the vendor's behalf (same transition, same money rules). `v` names the vendor whose part it is.
   const cancelSegment = (v: VendorFixture, segmentId: string) =>
-    world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } });
+    world.api('patch', `/admin/orders/segments/${segmentId}/status`, { token: superAdmin.accessToken, body: { status: 'CANCELLED', reason: `Out of stock (${v.branchId})` } });
   const claim = (customer: Actor, orderId: string) => world.api('post', `/payments/manual-transfer/orders/${orderId}/claim`, { token: customer.accessToken, body: {} });
   const approve = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/approve`, { token: reviewer.accessToken });
   const reject = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/reject`, { token: reviewer.accessToken, body: { reason: 'no money received' } });

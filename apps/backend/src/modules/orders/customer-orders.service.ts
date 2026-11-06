@@ -14,7 +14,7 @@ import { Driver } from '../delivery/entities/driver.entity';
 import { OrderStatusEvent } from './entities/order-status-event.entity';
 import { loadOrderTimeline } from './order-status-history.service';
 import { OrderEtaService, OrderEtaView } from './order-eta.service';
-import { customerCancellationBlock } from './customer-cancellation-rule';
+import { customerCancellationBlock, servicePurchaseRecordedFor } from './customer-cancellation-rule';
 import { paymentBlocksFulfilment } from './order-payment-gate.service';
 import { DeliveryFeeBreakdown } from '../delivery-fee/delivery-fee-calculation.service';
 import { CustomItemPriceStatus, customItemPriceStatus } from './custom-item-price-status';
@@ -368,7 +368,7 @@ export class CustomerOrdersService {
           : null,
       eta,
       timeline: await this.loadTimeline(orderId),
-      customerCanCancel: customerCancellationBlock(order.status, order.segments) === null,
+      customerCanCancel: customerCancellationBlock(order.status, order.segments, (await servicePurchaseRecordedFor((q, v) => this.ordersRepository.query(q, v), [order.id])).has(order.id)) === null,
       payment: this.paymentView(order, payment),
       cancellationReason: order.cancellationReason ?? null,
       cancelledByRole: order.cancelledByRole ?? null,
@@ -465,7 +465,7 @@ export class CustomerOrdersService {
         status: paymentView.status,
         awaitingApproval: paymentView.awaitingApproval,
       },
-      customerCanCancel: customerCancellationBlock(order.status, order.segments) === null,
+      customerCanCancel: customerCancellationBlock(order.status, order.segments, (await servicePurchaseRecordedFor((q, v) => this.ordersRepository.query(q, v), [order.id])).has(order.id)) === null,
       cancellationReason: order.cancellationReason ?? null,
     };
   }

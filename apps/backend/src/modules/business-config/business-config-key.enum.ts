@@ -44,6 +44,13 @@ export enum BusinessConfigKey {
   DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES = 'DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES',
 
   /**
+   * R16 (decision register 2026-11-06): minutes a driver has to acknowledge an assignment (manual or automatic). Default 5
+   * when unset; Admin may set a whole number from 1 to 30. An overdue acknowledgement only alerts Operations — it never
+   * releases or reassigns the order. The value is read when the assignment is made (changing it never moves existing deadlines).
+   */
+  DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES = 'DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES',
+
+  /**
    * PHASE 3 DELIVERY-FEE addition. Registered-vendor (CATALOG-only)
    * pricing parameters — see DeliveryFeeCalculationService. Deliberately
    * NOT seeded with any value by any migration: "do not invent business

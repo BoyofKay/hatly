@@ -92,6 +92,8 @@ export interface AdminOrderDetail {
   delivery?: {
     assignedAt: string | null;
     acceptDeadlineAt: string | null;
+    /** R16: when the current driver acknowledged (null = not yet). */
+    acknowledgedAt?: string | null;
     pickedUpAt: string | null;
     deliveredAt: string | null;
     reassignmentCount: number;

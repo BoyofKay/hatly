@@ -48,6 +48,8 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
   const reject = (paymentId: string) => world.api('post', `/admin/manual-transfer-payments/${paymentId}/reject`, { token: reviewer.accessToken, body: { reason: 'no' } });
   const vendorStatus = (v: VendorFixture, segmentId: string, status: string) => world.api('patch', `/vendor/orders/segments/${segmentId}/status`, { token: v.manager.accessToken, body: { status, ...(status === 'CANCELLED' ? { reason: 'Out of stock' } : {}) } });
   const adminStatus = (orderId: string, status: string) => world.api('patch', `/orders/${orderId}/status`, { token: superAdmin.accessToken, body: { status } });
+  // R2: Operations acting on a vendor part (the vendor cannot see an unverified InstaPay / Vodafone Cash order).
+  const opsSegment = (segmentId: string, status: string) => world.api('patch', `/admin/orders/segments/${segmentId}/status`, { token: superAdmin.accessToken, body: { status } });
   const segmentOf = async (orderId: string, v: VendorFixture): Promise<string> =>
     (await world.ds.query('SELECT id FROM order_vendor_segments WHERE order_id = $1 AND vendor_branch_id = $2', [orderId, v.branchId]))[0].id;
 
@@ -530,8 +532,9 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
       const order = expectData<any>(await place(c, { deliveryAddress: addr(), paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: 'INSTAPAY' }), 201);
       const seg = await segmentOf(order.id, v1);
 
-      expectData(await vendorStatus(v1, seg, 'CONFIRMED')); // accepting is fine
-      const blocked = await vendorStatus(v1, seg, 'PREPARING');
+      expect((await vendorStatus(v1, seg, 'CONFIRMED')).status).toBe(404); // R2: hidden from the vendor until verified
+      expectData(await opsSegment(seg, 'CONFIRMED')); // Operations may accept on its behalf
+      const blocked = await opsSegment(seg, 'PREPARING');
       expect(blocked.status).toBe(409);
       expect(blocked.body.error.details).toMatchObject({ code: 'PAYMENT_NOT_APPROVED', paymentStatus: 'PENDING' });
       expectData(await adminStatus(order.id, 'CONFIRMED'));
@@ -544,7 +547,7 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
       // claimed / under review still block
       await claim(c, order.id);
       expect((await paymentOf(order.id)).status).toBe('UNDER_REVIEW');
-      expect((await vendorStatus(v1, seg, 'PREPARING')).status).toBe(409);
+      expect((await opsSegment(seg, 'PREPARING')).status).toBe(409);
       // a manual dispatch attempt is blocked too
       const assign = await adminStatus(order.id, 'ASSIGNED_TO_DRIVER');
       expect(assign.status).toBeGreaterThanOrEqual(400);
@@ -560,8 +563,9 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
       const seg = await segmentOf(order.id, v1);
       await claim(c, order.id);
       expectData(await reject((await paymentOf(order.id)).id), 201);
-      expectData(await vendorStatus(v1, seg, 'CONFIRMED'));
-      expect((await vendorStatus(v1, seg, 'PREPARING')).body.error.details.code).toBe('PAYMENT_NOT_APPROVED');
+      expect((await vendorStatus(v1, seg, 'CONFIRMED')).status).toBe(404); // a rejected transfer is never shown to the vendor
+      expectData(await opsSegment(seg, 'CONFIRMED'));
+      expect((await opsSegment(seg, 'PREPARING')).body.error.details.code).toBe('PAYMENT_NOT_APPROVED');
     });
 
     it('COD and PAY_AT_DELIVERY never block fulfilment', async () => {

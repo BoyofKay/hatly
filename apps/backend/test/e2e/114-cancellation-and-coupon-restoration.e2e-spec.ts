@@ -141,16 +141,29 @@ describe('E2E — customer cancellation of Hatly/Wasally orders and discount/cou
       expect(timeline.at(-1)).toMatchObject({ to_status: 'CANCELLED', actor_role: 'CUSTOMER' });
     });
 
-    it('once a driver is assigned the customer is refused (400 ORDER_NOT_CANCELLABLE_BY_CUSTOMER) and nothing changes', async () => {
+    it('R40: after a driver is assigned the customer can still cancel until the purchase is recorded; the driver is freed', async () => {
       const driver = await s.driver({ lat: 30.4212, lng: 31.5612 });
       const { c, order } = await serviceOrder(wasallyItem, 'COD');
       expectData(await assign(order.id, driver.driverId), 201);
+      expect((await details(c, order.id)).customerCanCancel).toBe(true);
+      expectData(await cancel(c, order.id), 201);
+      expect((await orderRow(order.id)).status).toBe('CANCELLED');
+      expect((await world.ds.query('SELECT is_available FROM drivers WHERE id = $1', [driver.driverId]))[0].is_available).toBe(true);
+    });
+
+    it('R40: once the driver recorded the purchase the customer is refused (SERVICE_PURCHASE_RECORDED) and nothing changes', async () => {
+      const driver = await s.driver({ lat: 30.4212, lng: 31.5612 });
+      const { c, order } = await serviceOrder(wasallyItem, 'COD');
+      expectData(await assign(order.id, driver.driverId), 201);
+      const [item] = await world.ds.query(
+        `SELECT oi.id FROM order_items oi JOIN order_vendor_segments g ON g.id = oi.order_vendor_segment_id WHERE g.order_id = $1 LIMIT 1`, [order.id]);
+      await world.ds.query(
+        `INSERT INTO ad_hoc_purchase_records (order_item_id, amount_minor, recorded_by_driver_id, recorded_by_role) VALUES ($1, 1000, $2, 'DRIVER')`, [item.id, driver.driverId]);
+      expect((await details(c, order.id)).customerCanCancel).toBe(false);
       const res = await cancel(c, order.id);
       expect(res.status).toBe(400);
-      expect(res.body.error.details).toMatchObject({ code: 'ORDER_NOT_CANCELLABLE_BY_CUSTOMER', status: 'ASSIGNED_TO_DRIVER' });
+      expect(res.body.error.details).toMatchObject({ code: 'ORDER_NOT_CANCELLABLE_BY_CUSTOMER', reason: 'SERVICE_PURCHASE_RECORDED' });
       expect((await orderRow(order.id)).status).toBe('ASSIGNED_TO_DRIVER');
-      expect((await details(c, order.id)).customerCanCancel).toBe(false);
-      expect((await world.ds.query('SELECT is_available FROM drivers WHERE id = $1', [driver.driverId]))[0].is_available).toBe(false);
     });
 
     it('Wallet (Wasally): the wallet is refunded exactly the amount it paid, once — a duplicate request is a 400 and credits nothing more', async () => {
@@ -194,7 +207,7 @@ describe('E2E — customer cancellation of Hatly/Wasally orders and discount/cou
       expect((await orderRow(order.id)).status).toBe('CANCELLED');
     });
 
-    it('someone else\'s order is a 404, a vendor order that is READY_FOR_PICKUP stays refused, and the ADMIN keeps cancelling a READY service order', async () => {
+    it('someone else\'s order is a 404, a vendor order that is READY_FOR_PICKUP is cancellable (R3), and the ADMIN keeps cancelling a READY service order', async () => {
       const { c, order } = await serviceOrder(wasallyItem, 'COD');
       const stranger = await s.customer();
       expect((await cancel(stranger, order.id)).status).toBe(404);
@@ -203,8 +216,8 @@ describe('E2E — customer cancellation of Hatly/Wasally orders and discount/cou
       const vendorCustomer = await cartFor([p1]);
       const vendorOrder = expectData<any>(await place(vendorCustomer, { paymentMethod: 'COD' }), 201);
       await s.vendorPrepares(v1, vendorOrder.id);
-      expect((await orderRow(vendorOrder.id)).status).toBe('READY_FOR_PICKUP');
-      expect((await cancel(vendorCustomer, vendorOrder.id)).status).toBe(400);
+      expect(['READY_FOR_PICKUP', 'ASSIGNED_TO_DRIVER']).toContain((await orderRow(vendorOrder.id)).status);
+      expectData(await cancel(vendorCustomer, vendorOrder.id), 201); // R3: until the driver picks up
 
       expectData(await world.api('patch', `/orders/${order.id}/status`, { token: superAdmin.accessToken, body: { status: 'CANCELLED', cancellationReason: 'support' } }));
       expect(await orderRow(order.id)).toMatchObject({ status: 'CANCELLED', cancelled_by_role: 'SUPER_ADMIN' });

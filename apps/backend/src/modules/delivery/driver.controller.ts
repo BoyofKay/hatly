@@ -77,6 +77,13 @@ export class DriverController {
     return { data: delivery };
   }
 
+  /** R16: acknowledge an assignment (no accept/reject exists). Opening the delivery acknowledges it too. */
+  @Post('deliveries/:id/acknowledge')
+  async acknowledgeDelivery(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    const delivery = await this.driverDeliveriesService.acknowledgeForUser(user.id, id);
+    return { data: delivery };
+  }
+
   @Patch('deliveries/:id/status')
   async updateDeliveryStatus(
     @CurrentUser() user: AuthenticatedUser,

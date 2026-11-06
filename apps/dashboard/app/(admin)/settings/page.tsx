@@ -59,6 +59,13 @@ const CONFIG_FIELDS: ConfigFieldDef[] = [
   },
   { key: 'MAX_BICYCLE_PICKUP_DISTANCE_METERS', label: 'Max Bicycle Pickup Distance', type: 'integer', unit: 'meters' },
   { key: 'DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES', label: 'Dispatch Assignment Lead Time', type: 'integer', unit: 'minutes' },
+  {
+    key: 'DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES',
+    label: 'Driver Acknowledgement Window',
+    type: 'integer',
+    unit: 'minutes',
+    help: 'How long a driver has to acknowledge an assignment (manual or automatic). Default 5 when empty; allowed 1 to 30. When it passes, Operations get an alert — the order is never released or reassigned automatically. Applies to new assignments only.',
+  },
   { key: 'LOYALTY_POINTS_PER_EGP', label: 'Loyalty Points per EGP', type: 'integer', unit: 'points' },
   { key: 'LOYALTY_WALLET_CONVERSION_POINTS_PER_EGP', label: 'Loyalty→Wallet Conversion Rate', type: 'integer', unit: 'points per EGP' },
   { key: 'CHECKOUT_QUOTE_TTL_SECONDS', label: 'Checkout Quote TTL', type: 'integer', unit: 'seconds' },

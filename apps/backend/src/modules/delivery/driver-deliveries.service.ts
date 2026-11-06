@@ -97,6 +97,8 @@ export interface DriverDeliveryView {
   serviceRoute: FrozenRoute | null;
   assignedAt: Date | null;
   acceptDeadlineAt: Date | null;
+  /** R16: when this driver acknowledged the assignment (null = not yet). */
+  acknowledgedAt: Date | null;
   pickedUpAt: Date | null;
   deliveredAt: Date | null;
   segments: DriverDeliverySegmentView[];
@@ -145,6 +147,9 @@ export class DriverDeliveriesService {
   async getForUser(userId: string, deliveryId: string): Promise<DriverDeliveryView> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
     await this.driverAuthorizationService.assertOwnsDelivery(driver.id, deliveryId);
+    // R16: the driver opening the assignment IS the acknowledgement ("acknowledges having viewed it"). This also covers driver-app
+    // builds that have no acknowledge button (backward compatibility, R38): their delivery screen loads exactly this endpoint.
+    await this.markAcknowledged(deliveryId, driver.id);
 
     const delivery = await this.deliveriesRepository.findOne({
       where: { id: deliveryId },
@@ -155,6 +160,29 @@ export class DriverDeliveriesService {
       throw new NotFoundException('Delivery not found.');
     }
     return (await this.buildViews([delivery]))[0];
+  }
+
+  /** R16: explicit acknowledgement (newer driver apps). Same effect as opening the assignment; returns the delivery. */
+  async acknowledgeForUser(userId: string, deliveryId: string): Promise<DriverDeliveryView> {
+    return this.getForUser(userId, deliveryId);
+  }
+
+  /**
+   * Records the CURRENT driver's acknowledgement once (first time only, only while the order is ASSIGNED_TO_DRIVER to this driver)
+   * and closes that order's ACKNOWLEDGEMENT_OVERDUE alert in the same statement. Idempotent; never changes the assignment.
+   */
+  private async markAcknowledged(deliveryId: string, driverId: string): Promise<void> {
+    await this.deliveriesRepository.manager.query(
+      `WITH ack AS (
+         UPDATE deliveries d SET acknowledged_at = now()
+           FROM orders o
+          WHERE d.id = $1 AND d.driver_id = $2 AND d.acknowledged_at IS NULL AND o.id = d.order_id AND o.status = 'ASSIGNED_TO_DRIVER'
+        RETURNING d.order_id
+       )
+       UPDATE dispatch_alerts SET resolved_at = now(), updated_at = now()
+        WHERE order_id IN (SELECT order_id FROM ack) AND reason = 'ACKNOWLEDGEMENT_OVERDUE' AND resolved_at IS NULL`,
+      [deliveryId, driverId],
+    );
   }
 
   private async buildViews(deliveries: Delivery[]): Promise<DriverDeliveryView[]> {
@@ -189,6 +217,7 @@ export class DriverDeliveriesService {
       serviceRoute: readFrozenRoute(delivery.order.deliveryFeeBreakdownSnapshot),
       assignedAt: delivery.assignedAt ?? null,
       acceptDeadlineAt: delivery.acceptDeadlineAt ?? null,
+      acknowledgedAt: delivery.acknowledgedAt ?? null,
       pickedUpAt: delivery.pickedUpAt ?? null,
       deliveredAt: delivery.deliveredAt ?? null,
       segments: delivery.order.segments.map((segment) => {

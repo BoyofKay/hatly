@@ -24,7 +24,7 @@ import { PushNotificationService } from '../notifications/push-notification.serv
 import { StaffAlertsService } from '../notifications/staff-alerts.service';
 import { Permission } from '../permissions/permission.enum';
 import { OrderPaymentGateService } from './order-payment-gate.service';
-import { CUSTOMER_CANCELLABLE_ORDER_STATUSES, customerCancellationBlock } from './customer-cancellation-rule';
+import { CUSTOMER_CANCELLABLE_ORDER_STATUSES, customerCancellationBlock, servicePurchaseRecordedFor } from './customer-cancellation-rule';
 import { OrderStatusHistoryService } from './order-status-history.service';
 import { OrderWalletRefundService } from './order-wallet-refund.service';
 import { OfferConsumptionService } from '../offers/offer-consumption.service';
@@ -105,7 +105,10 @@ const TRANSITIONS: TransitionRule[] = [
   { from: OrderStatus.READY_FOR_PICKUP, to: OrderStatus.COLLECTED, allowedRoles: [Role.VENDOR, Role.VENDOR_MANAGER, Role.ADMIN] },
 
   { from: OrderStatus.ASSIGNED_TO_DRIVER, to: OrderStatus.PICKED_UP, allowedRoles: [Role.DRIVER] },
-  { from: OrderStatus.ASSIGNED_TO_DRIVER, to: OrderStatus.READY_FOR_PICKUP, allowedRoles: [Role.DRIVER, Role.ADMIN] }, // driver rejects / reassignment
+  // R3: the goods have not left the vendor yet — Operations may cancel, and the customer may (through CustomerOrderCancellationService).
+  { from: OrderStatus.ASSIGNED_TO_DRIVER, to: OrderStatus.CANCELLED, allowedRoles: [Role.ADMIN] },
+  // R17 (decision register 2026-11-06): only Operations releases an assignment — drivers have no release/reject (they call Operations).
+  { from: OrderStatus.ASSIGNED_TO_DRIVER, to: OrderStatus.READY_FOR_PICKUP, allowedRoles: [Role.ADMIN] }, // admin release / reassignment
 
   { from: OrderStatus.PICKED_UP, to: OrderStatus.ON_THE_WAY, allowedRoles: [Role.DRIVER] },
   // PHASE F addition. CONFIRMED: FAILED_DELIVERY is distinct from
@@ -266,12 +269,10 @@ export class OrderStateMachineService {
     // assigned first the status is already ASSIGNED_TO_DRIVER and this is refused; if this wins, assignment sees CANCELLED and is refused.
     let customerMayCancel = false;
     if (params.customerCancellation === true && params.actorRole === Role.CUSTOMER && params.to === OrderStatus.CANCELLED) {
-      if (CUSTOMER_CANCELLABLE_STATUSES.includes(order.status)) {
-        customerMayCancel = true;
-      } else if (order.status === OrderStatus.READY_FOR_PICKUP) {
-        const orderSegments = await manager.find(OrderVendorSegment, { where: { orderId: order.id } });
-        customerMayCancel = customerCancellationBlock(order.status, orderSegments) === null;
-      }
+      // R3 / R40, re-checked HERE under the order lock (never trusted from the caller).
+      const orderSegments = await manager.find(OrderVendorSegment, { where: { orderId: order.id } });
+      const purchased = await servicePurchaseRecordedFor((sql, values) => manager.query(sql, values), [order.id]);
+      customerMayCancel = customerCancellationBlock(order.status, orderSegments, purchased.has(order.id)) === null;
     }
 
     if (!roleMayUseRule(rule, params.actorRole) && !customerMayCancel) {
@@ -478,7 +479,7 @@ export class OrderStateMachineService {
       await manager
         .createQueryBuilder()
         .update(Delivery)
-        .set(params.to === OrderStatus.PICKED_UP ? { pickedUpAt: new Date() } : { deliveredAt: new Date() })
+        .set(params.to === OrderStatus.PICKED_UP ? { pickedUpAt: new Date(), acknowledgedAt: () => 'COALESCE(acknowledged_at, now())' } : { deliveredAt: new Date() })
         .where('order_id = :orderId', { orderId: order.id })
         .execute();
     }
@@ -502,6 +503,26 @@ export class OrderStateMachineService {
         .update(Driver)
         .set({ isAvailable: true })
         .where('id IN (SELECT driver_id FROM deliveries WHERE order_id = :orderId)', { orderId: order.id })
+        .execute();
+    }
+
+    // R45: a cancellation while a driver is assigned — Operations tell the driver to stop and decide, case by case, whether a trip that had
+    // already started deserves compensation (a Hatly operational expense, never automatic, never a deduction from the driver).
+    if (fromStatus === OrderStatus.ASSIGNED_TO_DRIVER && params.to === OrderStatus.CANCELLED && this.staffAlerts) {
+      await this.staffAlerts.alert(manager, {
+        eventKey: `order:${order.id}:cancelled-after-assignment`, category: 'OPS_CANCELLED_AFTER_ASSIGNMENT', requiredAction: 'CONTACT_DRIVER',
+        recipients: (await this.staffAlerts.recipientsHolding(manager, [Permission.ASSIGN_REASSIGN_ORDERS, Permission.OVERRIDE_DISPATCH])).filter((id) => id !== params.actorUserId),
+        orderId: order.id, orderNumber: order.orderNumber,
+      });
+    }
+
+    // R16: once the order leaves ASSIGNED_TO_DRIVER (picked up, released by Operations, cancelled) an open "not acknowledged" alert is moot.
+    if (fromStatus === OrderStatus.ASSIGNED_TO_DRIVER) {
+      await manager
+        .createQueryBuilder()
+        .update(DispatchAlert)
+        .set({ resolvedAt: () => 'now()' })
+        .where("order_id = :orderId AND reason = 'ACKNOWLEDGEMENT_OVERDUE' AND resolved_at IS NULL", { orderId: order.id })
         .execute();
     }
 

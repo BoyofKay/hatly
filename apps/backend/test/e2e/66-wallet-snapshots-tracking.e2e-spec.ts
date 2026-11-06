@@ -326,7 +326,8 @@ describe('E2E — wallet, snapshots, ETA, tracking, order list (PD-006)', () => 
       try {
         const c = await cartFor([p1, p2]);
         const order = expectData<any>(await place(c, { paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: 'ORANGE_CASH' }), 201);
-        expectData(await vendorStatus(v1, await segmentOf(order.id, v1), { status: 'CONFIRMED' }));
+        // R2: the vendor cannot see it before verification — Operations accept on its behalf.
+        expectData(await world.api('patch', `/admin/orders/segments/${await segmentOf(order.id, v1)}/status`, { token: (await s.superAdmin()).accessToken, body: { status: 'CONFIRMED' } }));
         const t = expectData<any>(await world.api('get', `/orders/${order.id}/tracking`, { token: c.accessToken }));
         expect(t).toMatchObject({ orderId: order.id, status: 'PENDING', fulfillmentType: 'DELIVERY', customerCanCancel: true });
         // Updated by the ETA/Manual Transfer timing fix (production-readiness slice, see 69-eta-payment-review.e2e-spec.ts):
@@ -375,25 +376,16 @@ describe('E2E — wallet, snapshots, ETA, tracking, order list (PD-006)', () => 
   });
 
   describe('customer cancellation — refined (PD-005/PD-006)', () => {
-    it('the customer can no longer cancel once ANY active vendor has started PREPARING — even while the order status is still PENDING; cancelled segments do not count', async () => {
+    it('R3: the customer can still cancel after a vendor started PREPARING (Hatly bears the preparation cost)', async () => {
       const c = await cartFor([p1, p2]);
       const order = expectData<any>(await place(c, { paymentMethod: 'COD' }), 201);
       const seg1 = await segmentOf(order.id, v1);
-      expect((await orderRow(order.id)).status).toBe('PENDING');
       expect((await details(c, order.id)).customerCanCancel).toBe(true);
-
       for (const st of ['CONFIRMED', 'PREPARING']) expectData(await vendorStatus(v1, seg1, { status: st }));
       expect((await orderRow(order.id)).status).toBe('PENDING'); // the order-level status has not moved
-      expect((await details(c, order.id)).customerCanCancel).toBe(false);
-      const res = await cancel(c, order.id);
-      expect(res.status).toBe(400);
-      expect(res.body.error.details).toMatchObject({ code: 'ORDER_NOT_CANCELLABLE_BY_CUSTOMER', reason: 'VENDOR_SEGMENT_PREPARING' });
-      expect((await orderRow(order.id)).status).toBe('PENDING');
-
-      // if that vendor then cancels its own segment, the remaining (not preparing) vendor no longer blocks the customer
-      expectData(await vendorStatus(v1, seg1, { status: 'CANCELLED', reason: 'Out of stock' }));
       expect((await details(c, order.id)).customerCanCancel).toBe(true);
       expectData(await cancel(c, order.id), 201);
+      expect((await orderRow(order.id)).status).toBe('CANCELLED');
     });
 
     it('a customer can never cancel just one vendor\'s segment (no such endpoint, and the vendor endpoint is closed to them)', async () => {

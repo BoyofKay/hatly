@@ -118,16 +118,18 @@ describe('E2E — operational completion', () => {
       return order;
     };
 
-    it('a driver hand-back: flagged released (by DRIVER, with when), counted as awaiting MANUAL assignment, listed by ?releasedOnly=true', async () => {
+    it('R17: an Operations release (no driver hand-back exists): flagged released (by ADMIN, with when), counted as awaiting MANUAL assignment, listed by ?releasedOnly=true', async () => {
       const before = (await summary()).releasedAwaitingManualAssignment;
       const d = await s.driver({ ...near });
       const order = await assignTo(d);
       const untouched = await readyOrder(); // waiting for its FIRST assignment — never "released"
       const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: d.accessToken })).find((x) => x.orderId === order.id);
-      expectData(await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: d.accessToken, body: { status: 'READY_FOR_PICKUP' } }));
+      const refused = await world.api('patch', `/driver/deliveries/${delivery.id}/status`, { token: d.accessToken, body: { status: 'READY_FOR_PICKUP' } });
+      expect(refused.status).toBe(400); // the driver calls Operations instead
+      expectData(await world.api('patch', `/orders/${order.id}/status`, { token: superAdmin.accessToken, body: { status: 'READY_FOR_PICKUP' } }));
 
       const row = await rowOf(order.orderNumber);
-      expect(row).toMatchObject({ status: 'READY_FOR_PICKUP', driver: null, openDispatchAlert: { reason: 'AUTO_ASSIGN_DISABLED' }, released: { byRole: 'DRIVER', at: expect.any(String) } });
+      expect(row).toMatchObject({ status: 'READY_FOR_PICKUP', driver: null, released: { byRole: 'SUPER_ADMIN', at: expect.any(String) } }); // Operations (the acting admin's role)
       expect((await rowOf(untouched.orderNumber)).released).toBeNull();
       expect((await summary()).releasedAwaitingManualAssignment).toBe(before + 1);
       const releasedOnly = expectData<any[]>(await world.api('get', '/admin/control-tower/deliveries?releasedOnly=true&limit=100', { token: superAdmin.accessToken }));
@@ -142,19 +144,20 @@ describe('E2E — operational completion', () => {
       expect((await summary()).releasedAwaitingManualAssignment).toBe(before);
     });
 
-    it('a timeout release with no eligible driver: flagged released (by the system), but carried by its open alert — not double-counted', async () => {
+    it('R16: an overdue acknowledgement is NOT a release — the order stays with its driver and carries an ACKNOWLEDGEMENT_OVERDUE alert', async () => {
       const d = await s.driver({ ...near });
       const order = await assignTo(d);
-      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true); // the timeout sweep only runs with automatic dispatch on
-      expectData(await world.api('patch', '/driver/online-status', { token: d.accessToken, body: { isOnline: false } }));
+      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true);
       await world.ds.query("UPDATE deliveries SET accept_deadline_at = NOW() - INTERVAL '1 minute' WHERE order_id = $1", [order.id]);
       const before = (await summary()).releasedAwaitingManualAssignment;
 
-      await world.app.get(AutomaticDispatchService).reassignTimedOutDeliveries();
+      await world.app.get(AutomaticDispatchService).alertUnacknowledgedAssignments();
 
       const row = await rowOf(order.orderNumber);
-      expect(row).toMatchObject({ status: 'READY_FOR_PICKUP', released: { byRole: 'ADMIN' }, openDispatchAlert: { reason: 'NO_ELIGIBLE_DRIVER' } });
+      expect(row).toMatchObject({ status: 'ASSIGNED_TO_DRIVER', released: null, acceptDeadlinePassed: true, openDispatchAlert: { reason: 'ACKNOWLEDGEMENT_OVERDUE' } });
+      expect(row.driver).toMatchObject({ id: d.driverId });
       expect((await summary()).releasedAwaitingManualAssignment).toBe(before);
+      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
     });
 
     it('releasedOnly is validated', async () => {
@@ -299,7 +302,7 @@ describe('E2E — operational completion', () => {
   describe('cross-actor races leave order, delivery and drivers consistent', () => {
     const ROUNDS = 4;
     const ACTIVE = ['ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY'];
-    const sweep = () => world.app.get(AutomaticDispatchService).reassignTimedOutDeliveries();
+    const sweep = () => world.app.get(AutomaticDispatchService).alertUnacknowledgedAssignments();
     const reassign = (orderId: string, driverId: string, expectedCurrentDriverId: string) =>
       world.api('post', `/admin/orders/${orderId}/reassign-driver`, { token: superAdmin.accessToken, body: { driverId, expectedCurrentDriverId } });
     const assign = (orderId: string, driverId: string) =>
@@ -335,26 +338,24 @@ describe('E2E — operational completion', () => {
       return { status: status as string, carrier };
     }
 
-    it('1+2. timeout recovery (sweep) vs a manual REASSIGNMENT of the same expired order', async () => {
+    it('1+2. the acknowledgement sweep vs a manual REASSIGNMENT of the same overdue order — the reassignment always wins (the sweep never releases)', async () => {
       for (let round = 0; round < ROUNDS; round++) {
         const [d1, d2] = await pair();
         const order = await readyOrder();
         expectData(await assign(order.id, d1.driverId), 201);
         await world.ds.query("UPDATE deliveries SET accept_deadline_at = NOW() - INTERVAL '1 minute' WHERE order_id = $1", [order.id]);
-        await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true); // the sweep only runs with automatic dispatch on
+        await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true);
 
         const [, manual] = await Promise.all([sweep(), reassign(order.id, d2.driverId, d1.driverId)]);
 
-        expect([201, 409]).toContain(manual.status);
-        if (manual.status === 409) expect(['ASSIGNMENT_CHANGED', 'ORDER_NOT_REASSIGNABLE']).toContain(errCode(manual));
+        expect(manual.status).toBe(201);
         const { status, carrier } = await expectConsistent(order.id, [d1, d2]);
-        expect(status).toBe('ASSIGNED_TO_DRIVER'); // one of the two always re-assigns it — never a silent orphan
-        if (manual.status === 201) expect(carrier).toBe(d2.driverId);
+        expect([status, carrier]).toEqual(['ASSIGNED_TO_DRIVER', d2.driverId]);
         await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
       }
     });
 
-    it('1. timeout recovery (sweep) vs a manual ASSIGNMENT racing the sweep’s own re-assignment', async () => {
+    it('1. the acknowledgement sweep vs a manual ASSIGNMENT of an already-assigned order — refused, the order keeps its driver', async () => {
       for (let round = 0; round < ROUNDS; round++) {
         const [d1, d2] = await pair();
         const order = await readyOrder();
@@ -364,11 +365,10 @@ describe('E2E — operational completion', () => {
 
         const [, manual] = await Promise.all([sweep(), assign(order.id, d2.driverId)]);
 
-        expect([201, 409]).toContain(manual.status); // 409 = not READY at that instant (still assigned, or the sweep re-assigned first)
-        if (manual.status === 409) expect(errCode(manual)).toBe('ORDER_NOT_ASSIGNABLE');
+        expect(manual.status).toBe(409);
+        expect(errCode(manual)).toBe('ORDER_NOT_ASSIGNABLE');
         const { status, carrier } = await expectConsistent(order.id, [d1, d2]);
-        expect(status).toBe('ASSIGNED_TO_DRIVER');
-        if (manual.status === 201) expect(carrier).toBe(d2.driverId);
+        expect([status, carrier]).toEqual(['ASSIGNED_TO_DRIVER', d1.driverId]);
         await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
       }
     });
@@ -413,7 +413,7 @@ describe('E2E — operational completion', () => {
       }
     });
 
-    it('4. the driver hands the order back while an admin reassigns it — exactly one wins; the order is never orphaned unseen', async () => {
+    it('4. R17: a driver release attempt racing an admin reassignment — the driver is always refused; the reassignment wins', async () => {
       for (let round = 0; round < ROUNDS; round++) {
         const [d1, d2] = await pair();
         const order = await readyOrder();
@@ -421,20 +421,11 @@ describe('E2E — operational completion', () => {
 
         const [release, manual] = await Promise.all([driverStatus(d1, order.id, 'READY_FOR_PICKUP'), reassign(order.id, d2.driverId, d1.driverId)]);
 
-        const released = release.status === 200;
-        expect(released !== (manual.status === 201)).toBe(true);
+        expect(release.status).toBeGreaterThanOrEqual(400);
+        expect(release.status).toBeLessThan(500);
+        expect(manual.status).toBe(201);
         const { status, carrier } = await expectConsistent(order.id, [d1, d2]);
-        if (released) {
-          expect([status, manual.status]).toEqual(['READY_FOR_PICKUP', 409]);
-          expect(['ASSIGNMENT_CHANGED', 'ORDER_NOT_REASSIGNABLE']).toContain(errCode(manual));
-          // waiting again → shown as released in the Control Tower, never a silent orphan
-          const row = expectData<any[]>(await world.api('get', `/admin/control-tower/deliveries?search=${order.orderNumber}`, { token: superAdmin.accessToken }))[0];
-          expect(row.released).toMatchObject({ byRole: 'DRIVER' });
-        } else {
-          expect([status, carrier]).toEqual(['ASSIGNED_TO_DRIVER', d2.driverId]);
-          expect(release.status).toBeGreaterThanOrEqual(400);
-          expect(release.status).toBeLessThan(500);
-        }
+        expect([status, carrier]).toEqual(['ASSIGNED_TO_DRIVER', d2.driverId]);
       }
     });
   });

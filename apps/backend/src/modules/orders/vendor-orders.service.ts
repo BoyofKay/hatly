@@ -107,8 +107,9 @@ export class VendorOrdersService {
       order: { createdAt: 'DESC' },
       take: VENDOR_ORDERS_LIST_MAX_SEGMENTS,
     });
+    const visible = await this.onlyVendorVisible(segments);
 
-    return this.groupSegmentsByOrder(segments, await this.historyFor(segments));
+    return this.groupSegmentsByOrder(visible, await this.historyFor(visible));
   }
 
   async getForUser(userId: string, orderId: string): Promise<VendorOrderView> {
@@ -122,7 +123,8 @@ export class VendorOrdersService {
       relations: { order: true, items: true },
     });
 
-    if (segments.length === 0) {
+    if (segments.length === 0 || (await this.onlyVendorVisible(segments)).length === 0) {
+      // R2: an InstaPay / Vodafone Cash order whose payment Operations have not verified yet is answered exactly like a missing one.
       // Same "not found" whether the order doesn't exist at all or
       // exists but has no segment owned by this vendor — no reason to
       // leak which, matching CartService.getOwnedCartForItem's pattern.
@@ -130,6 +132,18 @@ export class VendorOrdersService {
     }
 
     return this.groupSegmentsByOrder(segments, await this.historyFor(segments))[0];
+  }
+
+  /** R2: drops segments of MANUAL_TRANSFER orders whose payment is not PAID yet (see vendor-order-visibility.ts). */
+  private async onlyVendorVisible(segments: OrderVendorSegment[]): Promise<OrderVendorSegment[]> {
+    const gated = [...new Set(segments.filter((s) => s.order?.paymentMethod === 'MANUAL_TRANSFER').map((s) => s.orderId))];
+    if (gated.length === 0) return segments;
+    const paid: Array<{ order_id: string }> = await this.segmentsRepository.query(
+      `SELECT order_id FROM payments WHERE order_id = ANY($1) AND status = 'PAID'`,
+      [gated],
+    );
+    const paidIds = new Set(paid.map((r) => r.order_id));
+    return segments.filter((s) => s.order?.paymentMethod !== 'MANUAL_TRANSFER' || paidIds.has(s.orderId));
   }
 
   private historyFor(segments: OrderVendorSegment[]) {

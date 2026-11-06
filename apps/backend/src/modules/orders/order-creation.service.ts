@@ -1,3 +1,4 @@
+import { notifyVendorsOfNewOrder } from './vendor-new-order-alerts';
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { StaffAlertsService } from '../notifications/staff-alerts.service';
 import { AdHocFulfilmentService } from './ad-hoc-fulfilment.service';
@@ -226,20 +227,9 @@ export class OrderCreationService {
       // Told in the same transaction as the order itself — "order exists" and "customer notified" cannot disagree.
       await recordOrderNotification(manager, order, CustomerNotificationType.ORDER_PLACED);
       // The staff of each vendor branch in the order learn of it in the same transaction (only their own branch's part; never customer data).
-      if (this.staffAlerts) {
-        const parts: Array<{ vendor_branch_id: string; status: string }> = await manager.query(
-          `SELECT DISTINCT vendor_branch_id, status FROM order_vendor_segments WHERE order_id = $1 AND group_type = 'CATALOG' AND vendor_branch_id IS NOT NULL`,
-          [order.id],
-        );
-        for (const part of parts) {
-          await this.staffAlerts.alert(manager, {
-            eventKey: `order:${order.id}:new:${part.vendor_branch_id}`, category: 'VENDOR_NEW_ORDER',
-            // A branch on automatic acceptance has already accepted it; the others must accept it.
-            requiredAction: part.status === 'PENDING' ? 'ACCEPT_ORDER' : undefined,
-            recipients: await this.staffAlerts.vendorRecipients(manager, part.vendor_branch_id),
-            orderId: order.id, orderNumber: order.orderNumber, vendorBranchId: part.vendor_branch_id,
-          });
-        }
+      // R2: an InstaPay / Vodafone Cash order is announced to vendors only once Operations verified the payment (PaymentStateMachineService).
+      if (this.staffAlerts && order.paymentMethod !== 'MANUAL_TRANSFER') {
+        await notifyVendorsOfNewOrder(manager, this.staffAlerts, order);
       }
 
       const createdOrder = await manager.findOne(Order, { where: { id: order.id }, relations: { segments: { items: true } } });

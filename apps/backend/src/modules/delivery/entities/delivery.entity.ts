@@ -21,6 +21,10 @@ export class Delivery extends BaseEntity {
   @Column({ name: 'accept_deadline_at', type: 'timestamptz', nullable: true })
   acceptDeadlineAt?: Date | null;
 
+  /** R16: when the CURRENT driver acknowledged this assignment (null = not yet). Reset on every (re)assignment. */
+  @Column({ name: 'acknowledged_at', type: 'timestamptz', nullable: true })
+  acknowledgedAt?: Date | null;
+
   @Column({ name: 'picked_up_at', type: 'timestamptz', nullable: true })
   pickedUpAt?: Date | null;
 

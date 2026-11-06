@@ -160,6 +160,47 @@ describe('OrderFinancialEventsService', () => {
       expect(event.rateSnapshot).toEqual({ commissionRateBasisPoints: 2000, baseAmountMinor: 500 });
     });
 
+    it('R28/U1: a normal order — the additional-vendor charge is part of the driver compensation (whole fee is the base)', async () => {
+      const delivery = { id: 'delivery-1', driverId: 'driver-1' };
+      const drivers = [{ id: 'driver-1', commissionRateBasisPoints: 1000 }]; // 10%
+      const { service, recordedEvents } = buildHarness({ delivery, drivers });
+      const breakdown = { deliveryFeeMinor: 2500, additionalVendorChargeMinor: 500 };
+
+      await service.handleTransition({ id: 'order-1', deliveryFeeMinor: 2500, deliveryFeeBreakdownSnapshot: breakdown } as any, OrderStatus.DELIVERED);
+
+      const event = recordedEvents.find((e) => e.type === FinancialEventType.DRIVER_COMMISSION_RECOGNIZED);
+      expect(event.amountMinor).toBe(250);
+      expect(event.rateSnapshot).toEqual({ commissionRateBasisPoints: 1000, baseAmountMinor: 2500 });
+      expect(recordedEvents.find((e) => e.type === FinancialEventType.HATLY_SERVICE_CHARGE_RECOGNIZED)).toBeUndefined();
+    });
+
+    it('R28/R40/U1: Hatly Service — the base delivery fee is the driver compensation; the multiplier premium is a separate Hatly service revenue entry', async () => {
+      const delivery = { id: 'delivery-1', driverId: 'driver-1' };
+      const drivers = [{ id: 'driver-1', commissionRateBasisPoints: 1000 }]; // 10%
+      const { service, recordedEvents } = buildHarness({ delivery, drivers });
+      const charge = { chargeMinor: 3000, baseFeeMinor: 2000, multiplierUsed: 1.5, service: 'HATLY' };
+
+      await service.handleTransition({ id: 'order-1', deliveryFeeMinor: 3000, deliveryFeeBreakdownSnapshot: charge } as any, OrderStatus.DELIVERED);
+
+      const commission = recordedEvents.find((e) => e.type === FinancialEventType.DRIVER_COMMISSION_RECOGNIZED);
+      expect(commission.amountMinor).toBe(200); // 10% of the 2000 base fee, never of the 3000 charge
+      expect(commission.rateSnapshot).toMatchObject({ baseAmountMinor: 2000, deliveryChargeMinor: 3000, hatlyServiceRevenueMinor: 1000 });
+      const revenue = recordedEvents.find((e) => e.type === FinancialEventType.HATLY_SERVICE_CHARGE_RECOGNIZED);
+      expect(revenue).toMatchObject({ amountMinor: 1000, orderId: 'order-1', idempotencyKey: 'hatly-service-charge:order-1' });
+      expect(revenue.driverId).toBeUndefined(); // Hatly revenue is never booked to the driver
+    });
+
+    it('R28: the Hatly Service revenue is recorded even when the driver has no rate (only the driver commission fails closed)', async () => {
+      const delivery = { id: 'delivery-1', driverId: 'driver-1' };
+      const drivers = [{ id: 'driver-1', commissionRateBasisPoints: null }];
+      const { service, recordedEvents } = buildHarness({ delivery, drivers });
+      const charge = { chargeMinor: 3000, baseFeeMinor: 2000, multiplierUsed: 1.5, service: 'WASALLY' };
+
+      await service.handleTransition({ id: 'order-1', deliveryFeeMinor: 3000, deliveryFeeBreakdownSnapshot: charge } as any, OrderStatus.DELIVERED);
+
+      expect(recordedEvents.map((e) => e.type)).toEqual([FinancialEventType.HATLY_SERVICE_CHARGE_RECOGNIZED]);
+    });
+
     it('fails closed — skips when the driver has no configured commission rate', async () => {
       const delivery = { id: 'delivery-1', driverId: 'driver-1' };
       const drivers = [{ id: 'driver-1', commissionRateBasisPoints: null }];

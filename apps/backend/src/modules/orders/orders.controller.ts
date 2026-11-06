@@ -138,10 +138,6 @@ export class OrdersController {
       // a driver's ownership is re-checked under the order lock (an admin may have reassigned since the check above)
       ...(actingDriver ? { actingDriverId: actingDriver.id } : {}),
     });
-    // U3: a driver handing the order back through this endpoint gets the same single redispatch (without them).
-    if (actingDriver && dto.status === OrderStatus.READY_FOR_PICKUP) {
-      await this.automaticDispatchService.redispatchAfterDriverRelease(order.id, actingDriver.id);
-    }
     return { data: order };
   }
 }

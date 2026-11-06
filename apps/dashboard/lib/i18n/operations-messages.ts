@@ -10,6 +10,7 @@ export const opEn = {
   opBannerAutoOff: '{count} order(s) wait for a manual driver assignment (automatic assignment is off)',
   opBannerAssignError: '{count} order(s) hit an assignment error',
   opBannerNotResponding: '{count} order(s) whose drivers are not responding',
+  opBannerNotAcknowledged: '{count} assignment(s) not acknowledged by the driver in time — contact the driver',
   opBannerPendingOverdue: '{count} vendor part(s) not accepted for over {minutes} minutes',
   opBannerPrepOverdue: '{count} vendor part(s) past the expected ready time',
   opBannerRefunds: '{count} Manual Transfer refund(s) still to send',
@@ -31,6 +32,7 @@ export const opEn = {
   opReason_AUTO_ASSIGN_DISABLED: 'Automatic assignment is off — assign a driver',
   opReason_ASSIGNMENT_ERROR: 'Assignment error',
   opReason_DRIVER_NOT_RESPONDING: 'Drivers are not responding',
+  opReason_ACKNOWLEDGEMENT_OVERDUE: 'Driver has not acknowledged the order — contact the driver',
 
   // ---- dispatch attempts
   opAttemptsTitle: 'Driver assignment attempts',
@@ -42,6 +44,7 @@ export const opEn = {
   opOutcome_DRIVER_TIMED_OUT: 'Driver did not answer in time',
   opOutcome_DRIVER_NOT_RESPONDING: 'Drivers not responding (3 attempts)',
   opOutcome_DRIVER_RELEASED: 'Driver handed the order back',
+  opOutcome_ACKNOWLEDGEMENT_OVERDUE: 'Driver did not acknowledge in time (Operations alerted)',
 
   // ---- vendor parts (segments) on the order
   opSegmentsTitle: 'Vendor parts',
@@ -114,6 +117,7 @@ export const opAr: Record<keyof typeof opEn, string> = {
   opBannerAutoOff: '{count} طلب بانتظار تعيين سائق يدويًا (التعيين التلقائي متوقف)',
   opBannerAssignError: '{count} طلب واجه خطأ في التعيين',
   opBannerNotResponding: '{count} طلب لا يستجيب سائقوه',
+  opBannerNotAcknowledged: '{count} إسناد لم يؤكد السائق استلامه في الوقت المحدد — تواصل مع السائق',
   opBannerPendingOverdue: '{count} جزء من البائعين لم يُقبل منذ أكثر من {minutes} دقائق',
   opBannerPrepOverdue: '{count} جزء من البائعين تجاوز وقت الجاهزية المتوقع',
   opBannerRefunds: '{count} استرداد بتحويل يدوي لم يُرسل بعد',
@@ -133,6 +137,7 @@ export const opAr: Record<keyof typeof opEn, string> = {
   opReason_AUTO_ASSIGN_DISABLED: 'التعيين التلقائي متوقف — عيّن سائقًا',
   opReason_ASSIGNMENT_ERROR: 'خطأ في التعيين',
   opReason_DRIVER_NOT_RESPONDING: 'السائقون لا يستجيبون',
+  opReason_ACKNOWLEDGEMENT_OVERDUE: 'لم يؤكد السائق استلام الطلب — تواصل مع السائق',
 
   opAttemptsTitle: 'محاولات تعيين السائق',
   opAttemptsNone: 'لم تُسجَّل أي محاولة تعيين.',
@@ -143,6 +148,7 @@ export const opAr: Record<keyof typeof opEn, string> = {
   opOutcome_DRIVER_TIMED_OUT: 'لم يرد السائق في الوقت المحدد',
   opOutcome_DRIVER_NOT_RESPONDING: 'السائقون لا يستجيبون (3 محاولات)',
   opOutcome_DRIVER_RELEASED: 'أعاد السائق الطلب',
+  opOutcome_ACKNOWLEDGEMENT_OVERDUE: 'لم يؤكد السائق في الوقت المحدد (تم تنبيه العمليات)',
 
   opSegmentsTitle: 'أجزاء البائعين',
   opSegmentsHint: 'تصرّف نيابةً عن البائع فقط عند تعذّر ذلك عليه. يُسجَّل كل إجراء باسمك ويُوسَم «نيابةً عن البائع».',

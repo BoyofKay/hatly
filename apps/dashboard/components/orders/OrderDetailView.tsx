@@ -134,7 +134,7 @@ function OrderDetailScreen({ orderId, embedded, onClose }: { orderId: string; em
                 {detail.segments
                   .filter((segment) => segment.groupType !== 'AD_HOC_SERVICE')
                   .map((segment) => (
-                    <SegmentOperations key={segment.id} segment={segment} onChanged={refresh} />
+                    <SegmentOperations key={segment.id} segment={segment} onChanged={refresh} orderStatus={detail.status} />
                   ))}
               </div>
             </Card>
@@ -280,6 +280,12 @@ function OperationsPanel({ detail, onChanged }: { detail: AdminOrderDetail; onCh
                 <>
                   <dt className="text-gray-500">{t('odAcceptDeadline')}</dt>
                   <dd>{fmt(detail.delivery.acceptDeadlineAt)}</dd>
+                </>
+              )}
+              {detail.delivery.assignedAt && (
+                <>
+                  <dt className="text-gray-500">{t('odAcknowledgedAt')}</dt>
+                  <dd data-testid="od-acknowledged-at">{detail.delivery.acknowledgedAt ? fmt(detail.delivery.acknowledgedAt) : t('odNotAcknowledged')}</dd>
                 </>
               )}
               <dt className="text-gray-500">{t('odPickedUpAt')}</dt>

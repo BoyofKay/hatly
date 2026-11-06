@@ -1,3 +1,6 @@
+import { BusinessConfigKey } from '../business-config/business-config-key.enum';
+import { BusinessConfig } from '../business-config/entities/business-config.entity';
+import { resolveAcknowledgementWindowMinutes } from '../business-config/business-config.service';
 import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
@@ -272,11 +275,15 @@ export class DeliveryAssignmentService {
 
     const existingDelivery =
       lockedDelivery ?? (await manager.findOne(Delivery, { where: { orderId }, lock: { mode: 'pessimistic_write' } }));
+    // R16: acknowledge-by deadline = now + the configured window (default 5 min), read at assignment time; same for manual and automatic.
+    const windowRow = await manager.findOne(BusinessConfig, { where: { key: BusinessConfigKey.DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES } });
+    const acknowledgeBy = new Date(Date.now() + resolveAcknowledgementWindowMinutes(windowRow?.value) * 60_000);
     const delivery = existingDelivery
       ? Object.assign(existingDelivery, {
           driverId: driver.id,
           assignedAt: new Date(),
-          acceptDeadlineAt: new Date(Date.now() + 30_000),
+          acceptDeadlineAt: acknowledgeBy,
+          acknowledgedAt: null,
           pickedUpAt: null,
           deliveredAt: null,
         })
@@ -284,7 +291,8 @@ export class DeliveryAssignmentService {
           orderId,
           driverId: driver.id,
           assignedAt: new Date(),
-          acceptDeadlineAt: new Date(Date.now() + 30_000),
+          acceptDeadlineAt: acknowledgeBy,
+          acknowledgedAt: null,
         });
     const savedDelivery = await manager.save(delivery);
 

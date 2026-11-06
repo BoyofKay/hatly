@@ -66,8 +66,6 @@ import { BusinessEvent } from '../../common/logging/business-events';
 export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AutomaticDispatchService.name);
 
-  /** Unanswered assignment offers in a row before operations are told the driver(s) are not responding (approved initial threshold). */
-  static readonly MAX_UNANSWERED_ATTEMPTS = 3;
   /** A still-open automatic-dispatch alert is retried at most this often (no retry storm; the sweep tick may be much faster). */
   static readonly ALERT_RETRY_INTERVAL_MS = 60_000;
 
@@ -121,7 +119,7 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
     }
     this.sweepTimer = setInterval(() => {
       if (this.shuttingDown) return; // never start new work once shutdown has begun (Dispatch Hardening)
-      this.inFlightSweep = this.reassignTimedOutDeliveries()
+      this.inFlightSweep = this.alertUnacknowledgedAssignments()
         .then(() => this.retryOpenAlerts())
         .catch((error) => {
           this.logger.error(`Unexpected error during timeout-driven reassignment sweep: ${(error as Error).message}`);
@@ -264,163 +262,53 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * U3 (approved): a DRIVER handed an assigned order back (ASSIGNED_TO_DRIVER → READY_FOR_PICKUP, already committed).
-   * One immediate attempt through the SAME automatic dispatch (ranking, atomic assignment, locks, push, alerts, the
-   * AUTOMATIC_DISPATCH_ENABLED switch), never re-offering it to that driver. No delay, no retry loop: if nobody else is
-   * eligible the existing NO_ELIGIBLE_DRIVER alert is raised and an admin takes over. An admin who assigned it in the
-   * meantime simply wins (the attempt sees ORDER_NOT_ASSIGNABLE and stops). Never fails the driver's own request: the
-   * release already happened; an unexpected error is logged, and the order stays visible as "released" in the Control Tower.
+   * R16 (decision register 2026-11-06) — replaces the former 30-second timeout-driven reassignment. Drivers acknowledge an
+   * assignment (manual OR automatic, so this runs whatever AUTOMATIC_DISPATCH_ENABLED says); when the acknowledge-by time
+   * (`acceptDeadlineAt`, default 5 minutes after assignment, BusinessConfig DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES) passes with
+   * no acknowledgement, Operations get ONE ACKNOWLEDGEMENT_OVERDUE alert per assignment. Nothing is released, re-ranked or
+   * reassigned: only Operations release and reassign (R17). Toggling the dispatch mode therefore never touches an assignment (R13).
+   *
+   * Same whole-sweep Redis lock as before (one sweep at a time across instances; a Redis outage skips the tick). Idempotent:
+   * an assignment that already produced an acknowledgement alert (open or since resolved) is never alerted again, so an
+   * admin closing the alert does not bring it back every tick. Batch-limited, oldest deadline first, index-backed.
    */
-  async redispatchAfterDriverRelease(orderId: string, releasingDriverId: string): Promise<void> {
-    try {
-      // The driver ACTED (handed the order back) — that is an answer, so the unanswered streak starts over.
-      await this.deliveriesRepository.update({ orderId }, { consecutiveUnanswered: 0 });
-      await this.recordAttempt(orderId, 'DRIVER_RELEASED', releasingDriverId, 'The driver handed the order back.');
-      await this.attemptAutomaticDispatch(orderId, { excludeDriverIds: [releasingDriverId] });
-    } catch (error) {
-      this.logger.error(`Redispatch after driver release failed for order ${orderId}: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * Timeout-driven reassignment milestone. Finds every Delivery whose `acceptDeadlineAt` has
-   * passed while its Order is STILL exactly `ASSIGNED_TO_DRIVER` (an order that already moved on —
-   * PICKED_UP, cancelled, reassigned by an Admin, etc. — is never touched: the query itself
-   * excludes it, and the per-item re-check below excludes it again under lock), and, for each one:
-   * releases the assigned driver via the EXISTING, already-permitted `ASSIGNED_TO_DRIVER →
-   * READY_FOR_PICKUP` transition (the same one the driver-reject path and
-   * `AdminDispatchService.reassign()` already use — nothing new in `OrderStateMachineService`), then
-   * re-ranks and reassigns through the EXISTING `DriverRankingService`/`DeliveryAssignmentService`
-   * primitives, exactly as `attemptAutomaticDispatch` above already does. No new order/driver state,
-   * no new distance/pricing/ranking value — this method is a new TRIGGER for entirely existing
-   * machinery.
-   *
-   * Deliberately does NOT exclude the just-timed-out driver from the fresh ranking call — that
-   * would be inventing a new ranking rule ("never re-offer to the same driver") the approved
-   * ranking rules don't have; if that driver is still the only/best eligible candidate (e.g. a
-   * solo-driver service area), being offered the same delivery again, with a fresh
-   * `acceptDeadlineAt`, is the correct, unmodified behavior of re-running the existing ranking.
-   *
-   * Batch-limited (`dispatch.sweepBatchLimit`, oldest-expired-first): bounds how long a single
-   * sweep — and therefore its Redis lock and its per-item Postgres row locks — can run for. A
-   * backlog larger than the batch drains over multiple ticks rather than one unbounded pass;
-   * nothing "gets lost," it's just picked up on a later tick, in the same oldest-first order.
-   *
-   * Idempotent and concurrency-safe: a whole-sweep Redis lock (NX+PX, ownership-token compare-
-   * and-delete release — see `acquireSweepLock`/`releaseSweepLock`) means only one sweep ever
-   * *actively* runs at a time, and a sweep that outlives its own lock's TTL can never delete a lock
-   * a DIFFERENT, legitimately-running sweep already re-acquired. Within a sweep, each candidate
-   * Delivery row is pessimistic-locked and its `acceptDeadlineAt` re-verified as still-expired
-   * BEFORE anything is released — a delivery an Admin (or a previous/overlapping sweep) already
-   * reassigned in the meantime is silently skipped, never double-reassigned. Returned counts are
-   * for tests/observability only — no caller currently depends on them.
-   */
-  async reassignTimedOutDeliveries(): Promise<{ processed: number; reassigned: number; alerted: number; skipped: number }> {
-    const result = { processed: 0, reassigned: 0, alerted: 0, skipped: 0 };
-    const startedAt = Date.now();
-
-    const isEnabled = await this.businessConfigService.isAutomaticDispatchEnabled();
-    if (!isEnabled) {
-      return result;
-    }
-
+  async alertUnacknowledgedAssignments(): Promise<{ processed: number; alerted: number }> {
+    const result = { processed: 0, alerted: 0 };
     const lockToken = await this.acquireSweepLock();
-    if (!lockToken) {
-      // Another sweep (a slow previous tick, or another app instance) is already running, OR Redis
-      // itself is unavailable right now — either way, never process the same expired deliveries
-      // twice in parallel, and never let a Redis outage crash the caller. Fails closed: existing
-      // delivery data is untouched, and the NEXT tick (this instance or another) tries again.
-      return result;
-    }
-
+    if (!lockToken) return result;
     try {
-      const expired = await this.deliveriesRepository
+      const overdue = await this.deliveriesRepository
         .createQueryBuilder('delivery')
         .innerJoin(Order, 'order', 'order.id = delivery.order_id')
         .where('delivery.accept_deadline_at IS NOT NULL')
         .andWhere('delivery.accept_deadline_at < NOW()')
+        .andWhere('delivery.acknowledged_at IS NULL')
         .andWhere('order.status = :status', { status: OrderStatus.ASSIGNED_TO_DRIVER })
-        .select('delivery.id', 'id')
+        .andWhere(
+          `NOT EXISTS (SELECT 1 FROM dispatch_alerts a WHERE a.order_id = delivery.order_id AND a.reason = 'ACKNOWLEDGEMENT_OVERDUE'
+             AND a.deleted_at IS NULL AND (a.resolved_at IS NULL OR a.created_at >= delivery.assigned_at))`,
+        )
+        .select('delivery.order_id', 'orderId')
+        .addSelect('delivery.driver_id', 'driverId')
         .orderBy('delivery.accept_deadline_at', 'ASC')
         .limit(this.sweepBatchLimit)
-        .getRawMany<{ id: string }>();
-
-      for (const { id: deliveryId } of expired) {
+        .getRawMany<{ orderId: string; driverId: string | null }>();
+      for (const row of overdue) {
         result.processed++;
-        const released = await this.releaseIfStillExpired(deliveryId);
-        if (!released) {
-          // Already handled by an Admin, a driver's own action, or a previous tick in the meantime —
-          // a benign, expected race outcome (Section 11: "safely treated as no-op"), never an error.
-          result.skipped++;
-          this.logger.debug(`Skipped delivery ${deliveryId} in timeout sweep: no longer expired/ASSIGNED_TO_DRIVER.`);
-          continue;
-        }
-
-        logBusinessEvent(this.logger, 'log', BusinessEvent.DISPATCH_DRIVER_TIMEOUT, () => this.requestContextService.getCorrelationId(), {
-          orderId: released.orderId,
-          deliveryId,
-          previousDriverId: released.previousDriverId,
-        });
-
-        await this.recordAttempt(released.orderId, 'DRIVER_TIMED_OUT', released.previousDriverId, `Unanswered offer ${released.unanswered} of ${AutomaticDispatchService.MAX_UNANSWERED_ATTEMPTS}.`);
-
-        if (released.unanswered >= AutomaticDispatchService.MAX_UNANSWERED_ATTEMPTS) {
-          // Stop cycling: the order stays released (READY_FOR_PICKUP) with a visible alert until an admin assigns a driver.
-          await this.recordAttempt(released.orderId, 'DRIVER_NOT_RESPONDING', released.previousDriverId, null);
-          await this.raiseAlert(
-            released.orderId,
-            'DRIVER_NOT_RESPONDING',
-            `${released.unanswered} assignment offers in a row went unanswered — assign a driver manually.`,
-          );
-          result.alerted++;
-          continue;
-        }
-
-        const order = await this.ordersRepository.findOne({ where: { id: released.orderId }, relations: { segments: true } });
-        if (!order) continue; // structurally shouldn't happen (the Order row backing an existing Delivery), never assumed away
-
-        const candidateDriverIds = await this.driverRankingService.rankCandidates(order);
-        if (candidateDriverIds.length === 0) {
-          logBusinessEvent(this.logger, 'warn', BusinessEvent.DISPATCH_NO_ELIGIBLE_DRIVER, () => this.requestContextService.getCorrelationId(), {
-            orderId: released.orderId,
-          });
-          await this.recordAttempt(released.orderId, 'NO_ELIGIBLE_DRIVER', null, 'No driver could be ranked after a timeout.');
-          await this.raiseAlert(released.orderId, 'NO_ELIGIBLE_DRIVER', 'No eligible driver is online and available.');
-          result.alerted++;
-          continue;
-        }
-
-        try {
-          const reassigned = await this.deliveryAssignmentService.assignDriver({ orderId: released.orderId, candidateDriverIds });
-          await this.recordAttempt(released.orderId, 'ASSIGNED', reassigned.driverId ?? null, 'Re-offered after a timeout.');
-          result.reassigned++;
-        } catch (error) {
-          if (error instanceof OrderNotAssignableException) {
-            // Someone else acted on the released order in the meantime (e.g. an admin assigned it) — a benign race.
-            result.skipped++;
-            continue;
-          }
-          if (error instanceof ConflictException) {
-            await this.recordAttempt(released.orderId, 'NO_ELIGIBLE_DRIVER', null, 'Every ranked driver became unavailable before the assignment.');
-            await this.raiseAlert(released.orderId, 'NO_ELIGIBLE_DRIVER', 'Every ranked driver became unavailable before the assignment.');
-            result.alerted++;
-            continue;
-          }
-          // Not swallowed and not allowed to abort the rest of the batch: persisted and raised to operations.
-          await this.recordAssignmentError(released.orderId, error);
-          result.alerted++;
-          continue;
-        }
+        await this.recordAttempt(row.orderId, 'ACKNOWLEDGEMENT_OVERDUE', row.driverId, 'The assigned driver did not acknowledge in time.');
+        await this.raiseAlert(
+          row.orderId,
+          'ACKNOWLEDGEMENT_OVERDUE',
+          'The assigned driver has not acknowledged this order. Contact the driver; release or reassign it if needed.',
+        );
+        result.alerted++;
       }
     } finally {
       await this.releaseSweepLock(lockToken);
     }
-
-    logBusinessEvent(this.logger, 'log', BusinessEvent.DISPATCH_TIMEOUT_SWEEP_COMPLETED, () => this.requestContextService.getCorrelationId(), {
-      ...result,
-      durationMs: Date.now() - startedAt,
-    });
-
+    if (result.processed > 0) {
+      logBusinessEvent(this.logger, 'log', BusinessEvent.DISPATCH_TIMEOUT_SWEEP_COMPLETED, () => this.requestContextService.getCorrelationId(), { ...result });
+    }
     return result;
   }
 
@@ -484,82 +372,6 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
         reason: (error as Error).message,
       });
     }
-  }
-
-  /**
-   * Locks the Order, THEN the Delivery row (in that order — see below), re-verifies under those
-   * locks that the delivery is STILL expired (nobody else refreshed/handled it since the outer query
-   * ran), and — only if so — releases it via the existing state-machine transition, in the SAME
-   * transaction as the locks. Returns `null` when there was nothing to do (already handled), so the
-   * caller treats it as a no-op rather than an error — the same "benign, expected replay" discipline
-   * this codebase already applies to other idempotent operations (e.g. `FinancialEventService`'s
-   * duplicate-key path).
-   *
-   * Dispatch Hardening milestone fix (lock ordering, Section 4): this method used to lock the
-   * Delivery row FIRST and only reach the Order lock afterward (inside `transitionInTransaction`).
-   * `DriverOrderActionsService.updateStatus()`'s own path (`OrderStateMachineService.applyTransition`)
-   * locks the Order row FIRST and only touches Delivery afterward (setting `pickedUpAt`/`deliveredAt`)
-   * — the exact OPPOSITE order. Two transactions locking the same two rows in reverse order is a
-   * textbook Postgres deadlock, genuinely reproduced under true concurrency (a driver progressing
-   * their own delivery at the same moment this sweep processes it — see this class's own e2e test).
-   * This codebase's own established discipline for exactly this situation is consistent lock
-   * ORDERING, never a generic retry-on-deadlock wrapper (see e.g.
-   * `customer-order-cancellation.service.ts`'s own comment on why it locks order before payment) — so
-   * the fix here is the same: always Order before Delivery, matching every other concurrent path.
-   */
-  private async releaseIfStillExpired(deliveryId: string): Promise<{ orderId: string; previousDriverId: string | null; unanswered: number } | null> {
-    const outcome = await this.deliveriesRepository.manager.transaction(async (manager) => {
-      // An UNLOCKED peek just to learn which Order this Delivery belongs to (a Delivery id alone
-      // doesn't say) — never itself a source of stale data, since the fields that actually matter
-      // (current order status, current deadline) are re-verified below UNDER the real locks, in the
-      // same Order-then-Delivery order every other concurrent path in this codebase already uses.
-      const deliveryPeek = await manager.findOne(Delivery, { where: { id: deliveryId } });
-      if (!deliveryPeek) return null;
-
-      const order = await manager.findOne(Order, { where: { id: deliveryPeek.orderId }, lock: { mode: 'pessimistic_write' } });
-      if (!order || order.status !== OrderStatus.ASSIGNED_TO_DRIVER) {
-        return null; // already progressed/released by someone else since the outer query ran
-      }
-
-      const delivery = await manager.findOne(Delivery, { where: { id: deliveryId }, lock: { mode: 'pessimistic_write' } });
-      if (!delivery || !delivery.acceptDeadlineAt || delivery.acceptDeadlineAt.getTime() > Date.now()) {
-        return null; // already refreshed (reassigned) since the outer query ran, or somehow cleared — nothing to release
-      }
-
-      try {
-        const { afterCommit } = await this.orderStateMachine.transitionInTransaction(manager, {
-          orderId: delivery.orderId,
-          to: OrderStatus.READY_FOR_PICKUP,
-          actorRole: Role.ADMIN, // system-initiated release, same convention already used for READY_FOR_PICKUP→ASSIGNED_TO_DRIVER
-        });
-        // One more offer that nobody answered (same transaction, delivery row already locked).
-        delivery.consecutiveUnanswered = (delivery.consecutiveUnanswered ?? 0) + 1;
-        await manager.save(delivery);
-        return { orderId: delivery.orderId, previousDriverId: delivery.driverId ?? null, afterCommit, unanswered: delivery.consecutiveUnanswered };
-      } catch (error) {
-        if (error instanceof BadRequestException) {
-          // The order already left ASSIGNED_TO_DRIVER (picked up, cancelled, or already released by
-          // someone else) between the outer query and this lock — never reassign an order that has
-          // already progressed. A benign, expected race outcome, not an error.
-          return null;
-        }
-        throw error;
-      }
-    });
-
-    if (!outcome) return null;
-
-    // Per `transitionInTransaction`'s own contract: only call `afterCommit()` once this transaction
-    // has actually committed (guaranteed here — we're past the `await ... .transaction(...)` call).
-    // For THIS transition (ASSIGNED_TO_DRIVER→READY_FOR_PICKUP) it is a documented no-op today —
-    // `OrderFinancialEventsService.handleTransition` has no case for it and
-    // `OrderStateMachineService`'s own push-notification switch explicitly lists this exact
-    // transition as one that "intentionally sends nothing" — but calling it keeps this path
-    // byte-for-byte consistent with `AdminDispatchService.reassign()`, which uses the plain
-    // `transition()` (= `applyTransition` + `runAfterCommit` together) for the identical
-    // transition, rather than silently diverging from it.
-    await outcome.afterCommit();
-    return { orderId: outcome.orderId, previousDriverId: outcome.previousDriverId, unanswered: outcome.unanswered };
   }
 
   /** ONE open alert per (order, reason): repeating the same situation refreshes it instead of stacking duplicates. */

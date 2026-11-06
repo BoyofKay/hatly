@@ -84,7 +84,10 @@ export class ChangeFeedService implements OnApplicationBootstrap, OnModuleDestro
     let branch = '';
     if (scope.branchIds) {
       values.push(scope.branchIds);
-      branch = `AND vendor_branch_id = ANY($${values.length})`;
+      // R2: vendors never receive changes of an InstaPay / Vodafone Cash order before its payment is verified.
+      branch = `AND vendor_branch_id = ANY($${values.length})
+        AND NOT EXISTS (SELECT 1 FROM orders vo WHERE vo.id = change_events.order_id AND vo.payment_method = 'MANUAL_TRANSFER'
+                          AND NOT EXISTS (SELECT 1 FROM payments vp WHERE vp.order_id = vo.id AND vp.status = 'PAID'))`;
     }
     const rows: Array<{ seq: string; txid: string; entity: ChangeEntity; entity_id: string; order_id: string; kind: string }> = await this.ds.query(
       `SELECT seq, txid, entity, entity_id, order_id, kind FROM change_events

@@ -257,3 +257,26 @@ describe('BusinessConfigService — Hatly / Wasally default route locations (PD-
     expect(repo.delete).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('BusinessConfigService — R16 driver acknowledgement window', () => {
+  const svc = (rows: Array<{ id: string; key: string; value: unknown }> = []) => new BusinessConfigService(buildMockRepo(rows) as any);
+
+  it('defaults to 5 minutes when never set, and falls back to 5 for any stored value outside 1-30 whole minutes', async () => {
+    expect(await svc().getAcknowledgementWindowMinutes()).toBe(5);
+    for (const value of [0, 31, 2.5, '10', null, true]) {
+      expect(await svc([{ id: 'w', key: 'DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES', value }]).getAcknowledgementWindowMinutes()).toBe(5);
+    }
+    expect(await svc([{ id: 'w', key: 'DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES', value: 12 }]).getAcknowledgementWindowMinutes()).toBe(12);
+  });
+
+  it('accepts only a whole number from 1 to 30 on write', async () => {
+    const s = svc();
+    await s.set('DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES', 1, 'admin-1');
+    await s.set('DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES', 30, 'admin-1');
+    expect(await s.getAcknowledgementWindowMinutes()).toBe(30);
+    for (const value of [0, 31, 4.5, '5', null]) {
+      await expect(s.set('DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES', value, 'admin-1')).rejects.toMatchObject({ response: { details: { code: 'INVALID_BUSINESS_CONFIG_VALUE' } } });
+    }
+    expect(await s.getAcknowledgementWindowMinutes()).toBe(30);
+  });
+});

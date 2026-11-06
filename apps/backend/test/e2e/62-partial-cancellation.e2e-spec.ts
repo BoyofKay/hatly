@@ -253,7 +253,10 @@ describe('E2E — multi-vendor partial cancellation (fee, totals, refund)', () =
     it('an UNPAID transfer records no refund EVENT (it may still be rejected): PD-004 keeps a pending entitlement instead and never rewrites the amount the customer may have sent', async () => {
       const pending = await order([p1, p2], 'MANUAL_TRANSFER');
       const paidBasis = num((await paymentOf(pending.order.id)).amount_minor);
-      expectData(await cancelSegment(v2, await segmentOf(pending.order.id, v2)));
+      // R2: the vendor cannot see an unverified transfer order — Operations cancel the vendor part on its behalf.
+      const opsCancel = async (orderId: string) =>
+        expectData(await world.api('patch', `/admin/orders/segments/${await segmentOf(orderId, v2)}/status`, { token: superAdmin.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } }));
+      await opsCancel(pending.order.id);
       expect(await refundEvents(pending.order.id)).toEqual([]);
       const payment = await paymentOf(pending.order.id);
       expect(num(payment.amount_minor)).toBe(paidBasis);
@@ -262,7 +265,7 @@ describe('E2E — multi-vendor partial cancellation (fee, totals, refund)', () =
 
       const claimed = await order([p1, p2], 'MANUAL_TRANSFER');
       await world.api('post', `/payments/manual-transfer/orders/${claimed.order.id}/claim`, { token: claimed.customer.accessToken, body: {} });
-      expectData(await cancelSegment(v2, await segmentOf(claimed.order.id, v2)));
+      await opsCancel(claimed.order.id);
       expect(await refundEvents(claimed.order.id)).toEqual([]);
       expect((await paymentOf(claimed.order.id)).pending_refund_status).toBe('PENDING');
     });

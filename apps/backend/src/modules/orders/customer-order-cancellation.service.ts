@@ -5,7 +5,7 @@ import { OrderVendorSegment } from './entities/order-vendor-segment.entity';
 import { OrderStatus } from './order-status.enum';
 import { OrderVendorSegmentStatus } from './order-vendor-segment-status.enum';
 import { OrderStateMachineService } from './order-state-machine.service';
-import { customerCancellationBlock } from './customer-cancellation-rule';
+import { customerCancellationBlock, servicePurchaseRecordedFor } from './customer-cancellation-rule';
 import { Role } from '../../common/enums/role.enum';
 
 /**
@@ -54,18 +54,19 @@ export class CustomerOrderCancellationService {
           details: { code: 'ORDER_ALREADY_CANCELLED' },
         });
       }
-      const block = customerCancellationBlock(order.status, segments);
+      const purchased = await servicePurchaseRecordedFor((sql, values) => manager.query(sql, values), [orderId]);
+      const block = customerCancellationBlock(order.status, segments, purchased.has(orderId));
       if (block === 'ORDER_STATUS') {
         throw new BadRequestException({
-          message: `This order is ${order.status} and can no longer be cancelled by the customer.`,
+          message: `This order is ${order.status} and can no longer be cancelled in the app. Please contact Hatly support.`,
           details: { code: 'ORDER_NOT_CANCELLABLE_BY_CUSTOMER', status: order.status },
         });
       }
-      if (block === 'VENDOR_SEGMENT_PREPARING') {
-        // The order status is still PENDING/CONFIRMED, but a vendor has already started preparing its part.
+      if (block === 'SERVICE_PURCHASE_RECORDED') {
+        // R40: the driver already bought the Hatly Service items — Operations handle the case and its money.
         throw new BadRequestException({
-          message: 'A vendor has already started preparing your order, so it can no longer be cancelled.',
-          details: { code: 'ORDER_NOT_CANCELLABLE_BY_CUSTOMER', status: order.status, reason: 'VENDOR_SEGMENT_PREPARING' },
+          message: 'The driver has already bought the items, so this order can no longer be cancelled in the app. Please contact Hatly support.',
+          details: { code: 'ORDER_NOT_CANCELLABLE_BY_CUSTOMER', status: order.status, reason: 'SERVICE_PURCHASE_RECORDED' },
         });
       }
 

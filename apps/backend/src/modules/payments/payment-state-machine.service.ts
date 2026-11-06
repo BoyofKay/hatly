@@ -1,4 +1,6 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { StaffAlertsService } from '../notifications/staff-alerts.service';
+import { notifyVendorsOfNewOrder } from '../orders/vendor-new-order-alerts';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Payment } from './entities/payment.entity';
 import { Order } from '../orders/entities/order.entity';
@@ -47,6 +49,8 @@ export class PaymentStateMachineService {
     private readonly dataSource: DataSource,
     private readonly requestContextService: RequestContextService,
     private readonly manualTransferRefundService: ManualTransferRefundService,
+    // Staff inbox. Optional so unit tests that build this service by hand keep working unchanged.
+    @Optional() private readonly staffAlerts?: StaffAlertsService,
   ) {}
 
   async transition(params: {
@@ -110,6 +114,13 @@ export class PaymentStateMachineService {
         // `paymentBlocksFulfilment`/`OrderPaymentGateService` — so every still-open segment's estimate starts counting from
         // NOW, not from whenever the order was originally created.
         await reanchorPreparationTiming(manager, saved.orderId);
+        // R2: the vendor sees (and is told about) an InstaPay / Vodafone Cash order only from this moment — same transaction.
+        if (this.staffAlerts) {
+          const order = await manager.findOne(Order, { where: { id: saved.orderId } });
+          if (order && order.paymentMethod === 'MANUAL_TRANSFER' && order.status !== 'CANCELLED') {
+            await notifyVendorsOfNewOrder(manager, this.staffAlerts, order);
+          }
+        }
       } else if (params.to === PaymentStatus.REJECTED) {
         await this.manualTransferRefundService.voidPendingRefund(saved, manager);
       }

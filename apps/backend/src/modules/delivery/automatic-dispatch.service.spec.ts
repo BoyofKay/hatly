@@ -187,7 +187,8 @@ function buildTimeoutHarness(opts: {
           limitCalls.push(n);
           return qb;
         }),
-        getRawMany: jest.fn(async () => (opts.expiredDeliveryIds ?? []).map((id) => ({ id }))),
+        addSelect: jest.fn(() => qb),
+        getRawMany: jest.fn(async () => (opts.expiredDeliveryIds ?? []).map((id) => ({ orderId: opts.deliveriesById?.[id]?.orderId ?? `order-of-${id}`, driverId: opts.deliveriesById?.[id]?.driverId ?? null }))),
       };
       return qb;
     }),
@@ -382,62 +383,7 @@ describe('AutomaticDispatchService', () => {
   });
 });
 
-describe('AutomaticDispatchService — one redispatch after a DRIVER hand-back, excluding that driver (U3)', () => {
-  it('the releasing driver is removed from the ranked candidates; the rest keep the unchanged ranking order', async () => {
-    const { service, deliveryAssignmentService, driverRankingService } = buildHarness({
-      isAutomaticDispatchEnabled: true,
-      candidateDriverIds: ['releaser', 'driver-b', 'driver-c'],
-    });
-    await service.redispatchAfterDriverRelease('order-1', 'releaser');
-    expect(driverRankingService.rankCandidates).toHaveBeenCalledTimes(1); // the existing ranking, unchanged and called once
-    expect(deliveryAssignmentService.assignDriver).toHaveBeenCalledTimes(1);
-    expect(deliveryAssignmentService.assignDriver).toHaveBeenCalledWith({ orderId: 'order-1', candidateDriverIds: ['driver-b', 'driver-c'] });
-  });
-
-  it('if the releasing driver was the only eligible one: NO assignment, the existing NO_ELIGIBLE_DRIVER alert is raised once', async () => {
-    const { service, deliveryAssignmentService, alerts } = buildHarness({ isAutomaticDispatchEnabled: true, candidateDriverIds: ['releaser'] });
-    await service.redispatchAfterDriverRelease('order-1', 'releaser');
-    expect(deliveryAssignmentService.assignDriver).not.toHaveBeenCalled();
-    expect(alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'NO_ELIGIBLE_DRIVER' })]);
-  });
-
-  it('automatic dispatch OFF: nothing happens — the order waits for an admin (same switch as every automatic dispatch)', async () => {
-    const { service, deliveryAssignmentService, driverRankingService, alerts } = buildHarness({ isAutomaticDispatchEnabled: false, candidateDriverIds: ['driver-b'] });
-    await service.redispatchAfterDriverRelease('order-1', 'releaser');
-    expect(driverRankingService.rankCandidates).not.toHaveBeenCalled();
-    expect(deliveryAssignmentService.assignDriver).not.toHaveBeenCalled();
-    // Never silent: the order waits for an admin AND says so with one open alert.
-    expect(alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'AUTO_ASSIGN_DISABLED' })]);
-  });
-
-  it('an admin assigned it meanwhile (ORDER_NOT_ASSIGNABLE): the attempt stops quietly — no alert, no error', async () => {
-    const { service, alerts } = buildHarness({
-      isAutomaticDispatchEnabled: true,
-      candidateDriverIds: ['driver-b'],
-      assignDriverError: new OrderNotAssignableException('assigned meanwhile', 'ORDER_NOT_ASSIGNABLE', OrderStatus.ASSIGNED_TO_DRIVER),
-    });
-    await expect(service.redispatchAfterDriverRelease('order-1', 'releaser')).resolves.toBeUndefined();
-    expect(alerts).toHaveLength(0);
-  });
-
-  it('an unexpected failure (e.g. the assignment transaction failed) never fails the driver\'s release request — it is logged', async () => {
-    const { service } = buildHarness({ isAutomaticDispatchEnabled: true, candidateDriverIds: ['driver-b'], assignDriverError: new Error('db down') });
-    const logged = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
-    await expect(service.redispatchAfterDriverRelease('order-1', 'releaser')).resolves.toBeUndefined();
-    expect(logged).toHaveBeenCalledWith(expect.stringContaining('db down'));
-  });
-
-  it('a PICKUP order is never redispatched (it never has a driver to release, and is never dispatched)', async () => {
-    const { service, driverRankingService, alerts } = buildHarness({
-      isAutomaticDispatchEnabled: true,
-      order: { id: 'order-1', fulfillmentType: 'PICKUP', segments: [] },
-      candidateDriverIds: ['driver-b'],
-    });
-    await service.redispatchAfterDriverRelease('order-1', 'releaser');
-    expect(driverRankingService.rankCandidates).not.toHaveBeenCalled();
-    expect(alerts).toHaveLength(0);
-  });
-
+describe('AutomaticDispatchService — exclusions', () => {
   it('without exclusions attemptAutomaticDispatch is unchanged (every ranked candidate offered)', async () => {
     const { service, deliveryAssignmentService } = buildHarness({ isAutomaticDispatchEnabled: true, candidateDriverIds: ['a', 'b'] });
     await service.attemptAutomaticDispatch('order-1');
@@ -445,220 +391,63 @@ describe('AutomaticDispatchService — one redispatch after a DRIVER hand-back, 
   });
 });
 
-describe('AutomaticDispatchService.reassignTimedOutDeliveries (timeout-driven reassignment milestone)', () => {
-  const expired = new Date(Date.now() - 5_000);
-  const notYetExpired = new Date(Date.now() + 25_000);
+describe('AutomaticDispatchService.alertUnacknowledgedAssignments (R16: acknowledgement, alert only)', () => {
+  const late = { acceptDeadlineAt: new Date(Date.now() - 5_000), orderId: 'order-1', driverId: 'driver-1' };
 
-  it('does nothing at all when AUTOMATIC_DISPATCH_ENABLED is OFF — same rule as attemptAutomaticDispatch', async () => {
-    const h = buildTimeoutHarness({
-      isAutomaticDispatchEnabled: false,
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' } },
-    });
-
-    const result = await h.service.reassignTimedOutDeliveries();
-
-    expect(result).toEqual({ processed: 0, reassigned: 0, alerted: 0, skipped: 0 });
+  it('an overdue, unacknowledged assignment raises ONE ACKNOWLEDGEMENT_OVERDUE alert and an attempt row — nothing is released or reassigned', async () => {
+    const h = buildTimeoutHarness({ expiredDeliveryIds: ['delivery-1'], deliveriesById: { 'delivery-1': late }, candidatesByOrderId: { 'order-1': ['driver-2'] } });
+    const result = await h.service.alertUnacknowledgedAssignments();
+    expect(result).toEqual({ processed: 1, alerted: 1 });
+    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'ACKNOWLEDGEMENT_OVERDUE' })]);
+    expect(h.attemptRows).toEqual([expect.objectContaining({ orderId: 'order-1', outcome: 'ACKNOWLEDGEMENT_OVERDUE', driverId: 'driver-1' })]);
     expect(h.orderStateMachine.transitionInTransaction).not.toHaveBeenCalled();
-  });
-
-  it('an assigned driver who times out is released (ASSIGNED_TO_DRIVER→READY_FOR_PICKUP) and reassigned to the next ranked candidate', async () => {
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' } },
-      candidatesByOrderId: { 'order-1': ['driver-2'] },
-    });
-
-    const result = await h.service.reassignTimedOutDeliveries();
-
-    expect(h.transitionCalls).toEqual([{ orderId: 'order-1', to: 'READY_FOR_PICKUP' }]);
-    expect(h.afterCommitCalls).toEqual(['order-1']); // consistent with AdminDispatchService.reassign()'s own plain transition()
-    expect(h.assignDriverCalls).toEqual([{ orderId: 'order-1', candidateDriverIds: ['driver-2'] }]);
-    expect(result).toEqual({ processed: 1, reassigned: 1, alerted: 0, skipped: 0 });
-  });
-
-  it('CONFIRMED: does NOT exclude the just-timed-out driver from the fresh ranking call — reuses ranking exactly as-is', async () => {
-    // The driver who timed out (driver-1) is still the only eligible candidate the (fake) ranking
-    // returns — this is a legitimate outcome (e.g. a solo-driver service area), not a bug.
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' } },
-      candidatesByOrderId: { 'order-1': ['driver-1'] },
-    });
-
-    await h.service.reassignTimedOutDeliveries();
-
-    expect(h.assignDriverCalls).toEqual([{ orderId: 'order-1', candidateDriverIds: ['driver-1'] }]);
-  });
-
-  it('the timed-out driver is naturally excluded once actually ineligible — ranking already filters (no new rule invented)', async () => {
-    // The ranking fake below models "driver-1 went offline in the meantime": it is simply never
-    // offered as a candidate — exactly what real DriverRankingService.rankCandidates would do.
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' } },
-      candidatesByOrderId: { 'order-1': ['driver-2'] },
-    });
-
-    await h.service.reassignTimedOutDeliveries();
-
-    expect(h.assignDriverCalls[0].candidateDriverIds).not.toContain('driver-1');
-  });
-
-  it('no eligible driver at all: raises the EXISTING DispatchAlert (NO_ELIGIBLE_DRIVER), order stays retryable, never a new alert type', async () => {
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' } },
-      candidatesByOrderId: { 'order-1': [] },
-    });
-
-    const result = await h.service.reassignTimedOutDeliveries();
-
+    expect(h.driverRankingService.rankCandidates).not.toHaveBeenCalled();
     expect(h.assignDriverCalls).toEqual([]);
-    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'NO_ELIGIBLE_DRIVER' })]);
-    expect(result).toEqual({ processed: 1, reassigned: 0, alerted: 1, skipped: 0 });
   });
 
-  it('every ranked candidate loses the assignment race (ConflictException): alerts the same way as "no candidates"', async () => {
+  it('R13/R16: runs the same way whether AUTOMATIC_DISPATCH_ENABLED is ON or OFF (manual assignments are acknowledged too) and never reads the switch', async () => {
+    for (const enabled of [true, false]) {
+      const h = buildTimeoutHarness({ isAutomaticDispatchEnabled: enabled, expiredDeliveryIds: ['delivery-1'], deliveriesById: { 'delivery-1': late } });
+      expect(await h.service.alertUnacknowledgedAssignments()).toEqual({ processed: 1, alerted: 1 });
+      expect(h.orderStateMachine.transitionInTransaction).not.toHaveBeenCalled();
+    }
+  });
+
+  it('the query only selects ASSIGNED_TO_DRIVER deliveries past the deadline, not acknowledged, not already alerted for this assignment', async () => {
+    const h = buildTimeoutHarness({});
+    await h.service.alertUnacknowledgedAssignments();
+    const qb = (h as any).service['deliveriesRepository'].createQueryBuilder.mock.results[0].value;
+    const clauses = [...qb.where.mock.calls, ...qb.andWhere.mock.calls].map((c: any[]) => String(c[0])).join(' | ');
+    expect(clauses).toContain('accept_deadline_at < NOW()');
+    expect(clauses).toContain('acknowledged_at IS NULL');
+    expect(clauses).toContain("reason = 'ACKNOWLEDGEMENT_OVERDUE'");
+    expect(clauses).toContain('a.created_at >= delivery.assigned_at');
+  });
+
+  it('several overdue assignments are each alerted independently', async () => {
     const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' } },
-      candidatesByOrderId: { 'order-1': ['driver-2'] },
-      assignDriverErrorByOrderId: { 'order-1': new ConflictException('No available driver could be assigned.') },
+      expiredDeliveryIds: ['d1', 'd2'],
+      deliveriesById: { d1: { ...late, orderId: 'o1' }, d2: { ...late, orderId: 'o2' } },
     });
-
-    const result = await h.service.reassignTimedOutDeliveries();
-
-    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'NO_ELIGIBLE_DRIVER' })]);
-    expect(result.alerted).toBe(1);
+    expect(await h.service.alertUnacknowledgedAssignments()).toEqual({ processed: 2, alerted: 2 });
+    expect(h.alerts.map((a) => a.orderId)).toEqual(['o1', 'o2']);
   });
 
-  it('an already-progressed delivery (order left ASSIGNED_TO_DRIVER between the query and the lock) is never reassigned', async () => {
-    // transitionInTransaction rejects because the order is no longer exactly ASSIGNED_TO_DRIVER —
-    // the SAME BadRequestException OrderStateMachineService already throws for any invalid
-    // (from, to) pair; nothing new is invented to detect this.
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' } },
-      transitionOutcomeByOrderId: { 'order-1': new BadRequestException('Cannot transition order from PICKED_UP to READY_FOR_PICKUP.') },
-    });
-
-    const result = await h.service.reassignTimedOutDeliveries();
-
-    expect(h.assignDriverCalls).toEqual([]);
-    expect(h.alerts).toEqual([]);
-    expect(result).toEqual({ processed: 1, reassigned: 0, alerted: 0, skipped: 1 });
-  });
-
-  it('idempotent: a delivery already refreshed (reassigned) since the outer query ran is silently skipped, never released twice', async () => {
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      // The fresh, LOCKED re-read shows a deadline in the FUTURE now — someone else (an Admin, or a
-      // previous tick) already handled this exact delivery.
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: notYetExpired, orderId: 'order-1', driverId: 'driver-2' } },
-    });
-
-    const result = await h.service.reassignTimedOutDeliveries();
-
-    expect(h.orderStateMachine.transitionInTransaction).not.toHaveBeenCalled();
-    expect(result).toEqual({ processed: 1, reassigned: 0, alerted: 0, skipped: 1 });
-  });
-
-  it('idempotent: running the sweep twice in a row processes nothing the second time once nothing is left expired', async () => {
+  it('nothing overdue: no alert, no attempt row', async () => {
     const h = buildTimeoutHarness({ expiredDeliveryIds: [] });
-    const first = await h.service.reassignTimedOutDeliveries();
-    const second = await h.service.reassignTimedOutDeliveries();
-    expect(first).toEqual({ processed: 0, reassigned: 0, alerted: 0, skipped: 0 });
-    expect(second).toEqual({ processed: 0, reassigned: 0, alerted: 0, skipped: 0 });
-  });
-
-  it('CONCURRENCY: a sweep already in progress (whole-sweep Redis lock held) makes a second, overlapping invocation a clean no-op', async () => {
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' } },
-      candidatesByOrderId: { 'order-1': ['driver-2'] },
-      lockAlreadyHeld: true,
-    });
-
-    // Two "overlapping" invocations; our fake redis.set() denies the lock on the FIRST call only —
-    // model this as two genuinely concurrent calls racing for the same lock.
-    const [first, second] = await Promise.all([h.service.reassignTimedOutDeliveries(), h.service.reassignTimedOutDeliveries()]);
-    const results = [first, second];
-    expect(results.filter((r) => r.processed > 0)).toHaveLength(1); // exactly one of the two actually did the work
-    expect(h.redis.eval).toHaveBeenCalledTimes(1); // only the one that acquired the lock ever releases it
-  });
-
-  it('an unexpected failure on one delivery is persisted as an ASSIGNMENT_ERROR alert and the sweep releases its lock — never stuck, never silent', async () => {
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' } },
-      candidatesByOrderId: { 'order-1': ['driver-2'] },
-      assignDriverErrorByOrderId: { 'order-1': new Error('unexpected database failure') },
-    });
-
-    await expect(h.service.reassignTimedOutDeliveries()).resolves.toBeDefined();
-    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'ASSIGNMENT_ERROR' })]);
-    expect(h.redis.eval).toHaveBeenCalledTimes(1);
-  });
-
-  it('multiple expired deliveries in one sweep are each processed independently', async () => {
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1', 'delivery-2'],
-      deliveriesById: {
-        'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1' },
-        'delivery-2': { acceptDeadlineAt: expired, orderId: 'order-2', driverId: 'driver-3' },
-      },
-      candidatesByOrderId: { 'order-1': ['driver-2'], 'order-2': [] },
-    });
-
-    const result = await h.service.reassignTimedOutDeliveries();
-
-    expect(result).toEqual({ processed: 2, reassigned: 1, alerted: 1, skipped: 0 });
-    expect(h.assignDriverCalls).toEqual([{ orderId: 'order-1', candidateDriverIds: ['driver-2'] }]);
-    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-2', reason: 'NO_ELIGIBLE_DRIVER' })]);
-  });
-
-  it('the THIRD consecutive unanswered offer stops the cycling: DRIVER_NOT_RESPONDING alert + attempt rows, no further ranking or assignment', async () => {
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1', consecutiveUnanswered: 2 } },
-      candidatesByOrderId: { 'order-1': ['driver-2'] },
-    });
-
-    const result = await h.service.reassignTimedOutDeliveries();
-
-    expect(h.assignDriverCalls).toEqual([]);
-    expect(h.alerts).toEqual([expect.objectContaining({ orderId: 'order-1', reason: 'DRIVER_NOT_RESPONDING' })]);
-    expect(h.alerts[0].detail).toMatch(/3 assignment offers in a row/);
-    expect(result).toMatchObject({ processed: 1, reassigned: 0, alerted: 1 });
-    expect(h.attemptRows.map((a: any) => a.outcome)).toEqual(['DRIVER_TIMED_OUT', 'DRIVER_NOT_RESPONDING']);
-  });
-
-  it('the FIRST and SECOND unanswered offers still reassign (the counter is saved with the release)', async () => {
-    const h = buildTimeoutHarness({
-      expiredDeliveryIds: ['delivery-1'],
-      deliveriesById: { 'delivery-1': { acceptDeadlineAt: expired, orderId: 'order-1', driverId: 'driver-1', consecutiveUnanswered: 1 } },
-      candidatesByOrderId: { 'order-1': ['driver-2'] },
-    });
-
-    const result = await h.service.reassignTimedOutDeliveries();
-
-    expect(h.assignDriverCalls).toEqual([{ orderId: 'order-1', candidateDriverIds: ['driver-2'] }]);
+    expect(await h.service.alertUnacknowledgedAssignments()).toEqual({ processed: 0, alerted: 0 });
     expect(h.alerts).toEqual([]);
-    expect(result).toMatchObject({ processed: 1, reassigned: 1, alerted: 0 });
-    expect(h.fakeManager.save.mock.calls[0][0].consecutiveUnanswered).toBe(2);
   });
 
-  it('the sweep query is BATCH-LIMITED using the configured technical constant — never an unbounded pass', async () => {
-    const h = buildTimeoutHarness({ expiredDeliveryIds: [], configOverrides: { sweepBatchLimit: 7 } });
-    await h.service.reassignTimedOutDeliveries();
+  it('a second overlapping sweep (whole-sweep Redis lock held) is a clean no-op', async () => {
+    const h = buildTimeoutHarness({ expiredDeliveryIds: ['delivery-1'], deliveriesById: { 'delivery-1': late }, lockAlreadyHeld: true });
+    expect(await h.service.alertUnacknowledgedAssignments()).toEqual({ processed: 0, alerted: 0 });
+  });
+
+  it('the sweep query is BATCH-LIMITED using the configured technical constant', async () => {
+    const h = buildTimeoutHarness({ configOverrides: { sweepBatchLimit: 7 } });
+    await h.service.alertUnacknowledgedAssignments();
     expect(h.limitCalls).toEqual([7]);
-  });
-
-  it('respects a different configured batch limit (e.g. the production default, 50)', async () => {
-    const h = buildTimeoutHarness({ expiredDeliveryIds: [] });
-    await h.service.reassignTimedOutDeliveries();
-    expect(h.limitCalls).toEqual([50]);
   });
 });
 
@@ -667,8 +456,8 @@ describe('AutomaticDispatchService — Dispatch Hardening milestone: multi-insta
 
   it('a lock already held by ANOTHER instance (a different value already at the key) is correctly NOT acquired', async () => {
     const h = buildTimeoutHarness({ expiredDeliveryIds: ['delivery-1'], existingLockValue: 'some-other-instance-token' });
-    const result = await h.service.reassignTimedOutDeliveries();
-    expect(result).toEqual({ processed: 0, reassigned: 0, alerted: 0, skipped: 0 }); // never even queried
+    const result = await h.service.alertUnacknowledgedAssignments();
+    expect(result).toEqual({ processed: 0, alerted: 0 }); // never even queried
   });
 
   it('CRITICAL (the bug this milestone fixes): releasing with a STALE/foreign token — because the TTL already expired and another instance re-acquired the lock under a NEW token — is correctly a no-op, never deletes the OTHER instance\'s active lock', async () => {
@@ -695,11 +484,11 @@ describe('AutomaticDispatchService — Dispatch Hardening milestone: multi-insta
 
   it('the lock key is empty again after a successful sweep — the SAME lock is acquirable by the next tick/instance', async () => {
     const h = buildTimeoutHarness({ expiredDeliveryIds: [] });
-    await h.service.reassignTimedOutDeliveries();
+    await h.service.alertUnacknowledgedAssignments();
     expect(h.getLockValue()).toBeNull();
     // A second, fully independent call (simulating the NEXT tick, or another instance) can acquire it again.
-    const result = await h.service.reassignTimedOutDeliveries();
-    expect(result).toEqual({ processed: 0, reassigned: 0, alerted: 0, skipped: 0 });
+    const result = await h.service.alertUnacknowledgedAssignments();
+    expect(result).toEqual({ processed: 0, alerted: 0 });
   });
 
   it('Redis unavailable at LOCK ACQUISITION: fails safely, returns a zeroed result, never throws, existing data untouched', async () => {
@@ -709,10 +498,10 @@ describe('AutomaticDispatchService — Dispatch Hardening milestone: multi-insta
       redisSetThrows: new Error('ECONNREFUSED'),
     });
 
-    const result = await h.service.reassignTimedOutDeliveries();
+    const result = await h.service.alertUnacknowledgedAssignments();
 
-    expect(result).toEqual({ processed: 0, reassigned: 0, alerted: 0, skipped: 0 });
-    expect(h.orderStateMachine.transitionInTransaction).not.toHaveBeenCalled(); // never even attempted
+    expect(result).toEqual({ processed: 0, alerted: 0 });
+    expect(h.alerts).toEqual([]); // never even attempted
   });
 
   it('Redis unavailable at LOCK RELEASE (after real work already committed): the sweep result is still returned successfully — a release failure is degraded-but-recoverable (TTL self-heals), never surfaced as the sweep having failed', async () => {
@@ -723,11 +512,11 @@ describe('AutomaticDispatchService — Dispatch Hardening milestone: multi-insta
       redisEvalThrows: new Error('ECONNRESET'),
     });
 
-    const result = await h.service.reassignTimedOutDeliveries();
+    const result = await h.service.alertUnacknowledgedAssignments();
 
-    // The actual dispatch work (the part that matters — real, authoritative state) still completed.
-    expect(result).toEqual({ processed: 1, reassigned: 1, alerted: 0, skipped: 0 });
-    expect(h.assignDriverCalls).toEqual([{ orderId: 'order-1', candidateDriverIds: ['driver-2'] }]);
+    // The actual work (the alert — real, authoritative state) still completed.
+    expect(result).toEqual({ processed: 1, alerted: 1 });
+    expect(h.alerts).toHaveLength(1);
   });
 });
 
@@ -766,13 +555,13 @@ describe('AutomaticDispatchService — Dispatch Hardening milestone: lifecycle (
       deliveriesById: { 'delivery-1': { acceptDeadlineAt: new Date(Date.now() - 1000), orderId: 'order-1', driverId: 'driver-1' } },
       candidatesByOrderId: { 'order-1': ['driver-2'] },
     });
-    // Make the ranking call (mid-sweep) hang until we release it — simulates "still in flight".
-    h.driverRankingService.rankCandidates.mockImplementation(async () => {
+    // Make the attempt write (mid-sweep) hang until we release it — simulates "still in flight".
+    const insert = (h.service as any).dispatchAttemptsRepository.insert;
+    insert.mockImplementation(async () => {
       await blocker;
-      return ['driver-2'];
     });
 
-    const sweepPromise = h.service.reassignTimedOutDeliveries();
+    const sweepPromise = h.service.alertUnacknowledgedAssignments();
     (h.service as any).inFlightSweep = sweepPromise;
 
     let destroyResolved = false;

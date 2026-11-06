@@ -288,7 +288,7 @@ describe('DriverOrderActionsService', () => {
   });
 });
 
-describe('DriverOrderActionsService — redispatch after a driver release (U3)', () => {
+describe('DriverOrderActionsService — no redispatch on driver status changes (R17 supersedes U3)', () => {
   function harness(to: OrderStatus) {
     const driverAuthorizationService = {
       getDriverForUser: jest.fn(async () => ({ id: 'driver-1' })),
@@ -315,12 +315,11 @@ describe('DriverOrderActionsService — redispatch after a driver release (U3)',
     return { service, automaticDispatch, calls };
   }
 
-  it('a release redispatches once, AFTER the release committed, excluding the releasing driver', async () => {
+  it('R17: a driver release attempt never triggers any redispatch (only Operations release; the state machine refuses DRIVER)', async () => {
     const { service, automaticDispatch, calls } = harness(OrderStatus.READY_FOR_PICKUP);
     await service.updateStatus({ userId: 'user-1', deliveryId: 'delivery-1', to: OrderStatus.READY_FOR_PICKUP });
-    expect(automaticDispatch.redispatchAfterDriverRelease).toHaveBeenCalledTimes(1);
-    expect(automaticDispatch.redispatchAfterDriverRelease).toHaveBeenCalledWith('order-1', 'driver-1');
-    expect(calls).toEqual(['transition', 'redispatch']);
+    expect(automaticDispatch.redispatchAfterDriverRelease).not.toHaveBeenCalled();
+    expect(calls).toEqual(['transition']);
   });
 
   it('no other driver transition redispatches', async () => {

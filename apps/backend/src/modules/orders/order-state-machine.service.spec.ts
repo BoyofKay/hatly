@@ -38,7 +38,7 @@ function deliveryUpdateQueryBuilder() {
     },
     execute: async () => {
       if (call.entity === 'Driver') driverReleases.push({ orderId: call.orderId });
-      else deliveryTimestampWrites.push({ set: call.set, orderId: call.orderId });
+      else if (call.entity !== 'DispatchAlert') deliveryTimestampWrites.push({ set: call.set, orderId: call.orderId });
       return { affected: 1 };
     },
   };
@@ -132,6 +132,7 @@ let lastMocks: any;
 // describe blocks below can call it.
 function buildInventoryHarness(params: {
   orderStatus?: OrderStatus;
+  servicePurchased?: boolean;
   segments: any[];
   items: any[];
   products: any[];
@@ -144,8 +145,12 @@ function buildInventoryHarness(params: {
   const paymentStore = params.payment ? { ...params.payment } : null;
 
   const manager = {
-    // The order id of a segment and the stock-ledger context (a no-op for this fake store).
-    query: async (sql: string) => (sql.includes('order_vendor_segments') ? [{ order_id: 'order-1' }] : [{ set_config: '' }]),
+    // The order id of a segment and the stock-ledger context (a no-op for this fake store). R40: `servicePurchased` fakes a driver's
+    // recorded Hatly Service purchase.
+    query: async (sql: string) =>
+      sql.includes('ad_hoc_purchase_records')
+        ? (params.servicePurchased ? [{ order_id: 'order-1' }] : [])
+        : sql.includes('order_vendor_segments') ? [{ order_id: 'order-1' }] : [{ set_config: '' }],
     findOne: async (_EntityClass: any, _opts: any) => ({ ...store }),
     save: async (entity: any) => {
       Object.assign(store, entity);
@@ -275,7 +280,8 @@ describe('OrderStateMachineService — delivery timestamps (Group 8 regression)'
   it('stamps deliveries.picked_up_at when the order becomes PICKED_UP, for that order only', async () => {
     const service = buildHarness({ id: 'order-1', status: OrderStatus.ASSIGNED_TO_DRIVER });
     await service.transition({ orderId: 'order-1', to: OrderStatus.PICKED_UP, actorRole: Role.DRIVER });
-    expect(deliveryTimestampWrites).toEqual([{ set: { pickedUpAt: expect.any(Date) }, orderId: 'order-1' }]);
+    // R16: picking up also records the acknowledgement if the driver never opened the order (COALESCE keeps an earlier one).
+    expect(deliveryTimestampWrites).toEqual([{ set: { pickedUpAt: expect.any(Date), acknowledgedAt: expect.any(Function) }, orderId: 'order-1' }]);
   });
 
   it('stamps deliveries.delivered_at when the order becomes DELIVERED', async () => {
@@ -288,11 +294,19 @@ describe('OrderStateMachineService — delivery timestamps (Group 8 regression)'
     [OrderStatus.ON_THE_WAY, OrderStatus.DELIVERED, Role.DRIVER],
     [OrderStatus.ON_THE_WAY, OrderStatus.FAILED_DELIVERY, Role.DRIVER],
     [OrderStatus.PENDING, OrderStatus.CANCELLED, Role.ADMIN],
-    [OrderStatus.ASSIGNED_TO_DRIVER, OrderStatus.READY_FOR_PICKUP, Role.DRIVER],
+    [OrderStatus.ASSIGNED_TO_DRIVER, OrderStatus.READY_FOR_PICKUP, Role.ADMIN],
   ])('frees the driver (is_available = true) when %s -> %s (Group 8 regression: they were never freed)', async (from, to, role) => {
     const service = buildHarness({ id: 'order-1', status: from });
     await service.transition({ orderId: 'order-1', to, actorRole: role });
     expect(driverReleases).toEqual([{ orderId: 'order-1' }]);
+  });
+
+  it('R17: a DRIVER can no longer release an assignment (ASSIGNED_TO_DRIVER -> READY_FOR_PICKUP is Operations-only)', async () => {
+    const service = buildHarness({ id: 'order-1', status: OrderStatus.ASSIGNED_TO_DRIVER });
+    await expect(service.transition({ orderId: 'order-1', to: OrderStatus.READY_FOR_PICKUP, actorRole: Role.DRIVER })).rejects.toThrow(
+      'Role DRIVER is not allowed to perform this transition.',
+    );
+    expect(driverReleases).toEqual([]);
   });
 
   it.each([
@@ -1766,30 +1780,27 @@ describe('OrderStateMachineService — customer cancellation door (PD-005)', () 
   const cancelAsCustomer = (h: ReturnType<typeof buildInventoryHarness>, extra: Record<string, unknown> = {}) =>
     h.service.transition({ orderId: 'order-1', to: OrderStatus.CANCELLED, actorRole: Role.CUSTOMER, actorUserId: 'cust-1', customerCancellation: true, ...extra });
 
-  it.each([OrderStatus.PENDING, OrderStatus.CONFIRMED])('a customer CAN cancel a %s order through the customer path (recorded as cancelled by CUSTOMER)', async (status) => {
-    const h = buildInventoryHarness({ orderStatus: status, segments: [], items: [], products: [] });
-    const order = await cancelAsCustomer(h, { cancellationReason: 'changed my mind' });
-    expect(order.status).toBe(OrderStatus.CANCELLED);
-    expect(order).toMatchObject({ cancelledByRole: Role.CUSTOMER, cancellationReason: 'changed my mind' });
-  });
+  it.each([OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP, OrderStatus.ASSIGNED_TO_DRIVER])(
+    'R3: a customer CAN cancel a %s order through the customer path (recorded as cancelled by CUSTOMER)',
+    async (status) => {
+      const h = buildInventoryHarness({ orderStatus: status, segments: [{ id: 'seg-1', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'CATALOG' }], items: [], products: [] });
+      const order = await cancelAsCustomer(h, { cancellationReason: 'changed my mind' });
+      expect(order.status).toBe(OrderStatus.CANCELLED);
+      expect(order).toMatchObject({ cancelledByRole: Role.CUSTOMER, cancellationReason: 'changed my mind' });
+    },
+  );
 
-  it.each([
-    OrderStatus.PREPARING,
-    OrderStatus.READY_FOR_PICKUP,
-    OrderStatus.ASSIGNED_TO_DRIVER,
-    OrderStatus.PICKED_UP,
-    OrderStatus.ON_THE_WAY,
-    OrderStatus.DELIVERED,
-    OrderStatus.FAILED_DELIVERY,
-    OrderStatus.CANCELLED,
-  ])('a customer can NEVER cancel a %s order — even through the customer path', async (status) => {
-    const h = buildInventoryHarness({ orderStatus: status, segments: [], items: [], products: [] });
-    await expect(cancelAsCustomer(h)).rejects.toBeInstanceOf(BadRequestException);
-  });
+  it.each([OrderStatus.PICKED_UP, OrderStatus.ON_THE_WAY, OrderStatus.DELIVERED, OrderStatus.FAILED_DELIVERY, OrderStatus.CANCELLED])(
+    'a customer can NEVER cancel a %s order — even through the customer path (they contact Operations)',
+    async (status) => {
+      const h = buildInventoryHarness({ orderStatus: status, segments: [], items: [], products: [] });
+      await expect(cancelAsCustomer(h)).rejects.toBeInstanceOf(BadRequestException);
+    },
+  );
 
-  it('PD-014: a customer CAN cancel a READY_FOR_PICKUP order made only of Hatly / Wasally service segments (no vendor, no driver yet)', async () => {
+  it('R40: a Hatly Service order can be cancelled by the customer while assigned, as long as no purchase is recorded', async () => {
     const h = buildInventoryHarness({
-      orderStatus: OrderStatus.READY_FOR_PICKUP,
+      orderStatus: OrderStatus.ASSIGNED_TO_DRIVER,
       segments: [{ id: 'seg-1', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'AD_HOC_SERVICE' }],
       items: [],
       products: [],
@@ -1800,34 +1811,21 @@ describe('OrderStateMachineService — customer cancellation door (PD-005)', () 
     expect(h.offerConsumptionService.reverseSubtotalDiscountConsumptionForOrder).toHaveBeenCalledWith(expect.anything(), 'order-1');
   });
 
-  it('PD-014: a customer still cannot cancel a READY_FOR_PICKUP order that has a vendor part (the vendor prepared it), nor one with no active segment', async () => {
-    const vendor = buildInventoryHarness({
-      orderStatus: OrderStatus.READY_FOR_PICKUP,
-      segments: [{ id: 'seg-1', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'CATALOG' }],
-      items: [],
-      products: [],
-    });
-    await expect(cancelAsCustomer(vendor)).rejects.toBeInstanceOf(BadRequestException);
-    const mixed = buildInventoryHarness({
-      orderStatus: OrderStatus.READY_FOR_PICKUP,
-      segments: [
-        { id: 'seg-1', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'CATALOG' },
-        { id: 'seg-2', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'AD_HOC_SERVICE' },
-      ],
-      items: [],
-      products: [],
-    });
-    await expect(cancelAsCustomer(mixed)).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('PD-014: once the driver is assigned the customer is refused, however the order is made up', async () => {
+  it('R40: once the driver recorded the Hatly Service purchase the customer is refused (re-checked under the order lock)', async () => {
     const h = buildInventoryHarness({
       orderStatus: OrderStatus.ASSIGNED_TO_DRIVER,
       segments: [{ id: 'seg-1', orderId: 'order-1', status: 'READY_FOR_PICKUP', groupType: 'AD_HOC_SERVICE' }],
       items: [],
       products: [],
+      servicePurchased: true,
     });
     await expect(cancelAsCustomer(h)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('R3: an ADMIN may cancel an ASSIGNED_TO_DRIVER order (the goods have not left the vendor); the driver is freed', async () => {
+    const h = buildInventoryHarness({ orderStatus: OrderStatus.ASSIGNED_TO_DRIVER, segments: [], items: [], products: [] });
+    const order = await h.service.transition({ orderId: 'order-1', to: OrderStatus.CANCELLED, actorRole: Role.ADMIN, actorUserId: 'admin-1' });
+    expect(order.status).toBe(OrderStatus.CANCELLED);
   });
 
   it.each([OrderStatus.PENDING, OrderStatus.CONFIRMED])('without the customer-path flag a customer is still refused on a %s order (the generic status endpoint stays closed to customers)', async (status) => {

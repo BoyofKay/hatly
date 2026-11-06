@@ -1,3 +1,5 @@
+import { Payment } from '../payments/entities/payment.entity';
+import { isOrderVisibleToVendor } from './vendor-order-visibility';
 import { BadRequestException, ConflictException, ForbiddenException, forwardRef, Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { CustomerNotificationType, recordOrderNotification } from '../notifications/customer-notification-events';
 import { DataSource } from 'typeorm';
@@ -151,6 +153,12 @@ export class OrderVendorSegmentStateMachineService {
           message: `This order is ${parentOrder.status} — its vendor segments can no longer be changed.`,
           details: { code: 'ORDER_NOT_ACTIVE_FOR_VENDOR', status: parentOrder.status },
         });
+      }
+
+      // R2: a vendor cannot act on (or learn about) an InstaPay / Vodafone Cash order until Operations verified its payment.
+      if (!params.system && (params.actorRole === Role.VENDOR || params.actorRole === Role.VENDOR_MANAGER) && parentOrder?.paymentMethod === 'MANUAL_TRANSFER') {
+        const payment = await manager.getRepository(Payment).findOne({ where: { orderId: parentOrder.id } });
+        if (!isOrderVisibleToVendor(parentOrder.paymentMethod, payment?.status)) throw new NotFoundException('Order not found.');
       }
 
       const rule = SEGMENT_TRANSITIONS.find((t) => t.from === segment.status && t.to === params.to);

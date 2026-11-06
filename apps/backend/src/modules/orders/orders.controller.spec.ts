@@ -103,11 +103,11 @@ describe('OrdersController — PATCH :id/status', () => {
   });
 });
 
-describe('OrdersController — U3 redispatch after a driver release through the generic endpoint', () => {
-  it('a DRIVER moving the order back to READY_FOR_PICKUP triggers the single redispatch excluding them; other roles never do', async () => {
+describe('OrdersController — R17: no redispatch through the generic endpoint (driver release removed)', () => {
+  it('neither a DRIVER nor an ADMIN moving the order back to READY_FOR_PICKUP triggers an automatic redispatch', async () => {
     const asDriver = buildHarness();
     await asDriver.controller.updateStatus('order-1', { status: OrderStatus.READY_FOR_PICKUP } as any, { id: 'user-1', role: Role.DRIVER } as any);
-    expect(asDriver.automaticDispatchService.redispatchAfterDriverRelease).toHaveBeenCalledWith('order-1', 'driver-1');
+    expect(asDriver.automaticDispatchService.redispatchAfterDriverRelease).not.toHaveBeenCalled();
 
     const asAdmin = buildHarness();
     await asAdmin.controller.updateStatus('order-1', { status: OrderStatus.READY_FOR_PICKUP } as any, { id: 'admin-1', role: Role.ADMIN } as any);

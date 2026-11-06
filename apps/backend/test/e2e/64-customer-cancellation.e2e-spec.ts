@@ -113,38 +113,48 @@ describe('E2E — customer order cancellation (PD-005)', () => {
     });
   });
 
-  describe('c/d) refused from PREPARING on — enforced by the backend', () => {
-    it('PREPARING and READY_FOR_PICKUP: refused with ORDER_NOT_CANCELLABLE_BY_CUSTOMER; the order, its stock and its money are untouched', async () => {
+  describe('c/d) R3: allowed until the driver picks the goods up — refused from PICKED_UP on', () => {
+    it.each(['PREPARING', 'READY_FOR_PICKUP'])('%s: cancelled by the customer; stock back once; every segment cancelled (Hatly bears the preparation cost)', async (target) => {
       const t = await s.product(v1, { priceMinor: 10000, inventoryMode: 'TRACKED', quantity: 10 });
       const { customer, order: o } = await placed([t], 'COD', [2]);
       expectData(await adminStatus(o.id, 'CONFIRMED'));
       expectData(await adminStatus(o.id, 'PREPARING'));
-      for (const status of ['PREPARING', 'READY_FOR_PICKUP']) {
-        if (status === 'READY_FOR_PICKUP') expectData(await adminStatus(o.id, 'READY_FOR_PICKUP'));
-        const before = await orderRow(o.id);
-        const res = await cancel(customer, o.id);
-        expect(res.status).toBe(400);
-        expect(res.body.error.details).toMatchObject({ code: 'ORDER_NOT_CANCELLABLE_BY_CUSTOMER', status });
-        expect(await orderRow(o.id)).toMatchObject({ status, total_minor: before.total_minor, delivery_fee_minor: before.delivery_fee_minor });
-        expect(await stock(t.id)).toBe(8);
-        expect((await segments(o.id)).map((r: any) => r.status)).not.toContain('CANCELLED');
+      if (target === 'READY_FOR_PICKUP') {
+        await world.ds.query('UPDATE drivers SET is_online = false, is_available = false'); // keep it READY (no driver)
+        expectData(await adminStatus(o.id, 'READY_FOR_PICKUP'));
       }
+      expect((await orderRow(o.id)).status).toBe(target);
+      expectData(await cancel(customer, o.id), 201);
+      expect(await orderRow(o.id)).toMatchObject({ status: 'CANCELLED', cancelled_by_role: 'CUSTOMER' });
+      expect(await stock(t.id)).toBe(10);
+      expect((await segments(o.id)).every((r: any) => r.status === 'CANCELLED')).toBe(true);
     });
 
-    it('ASSIGNED_TO_DRIVER, PICKED_UP, ON_THE_WAY, DELIVERED: all refused', async () => {
+    it('ASSIGNED_TO_DRIVER: cancelled, the driver is freed and Operations are alerted (R45); PICKED_UP, ON_THE_WAY, DELIVERED: refused', async () => {
+      await s.driver({ lat: 30.4212, lng: 31.5612 });
+      const first = await placed([p1]);
+      await s.vendorPrepares(v1, first.order.id);
+      expect((await orderRow(first.order.id)).status).toBe('ASSIGNED_TO_DRIVER');
+      const assigned: DriverFixture = await s.driverAssignedTo(first.order.id);
+      expectData(await cancel(first.customer, first.order.id), 201);
+      expect(await orderRow(first.order.id)).toMatchObject({ status: 'CANCELLED', cancelled_by_role: 'CUSTOMER' });
+      expect((await world.ds.query('SELECT is_available FROM drivers WHERE id = $1', [assigned.driverId]))[0].is_available).toBe(true);
+      const opsAlerts = await world.ds.query(`SELECT * FROM staff_notifications WHERE order_id = $1 AND category = 'OPS_CANCELLED_AFTER_ASSIGNMENT'`, [first.order.id]);
+      // one row per Operations recipient (there may be none in a fresh world without dispatchers); never a duplicate per recipient
+      expect(new Set(opsAlerts.map((r: any) => r.user_id)).size).toBe(opsAlerts.length);
+
       await s.driver({ lat: 30.4212, lng: 31.5612 });
       const { customer, order: o } = await placed([p1]);
       await s.vendorPrepares(v1, o.id);
       expect((await orderRow(o.id)).status).toBe('ASSIGNED_TO_DRIVER');
       const driver: DriverFixture = await s.driverAssignedTo(o.id);
-      const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: driver.accessToken }))[0];
+      const delivery = expectData<any[]>(await world.api('get', '/driver/deliveries', { token: driver.accessToken })).find((d: any) => d.orderId === o.id);
       const refused = async (status: string) => {
         const res = await cancel(customer, o.id);
         expect(res.status).toBe(400);
         expect(res.body.error.details).toMatchObject({ code: 'ORDER_NOT_CANCELLABLE_BY_CUSTOMER', status });
         expect((await orderRow(o.id)).status).toBe(status);
       };
-      await refused('ASSIGNED_TO_DRIVER');
       for (const status of ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED']) {
         // M4 — Proof of Delivery is required for the DELIVERED transition.
         const extra = status === 'DELIVERED' ? { proofPhotoUrl: await s.uploadFakePhoto(driver.accessToken) } : {};
@@ -316,7 +326,9 @@ describe('E2E — customer order cancellation (PD-005)', () => {
     it('after a partial vendor cancellation the entitlement is re-derived to the full amount, and one approval refunds the paid amount once', async () => {
       const { customer, order: o } = await underReview([p1, p2]);
       const payment = await paymentOf(o.id);
-      expectData(await cancelSegment(v2, await segmentOf(o.id, v2)));
+      // R2: the vendor cannot see the order before verification — Operations cancel the vendor part on its behalf.
+      expect((await cancelSegment(v2, await segmentOf(o.id, v2))).status).toBe(404);
+      expectData(await world.api('patch', `/admin/orders/segments/${await segmentOf(o.id, v2)}/status`, { token: superAdmin.accessToken, body: { status: 'CANCELLED', reason: 'Out of stock' } }));
       expect(num((await paymentOf(o.id)).pending_refund_minor)).toBeLessThan(num(payment.amount_minor));
       expectData(await cancel(customer, o.id), 201);
       expect(num((await paymentOf(o.id)).pending_refund_minor)).toBe(num(payment.amount_minor)); // final overpayment, not a stack
@@ -382,25 +394,17 @@ describe('E2E — customer order cancellation (PD-005)', () => {
       expect(world.unhandledServerErrors()).toEqual([]);
     });
 
-    it('customer cancellation racing the order moving to PREPARING: exactly one outcome — either cancelled (stock back) or PREPARING (cancellation refused, stock kept)', async () => {
+    it('R3: customer cancellation racing the order moving to PREPARING: no 5xx, and the customer can always cancel (before or after preparation started)', async () => {
       for (let i = 0; i < 5; i++) {
         const t = await s.product(v1, { priceMinor: 10000, inventoryMode: 'TRACKED', quantity: 10 });
         const o = await placed([t], 'COD', [2]);
         expectData(await adminStatus(o.order.id, 'CONFIRMED'));
         const [c, a] = await Promise.all([cancel(o.customer, o.order.id), adminStatus(o.order.id, 'PREPARING')]);
-        const row = await orderRow(o.order.id);
         expect(c.status).toBeLessThan(500);
         expect(a.status).toBeLessThan(500);
-        if (row.status === 'CANCELLED') {
-          expect(c.status).toBe(201);
-          expect(a.status).toBe(400);
-          expect(await stock(t.id)).toBe(10);
-        } else {
-          expect(row.status).toBe('PREPARING');
-          expect(c.status).toBe(400);
-          expect(a.status).toBeLessThan(300);
-          expect(await stock(t.id)).toBe(8);
-        }
+        expect(c.status).toBe(201); // whichever ran first, PREPARING no longer blocks the customer
+        expect((await orderRow(o.order.id)).status).toBe('CANCELLED');
+        expect(await stock(t.id)).toBe(10);
       }
     });
   });

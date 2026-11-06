@@ -22,7 +22,10 @@ const ACTION_LABEL: Record<SegmentTarget, MessageKey> = {
  * preparing, mark ready, reject with a required reason) and its full history. Every action is the backend's own segment transition — the
  * page never computes money or state; it re-reads the order afterwards.
  */
-export function SegmentOperations({ segment, onChanged }: { segment: Segment; onChanged: () => Promise<void> | void }) {
+/** The backend refuses every vendor-part change once the order left the vendor or ended (SEGMENT_LOCKED_ORDER_STATUSES); never offer one. */
+const LOCKED_ORDER_STATUSES = ['PICKED_UP', 'ON_THE_WAY', 'DELIVERED', 'COLLECTED', 'CANCELLED', 'FAILED_DELIVERY'];
+
+export function SegmentOperations({ segment, onChanged, orderStatus }: { segment: Segment; onChanged: () => Promise<void> | void; orderStatus?: string }) {
   const { t, locale } = useI18n();
   const canAct = useAdminPermission(MANAGE_ORDER_FULFILMENT);
   const [busy, setBusy] = useState(false);
@@ -31,7 +34,7 @@ export function SegmentOperations({ segment, onChanged }: { segment: Segment; on
   const [reason, setReason] = useState('');
   const [expectedReadyAt, setExpectedReadyAt] = useState('');
   const [flash, setFlash] = useState<{ ok: boolean; message: string } | null>(null);
-  const actions = SEGMENT_NEXT_ACTIONS[segment.status] ?? [];
+  const actions = orderStatus && LOCKED_ORDER_STATUSES.includes(orderStatus) ? [] : SEGMENT_NEXT_ACTIONS[segment.status] ?? [];
   const fmt = (iso: string) => new Date(iso).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-GB');
 
   async function run(status: SegmentTarget) {

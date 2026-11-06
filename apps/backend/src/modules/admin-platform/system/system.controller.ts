@@ -140,7 +140,7 @@ export class ConfigOverviewController {
     return { data: rows.map((r: any) => ({ at: new Date(r.created_at).toISOString(), by: r.full_name, role: r.actor_role })), meta: { note: 'The values themselves are never recorded (a setting may hold a payment destination).' } };
   }
 
-  /** The single, obvious switch for automatic dispatch. ON: eligible drivers are assigned automatically. OFF: assignment stops and admins assign/reassign manually. Existing orders and assignments are untouched either way. */
+  /** The single, obvious switch for automatic dispatch. ON: eligible drivers are assigned automatically. OFF: assignment stops and admins assign/reassign manually. Existing orders and assignments are untouched either way (R13: switching never releases or reassigns; drivers acknowledge within the configured window in both modes, R16). */
   @Get('dispatch/automation')
   @RequiresAnyPermission(Permission.ASSIGN_REASSIGN_ORDERS, Permission.OVERRIDE_DISPATCH, Permission.MANAGE_BUSINESS_CONFIG)
   async automation() {

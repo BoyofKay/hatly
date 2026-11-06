@@ -8,7 +8,8 @@ export type DispatchAttemptOutcome =
   | 'ASSIGNMENT_ERROR'
   | 'DRIVER_TIMED_OUT'
   | 'DRIVER_NOT_RESPONDING'
-  | 'DRIVER_RELEASED';
+  | 'DRIVER_RELEASED'
+  | 'ACKNOWLEDGEMENT_OVERDUE';
 
 @Entity({ name: 'dispatch_attempts' })
 export class DispatchAttempt {

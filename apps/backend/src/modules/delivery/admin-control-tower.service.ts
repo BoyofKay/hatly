@@ -56,7 +56,7 @@ export interface ControlTowerSummary {
      * alert — those are retried automatically): automatic assignment is off or the driver did not respond, so an admin must assign them.
      */
     releasedAwaitingManualAssignment: number;
-    /** ASSIGNED_TO_DRIVER orders whose driver's accept window (acceptDeadlineAt) has passed — the timeout sweep's input. */
+    /** R16: ASSIGNED_TO_DRIVER orders whose driver has NOT acknowledged within the window (acceptDeadlineAt passed, acknowledgedAt null). */
     assignedPastAcceptDeadline: number;
     /** FAILED_DELIVERY orders with no recorded resolution — the Failed Deliveries queue (same definition). */
     failedDeliveriesUnresolved: number;
@@ -75,7 +75,7 @@ export interface ControlTowerSummary {
     /** Segments accepted/preparing past their expected-ready time (`expectedReadyAt`). */
     preparationOverdue: number;
     /** Open dispatch alerts by stable reason code. */
-    openDispatchAlerts: Record<'NO_ELIGIBLE_DRIVER' | 'AUTO_ASSIGN_DISABLED' | 'ASSIGNMENT_ERROR' | 'DRIVER_NOT_RESPONDING', number>;
+    openDispatchAlerts: Record<'NO_ELIGIBLE_DRIVER' | 'AUTO_ASSIGN_DISABLED' | 'ASSIGNMENT_ERROR' | 'DRIVER_NOT_RESPONDING' | 'ACKNOWLEDGEMENT_OVERDUE', number>;
     /** Manual Transfer refunds recorded but not yet marked as sent. */
     refundsToSend: number;
     /** Active orders where some — not all — vendor parts were rejected. */
@@ -106,6 +106,8 @@ export interface ControlTowerDeliveryRow {
   driver: { id: string; fullName: string; phone: string } | null;
   assignedAt: string | null;
   acceptDeadlineAt: string | null;
+  /** R16: when the current driver acknowledged (null = not yet). */
+  acknowledgedAt: string | null;
   acceptDeadlinePassed: boolean;
   reassignmentCount: number;
   openDispatchAlert: { id: string; reason: string; createdAt: string } | null;
@@ -155,7 +157,7 @@ export class AdminControlTowerService {
             AND EXISTS (SELECT 1 FROM order_vendor_segments s WHERE s.order_id = o.id AND s.status <> 'CANCELLED')`,
       ),
     ]);
-    const openDispatchAlerts = { NO_ELIGIBLE_DRIVER: 0, AUTO_ASSIGN_DISABLED: 0, ASSIGNMENT_ERROR: 0, DRIVER_NOT_RESPONDING: 0 };
+    const openDispatchAlerts = { NO_ELIGIBLE_DRIVER: 0, AUTO_ASSIGN_DISABLED: 0, ASSIGNMENT_ERROR: 0, DRIVER_NOT_RESPONDING: 0, ACKNOWLEDGEMENT_OVERDUE: 0 };
     for (const row of alertRows as Array<{ reason: keyof typeof openDispatchAlerts; n: number }>) {
       if (row.reason in openDispatchAlerts) openDispatchAlerts[row.reason] = Number(row.n);
     }
@@ -187,7 +189,7 @@ export class AdminControlTowerService {
            count(*) FILTER (WHERE o.status = 'READY_FOR_PICKUP' AND o.fulfillment_type = 'DELIVERY' AND EXISTS (
              SELECT 1 FROM dispatch_alerts a WHERE a.order_id = o.id AND a.resolved_at IS NULL AND a.deleted_at IS NULL))::int AS "awaitingWithOpenNoDriverAlert",
            count(*) FILTER (WHERE o.status = 'ASSIGNED_TO_DRIVER' AND EXISTS (
-             SELECT 1 FROM deliveries dl WHERE dl.order_id = o.id AND dl.accept_deadline_at < now()))::int AS "assignedPastAcceptDeadline",
+             SELECT 1 FROM deliveries dl WHERE dl.order_id = o.id AND dl.accept_deadline_at < now() AND dl.acknowledged_at IS NULL))::int AS "assignedPastAcceptDeadline",
            count(*) FILTER (WHERE o.status = 'FAILED_DELIVERY' AND NOT EXISTS (
              SELECT 1 FROM failed_delivery_resolutions r WHERE r.order_id = o.id))::int AS "failedDeliveriesUnresolved",
            count(*) FILTER (WHERE o.status = 'READY_FOR_PICKUP' AND o.fulfillment_type = 'PICKUP')::int AS "readyForCustomerPickup",
@@ -275,6 +277,7 @@ export class AdminControlTowerService {
               CASE WHEN o.status::text = ANY($2) THEN du.phone END AS driver_phone,
               CASE WHEN o.status::text = ANY($2) THEN dl.assigned_at END AS assigned_at,
               CASE WHEN o.status = 'ASSIGNED_TO_DRIVER' THEN dl.accept_deadline_at END AS accept_deadline_at,
+              CASE WHEN o.status = 'ASSIGNED_TO_DRIVER' THEN dl.acknowledged_at END AS acknowledged_at,
               COALESCE(dl.reassignment_count, 0) AS reassignment_count,
               (SELECT max(e.created_at) FROM order_status_events e WHERE e.order_id = o.id AND e.to_status = o.status::text) AS status_since,
               CASE WHEN o.status = 'READY_FOR_PICKUP' THEN (
@@ -315,7 +318,8 @@ export class AdminControlTowerService {
         driver: r.driver_id ? { id: r.driver_id, fullName: r.driver_name, phone: r.driver_phone } : null,
         assignedAt: r.assigned_at ? new Date(r.assigned_at).toISOString() : null,
         acceptDeadlineAt: r.accept_deadline_at ? new Date(r.accept_deadline_at).toISOString() : null,
-        acceptDeadlinePassed: r.accept_deadline_at ? new Date(r.accept_deadline_at).getTime() < now : false,
+        acknowledgedAt: r.acknowledged_at ? new Date(r.acknowledged_at).toISOString() : null,
+        acceptDeadlinePassed: r.accept_deadline_at && !r.acknowledged_at ? new Date(r.accept_deadline_at).getTime() < now : false,
         reassignmentCount: Number(r.reassignment_count ?? 0),
         openDispatchAlert: r.open_alert ?? null,
         released: r.released ? { at: new Date(r.released.at).toISOString(), byRole: r.released.byRole ?? null } : null,

@@ -91,6 +91,7 @@ describe('DriversService.listAll (Phase I-A, Chunk 6; operational fields — Con
         vehicleTypeId: 'vt-motorbike',
         lastLocationAt: new Date('2026-10-03T10:00:00Z'),
         activeDelivery: { orderId: 'order-9', orderNumber: 'HT-100009', status: 'PICKED_UP' },
+        commissionRateBasisPoints: null,
       },
       {
         id: 'driver-2',
@@ -103,6 +104,7 @@ describe('DriversService.listAll (Phase I-A, Chunk 6; operational fields — Con
         vehicleTypeId: null,
         lastLocationAt: null,
         activeDelivery: null,
+        commissionRateBasisPoints: null,
       },
     ]);
   });

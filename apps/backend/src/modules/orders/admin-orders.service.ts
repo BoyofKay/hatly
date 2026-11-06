@@ -171,6 +171,8 @@ export interface AdminOrderDetailView {
   delivery: {
     assignedAt: Date | null;
     acceptDeadlineAt: Date | null;
+    /** R16: when the current driver acknowledged (null = not yet / no active assignment). */
+    acknowledgedAt: Date | null;
     pickedUpAt: Date | null;
     deliveredAt: Date | null;
     reassignmentCount: number;
@@ -358,6 +360,7 @@ export class AdminOrdersService {
         ? {
             assignedAt: driverOnRecord ? delivery.assignedAt ?? null : null,
             acceptDeadlineAt: order.status === OrderStatus.ASSIGNED_TO_DRIVER ? delivery.acceptDeadlineAt ?? null : null,
+            acknowledgedAt: driverOnRecord ? delivery.acknowledgedAt ?? null : null,
             pickedUpAt: delivery.pickedUpAt ?? null,
             deliveredAt: delivery.deliveredAt ?? null,
             reassignmentCount: delivery.reassignmentCount ?? 0,

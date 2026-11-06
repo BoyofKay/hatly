@@ -17,6 +17,7 @@ export const CATEGORY: Record<string, Pair> = {
   OPS_DISPATCH_NEEDED: ['An order needs a driver', 'طلب يحتاج إلى سائق'],
   OPS_TRANSFER_TO_VERIFY: ['A transfer is waiting for verification', 'تحويل بانتظار التحقق'],
   OPS_FAILED_DELIVERY: ['A delivery failed', 'فشل توصيل طلب'],
+  OPS_CANCELLED_AFTER_ASSIGNMENT: ['An order was cancelled after a driver was assigned', 'أُلغي طلب بعد إسناده لسائق'],
 };
 
 export const ACTION: Record<string, Pair> = {
@@ -31,6 +32,7 @@ export const ACTION: Record<string, Pair> = {
   ASSIGN_DRIVER: ['Assign a driver', 'أسند سائقًا'],
   VERIFY_TRANSFER: ['Verify the transfer', 'تحقّق من التحويل'],
   RESOLVE_FAILED_DELIVERY: ['Resolve the failed delivery', 'عالج التوصيل الفاشل'],
+  CONTACT_DRIVER: ['Tell the driver to stop; decide on any trip compensation', 'أبلغ السائق بالتوقف وقرّر أي تعويض عن المشوار'],
 };
 
 /** Dispatch-alert reasons carried in an OPS_DISPATCH_NEEDED note. */
@@ -39,6 +41,7 @@ const REASON: Record<string, Pair> = {
   NO_ELIGIBLE_DRIVER: ['No eligible driver is available', 'لا يوجد سائق مؤهل متاح'],
   ASSIGNMENT_ERROR: ['Automatic assignment failed', 'فشل الإسناد التلقائي'],
   DRIVER_NOT_RESPONDING: ['The driver did not respond', 'لم يستجب السائق'],
+  ACKNOWLEDGEMENT_OVERDUE: ['The driver has not acknowledged the order', 'لم يؤكد السائق استلام الطلب'],
 };
 
 export const words = (m: Record<string, Pair>, key: string | null | undefined, locale: 'en' | 'ar'): string => (key && m[key] ? m[key][locale === 'ar' ? 1 : 0] : key ?? '');

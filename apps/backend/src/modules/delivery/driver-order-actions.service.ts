@@ -89,10 +89,6 @@ export class DriverOrderActionsService {
       cancellationReason: params.cancellationReason,
       failureReason: params.failureReason,
     });
-    // U3: the driver handed the order back (the only DRIVER transition to READY_FOR_PICKUP) — redispatch once, without them.
-    if (params.to === OrderStatus.READY_FOR_PICKUP) {
-      await this.automaticDispatchService.redispatchAfterDriverRelease(order.id, driver.id);
-    }
     return order;
   }
 }

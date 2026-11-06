@@ -236,7 +236,9 @@ describe('E2E — customer cart compatibility, financial consistency and the dri
 
     it('a driver who was released from an order (waiting for a driver again) no longer sees it — nor the customer on it', async () => {
       const { order, d, delivery, step } = await deliver(v1, p1.id);
-      expectData(await step('READY_FOR_PICKUP')); // the driver hands it back
+      expect((await step('READY_FOR_PICKUP')).status).toBe(400); // R17: a driver cannot hand it back …
+      const ops = await s.superAdmin(); // … Operations release it
+      expectData(await world.api('patch', `/orders/${order.id}/status`, { token: ops.accessToken, body: { status: 'READY_FOR_PICKUP' } }));
       const status = (await world.ds.query(`SELECT status FROM orders WHERE id = $1`, [order.id]))[0].status as string;
       const list = expectData<any[]>(await call('get', d, '/driver/deliveries'));
       const detail = await call('get', d, `/driver/deliveries/${delivery.id}`);

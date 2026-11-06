@@ -62,6 +62,7 @@ export function OperationsBanner({ facts }: { facts: OperationsFacts | null }) {
     if (a.AUTO_ASSIGN_DISABLED) out.push(t('opBannerAutoOff', { count: a.AUTO_ASSIGN_DISABLED }));
     if (a.ASSIGNMENT_ERROR) out.push(t('opBannerAssignError', { count: a.ASSIGNMENT_ERROR }));
     if (a.DRIVER_NOT_RESPONDING) out.push(t('opBannerNotResponding', { count: a.DRIVER_NOT_RESPONDING }));
+    if (a.ACKNOWLEDGEMENT_OVERDUE) out.push(t('opBannerNotAcknowledged', { count: a.ACKNOWLEDGEMENT_OVERDUE }));
     if (facts.pendingAcceptanceOverdue) out.push(t('opBannerPendingOverdue', { count: facts.pendingAcceptanceOverdue, minutes: facts.pendingAcceptanceAlertMinutes }));
     if (facts.preparationOverdue) out.push(t('opBannerPrepOverdue', { count: facts.preparationOverdue }));
     if (facts.refundsToSend) out.push(t('opBannerRefunds', { count: facts.refundsToSend }));

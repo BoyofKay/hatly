@@ -23,6 +23,8 @@ export interface AdminDriver {
   lastLocationAt: string | null;
   /** The order this driver is currently on (assigned / picked up / on the way), if any. */
   activeDelivery: { orderId: string; orderNumber: string; status: string } | null;
+  /** R28: Hatly's commission on the driver's delivery compensation, basis points (null = not set). */
+  commissionRateBasisPoints?: number | null;
 }
 
 /** Reuses the real backend `admin/orders/dispatchable` endpoint (Chunk 6 backend addition). */
@@ -96,6 +98,11 @@ export async function listDriverVehicleTypes(): Promise<DriverVehicleTypeOption[
   return res.data.data;
 }
 
+/** R28: `PATCH admin/drivers/:id/commission-rate` (MANAGE_DRIVER_COMMISSION). Only future deliveries use the new rate. */
+export async function setDriverCommissionRate(driverId: string, commissionRateBasisPoints: number): Promise<void> {
+  await apiClient.patch(`/admin/drivers/${driverId}/commission-rate`, { commissionRateBasisPoints });
+}
+
 /** `PATCH admin/drivers/:id/vehicle-type` — sets, changes or clears (`null`) the driver's vehicle type. */
 export async function setDriverVehicleType(driverId: string, vehicleTypeId: string | null): Promise<AdminDriver> {
   const res = await apiClient.patch(`/admin/drivers/${driverId}/vehicle-type`, { vehicleTypeId });
@@ -108,7 +115,7 @@ export interface DispatchAlert {
   orderId: string;
   orderNumber: string | null;
   orderStatus: string | null;
-  reason: 'NO_ELIGIBLE_DRIVER' | 'AUTO_ASSIGN_DISABLED' | 'ASSIGNMENT_ERROR' | 'DRIVER_NOT_RESPONDING';
+  reason: 'NO_ELIGIBLE_DRIVER' | 'AUTO_ASSIGN_DISABLED' | 'ASSIGNMENT_ERROR' | 'DRIVER_NOT_RESPONDING' | 'ACKNOWLEDGEMENT_OVERDUE';
   detail?: string | null;
   /** Set by the assignment that resolved it. */
   resolvedAt: string | null;

@@ -622,12 +622,15 @@ describe('CustomerOrdersService — PD-006 views', () => {
     expect((await service.getForCustomer('customer-1', 'order-1')).deliveryBreakdown).toBeNull();
   });
 
-  it('customerCanCancel follows the server rule: PENDING/CONFIRMED and no vendor preparing yet', async () => {
+  it('customerCanCancel follows the server rule (R3): until the driver picks the goods up, whatever the vendor preparation', async () => {
     const cases: Array<[OrderStatus, string, boolean]> = [
       [OrderStatus.PENDING, 'PENDING', true],
       [OrderStatus.CONFIRMED, 'CONFIRMED', true],
-      [OrderStatus.PENDING, 'PREPARING', false], // order still PENDING, but a vendor has started
-      [OrderStatus.PREPARING, 'PREPARING', false],
+      [OrderStatus.PENDING, 'PREPARING', true], // a vendor has started: Hatly bears the preparation cost
+      [OrderStatus.PREPARING, 'PREPARING', true],
+      [OrderStatus.READY_FOR_PICKUP, 'READY_FOR_PICKUP', true],
+      [OrderStatus.ASSIGNED_TO_DRIVER, 'READY_FOR_PICKUP', true],
+      [OrderStatus.PICKED_UP, 'PICKED_UP', false],
       [OrderStatus.DELIVERED, 'PICKED_UP', false],
     ];
     for (const [status, segStatus, expected] of cases) {

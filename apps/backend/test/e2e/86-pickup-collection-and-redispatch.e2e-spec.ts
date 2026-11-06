@@ -367,234 +367,36 @@ describe('E2E — pickup collection (U2) and redispatch after a driver hand-back
   });
 
   // ================================================================== U3 =============================================
-  describe('U3 — one immediate redispatch after a driver hand-back, never to that driver', () => {
-    /** `d` holds a READY delivery order (assigned by an admin with automatic dispatch off), then dispatch is switched on. */
-    async function heldBy(d: DriverFixture) {
-      const order = await readyDelivery();
-      expectData(await assign(order.id, d.driverId), 201);
-      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true);
-      return order;
-    }
-
-    it('another eligible driver gets it at once — even though the releasing driver is the NEAREST; count unchanged, one delivery row, the new driver is notified', async () => {
-      const [d1, d2] = await onlyDrivers(near, mid); // d1 nearer: an unmodified ranking would re-pick d1
-      expectData(await world.api('post', '/driver/device-token', { token: d2.accessToken, body: { token: 'fcm-d2', platform: 'android' } }), 201);
-      const order = await heldBy(d1);
-
-      expectData(await release(d1, order.id));
-
-      const { status, carrier, reassignmentCount } = await expectConsistent(order.id, [d1, d2]);
-      expect([status, carrier, reassignmentCount]).toEqual(['ASSIGNED_TO_DRIVER', d2.driverId, 0]);
-      expect(await available(d1)).toBe(true);
-      expect(boundary.push.filter((p) => p.data.type === 'ORDER_ASSIGNED' && p.data.orderId === order.id).map((p) => p.tokens)).toEqual([['fcm-d2']]);
-      const timeline = (await q('SELECT from_status, to_status, actor_role FROM order_status_events WHERE order_id = $1 ORDER BY created_at, id', [order.id])).slice(-2);
-      expect(timeline).toEqual([
-        { from_status: 'ASSIGNED_TO_DRIVER', to_status: 'READY_FOR_PICKUP', actor_role: 'DRIVER' },
-        { from_status: 'READY_FOR_PICKUP', to_status: 'ASSIGNED_TO_DRIVER', actor_role: 'ADMIN' },
-      ]);
-      const ct = expectData<any[]>(await world.api('get', `/admin/control-tower/deliveries?search=${order.orderNumber}`, { token: superAdmin.accessToken }))[0];
-      expect(ct).toMatchObject({ driver: { id: d2.driverId }, released: null, reassignmentCount: 0 });
-    });
-
-    it('the releasing driver is the only eligible one: NOT re-offered — it waits with the existing NO_ELIGIBLE_DRIVER alert, flagged released; no retry loop', async () => {
-      const [d1] = await onlyDrivers(near);
-      const order = await heldBy(d1);
-      expectData(await release(d1, order.id));
-
-      expect(await statusOf(order.id)).toBe('READY_FOR_PICKUP');
-      expect(await available(d1)).toBe(true);
-      expect(await openAlerts(order.id)).toBe(1);
-      const ct = expectData<any[]>(await world.api('get', `/admin/control-tower/deliveries?search=${order.orderNumber}`, { token: superAdmin.accessToken }))[0];
-      expect(ct).toMatchObject({ driver: null, released: { byRole: 'DRIVER' }, openDispatchAlert: { reason: 'NO_ELIGIBLE_DRIVER' } });
-
-      // a second driver becoming eligible afterwards does NOT trigger a retry (no loop) — an admin takes over
-      const [d2] = [await s.driver({ ...mid })];
-      expect(await statusOf(order.id)).toBe('READY_FOR_PICKUP');
-      expectData(await assign(order.id, d2.driverId), 201);
-      expect(await openAlerts(order.id)).toBe(0); // the assignment that fixes it resolves the alert
-      await expectConsistent(order.id, [d1, d2]);
-
-      // the exclusion was for that one attempt only: d1 is offered the NEXT order normally
-      const next = await readyDelivery();
-      expect((await deliveries(next.id))[0].driver_id).toBe(d1.driverId);
-    });
-
-    it('automatic dispatch OFF: a hand-back waits for an admin (no attempt) — and says so with ONE open AUTO_ASSIGN_DISABLED alert, never silently', async () => {
+  describe('R17 (supersedes U3): drivers cannot hand an assignment back — only Operations release and reassign', () => {
+    it.each([true, false])('automatic dispatch %p: the driver release is refused on both endpoints; the order, its driver and the timeline are unchanged', async (auto) => {
       const [d1, d2] = await onlyDrivers(near, mid);
       const order = await readyDelivery();
       expectData(await assign(order.id, d1.driverId), 201);
-      expectData(await release(d1, order.id));
-      expect(await statusOf(order.id)).toBe('READY_FOR_PICKUP');
-      expect(await openAlerts(order.id)).toBe(1);
-      expect(await available(d2)).toBe(true);
+      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', auto);
+
+      const viaDriver = await release(d1, order.id);
+      expect(viaDriver.status).toBe(400);
+      const viaGeneric = await world.api('patch', `/orders/${order.id}/status`, { token: d1.accessToken, body: { status: 'READY_FOR_PICKUP' } });
+      expect(viaGeneric.status).toBeGreaterThanOrEqual(400);
+      expect(viaGeneric.status).toBeLessThan(500);
+
+      const { status, carrier, reassignmentCount } = await expectConsistent(order.id, [d1, d2]);
+      expect([status, carrier, reassignmentCount]).toEqual(['ASSIGNED_TO_DRIVER', d1.driverId, 0]);
+      expect(await available(d1)).toBe(false);
+      const released = await q(`SELECT count(*)::int AS n FROM order_status_events WHERE order_id = $1 AND to_status = 'READY_FOR_PICKUP' AND from_status = 'ASSIGNED_TO_DRIVER'`, [order.id]);
+      expect(released[0].n).toBe(0);
+      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
     });
 
-    it('a hand-back through the generic PATCH /orders/:id/status gets the same single redispatch without the releasing driver', async () => {
+    it('Operations reassign the order to another driver: old driver freed, new one busy, one delivery row', async () => {
       const [d1, d2] = await onlyDrivers(near, mid);
-      const order = await heldBy(d1);
-      expectData(await setStatus(d1, order.id, 'READY_FOR_PICKUP'));
-      const { status, carrier } = await expectConsistent(order.id, [d1, d2]);
-      expect([status, carrier]).toEqual(['ASSIGNED_TO_DRIVER', d2.driverId]);
-    });
-
-    it('a push failure during the redispatch never corrupts state: the new driver is still assigned', async () => {
-      const [d1, d2] = await onlyDrivers(near, mid);
-      expectData(await world.api('post', '/driver/device-token', { token: d2.accessToken, body: { token: 'fcm-d2b', platform: 'android' } }), 201);
-      const order = await heldBy(d1);
-      boundary.pushMode = 'throw';
-      expectData(await release(d1, order.id));
-      const { status, carrier } = await expectConsistent(order.id, [d1, d2]);
-      expect([status, carrier]).toEqual(['ASSIGNED_TO_DRIVER', d2.driverId]);
-    });
-
-    it('the redispatch transaction failing never fails the driver\'s release: the order waits, released, and an admin can assign it', async () => {
-      const [d1, d2] = await onlyDrivers(near, mid);
-      const order = await heldBy(d1);
-      await q(`CREATE OR REPLACE FUNCTION e2e_injected_failure() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'e2e injected failure'; END $$ LANGUAGE plpgsql`);
-      await q(`CREATE TRIGGER e2e_fault BEFORE UPDATE ON deliveries FOR EACH ROW WHEN (NEW.driver_id IS DISTINCT FROM OLD.driver_id) EXECUTE FUNCTION e2e_injected_failure()`);
-      let res: any;
-      try {
-        res = await release(d1, order.id);
-      } finally {
-        await q('DROP TRIGGER IF EXISTS e2e_fault ON deliveries');
-        await q('DROP FUNCTION IF EXISTS e2e_injected_failure()');
-      }
-      expect(res.status).toBe(200); // the hand-back itself happened
-      const { status } = await expectConsistent(order.id, [d1, d2]); // the failed assignment rolled back entirely
-      expect(status).toBe('READY_FOR_PICKUP');
-      const ct = expectData<any[]>(await world.api('get', `/admin/control-tower/deliveries?search=${order.orderNumber}`, { token: superAdmin.accessToken }))[0];
-      expect(ct.released).toMatchObject({ byRole: 'DRIVER' });
-      expectData(await assign(order.id, d2.driverId), 201);
-      await expectConsistent(order.id, [d1, d2]);
-    });
-  });
-
-  describe('U3 — races (no sleeps: each run several times; every outcome must be consistent)', () => {
-    const ROUNDS = 3;
-    async function heldBy(d: DriverFixture) {
       const order = await readyDelivery();
-      expectData(await assign(order.id, d.driverId), 201);
-      await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true);
-      return order;
-    }
-
-    it('duplicate release requests: exactly one hand-back, exactly one redispatch, one ORDER_ASSIGNED push', async () => {
-      for (let round = 0; round < ROUNDS; round++) {
-        const [d1, d2] = await onlyDrivers(near, mid);
-        expectData(await world.api('post', '/driver/device-token', { token: d2.accessToken, body: { token: `fcm-dup-${round}`, platform: 'android' } }), 201);
-        const order = await heldBy(d1);
-        boundary.reset();
-        const id = await deliveryIdOf(d1, order.id);
-        const results = await Promise.all([1, 2].map(() => world.api('patch', `/driver/deliveries/${id}/status`, { token: d1.accessToken, body: { status: 'READY_FOR_PICKUP' } })));
-        expect(results.filter((r) => r.status === 200)).toHaveLength(1);
-        results.filter((r) => r.status !== 200).forEach((r) => expect(r.status).toBeLessThan(500));
-        const { status, carrier, reassignmentCount } = await expectConsistent(order.id, [d1, d2]);
-        expect([status, carrier, reassignmentCount]).toEqual(['ASSIGNED_TO_DRIVER', d2.driverId, 0]);
-        expect(boundary.push.filter((p) => p.data.type === 'ORDER_ASSIGNED' && p.data.orderId === order.id)).toHaveLength(1);
-        await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
-      }
-    });
-
-    it('release vs an admin reassignment: exactly one wins; never two drivers, never the releasing driver re-offered by the redispatch', async () => {
-      for (let round = 0; round < ROUNDS; round++) {
-        const [d1, d2, d3] = await onlyDrivers(near, mid, far);
-        const order = await heldBy(d1);
-        const [rel, re] = await Promise.all([release(d1, order.id), reassign(order.id, d3.driverId, d1.driverId)]);
-        expect((rel.status === 200) !== (re.status === 201)).toBe(true);
-        const { status, carrier, reassignmentCount } = await expectConsistent(order.id, [d1, d2, d3]);
-        expect(status).toBe('ASSIGNED_TO_DRIVER');
-        if (rel.status === 200) {
-          expect([carrier, reassignmentCount]).toEqual([d2.driverId, 0]); // redispatch: nearest other driver, count untouched
-        } else {
-          expect([carrier, reassignmentCount]).toEqual([d3.driverId, 1]); // the admin's reassignment
-        }
-        await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
-      }
-    });
-
-    it('release vs an admin ASSIGNMENT racing the redispatch itself: one assignment, the other refused/stopped', async () => {
-      for (let round = 0; round < ROUNDS; round++) {
-        const [d1, d2, d3] = await onlyDrivers(near, mid, far);
-        const order = await heldBy(d1);
-        const [rel, manual] = await Promise.all([release(d1, order.id), assign(order.id, d3.driverId)]);
-        expect(rel.status).toBe(200);
-        expect([201, 409]).toContain(manual.status);
-        const { status, carrier } = await expectConsistent(order.id, [d1, d2, d3]);
-        expect(status).toBe('ASSIGNED_TO_DRIVER');
-        expect(carrier).not.toBe(d1.driverId);
-        if (manual.status === 201) expect(carrier).toBe(d3.driverId);
-        await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
-      }
-    });
-
-    it('release vs the same driver picking it up: exactly one of the two happens', async () => {
-      for (let round = 0; round < ROUNDS; round++) {
-        const [d1, d2] = await onlyDrivers(near, mid);
-        const order = await heldBy(d1);
-        const id = await deliveryIdOf(d1, order.id);
-        const [rel, pick] = await Promise.all([
-          world.api('patch', `/driver/deliveries/${id}/status`, { token: d1.accessToken, body: { status: 'READY_FOR_PICKUP' } }),
-          world.api('patch', `/driver/deliveries/${id}/status`, { token: d1.accessToken, body: { status: 'PICKED_UP' } }),
-        ]);
-        expect((rel.status === 200) !== (pick.status === 200)).toBe(true);
-        const { status, carrier } = await expectConsistent(order.id, [d1, d2]);
-        if (pick.status === 200) expect([status, carrier]).toEqual(['PICKED_UP', d1.driverId]);
-        else expect([status, carrier]).toEqual(['ASSIGNED_TO_DRIVER', d2.driverId]);
-        await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
-      }
-    });
-
-    it('release vs the timeout sweep on the same (expired) assignment: one release, one assignment, consistent', async () => {
-      for (let round = 0; round < ROUNDS; round++) {
-        const [d1, d2] = await onlyDrivers(near, mid);
-        const order = await heldBy(d1);
-        await q("UPDATE deliveries SET accept_deadline_at = NOW() - INTERVAL '1 minute' WHERE order_id = $1", [order.id]);
-        const [rel] = await Promise.all([release(d1, order.id), world.app.get(AutomaticDispatchService).reassignTimedOutDeliveries()]);
-        expect(rel.status).toBeLessThan(500);
-        const { status } = await expectConsistent(order.id, [d1, d2]);
-        expect(status).toBe('ASSIGNED_TO_DRIVER'); // whoever released it, somebody eligible re-took it — never an orphan
-        expect(Number((await q(`SELECT count(*)::int AS n FROM order_status_events WHERE order_id = $1 AND from_status = 'ASSIGNED_TO_DRIVER' AND to_status = 'READY_FOR_PICKUP'`, [order.id]))[0].n)).toBe(1);
-        await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
-      }
-    });
-
-    it('concurrent redispatch attempts, including from a SECOND app instance: exactly one assignment, never a duplicate delivery', async () => {
-      const second = await bootWorld({ resetInfrastructure: false });
-      try {
-        for (let round = 0; round < ROUNDS; round++) {
-          const [d1, d2, d3] = await onlyDrivers(near, mid, far);
-          const order = await readyDelivery();
-          expectData(await assign(order.id, d1.driverId), 201);
-          expectData(await release(d1, order.id)); // dispatch still OFF: it waits
-          await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true);
-          await Promise.all([
-            world.app.get(AutomaticDispatchService).redispatchAfterDriverRelease(order.id, d1.driverId),
-            second.app.get(AutomaticDispatchService).redispatchAfterDriverRelease(order.id, d1.driverId),
-            world.app.get(AutomaticDispatchService).redispatchAfterDriverRelease(order.id, d1.driverId),
-          ]);
-          const { status, carrier, reassignmentCount } = await expectConsistent(order.id, [d1, d2, d3]);
-          expect([status, reassignmentCount]).toEqual(['ASSIGNED_TO_DRIVER', 0]);
-          expect([d2.driverId, d3.driverId]).toContain(carrier);
-          expect(await deliveries(order.id)).toHaveLength(1);
-          await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
-        }
-      } finally {
-        await second.close();
-      }
-    });
-
-    it('the only other driver goes offline at the same moment: either assigned before its toggle (and kept, busy) or skipped with the alert — never the releaser', async () => {
-      for (let round = 0; round < ROUNDS; round++) {
-        const [d1, d2] = await onlyDrivers(near, mid);
-        const order = await heldBy(d1);
-        const [rel] = await Promise.all([release(d1, order.id), world.api('patch', '/driver/online-status', { token: d2.accessToken, body: { isOnline: false } })]);
-        expect(rel.status).toBe(200);
-        const { status, carrier } = await expectConsistent(order.id, [d1, d2]);
-        expect(carrier).not.toBe(d1.driverId);
-        if (status === 'READY_FOR_PICKUP') expect(await openAlerts(order.id)).toBe(1);
-        else expect(carrier).toBe(d2.driverId); // d2 was still eligible when it was ranked and locked
-        await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
-      }
+      expectData(await assign(order.id, d1.driverId), 201);
+      expect((await reassign(order.id, d2.driverId, d1.driverId)).status).toBe(201);
+      const { status, carrier } = await expectConsistent(order.id, [d1, d2]);
+      expect([status, carrier]).toEqual(['ASSIGNED_TO_DRIVER', d2.driverId]);
+      expect(await available(d1)).toBe(true);
+      expect(await deliveries(order.id)).toHaveLength(1);
     });
   });
 });

@@ -42,6 +42,18 @@ const CLEARABLE_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /** Keys whose value has a known shape: a write that does not match is refused (400) instead of breaking pricing later. */
+/** R16: acknowledgement window bounds and default (minutes). */
+export const ACK_WINDOW_MIN_MINUTES = 1;
+export const ACK_WINDOW_MAX_MINUTES = 30;
+export const ACK_WINDOW_DEFAULT_MINUTES = 5;
+
+/** Reads a stored acknowledgement window; anything missing or outside the bounds falls back to the 5-minute default. */
+export function resolveAcknowledgementWindowMinutes(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= ACK_WINDOW_MIN_MINUTES && value <= ACK_WINDOW_MAX_MINUTES
+    ? value
+    : ACK_WINDOW_DEFAULT_MINUTES;
+}
+
 const VALUE_VALIDATORS: Partial<Record<string, { valid: (v: unknown) => boolean; message: string }>> = {
   [BusinessConfigKey.HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER]: {
     valid: isValidHatlyServiceMultiplier,
@@ -58,6 +70,10 @@ const VALUE_VALIDATORS: Partial<Record<string, { valid: (v: unknown) => boolean;
   [BusinessConfigKey.WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION]: {
     valid: isValidServiceLocation,
     message: 'WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION must be { latitude, longitude, label } inside Egypt with a label of 1-120 characters (use DELETE to clear it).',
+  },
+  [BusinessConfigKey.DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES]: {
+    valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= ACK_WINDOW_MIN_MINUTES && v <= ACK_WINDOW_MAX_MINUTES,
+    message: `DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES must be a whole number of minutes from ${ACK_WINDOW_MIN_MINUTES} to ${ACK_WINDOW_MAX_MINUTES}.`,
   },
   // Customer phone verification switch: a real boolean only — `0`, `""`, `"false"` or `null` must never be stored and later read
   // by truthiness (which would silently turn OTP off, or fail to).
@@ -211,6 +227,13 @@ export class BusinessConfigService {
     const configured = await this.get<unknown>(BusinessConfigKey.CHECKOUT_ENABLED_ELECTRONIC_METHODS, null, manager);
     if (!Array.isArray(configured)) return [...ELECTRONIC_PAYMENT_METHODS];
     return ELECTRONIC_PAYMENT_METHODS.filter((m) => configured.includes(m));
+  }
+
+  /** R16: the driver acknowledgement window in minutes (default 5, bounds 1–30). */
+  async getAcknowledgementWindowMinutes(manager?: EntityManager): Promise<number> {
+    const repo = manager ? manager.getRepository(BusinessConfig) : this.repo;
+    const row = await repo.findOne({ where: { key: BusinessConfigKey.DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES } });
+    return resolveAcknowledgementWindowMinutes(row?.value);
   }
 
   /** How long a checkout quote is honoured, seconds (default 15 minutes). */
