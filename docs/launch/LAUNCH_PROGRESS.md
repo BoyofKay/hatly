@@ -385,6 +385,15 @@ Source: branch `feature/register-release-1` (commits `8110c54`, `dc4a364`, pushe
 **Rollback:** `ssh ubuntu@152.228.240.4 "cd /opt/hatly-prod && echo 20261101T191813Z-084657feb275 > RELEASE && ln -sfn releases/20261101T191813Z-084657feb275 current && current/deploy/production/prod.sh apps"` — the migration is additive, the old code ignores the column.
 **Owner:** sign in once: Drivers → set each driver's commission (1 driver has none, so nothing is recorded for them); Settings → acknowledgement window if not 5; one order is UNDER_REVIEW and is now hidden from its vendor until approved.
 
+## 3ai. Release 1.1 (2026-11-06) — DEPLOYED and verified; driver APK build 6 BUILT, NOT distributed
+
+Production release `20261106T214231Z-27f40e93dabb` (commit `3967c9b`, bundle compared file-by-file with the commit: identical) LIVE; rollback target `20261106T195428Z-50ef7fbe7cd6` (no migration, schema 74 unchanged).
+* **Driver acknowledgement (R16/R17):** `GET /driver/deliveries/:id` acknowledges implicitly only for apps WITHOUT the header `X-Hatly-Driver-Ack: explicit` (builds ≤ 5, backward compatible). New `GET /driver/support-contact` → `operationsPhone` (new setting `OPERATIONS_CONTACT_PHONE`, fallback `CUSTOMER_SERVICE_WHATSAPP_NUMBER`, else hidden).
+* **Dashboard:** Control Tower says "Released by Operations" (was "Released after the accept window"); Settings field "Operations Phone (for drivers)".
+* **Driver app 1.0.0+6** (`~/Downloads/Hatly-Driver-Release/hatly-driver-1.0.0-build6-20261106/`, SHA-256 `26bef899…6a89`, signer `6e9dcf06…` = production upload key, API `api.hatly.dev`): an unconfirmed assignment shows only "I've seen this order" plus "Confirm by HH:MM" / Operations-told notice / Call Operations; normal steps after it. Emulator: in-place update over build 5 → Success, launches to login, no crash (sign-in not performed). **Not distributed.**
+* **Gates:** backend unit 2,444 / e2e 82 suites 1,126 / integration 314 all ✔; driver `flutter test` 86 ✔, analyze 0 errors/0 warnings; dashboard unit 45, tsc, build ✔; Playwright on an isolated stack (Release 1.1 code, disposable DB copy, ports 3300/3302): 13 spec files, 57 tests ✔ (auth, permissions, release1-register, control tower 15, settings, dispatch alerts, order detail/operations, segment cancellation, vendor hub, notifications, driver integrated, transfer refunds).
+* **Production checks:** backup `hatly-prod-20261106T220011Z.dump` (sha `f0ed3a7f…`), restore drill OK (74 migrations), off-host copy matched; health db+redis up; 0 backend errors; routes 401 without session; served chunks contain the new wording/setting; counts unchanged.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
