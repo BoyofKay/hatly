@@ -430,6 +430,16 @@ Production release `20261107T035612Z-d19b76161a80` (commit `99d8764`, bundle ide
 * **Deploy:** backup `hatly-prod-20261107T035917Z.dump` (sha `367d0717…`), restore drill OK, off-host copy matched.
 * **Live:** health ok, 0 backend errors, new endpoints 401 without a session, the Product Requests page is served, 0 requests.
 
+## 3am. Release 2 package D-1 (2026-11-07) — DEPLOYED; one old order auto-assigned (owner action)
+
+Production release `20261107T045937Z-1a61e340d9bc` (commit `e9c9c08`, bundle identical to the commit) LIVE; rollback target `20261107T035612Z-d19b76161a80` (2C). No migration (schema 76).
+* **R14:** GPS is never mandatory for dispatch. Drivers with a location are ranked nearest first. Drivers without one (or whose distance cannot be computed) are candidates after them, in turn: the one assigned longest ago, or never, first. Bicycles without GPS stay excluded.
+* **Gates:** backend unit 2,459; e2e 85 suites / 1,147 (new R14 test in 70-dispatch); integration 314. Dashboard unchanged.
+* **Deploy:** backup `hatly-prod-20261107T050204Z.dump` (sha `062b8f0f…`), restore drill OK, off-host copy matched.
+* **Live:** health ok, 0 errors.
+* **Side effect:** HT-100002 (created 30 Oct, still before "Ready for pickup") was auto-assigned to the online driver without GPS 1 minute after deploy, unacknowledged. The pre-deploy check covered only undispatched "Ready for pickup" orders, but dispatch also starts during preparation (5-minute lead time). Releasing it would only re-queue it to the same driver, so the owner should cancel it in Admin if it is a stale test order.
+* The 12 other open orders (30 Oct–6 Nov) are PENDING vendor acceptance and are not dispatched unless a vendor accepts them.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
