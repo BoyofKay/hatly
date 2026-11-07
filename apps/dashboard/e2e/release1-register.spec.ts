@@ -78,3 +78,28 @@ test.describe('Release 1 — vendor', () => {
     await expect(page.getByTestId(`vendor-order-${order.id}`).first()).toBeVisible();
   });
 });
+
+test.describe('Release 2A — admin settings', () => {
+  test.use({ storageState: SUPER_ADMIN_STORAGE_STATE });
+
+  test('R21: the Transfer Verification Window can be set (60) and cleared back to "off"; an out-of-range value is refused', async ({ page }) => {
+    const key = 'MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES';
+    try {
+      await page.goto('/settings');
+      const input = page.getByTestId(`config-input-${key}`);
+      await expect(input).toBeVisible();
+      await input.fill('5');
+      await input.locator('xpath=..').getByRole('button', { name: 'Save' }).click();
+      await expect(page.getByText('15 to 10080', { exact: false }).first()).toBeVisible();
+      await input.fill('60');
+      await input.locator('xpath=..').getByRole('button', { name: 'Save' }).click();
+      await expect(input.locator('xpath=..').getByText('Saved')).toBeVisible();
+      // (no extra API read here: the Settings page already spends most of the per-route read limit)
+      await page.getByTestId(`config-clear-${key}`).click();
+      await expect(input).toHaveValue('');
+      await expect(input.locator('xpath=..').getByText('Saved')).toBeVisible();
+    } finally {
+      await adminApi().delete(`/admin/business-config/${key}`).catch(() => undefined);
+    }
+  });
+});
