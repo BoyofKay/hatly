@@ -152,6 +152,17 @@ describe('E2E — product governance (R7)', () => {
     expect(expectData<any[]>(await vendorApi('get', `/products/${p.id}/options`))).toHaveLength(0);
   });
 
+  it('Hatly making a waiting product available (activate or bulk) IS the approval: it becomes APPROVED and its review is closed', async () => {
+    for (const how of ['activate', 'bulk'] as const) {
+      const created = expectData<any>(await vendorApi('post', '/products', { vendorBranchId: vendor.branchId, categoryId: vendor.categoryId, name: `Direct ${how}`, priceMinor: 1200, pricingUnit: 'PIECE' }), 201);
+      if (how === 'activate') expectData(await adminApi('patch', `/products/${created.id}/activate`));
+      else expectData(await adminApi('post', '/products/bulk', { ids: [created.id], action: 'ACTIVATE', confirmCount: 1 }, await s.superAdmin()), 201);
+      expect(await row(created.id)).toMatchObject({ approval_status: 'APPROVED', is_available: true });
+      const [r] = await q(`SELECT status, decision_note FROM product_change_requests WHERE product_id = $1 AND kind = 'NEW_PRODUCT'`, [created.id]);
+      expect(r).toMatchObject({ status: 'APPROVED', decision_note: 'Made available directly by Hatly' });
+    }
+  });
+
   it('a rename of a live product waits for approval; Admin edits apply directly', async () => {
     const p = await s.product(vendor, { name: 'Bread', priceMinor: 1000 });
     const res = await vendorApi('patch', `/products/${p.id}`, { name: 'Baladi Bread' });

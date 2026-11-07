@@ -1,3 +1,4 @@
+import { approveOnHatlyActivation } from '../../products/product-approval';
 import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { DataSource } from 'typeorm';
@@ -150,7 +151,10 @@ export class DirectoryController {
       if (!p) { results.push({ id, ok: false, code: 'NOT_FOUND' }); continue; }
       if (body.action === 'ACTIVATE' || body.action === 'DEACTIVATE') {
         const to = body.action === 'ACTIVATE';
-        if (!body.dryRun) await this.ds.query(`UPDATE products SET is_available = $2, updated_at = now() WHERE id = $1`, [id, to]);
+        if (!body.dryRun) {
+          await this.ds.query(`UPDATE products SET is_available = $2, updated_at = now() WHERE id = $1`, [id, to]);
+          if (to) await approveOnHatlyActivation(this.ds, id); // R7: Hatly making it available is the approval
+        }
         results.push({ id, ok: true, before: p.is_available, after: to });
       } else if (body.action === 'SET_STOCK') {
         if (p.inventory_mode !== 'TRACKED') { results.push({ id, ok: false, code: 'NOT_TRACKED' }); continue; }

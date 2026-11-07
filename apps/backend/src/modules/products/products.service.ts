@@ -1,3 +1,4 @@
+import { approveOnHatlyActivation } from './product-approval';
 import { branchIdsUnderClosure, effectiveOpenSql } from '../../common/branch-availability';
 import { setStockContext } from '../orders/stock-context';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
@@ -566,6 +567,11 @@ export class ProductsService {
     const repo = manager ? manager.getRepository(Product) : this.productsRepository;
     const product = await this.adminGetProduct(id, manager);
     product.isAvailable = true;
+    if (product.approvalStatus && product.approvalStatus !== 'APPROVED') {
+      // R7: only Hatly reaches this for an unapproved product — making it available is the approval.
+      await approveOnHatlyActivation(repo.manager, id);
+      product.approvalStatus = 'APPROVED';
+    }
     return repo.save(product);
   }
 
