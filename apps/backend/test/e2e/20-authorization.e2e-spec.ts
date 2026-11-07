@@ -405,8 +405,9 @@ describe('E2E — authorization / IDOR', () => {
       const opener = await s.admin([Permission.OPEN_CLOSE_VENDOR_BRANCHES], 'Branch Opener');
       const reader = await s.superAdmin();
 
-      // s.vendor() activates the branch but never opens it — this is the exact real-world
+      // s.vendor() now opens the branch (R9: live stores are open), so first put it back in the
       // "created, still closed" state the audit found had no write path at all before M1.
+      expectData(await world.api('patch', `/admin/vendor-branches/${vendorA.branchId}/close`, { token: reader.accessToken }));
       const before = expectData(await world.api('get', `/admin/vendor-branches/${vendorA.branchId}`, { token: reader.accessToken }));
       expect(before.isOpen).toBe(false);
 

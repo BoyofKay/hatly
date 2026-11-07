@@ -58,7 +58,8 @@ describe('E2E — Filters V1', () => {
 
       closedVendor = await s.vendor({ name: 'Closed Diner', serviceAreaId: area.id, lat: 30.421, lng: 31.561 });
       await s.assignSector(closedVendor, sectorId);
-      // Left closed (the default) — deliberately no /open call here.
+      // s.vendor() opens every test store (R9: live stores are open), so this one is closed explicitly.
+      expectData(await world.api('patch', `/admin/vendor-branches/${closedVendor.branchId}/close`, { token: superAdmin.accessToken }));
 
       offerVendor = await s.vendor({ name: 'Offer Diner', serviceAreaId: area.id, lat: 30.421, lng: 31.561 });
       await s.assignSector(offerVendor, sectorId);

@@ -78,6 +78,7 @@ export class TestData {
       address: '1 Test St',
       latitude: 30.4,
       longitude: 31.5,
+      isOpen: true, // R9: a live store is open (a closed one takes no order)
     });
   }
 
