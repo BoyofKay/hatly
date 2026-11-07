@@ -8,7 +8,7 @@ function buildHarness(payment: any | null) {
     find: jest.fn(async () => (payment ? [{ ...payment }] : [])),
   };
   const paymentStateMachine = { transition: jest.fn(async (params: any) => ({ ...payment, status: params.to })) };
-  const service = new AdminManualTransferService(paymentsRepository as any, paymentStateMachine as any, {} as any);
+  const service = new AdminManualTransferService(paymentsRepository as any, paymentStateMachine as any, { query: jest.fn(async () => []) } as any);
   return { service, paymentStateMachine };
 }
 
