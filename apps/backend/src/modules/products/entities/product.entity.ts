@@ -62,6 +62,13 @@ export class Product extends BaseEntity {
   isAvailable: boolean;
 
   /**
+   * R7 (decision register 2026-11-06): APPROVED products may be live; a vendor's NEW product is PENDING until Hatly approves it (and stays
+   * unavailable meanwhile), or REJECTED. Every product created before R7, and every product Admin creates, is APPROVED.
+   */
+  @Column({ name: 'approval_status', type: 'varchar', length: 10, default: 'APPROVED' })
+  approvalStatus: 'APPROVED' | 'PENDING' | 'REJECTED';
+
+  /**
    * CHUNK 12A addition (Inventory Foundation — CONFIRMED business
    * decision, do not reopen). Explicit source of truth for finite
    * stock — never inferred from `quantity` alone. Defaults OPEN,

@@ -50,6 +50,12 @@ export function ProductOptionsEditor({ scope, productId }: { scope: OptionsScope
           {adding ? 'Cancel' : 'Add option group'}
         </button>
       </div>
+      {scope === 'vendor' && (
+        <p className="mt-2 rounded bg-blue-50 p-2 text-xs text-blue-800" data-testid="options-review-note">
+          On a live product, new options, renamed choices and higher prices are sent to Hatly for approval; lowering a price or removing a choice applies at once.
+          {' '}<span dir="rtl">في المنتج المعروض، الخيارات الجديدة وتغيير الأسماء ورفع الأسعار تُرسل إلى هاتلي للموافقة؛ خفض السعر أو حذف خيار يُطبَّق فورًا.</span>
+        </p>
+      )}
       {error && (
         <p data-testid="options-error" className="mt-2 text-xs text-red-600">
           {error}

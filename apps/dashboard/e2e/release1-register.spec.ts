@@ -136,3 +136,60 @@ test.describe('Release 2B — store requests (R8/R44)', () => {
     }
   });
 });
+
+test.describe('Release 2C — product requests (R7)', () => {
+  test.use({ storageState: SUPER_ADMIN_STORAGE_STATE });
+
+  test('a vendor’s new product waits on Product Requests and goes live on approval; a price increase is rejected and the price stays', async ({ page }) => {
+    const { vendorApi } = await import('./control-tower-fixtures');
+    const { VENDOR_A_BRANCH_ID } = await import('./env');
+    const base = (await adminApi().get(`/admin/products/${VENDOR_A_PRODUCT_ID}`)).data.data;
+    const created = await vendorApi().post('/vendor/products', { vendorBranchId: VENDOR_A_BRANCH_ID, categoryId: base.categoryId, name: `PW Review ${Date.now().toString(36)}`, priceMinor: 4200, pricingUnit: 'PIECE' });
+    expect(created.status).toBe(201);
+    const productId = created.data.data.id as string;
+    expect(created.data.data).toMatchObject({ approvalStatus: 'PENDING', isAvailable: false });
+    try {
+      const [newReq] = ((await adminApi().get('/admin/product-change-requests')).data.data as any[]).filter((r) => r.productId === productId);
+      await page.goto('/product-requests');
+      const row = page.getByTestId(`product-request-${newReq.id}`);
+      await expect(row).toContainText('New product');
+      await expect(row).toContainText('42.00 EGP');
+      await row.getByTestId(`approve-${newReq.id}`).click();
+      await expect(page.getByTestId(`product-request-${newReq.id}`)).toHaveCount(0);
+      expect((await adminApi().get(`/admin/products/${productId}`)).data.data).toMatchObject({ isAvailable: true, approvalStatus: 'APPROVED' });
+
+      const up = await vendorApi().patch(`/vendor/products/${productId}`, { priceMinor: 5000 });
+      const upId = up.data.data.pendingChange.id as string;
+      await page.reload();
+      const upRow = page.getByTestId(`product-request-${upId}`);
+      await expect(upRow).toContainText('Price: 42.00 EGP → 50.00 EGP');
+      await upRow.getByLabel('Note (optional)').fill('Price too high for this item');
+      await upRow.getByTestId(`reject-${upId}`).click();
+      await expect(page.getByTestId(`product-request-${upId}`)).toHaveCount(0);
+      expect((await adminApi().get(`/admin/products/${productId}`)).data.data.priceMinor).toBe(4200);
+    } finally {
+      await adminApi().patch(`/admin/products/${productId}/deactivate`).catch(() => undefined);
+    }
+  });
+});
+
+test.describe('Release 2C — vendor product changes (R7)', () => {
+  test.use({ storageState: VENDOR_A_STORAGE_STATE });
+
+  test('a price increase shows under “Product changes for Hatly” as waiting, and can be withdrawn; the live price is untouched', async ({ page }) => {
+    const { vendorApi } = await import('./control-tower-fixtures');
+    const before = (await vendorApi().get(`/vendor/products/${VENDOR_A_PRODUCT_ID}`)).data.data;
+    const up = await vendorApi().patch(`/vendor/products/${VENDOR_A_PRODUCT_ID}`, { priceMinor: Number(before.priceMinor) + 100 });
+    const reqId = up.data.data.pendingChange.id as string;
+    try {
+      await page.goto('/products');
+      const row = page.getByTestId(`product-request-${reqId}`);
+      await expect(row).toContainText('Waiting for Hatly');
+      await row.getByRole('button', { name: 'Withdraw' }).click();
+      await expect(row).toContainText('Withdrawn');
+      expect((await vendorApi().get(`/vendor/products/${VENDOR_A_PRODUCT_ID}`)).data.data.priceMinor).toBe(before.priceMinor);
+    } finally {
+      await vendorApi().post(`/vendor/products/change-requests/${reqId}/withdraw`).catch(() => undefined);
+    }
+  });
+});

@@ -83,7 +83,13 @@ describe('E2E — multipart uploads (Excel import, product image)', () => {
 
       const apply = await post('/vendor/products/import/apply').attach('file', changed, { filename: 'p.xlsx', contentType: xlsxMime });
       expect(apply.status).toBe(201);
-      expect(apply.body.data).toMatchObject({ updatedRows: 1 });
+      // R7: a vendor's price INCREASE from Excel goes to Hatly (the approved price stays live), exactly like on the screens
+      expect(apply.body.data).toMatchObject({ updatedRows: 1, sentForApproval: 1 });
+      expect((await world.ds.query('SELECT price_minor FROM products WHERE id = $1', [product.id]))[0].price_minor).toBe(10000);
+      const [req] = await world.ds.query(`SELECT id, source, payload FROM product_change_requests WHERE product_id = $1 AND status = 'PENDING' AND kind = 'UPDATE'`, [product.id]);
+      expect(req).toMatchObject({ source: 'EXCEL', payload: { priceMinor: 12550 } });
+      const admin = await s.superAdmin();
+      expect((await world.api('post', `/admin/product-change-requests/${req.id}/approve`, { token: admin.accessToken, body: {} })).status).toBe(201);
       expect((await world.ds.query('SELECT price_minor FROM products WHERE id = $1', [product.id]))[0].price_minor).toBe(12550);
     });
 
@@ -116,7 +122,8 @@ describe('E2E — multipart uploads (Excel import, product image)', () => {
     it('a real PNG is stored through the upload pipeline and referenced by a stable /uploads/files path', async () => {
       const res = await post(`/vendor/products/${product.id}/image`).attach('image', png, { filename: 'photo.png', contentType: 'image/png' });
       expect(res.status).toBe(201);
-      expect(res.body.data.imageUrl).toMatch(/^\/uploads\/files\/[0-9a-f-]{36}\.png$/);
+      // R7: a new image of a live product is a detail change Hatly approves first
+      expect(res.body.data.pendingChange.payload.imageUrl).toMatch(/^\/uploads\/files\/[0-9a-f-]{36}\.png$/);
     });
 
     it('a file that merely CLAIMS to be an image (spoofed Content-Type) is rejected by byte inspection', async () => {

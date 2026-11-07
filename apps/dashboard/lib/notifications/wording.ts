@@ -20,6 +20,8 @@ export const CATEGORY: Record<string, Pair> = {
   OPS_CANCELLED_AFTER_ASSIGNMENT: ['An order was cancelled after a driver was assigned', 'أُلغي طلب بعد إسناده لسائق'],
   OPS_BRANCH_CHANGE_REQUEST: ['A store asks for a change', 'متجر يطلب تغييرًا'],
   VENDOR_BRANCH_CHANGE_DECIDED: ['Hatly decided on your store request', 'قرّرت هاتلي بشأن طلب متجرك'],
+  OPS_PRODUCT_REVIEW: ['A product change needs review', 'تغيير منتج يحتاج مراجعة'],
+  VENDOR_PRODUCT_REVIEW_DECIDED: ['Hatly reviewed your product change', 'راجعت هاتلي تغيير منتجك'],
 };
 
 export const ACTION: Record<string, Pair> = {
@@ -36,6 +38,7 @@ export const ACTION: Record<string, Pair> = {
   RESOLVE_FAILED_DELIVERY: ['Resolve the failed delivery', 'عالج التوصيل الفاشل'],
   CONTACT_DRIVER: ['Tell the driver to stop; decide on any trip compensation', 'أبلغ السائق بالتوقف وقرّر أي تعويض عن المشوار'],
   REVIEW_BRANCH_REQUEST: ['Approve or reject the request', 'وافق على الطلب أو ارفضه'],
+  REVIEW_PRODUCT_REQUEST: ['Approve or reject the product change', 'وافق على تغيير المنتج أو ارفضه'],
 };
 
 /** Dispatch-alert reasons carried in an OPS_DISPATCH_NEEDED note. */
@@ -58,9 +61,10 @@ export function adminHref(a: StaffAlert, can: (...perms: string[]) => boolean): 
   if (a.exceptionId) return `/exceptions?case=${a.exceptionId}`;
   if (a.category === 'OPS_FAILED_DELIVERY' && can('MANAGE_ORDER_ISSUES')) return '/failed-deliveries';
   if (a.category === 'OPS_BRANCH_CHANGE_REQUEST' && can('MANAGE_VENDORS')) return '/branch-requests';
+  if (a.category === 'OPS_PRODUCT_REVIEW' && (can('MANAGE_CATALOG') || can('CATALOG_VIEW'))) return '/product-requests';
   if (a.category === 'OPS_TRANSFER_TO_VERIFY' && can('VERIFY_MANUAL_PAYMENTS')) return '/manual-transfer';
   return a.orderId ? `/order-management?order=${a.orderId}` : null;
 }
 
 /** A vendor notification always leads to the vendor's own order (the server only returns their branches' rows). */
-export const vendorHref = (a: StaffAlert): string => (a.orderId ? `/orders/${a.orderId}` : a.category === 'VENDOR_BRANCH_CHANGE_DECIDED' ? '/my-branches' : '/notifications');
+export const vendorHref = (a: StaffAlert): string => (a.orderId ? `/orders/${a.orderId}` : a.category === 'VENDOR_BRANCH_CHANGE_DECIDED' ? '/my-branches' : a.category === 'VENDOR_PRODUCT_REVIEW_DECIDED' ? '/products' : '/notifications');

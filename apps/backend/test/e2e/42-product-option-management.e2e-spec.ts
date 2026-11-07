@@ -164,8 +164,12 @@ describe('E2E — product option management', () => {
       const quoteBefore = expectData<any>(await world.api('post', '/checkout/quote', { token: c.accessToken, body: { deliveryAddress: { line1: 'x', latitude: home.lat, longitude: home.lng }, paymentMethod: 'COD' } }), 201);
       expect(quoteBefore.canPlaceOrder).toBe(true);
 
-      // the vendor now makes a choice mandatory
-      const required = expectData<any>(await vendorApi('post', `/products/${p.id}/options`, { name: 'Sauce', isRequired: true, allowsMultiple: false, values: [{ name: 'Mild' }, { name: 'Hot', priceDeltaMinor: 200 }] }), 201);
+      // the vendor now makes a choice mandatory — on a live product that is a request (R7); Hatly approves it
+      const asked = expectData<any>(await vendorApi('post', `/products/${p.id}/options`, { name: 'Sauce', isRequired: true, allowsMultiple: false, values: [{ name: 'Mild' }, { name: 'Hot', priceDeltaMinor: 200 }] }), 201);
+      expect(asked.request).toMatchObject({ kind: 'OPTIONS', status: 'PENDING', payload: { op: 'CREATE_OPTION' } });
+      expect(expectData<any[]>(await vendorApi('get', `/products/${p.id}/options`))).toHaveLength(0); // nothing changes until approved
+      expectData(await adminApi('post', `/product-change-requests/${asked.request.id}/approve`, {}), 201);
+      const [required] = expectData<any[]>(await vendorApi('get', `/products/${p.id}/options`));
 
       const quote = expectData<any>(await world.api('post', '/checkout/quote', { token: c.accessToken, body: { deliveryAddress: { line1: 'x', latitude: home.lat, longitude: home.lng }, paymentMethod: 'COD' } }), 201);
       expect(quote.canPlaceOrder).toBe(false);

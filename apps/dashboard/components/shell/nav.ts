@@ -64,6 +64,7 @@ export const NAV: NavGroup[] = [
     id: 'products', en: 'Products', ar: 'المنتجات', icon: 'box',
     items: [
       { href: '/catalog', en: 'Products', ar: 'المنتجات', perms: P.catalog },
+      { href: '/product-requests', en: 'Product Requests', ar: 'طلبات المنتجات', perms: P.catalog },
       { href: '/inventory', en: 'Inventory', ar: 'المخزون', perms: P.catalog },
       { href: '/media', en: 'Media library', ar: 'مكتبة الوسائط', perms: P.media },
     ],

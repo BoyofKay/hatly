@@ -39,14 +39,24 @@ function buildHarness(
   };
 
   const productExcelImportService = {};
+  const manager = { query: jest.fn(async () => []) };
+  const dataSource = { manager, transaction: jest.fn(async (cb: (m: any) => any) => cb(manager)) };
+  const governance = {
+    submitNew: jest.fn(async () => 'req-new'),
+    submitUpdate: jest.fn(async () => 'req-update'),
+    setPendingAvailability: jest.fn(async () => undefined),
+    view1: jest.fn(async (id: string) => ({ id, status: 'PENDING' })),
+  };
 
   const service = new VendorProductsService(
     productsService as any,
     vendorStaffAuthorizationService as any,
     uploadsService as any,
     productExcelImportService as any,
+    dataSource as any,
+    governance as any,
   );
-  return { service, productsService, vendorStaffAuthorizationService, uploadsService };
+  return { service, productsService, vendorStaffAuthorizationService, uploadsService, governance, manager };
 }
 
 describe('VendorProductsService.listForUser', () => {
@@ -114,7 +124,7 @@ describe('VendorProductsService.updateForUser', () => {
     });
     const updated = await service.updateForUser('user-1', 'p1', { name: 'New' } as any);
     expect(updated.name).toBe('New');
-    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' }, undefined, { userId: expect.anything(), role: 'VENDOR' });
+    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' }, expect.anything(), { userId: expect.anything(), role: 'VENDOR' });
   });
 
   it('CRITICAL: rejects updating a product in a branch the user does not own, and never calls adminUpdateProduct', async () => {
@@ -242,7 +252,7 @@ describe('VendorProductsService.uploadImageForUser (Chunk 12B-1 Correction)', ()
     });
     const updated = await service.updateForUser('user-1', 'p1', { name: 'New' } as any);
     expect(updated.name).toBe('New');
-    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' }, undefined, { userId: expect.anything(), role: 'VENDOR' });
+    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' }, expect.anything(), { userId: expect.anything(), role: 'VENDOR' });
   });
 });
 
@@ -279,7 +289,8 @@ describe('VendorProductsService.createForUser (Chunk 12B-2)', () => {
     const dto = baseDto();
     const created = await service.createForUser('user-1', dto as any);
     expect(created.id).toBe('new-product');
-    expect(productsService.adminCreateProduct).toHaveBeenCalledWith(dto);
+    // R7: saved PENDING and unavailable, and sent to Hatly for review
+    expect(productsService.adminCreateProduct).toHaveBeenCalledWith({ ...dto, isAvailable: false }, expect.objectContaining({ approvalStatus: 'PENDING' }));
   });
 
   it('VENDOR_MANAGER can create in an owned branch — identical treatment', async () => {
@@ -302,30 +313,57 @@ describe('VendorProductsService.createForUser (Chunk 12B-2)', () => {
     expect(productsService.adminCreateProduct).not.toHaveBeenCalled();
   });
 
-  it('isAvailable omitted is passed through untouched (adminCreateProduct/entity default governs behavior)', async () => {
-    const { service, productsService } = buildHarness({ ownedBranches: { 'user-1': ['branch-1'] } });
-    const dto = baseDto();
-    await service.createForUser('user-1', dto as any);
-    const passedDto = productsService.adminCreateProduct.mock.calls[0][0];
-    expect('isAvailable' in passedDto).toBe(false);
+  // R7: a new product is never available before Hatly approves it; what the vendor asked for is kept on the review request.
+  it('isAvailable omitted: saved unavailable; the review asks for it to go live once approved', async () => {
+    const { service, productsService, governance } = buildHarness({ ownedBranches: { 'user-1': ['branch-1'] } });
+    await service.createForUser('user-1', baseDto() as any);
+    expect(productsService.adminCreateProduct.mock.calls[0][0]).toMatchObject({ isAvailable: false });
+    expect((governance.submitNew.mock.calls[0] as any[])[4]).toBe(true);
   });
 
-  it('isAvailable=false is passed through to adminCreateProduct unchanged', async () => {
-    const { service, productsService } = buildHarness({ ownedBranches: { 'user-1': ['branch-1'] } });
+  it('isAvailable=false: saved unavailable and stays off after approval', async () => {
+    const { service, productsService, governance } = buildHarness({ ownedBranches: { 'user-1': ['branch-1'] } });
     await service.createForUser('user-1', baseDto({ isAvailable: false }) as any);
-    expect(productsService.adminCreateProduct).toHaveBeenCalledWith(expect.objectContaining({ isAvailable: false }));
+    expect(productsService.adminCreateProduct).toHaveBeenCalledWith(expect.objectContaining({ isAvailable: false }), expect.anything());
+    expect((governance.submitNew.mock.calls[0] as any[])[4]).toBe(false);
   });
 
-  it('isAvailable=true is passed through to adminCreateProduct unchanged', async () => {
-    const { service, productsService } = buildHarness({ ownedBranches: { 'user-1': ['branch-1'] } });
+  it('isAvailable=true: still saved unavailable until Hatly approves', async () => {
+    const { service, productsService, governance } = buildHarness({ ownedBranches: { 'user-1': ['branch-1'] } });
     await service.createForUser('user-1', baseDto({ isAvailable: true }) as any);
-    expect(productsService.adminCreateProduct).toHaveBeenCalledWith(expect.objectContaining({ isAvailable: true }));
+    expect(productsService.adminCreateProduct).toHaveBeenCalledWith(expect.objectContaining({ isAvailable: false }), expect.anything());
+    expect((governance.submitNew.mock.calls[0] as any[])[4]).toBe(true);
+  });
+
+  it('R7 on a LIVE product: a price reduction and inventory apply now; a price increase and a rename go to Hatly', async () => {
+    const live = { id: 'p1', vendorBranchId: 'branch-1', name: 'Old', priceMinor: 1000, approvalStatus: 'APPROVED' };
+    const { service, productsService, governance } = buildHarness({ ownedBranches: { 'user-1': ['branch-1'] }, products: { p1: live } });
+    const down = await service.updateForUser('user-1', 'p1', { priceMinor: 900, quantity: 5 } as any);
+    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { priceMinor: 900, quantity: 5 }, expect.anything(), expect.anything());
+    expect(governance.submitUpdate).not.toHaveBeenCalled();
+    expect(down.pendingChange).toBeNull();
+    productsService.adminUpdateProduct.mockClear();
+    const up = await service.updateForUser('user-1', 'p1', { priceMinor: 1200, name: 'New' } as any);
+    expect(productsService.adminUpdateProduct).not.toHaveBeenCalled();
+    expect(governance.submitUpdate).toHaveBeenCalledWith(expect.anything(), live, { priceMinor: 1200, name: 'New' }, expect.anything(), 'DASHBOARD');
+    expect(up.pendingChange).toMatchObject({ id: 'req-update' });
+  });
+
+  it('R7: activating a product Hatly rejected is refused; activating one that waits only records the wish', async () => {
+    const { service, productsService, governance } = buildHarness({
+      ownedBranches: { 'user-1': ['branch-1'] },
+      products: { r: { id: 'r', vendorBranchId: 'branch-1', approvalStatus: 'REJECTED' }, w: { id: 'w', vendorBranchId: 'branch-1', approvalStatus: 'PENDING' } },
+    });
+    await expect(service.activateForUser('user-1', 'r')).rejects.toMatchObject({ response: { details: { code: 'PRODUCT_REJECTED' } } });
+    await service.activateForUser('user-1', 'w');
+    expect(governance.setPendingAvailability).toHaveBeenCalledWith(expect.anything(), 'w', true);
+    expect(productsService.adminActivateProduct).not.toHaveBeenCalled();
   });
 
   it('pricingUnit is passed through to adminCreateProduct exactly as supplied', async () => {
     const { service, productsService } = buildHarness({ ownedBranches: { 'user-1': ['branch-1'] } });
     await service.createForUser('user-1', baseDto({ pricingUnit: 'WEIGHT' }) as any);
-    expect(productsService.adminCreateProduct).toHaveBeenCalledWith(expect.objectContaining({ pricingUnit: 'WEIGHT' }));
+    expect(productsService.adminCreateProduct).toHaveBeenCalledWith(expect.objectContaining({ pricingUnit: 'WEIGHT' }), expect.anything());
   });
 
   it('VendorCreateProductDto structurally has no imageUrl/id/rating/counter/timestamp field to inject', () => {
@@ -434,7 +472,7 @@ describe('VendorProductsService — 12B-1/12B-2 regression after 12B-3 (category
     });
     const updated = await service.updateForUser('user-1', 'p1', { name: 'New' } as any);
     expect(updated.name).toBe('New');
-    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' }, undefined, { userId: expect.anything(), role: 'VENDOR' });
+    expect(productsService.adminUpdateProduct).toHaveBeenCalledWith('p1', { name: 'New' }, expect.anything(), { userId: expect.anything(), role: 'VENDOR' });
   });
 });
 

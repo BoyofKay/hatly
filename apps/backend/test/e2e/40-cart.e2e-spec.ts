@@ -69,13 +69,14 @@ describe('E2E — cart', () => {
   it('a later price change is reflected in the cart (cart is live) but an existing ORDER keeps the snapshot price', async () => {
     const p = await s.product(v1, { name: 'Volatile', priceMinor: 5000 });
     await s.addToCart(customer, p.id, 2);
-    expectData(await world.api('patch', `/vendor/products/${p.id}`, { token: v1.manager.accessToken, body: { priceMinor: 6000 } }));
-    expect((await cart()).subtotalMinor).toBe(12000);
+    // R7: a vendor's price REDUCTION applies directly (an increase would wait for Hatly)
+    expectData(await world.api('patch', `/vendor/products/${p.id}`, { token: v1.manager.accessToken, body: { priceMinor: 4000 } }));
+    expect((await cart()).subtotalMinor).toBe(8000);
     const order = await s.checkout(customer, home);
-    expectData(await world.api('patch', `/vendor/products/${p.id}`, { token: v1.manager.accessToken, body: { priceMinor: 9999 } }));
+    expectData(await world.api('patch', `/vendor/products/${p.id}`, { token: v1.manager.accessToken, body: { priceMinor: 3000 } }));
     const stored = expectData(await world.api('get', `/orders/${order.id}`, { token: customer.accessToken }));
-    expect(stored.subtotalMinor).toBe(12000);
-    expect(stored.segments[0].items[0].unitPriceMinor).toBe(6000);
+    expect(stored.subtotalMinor).toBe(8000);
+    expect(stored.segments[0].items[0].unitPriceMinor).toBe(4000);
   });
 
   it('CHARACTERIZATION: adding the same product twice creates two lines (no merging)', async () => {

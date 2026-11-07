@@ -17,6 +17,45 @@ export interface VendorProduct {
   inventoryMode: InventoryMode;
   quantity: number | null;
   isAvailable: boolean;
+  /** R7: APPROVED products can be live; a new product waits (PENDING) for Hatly, or was REJECTED. */
+  approvalStatus?: 'APPROVED' | 'PENDING' | 'REJECTED';
+  /** Present after an edit when part of it (a price increase / detail change) was sent to Hatly instead of applied. */
+  pendingChange?: ProductChangeRequest | null;
+}
+
+/** R7: a vendor product change Hatly reviews. */
+export interface ProductChangeRequest {
+  id: string;
+  productId: string;
+  productName: string;
+  approvalStatus: 'APPROVED' | 'PENDING' | 'REJECTED';
+  isAvailable: boolean;
+  branchId: string;
+  branchName: string;
+  vendorName: string;
+  kind: 'NEW_PRODUCT' | 'UPDATE' | 'OPTIONS';
+  source: 'DASHBOARD' | 'EXCEL';
+  payload: Record<string, any>;
+  current: { name: string; nameAr: string | null; description: string | null; descriptionAr: string | null; categoryId: string; categoryName: string | null; imageUrl: string | null; priceMinor: number };
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+  requestedBy: string;
+  createdAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+}
+
+export async function listMyProductChangeRequests(vendorBranchId: string): Promise<ProductChangeRequest[]> {
+  return (await apiClient.get('/vendor/products/change-requests', { params: { vendorBranchId } })).data.data;
+}
+export async function withdrawMyProductChangeRequest(id: string): Promise<void> {
+  await apiClient.post(`/vendor/products/change-requests/${id}/withdraw`);
+}
+export async function listProductChangeRequests(status = 'PENDING'): Promise<ProductChangeRequest[]> {
+  return (await apiClient.get('/admin/product-change-requests', { params: { status } })).data.data;
+}
+export async function decideProductChangeRequest(id: string, decision: 'approve' | 'reject', note?: string): Promise<ProductChangeRequest> {
+  return (await apiClient.post(`/admin/product-change-requests/${id}/${decision}`, { note })).data.data;
 }
 
 export interface CreateVendorProductInput {
@@ -105,6 +144,8 @@ export interface ExcelImportApplyResult {
   totalRows: number;
   updatedRows: number;
   unchangedRows: number;
+  /** R7: rows whose price increase / name change was sent to Hatly instead of applied. */
+  sentForApproval?: number;
 }
 
 export async function downloadVendorImportTemplate(vendorBranchId: string, prefilled = true): Promise<Blob> {

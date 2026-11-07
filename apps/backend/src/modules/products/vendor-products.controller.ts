@@ -115,6 +115,17 @@ export class VendorProductsController {
     return { data: result };
   }
 
+  /** R7: this vendor's product reviews (new products, changes waiting for Hatly, decisions). Literal route — declared before `:id`. */
+  @Get('change-requests')
+  async changeRequests(@CurrentUser() user: AuthenticatedUser, @Query('vendorBranchId') vendorBranchId?: string) {
+    return { data: await this.vendorProductsService.listChangeRequestsForUser(user.id, vendorBranchId) };
+  }
+
+  @Post('change-requests/:requestId/withdraw')
+  async withdrawChangeRequest(@CurrentUser() user: AuthenticatedUser, @Param('requestId') requestId: string) {
+    return { data: await this.vendorProductsService.withdrawChangeRequestForUser(user.id, requestId) };
+  }
+
   @Get(':id')
   async getOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     const product = await this.vendorProductsService.getForUser(user.id, id);

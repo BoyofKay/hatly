@@ -25,7 +25,8 @@ import {
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { ProductOptionsEditor } from '../../../components/products/ProductOptionsEditor';
 import { useLang } from '../../../lib/ui/lang';
-import { KpiCard } from '../../../components/ui';
+import { KpiCard, useToast } from '../../../components/ui';
+import { VendorProductRequests } from '../../../components/products/VendorProductRequests';
 import { ICONS } from '../../../components/ui/icons';
 
 /**
@@ -40,6 +41,9 @@ import { ICONS } from '../../../components/ui/icons';
  */
 export default function VendorProductsPage() {
   const { t, num } = useLang();
+  const toast = useToast();
+  // R7: bumps the 'Product changes for Hatly' panel after any change that may have created a request.
+  const [requestsVersion, setRequestsVersion] = useState(0);
   const [branches, setBranches] = useState<VendorOwnedBranch[] | null>(null);
   const [branchError, setBranchError] = useState<string | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string>('');
@@ -184,6 +188,9 @@ export default function VendorProductsPage() {
     setIsCreating(true);
     try {
       await createVendorProduct(input);
+      // R7: a new product waits for Hatly's approval and is not shown to customers until then.
+      toast.push('success', t('Product saved and sent to Hatly for approval. It goes live once approved.', 'تم حفظ المنتج وإرساله إلى هاتلي للموافقة. يُعرض بعد الموافقة.'));
+      setRequestsVersion((v) => v + 1);
       setCreateFields({
         name: '',
         nameAr: '',
@@ -251,7 +258,12 @@ export default function VendorProductsPage() {
 
     setIsSaving(true);
     try {
-      await updateVendorProduct(editingId, input);
+      const saved = await updateVendorProduct(editingId, input);
+      // R7: a price reduction and stock apply now; a price increase or detail change waits for Hatly (the approved version stays live).
+      toast.push('success', saved.pendingChange
+        ? t('Saved. The price increase / detail changes were sent to Hatly for approval — customers see the current version until then.', 'تم الحفظ. أُرسلت زيادة السعر / تغييرات التفاصيل إلى هاتلي للموافقة — يرى العملاء النسخة الحالية حتى ذلك.')
+        : t('Saved.', 'تم الحفظ.'));
+      setRequestsVersion((v) => v + 1);
       setEditingId(null);
       await refreshBranchData(selectedBranchId);
     } catch (err: any) {
@@ -267,6 +279,9 @@ export default function VendorProductsPage() {
     setToggleErrorById((prev) => ({ ...prev, [product.id]: '' }));
     try {
       product.isAvailable ? await deactivateVendorProduct(product.id) : await activateVendorProduct(product.id);
+      if (!product.isAvailable && product.approvalStatus === 'PENDING') {
+        toast.push('success', t('Noted — it goes live as soon as Hatly approves it.', 'تم — سيُعرض فور موافقة هاتلي.'));
+      }
       await refreshBranchData(selectedBranchId);
     } catch (err: any) {
       setToggleErrorById((prev) => ({
@@ -312,7 +327,11 @@ export default function VendorProductsPage() {
     setUploadingImageId(productId);
     setImageErrorById((prev) => ({ ...prev, [productId]: '' }));
     try {
-      await uploadVendorProductImage(productId, file);
+      const saved = await uploadVendorProductImage(productId, file);
+      if (saved.pendingChange) {
+        toast.push('success', t('New photo sent to Hatly for approval. The current photo stays until then.', 'أُرسلت الصورة الجديدة إلى هاتلي للموافقة. تبقى الصورة الحالية حتى ذلك.'));
+        setRequestsVersion((v) => v + 1);
+      }
       await refreshBranchData(selectedBranchId);
     } catch (err: any) {
       // Product data itself is untouched by a failed upload — only the
@@ -371,6 +390,7 @@ export default function VendorProductsPage() {
     try {
       const result = await applyVendorImport(importFile);
       setImportResult(result);
+      setRequestsVersion((v) => v + 1);
       setImportSummary(null);
       setImportFile(null);
       await refreshBranchData(selectedBranchId);
@@ -435,6 +455,8 @@ export default function VendorProductsPage() {
           <KpiCard label={t('Without a photo', 'بلا صورة')} value={num(products.filter((p) => !p.imageUrl).length)} icon={ICONS.image} />
         </div>
       )}
+
+      {selectedBranchId && <div className="mt-4"><VendorProductRequests branchId={selectedBranchId} reloadKey={requestsVersion} onChanged={() => refreshBranchData(selectedBranchId)} /></div>}
 
       <div className="mt-4 flex justify-end gap-2">
         <button
@@ -525,6 +547,11 @@ export default function VendorProductsPage() {
             <p className="rounded bg-green-50 p-2 text-xs text-green-800">
               {t('Applied:', 'تم التطبيق:')} {importResult.totalRows} {t('total rows,', 'إجمالي الصفوف،')} {importResult.updatedRows} {t('updated,', 'محدَّث،')}{' '}
               {importResult.unchangedRows} {t('unchanged.', 'دون تغيير.')}
+              {importResult.sentForApproval ? (
+                <span className="block" data-testid="import-sent-for-approval">
+                  {t(`${importResult.sentForApproval} row(s) with a price increase or name change were sent to Hatly for approval.`, `أُرسل ${importResult.sentForApproval} صف بزيادة سعر أو تغيير اسم إلى هاتلي للموافقة.`)}
+                </span>
+              ) : null}
             </p>
           )}
 
@@ -824,6 +851,8 @@ export default function VendorProductsPage() {
                       >
                         {p.isAvailable ? 'Active' : 'Inactive'}
                       </span>
+                      {p.approvalStatus === 'PENDING' && <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800" data-testid={`approval-${p.id}`}>{t('Waiting for Hatly', 'بانتظار هاتلي')}</span>}
+                      {p.approvalStatus === 'REJECTED' && <span className="rounded bg-red-100 px-2 py-0.5 text-xs text-red-700" data-testid={`approval-${p.id}`}>{t('Rejected — edit to resend', 'مرفوض — عدّله لإعادة الإرسال')}</span>}
                       <button
                         onClick={() => handleToggleActive(p)}
                         disabled={togglingId === p.id}

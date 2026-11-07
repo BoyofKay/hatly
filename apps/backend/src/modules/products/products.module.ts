@@ -1,3 +1,6 @@
+import { NotificationsModule } from '../notifications/notifications.module';
+import { ProductChangeRequestsService } from './product-change-requests.service';
+import { AdminProductChangeRequestsController } from './product-change-requests.controller';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProductCategory } from './entities/product-category.entity';
@@ -24,6 +27,7 @@ import { AdminProductOptionsController, VendorProductOptionsController } from '.
     VendorsModule,
     UploadsModule,
     OffersModule,
+    NotificationsModule,
   ],
   controllers: [
     ProductsController,
@@ -33,8 +37,9 @@ import { AdminProductOptionsController, VendorProductOptionsController } from '.
     VendorCategoriesController,
     AdminProductOptionsController,
     VendorProductOptionsController,
+    AdminProductChangeRequestsController,
   ],
-  providers: [ProductsService, VendorProductsService, ProductExcelImportService, ProductOptionsService],
+  providers: [ProductsService, VendorProductsService, ProductExcelImportService, ProductOptionsService, ProductChangeRequestsService],
   exports: [ProductsService, TypeOrmModule],
 })
 export class ProductsModule {}

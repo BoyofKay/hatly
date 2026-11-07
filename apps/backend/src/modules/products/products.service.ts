@@ -208,7 +208,9 @@ export class ProductsService {
 
     let qb = this.productsRepository
       .createQueryBuilder('product')
-      .where('product.vendor_branch_id = :vendorBranchId', { vendorBranchId });
+      .where('product.vendor_branch_id = :vendorBranchId', { vendorBranchId })
+      // R7: a vendor's product Hatly has not approved (PENDING / REJECTED) is never shown to customers, not even as "unavailable".
+      .andWhere(`product.approval_status = 'APPROVED'`);
 
     if (params.categoryId) {
       qb = qb.andWhere('product.category_id = :categoryId', { categoryId: params.categoryId });
@@ -327,7 +329,8 @@ export class ProductsService {
       where: { id: productId },
       relations: { options: { values: true } },
     });
-    if (!product) {
+    if (!product || product.approvalStatus !== 'APPROVED') {
+      // R7: an unapproved vendor product does not exist for customers.
       throw new NotFoundException('Product not found.');
     }
     return product;
@@ -419,14 +422,16 @@ export class ProductsService {
     }
   }
 
-  async adminCreateProduct(dto: CreateProductDto): Promise<Product> {
+  async adminCreateProduct(dto: CreateProductDto, opts: { approvalStatus?: Product['approvalStatus']; manager?: EntityManager } = {}): Promise<Product> {
     await this.assertBranchExists(dto.vendorBranchId);
     await this.assertCategoryBelongsToBranch(dto.categoryId, dto.vendorBranchId);
 
     const { inventoryMode, quantity } = this.resolveInventoryFieldsForCreate(dto.inventoryMode, dto.quantity);
 
-    return this.productsRepository.save(
-      this.productsRepository.create({
+    const repo = opts.manager ? opts.manager.getRepository(Product) : this.productsRepository;
+    return repo.save(
+      repo.create({
+        ...(opts.approvalStatus ? { approvalStatus: opts.approvalStatus } : {}),
         vendorBranchId: dto.vendorBranchId,
         categoryId: dto.categoryId,
         name: dto.name,

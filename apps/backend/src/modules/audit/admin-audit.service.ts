@@ -81,6 +81,8 @@ export const AdminAuditAction = {
   BULK_ACTION: 'bulk.action',
   INTEGRATION_CHECK_RUN: 'integration.check_run',
   PRODUCT_MEDIA_SET: 'product.media_set',
+  PRODUCT_CHANGE_REQUESTED: 'product.change_requested',
+  PRODUCT_CHANGE_DECIDED: 'product.change_decided',
   DISPATCH_AUTOMATION_CHANGED: 'dispatch.automation_changed',
   /** Generic record of any other privileged (ADMIN / SUPER_ADMIN) mutation — see AdminMutationAuditInterceptor. */
   ADMIN_MUTATION: 'admin.mutation',

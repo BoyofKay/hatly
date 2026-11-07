@@ -37,6 +37,18 @@ export interface OptionGroupInput {
   maxSelections?: number | null;
 }
 
+/**
+ * R7: on a LIVE product a vendor's new option, rename or higher price is sent to Hatly instead of applied. The server answers `{ request }`;
+ * this turns it into an error-shaped notice (so every caller shows it where it shows the server's messages) and never pretends it applied.
+ */
+export const REVIEW_NOTICE = 'Sent to Hatly for approval — it applies once approved. / أُرسل إلى هاتلي للموافقة — يُطبَّق بعد الموافقة.';
+function unlessSentForReview<T>(data: any): T {
+  if (data && typeof data === 'object' && 'request' in data && data.request) {
+    throw Object.assign(new Error(REVIEW_NOTICE), { sentForReview: true, response: { status: 201, data: { error: { message: REVIEW_NOTICE } } } });
+  }
+  return data as T;
+}
+
 export async function listOptionGroups(scope: OptionsScope, productId: string): Promise<ProductOptionGroup[]> {
   const res = await apiClient.get(`/${scope}/products/${productId}/options`);
   return res.data.data;
@@ -45,12 +57,12 @@ export async function listOptionGroups(scope: OptionsScope, productId: string): 
 export async function createOptionGroup(scope: OptionsScope, productId: string, input: OptionGroupInput & { values: OptionValueInput[] }): Promise<ProductOptionGroup> {
   const { maxSelections, ...rest } = input;
   const res = await apiClient.post(`/${scope}/products/${productId}/options`, maxSelections == null ? rest : { ...rest, maxSelections });
-  return res.data.data;
+  return unlessSentForReview<ProductOptionGroup>(res.data.data);
 }
 
 export async function updateOptionGroup(scope: OptionsScope, optionId: string, input: OptionGroupInput): Promise<ProductOptionGroup> {
   const res = await apiClient.patch(`/${scope}/product-options/${optionId}`, input);
-  return res.data.data;
+  return unlessSentForReview<ProductOptionGroup>(res.data.data);
 }
 
 export async function deleteOptionGroup(scope: OptionsScope, optionId: string): Promise<void> {
@@ -59,12 +71,12 @@ export async function deleteOptionGroup(scope: OptionsScope, optionId: string): 
 
 export async function addOptionValue(scope: OptionsScope, optionId: string, input: OptionValueInput): Promise<ProductOptionGroup> {
   const res = await apiClient.post(`/${scope}/product-options/${optionId}/values`, input);
-  return res.data.data;
+  return unlessSentForReview<ProductOptionGroup>(res.data.data);
 }
 
 export async function updateOptionValue(scope: OptionsScope, valueId: string, input: Partial<OptionValueInput>): Promise<ProductOptionGroup> {
   const res = await apiClient.patch(`/${scope}/product-option-values/${valueId}`, input);
-  return res.data.data;
+  return unlessSentForReview<ProductOptionGroup>(res.data.data);
 }
 
 export async function deleteOptionValue(scope: OptionsScope, valueId: string): Promise<ProductOptionGroup> {

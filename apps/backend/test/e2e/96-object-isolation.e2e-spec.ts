@@ -71,8 +71,8 @@ describe('E2E — object-level isolation (security milestone)', () => {
 
     it("a FOREIGN option value nested in the cart body (another product's option) is refused and nothing is added", async () => {
       const option = expectData<any>(
-        await world.api('post', `/vendor/products/${productA.id}/options`, {
-          token: vendorA.manager.accessToken,
+        await world.api('post', `/admin/products/${productA.id}/options`, {
+          token: (await s.superAdmin()).accessToken, // fixture set up by Hatly (a vendor's option change on a live product is a request — R7)
           body: { name: 'Size', isRequired: false, allowsMultiple: false, values: [{ name: 'Large', priceDeltaMinor: 500 }] },
         }),
         201,
@@ -105,8 +105,8 @@ describe('E2E — object-level isolation (security milestone)', () => {
     let optionA: any;
     beforeAll(async () => {
       optionA = expectData<any>(
-        await world.api('post', `/vendor/products/${productA.id}/options`, {
-          token: vendorA.manager.accessToken,
+        await world.api('post', `/admin/products/${productA.id}/options`, {
+          token: (await s.superAdmin()).accessToken,
           body: { name: 'Spice', isRequired: false, allowsMultiple: false, values: [{ name: 'Hot', priceDeltaMinor: 0 }] },
         }),
         201,

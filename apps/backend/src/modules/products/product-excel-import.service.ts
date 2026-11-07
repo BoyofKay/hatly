@@ -1,5 +1,6 @@
 import { StockActor } from './products.service';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { ProductChangeRequestsService, splitVendorProductPatch } from './product-change-requests.service';
 import { DataSource } from 'typeorm';
 import * as XLSX from 'xlsx';
 import { ProductsService } from './products.service';
@@ -46,6 +47,8 @@ export interface ExcelImportApplyResult {
   totalRows: number;
   updatedRows: number;
   unchangedRows: number;
+  /** R7 (vendor imports only): rows whose price increase / name change was sent to Hatly for approval instead of applied. */
+  sentForApproval?: number;
 }
 
 interface ParsedRowIntent {
@@ -75,6 +78,7 @@ export class ProductExcelImportService {
   constructor(
     private readonly productsService: ProductsService,
     private readonly dataSource: DataSource,
+    @Optional() private readonly governance?: ProductChangeRequestsService,
   ) {}
 
   generateTemplate(products: Product[]): Buffer {
@@ -316,9 +320,33 @@ export class ProductExcelImportService {
     }
 
     let updated = 0;
+    let sentForApproval = 0;
+    // R7: a VENDOR import follows the same rule as the screens, per row — price reductions, inventory and availability apply; a price
+    // increase or a name change goes to Hatly; a product that is not approved yet is edited directly but never made available here.
+    const governed = actor?.role === 'VENDOR' && this.governance ? this.governance : null;
     await this.dataSource.transaction(async (manager) => {
       for (const intent of intents) {
         const rowResult = summary.rows.find((r) => r.productId === intent.productId);
+        if (governed) {
+          const product = await this.productsService.adminGetProduct(intent.productId, manager);
+          const fields: Record<string, unknown> = { name: intent.name, nameAr: intent.nameAr, priceMinor: intent.priceMinor, inventoryMode: intent.inventoryMode, quantity: intent.quantity };
+          const live = product.approvalStatus === 'APPROVED';
+          const { direct, gated } = live ? splitVendorProductPatch(product, fields) : { direct: fields, gated: {} as Record<string, unknown> };
+          if (Object.values(direct).some((v) => v !== undefined)) {
+            await this.productsService.adminUpdateProduct(intent.productId, direct as any, manager, { ...actor!, reason: 'IMPORT' });
+          }
+          if (Object.keys(gated).length > 0) {
+            await governed.submitUpdate(manager, product, gated, { id: actor!.userId, role: actor!.role }, 'EXCEL');
+            sentForApproval += 1;
+          }
+          if (intent.isAvailable !== undefined) {
+            if (!live) await governed.setPendingAvailability(manager, intent.productId, intent.isAvailable);
+            else if (intent.isAvailable) await this.productsService.adminActivateProduct(intent.productId, manager);
+            else await this.productsService.adminDeactivateProduct(intent.productId, manager);
+          }
+          if (rowResult && rowResult.changedFields.length > 0) updated += 1;
+          continue;
+        }
         const hasFieldChanges =
           intent.name !== undefined ||
           intent.nameAr !== undefined ||
@@ -357,6 +385,7 @@ export class ProductExcelImportService {
       totalRows: summary.totalRows,
       updatedRows: updated,
       unchangedRows: summary.totalRows - updated,
+      ...(governed ? { sentForApproval } : {}),
     };
   }
 

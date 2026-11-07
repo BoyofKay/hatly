@@ -32,6 +32,8 @@ export const STAFF_ALERT_META = {
   // R8/R44 (2026-11-07): a vendor asked to pause/reopen, change hours or schedule/cancel a closure; and the decision back to the vendor.
   OPS_BRANCH_CHANGE_REQUEST: { audience: 'OPERATIONS', severity: 'INFO', title: 'A store asks for a change', body: 'A vendor asked to pause or reopen, change its hours, or schedule a closure. Approve or reject it.' },
   VENDOR_BRANCH_CHANGE_DECIDED: { audience: 'VENDOR', severity: 'INFO', title: 'Hatly decided on your request', body: 'Your request to change the store was approved or rejected.' },
+  OPS_PRODUCT_REVIEW: { audience: 'OPERATIONS', severity: 'INFO', title: 'A product change needs review', body: 'A vendor added a product, raised a price or changed product details. Approve or reject it.' },
+  VENDOR_PRODUCT_REVIEW_DECIDED: { audience: 'VENDOR', severity: 'INFO', title: 'Hatly reviewed your product change', body: 'Your new product or product change was approved or rejected.' },
   // R45 (2026-11-06): the order was cancelled while a driver was assigned (before pickup).
   OPS_CANCELLED_AFTER_ASSIGNMENT: { audience: 'OPERATIONS', severity: 'CRITICAL', title: 'An order was cancelled after a driver was assigned', body: 'Tell the driver to stop. If the trip had started, decide whether to compensate it (a Hatly operational expense).' },
 } as const;
@@ -39,7 +41,7 @@ export type StaffAlertCategory = keyof typeof STAFF_ALERT_META;
 export const STAFF_ALERT_CATEGORIES = Object.keys(STAFF_ALERT_META) as StaffAlertCategory[];
 
 export type RequiredAction = 'REVIEW_NEW_CASE' | 'EXECUTE_CANCELLATION' | 'REVIEW_ISOLATED_CASE' | 'DECIDE_ESCALATION' | 'PREPARE_WITHOUT_ITEMS' | 'STOP_PREPARING' | 'VENDOR_ACTION'
-  | 'ACCEPT_ORDER' | 'ASSIGN_DRIVER' | 'VERIFY_TRANSFER' | 'RESOLVE_FAILED_DELIVERY' | 'CONTACT_DRIVER' | 'REVIEW_BRANCH_REQUEST';
+  | 'ACCEPT_ORDER' | 'ASSIGN_DRIVER' | 'VERIFY_TRANSFER' | 'RESOLVE_FAILED_DELIVERY' | 'CONTACT_DRIVER' | 'REVIEW_BRANCH_REQUEST' | 'REVIEW_PRODUCT_REQUEST';
 
 export interface StaffAlert {
   eventKey: string;

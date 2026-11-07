@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { ProductChangeRequestsService, splitVendorProductPatch } from './product-change-requests.service';
 import { ProductsService } from './products.service';
 import { VendorStaffAuthorizationService } from '../vendors/vendor-staff-authorization.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -36,6 +38,8 @@ export class VendorProductsService {
     private readonly vendorStaffAuthorizationService: VendorStaffAuthorizationService,
     private readonly uploadsService: UploadsService,
     private readonly productExcelImportService: ProductExcelImportService,
+    private readonly dataSource: DataSource,
+    private readonly governance: ProductChangeRequestsService,
   ) {}
 
   /**
@@ -108,7 +112,12 @@ export class VendorProductsService {
    */
   async createForUser(userId: string, dto: VendorCreateProductDto): Promise<Product> {
     await this.vendorStaffAuthorizationService.assertOwnsBranch(userId, dto.vendorBranchId);
-    return this.productsService.adminCreateProduct(dto);
+    // R7: a vendor's new product waits for Hatly — saved PENDING and unavailable; it goes live (as the vendor asked) once approved.
+    return this.dataSource.transaction(async (m) => {
+      const product = await this.productsService.adminCreateProduct({ ...dto, isAvailable: false }, { approvalStatus: 'PENDING', manager: m });
+      await this.governance.submitNew(m, product, { id: userId, role: 'VENDOR' }, 'DASHBOARD', dto.isAvailable !== false);
+      return product;
+    });
   }
 
   async listForUser(userId: string, vendorBranchId?: string): Promise<Product[]> {
@@ -183,21 +192,63 @@ export class VendorProductsService {
    * performs the category-belongs-to-branch check and the Chunk 12A
    * inventory transition rules, reused verbatim.
    */
-  async updateForUser(userId: string, productId: string, dto: VendorUpdateProductDto): Promise<Product> {
+  /**
+   * R7: on a product that is not live yet (PENDING / REJECTED) every change applies directly — Hatly reviews the product as a whole, and
+   * editing a REJECTED product sends it back for review. On a live product a price reduction and inventory apply now; a price increase
+   * and detail changes go to Hatly (`pendingChange`), and the approved version stays live meanwhile.
+   */
+  async updateForUser(userId: string, productId: string, dto: VendorUpdateProductDto): Promise<Product & { pendingChange: unknown }> {
     const product = await this.productsService.adminGetProduct(productId);
     await this.assertOwnsProductBranch(userId, product);
-    return this.productsService.adminUpdateProduct(productId, dto, undefined, { userId, role: 'VENDOR' });
+    const actor = { id: userId, role: 'VENDOR' };
+    if (product.approvalStatus !== 'APPROVED') {
+      return this.dataSource.transaction(async (m) => {
+        const saved = await this.productsService.adminUpdateProduct(productId, dto, m, { userId, role: 'VENDOR' });
+        if (product.approvalStatus === 'REJECTED') {
+          await m.query(`UPDATE products SET approval_status = 'PENDING' WHERE id = $1`, [productId]);
+          saved.approvalStatus = 'PENDING';
+          await this.governance.submitNew(m, saved, actor, 'DASHBOARD', true);
+        }
+        return { ...saved, pendingChange: null };
+      });
+    }
+    const { direct, gated } = splitVendorProductPatch(product, dto as Record<string, unknown>);
+    let saved = product;
+    let requestId: string | null = null;
+    await this.dataSource.transaction(async (m) => {
+      if (Object.keys(direct).length > 0) saved = await this.productsService.adminUpdateProduct(productId, direct as VendorUpdateProductDto, m, { userId, role: 'VENDOR' });
+      if (Object.keys(gated).length > 0) requestId = await this.governance.submitUpdate(m, product, gated, actor, 'DASHBOARD');
+    });
+    return { ...saved, pendingChange: requestId ? await this.governance.view1(requestId) : null };
+  }
+
+  /** The vendor's own product reviews (new products, changes waiting for Hatly, decisions). */
+  async listChangeRequestsForUser(userId: string, vendorBranchId?: string) {
+    return this.governance.vendorList({ id: userId, role: 'VENDOR' }, vendorBranchId);
+  }
+
+  async withdrawChangeRequestForUser(userId: string, requestId: string) {
+    return this.governance.withdraw({ id: userId, role: 'VENDOR' }, requestId);
   }
 
   async activateForUser(userId: string, productId: string): Promise<Product> {
     const product = await this.productsService.adminGetProduct(productId);
     await this.assertOwnsProductBranch(userId, product);
+    // R7: a product Hatly has not approved cannot go live. While it waits, this records that the vendor wants it live once approved.
+    if (product.approvalStatus === 'REJECTED') {
+      throw new ConflictException({ message: 'Hatly rejected this product. Edit it to send it for review again.', details: { code: 'PRODUCT_REJECTED' } });
+    }
+    if (product.approvalStatus === 'PENDING') {
+      await this.governance.setPendingAvailability(this.dataSource.manager, productId, true);
+      return product;
+    }
     return this.productsService.adminActivateProduct(productId);
   }
 
   async deactivateForUser(userId: string, productId: string): Promise<Product> {
     const product = await this.productsService.adminGetProduct(productId);
     await this.assertOwnsProductBranch(userId, product);
+    if (product.approvalStatus === 'PENDING') await this.governance.setPendingAvailability(this.dataSource.manager, productId, false);
     return this.productsService.adminDeactivateProduct(productId);
   }
 
@@ -271,7 +322,11 @@ export class VendorProductsService {
     const safeFilename = `product-image${extension}`;
     const upload = await this.uploadsService.upload(file.buffer.toString('base64'), safeFilename, userId);
 
-    // Storage succeeded — only now is the DB updated.
+    // Storage succeeded — only now is the DB updated. R7: a new image of a LIVE product is a detail change Hatly approves first.
+    if (product.approvalStatus === 'APPROVED') {
+      const requestId = await this.governance.submitUpdate(this.dataSource.manager, product, { imageUrl: upload.url }, { id: userId, role: 'VENDOR' }, 'DASHBOARD');
+      return { ...product, pendingChange: await this.governance.view1(requestId) } as Product;
+    }
     return this.productsService.adminUpdateProduct(productId, { imageUrl: upload.url });
   }
 }

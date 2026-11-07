@@ -120,14 +120,18 @@ describe('E2E — catalog', () => {
       expectData(await world.api('delete', '/cart', { token: customer.accessToken }));
     });
 
-    it('a vendor manager manages ONLY their own catalog: price change is immediately visible; stock-zero is reflected', async () => {
-      const upd = await world.api('patch', `/vendor/products/${burger.id}`, { token: vendor.manager.accessToken, body: { priceMinor: 9500 } });
+    it('a vendor manager manages ONLY their own catalog: a price reduction is immediately visible, an increase waits for Hatly (R7); stock-zero is reflected', async () => {
+      const upd = await world.api('patch', `/vendor/products/${burger.id}`, { token: vendor.manager.accessToken, body: { priceMinor: 8500 } });
       expect(upd.status).toBe(200);
-      expect(expectData(await world.api('get', `/products/${burger.id}`)).priceMinor).toBe(9500);
+      expect(expectData(await world.api('get', `/products/${burger.id}`)).priceMinor).toBe(8500);
+      const up = expectData<any>(await world.api('patch', `/vendor/products/${burger.id}`, { token: vendor.manager.accessToken, body: { priceMinor: 9900 } }));
+      expect(up.pendingChange).toMatchObject({ kind: 'UPDATE', status: 'PENDING', payload: { priceMinor: 9900 } });
+      expect(expectData(await world.api('get', `/products/${burger.id}`)).priceMinor).toBe(8500); // the approved price stays live
+      expectData(await world.api('post', `/vendor/products/change-requests/${up.pendingChange.id}/withdraw`, { token: vendor.manager.accessToken }), 201);
       expectData(await world.api('patch', `/vendor/products/${pasta.id}/set-inventory-zero`, { token: vendor.manager.accessToken }));
       expect(expectData(await world.api('get', `/products/${pasta.id}`)).quantity).toBe(0);
       // restore for later tests
-      await world.api('patch', `/vendor/products/${burger.id}`, { token: vendor.manager.accessToken, body: { priceMinor: 9000 } });
+      await world.api('patch', `/admin/products/${burger.id}`, { token: (await s.superAdmin()).accessToken, body: { priceMinor: 9000 } });
       await world.api('patch', `/vendor/products/${pasta.id}`, { token: vendor.manager.accessToken, body: { quantity: 3 } });
     });
 
