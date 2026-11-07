@@ -38,10 +38,11 @@ Driver APK 1.0.0+6: `~/Downloads/Hatly-Driver-Release/hatly-driver-1.0.0-build6-
 11. Record in LAUNCH_PROGRESS, then fast-forward `master` and the release branch.
 
 ## Next packages (not started)
-1. **2D — acceptance and dispatch:**
-   - R12 acceptance mode AUTO / VENDOR / HATLY
-   - R18 capacity per vehicle with an audited override
-   - R14 round-robin fallback
+1. **2D — acceptance and dispatch** (split; **paused for an owner decision**):
+   - 2D-1 R14: today a driver without GPS is never auto-assigned, which breaks "GPS never mandatory". The fix ranks GPS drivers by distance first, then drivers without GPS round-robin (least recently assigned first); bicycles without GPS stay excluded.
+   - **Decision needed before deploy:** Production has automatic dispatch ON, one approved online driver with no GPS, and old orders (31 Oct, 6 Nov) still "Ready for pickup" with open no-driver alerts. On deploy those would be auto-assigned to that driver. Close or cancel them first, or ship R14 behind a switch that starts OFF.
+   - 2D-2 R12: acceptance mode per vendor AUTO / VENDOR / HATLY (replaces the auto-accept boolean).
+   - 2D-3 R18: several active orders per vehicle capacity. This changes what `drivers.is_available` means everywhere — its own package.
 2. **2E — scheduled orders (R5).**
 3. **P2 money:**
    - goods principal and collections by source
