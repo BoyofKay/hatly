@@ -54,8 +54,14 @@ export class ProductOptionsService {
 
   // ---- groups ------------------------------------------------------------------------------------------------------------------
 
-  async createOption(productId: string, dto: CreateProductOptionDto, authorize: ProductAuthorizer): Promise<ProductOption> {
-    return this.dataSource.transaction(async (manager) => {
+  /** Runs in the caller's transaction (`outer`, nested as a savepoint) when given — R7 uses this to validate a vendor's option request by
+   *  applying it and rolling back — otherwise in a transaction of its own. */
+  private tx(outer?: EntityManager) {
+    return <T>(fn: (m: EntityManager) => Promise<T>): Promise<T> => (outer ? outer.transaction(fn) : this.dataSource.transaction(fn));
+  }
+
+  async createOption(productId: string, dto: CreateProductOptionDto, authorize: ProductAuthorizer, outer?: EntityManager): Promise<ProductOption> {
+    return this.tx(outer)(async (manager) => {
       const product = await this.requireProduct(productId, authorize, manager, true);
       const existing = await this.loadGroups(manager, product.id);
       if (existing.length >= MAX_OPTION_GROUPS_PER_PRODUCT) {
@@ -88,8 +94,8 @@ export class ProductOptionsService {
     });
   }
 
-  async updateOption(optionId: string, dto: UpdateProductOptionDto, authorize: ProductAuthorizer): Promise<ProductOption> {
-    return this.dataSource.transaction(async (manager) => {
+  async updateOption(optionId: string, dto: UpdateProductOptionDto, authorize: ProductAuthorizer, outer?: EntityManager): Promise<ProductOption> {
+    return this.tx(outer)(async (manager) => {
       const option = await this.requireOption(optionId, manager);
       const product = await this.requireProduct(option.productId, authorize, manager, true);
       const siblings = (await this.loadGroups(manager, product.id)).filter((o) => o.id !== option.id);
@@ -125,8 +131,8 @@ export class ProductOptionsService {
 
   // ---- values ------------------------------------------------------------------------------------------------------------------
 
-  async addValue(optionId: string, dto: ProductOptionValueDto, authorize: ProductAuthorizer): Promise<ProductOption> {
-    return this.dataSource.transaction(async (manager) => {
+  async addValue(optionId: string, dto: ProductOptionValueDto, authorize: ProductAuthorizer, outer?: EntityManager): Promise<ProductOption> {
+    return this.tx(outer)(async (manager) => {
       const option = await this.requireOption(optionId, manager);
       const product = await this.requireProduct(option.productId, authorize, manager, true);
       if (option.values.length >= MAX_VALUES_PER_OPTION_GROUP) {
@@ -141,8 +147,8 @@ export class ProductOptionsService {
     });
   }
 
-  async updateValue(valueId: string, dto: UpdateProductOptionValueDto, authorize: ProductAuthorizer): Promise<ProductOption> {
-    return this.dataSource.transaction(async (manager) => {
+  async updateValue(valueId: string, dto: UpdateProductOptionValueDto, authorize: ProductAuthorizer, outer?: EntityManager): Promise<ProductOption> {
+    return this.tx(outer)(async (manager) => {
       const value = await this.requireValue(valueId, manager);
       const option = await this.requireOption(value.optionId, manager);
       const product = await this.requireProduct(option.productId, authorize, manager, true);

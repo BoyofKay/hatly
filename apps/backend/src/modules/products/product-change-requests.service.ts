@@ -110,6 +110,17 @@ export class ProductChangeRequestsService {
 
   /** One option change of a live product. `ref` is the product (CREATE_OPTION), option (UPDATE_OPTION / ADD_VALUE) or value (UPDATE_VALUE) id. */
   async submitOption(product: Product, op: OptionOp, ref: string, body: Record<string, unknown>, actor: Actor): Promise<string> {
+    // Validate now, not at approval: apply the change inside a transaction and roll it back — the vendor sees the same refusal (bad limits,
+    // duplicate names, a price below zero) the direct path would give, and Hatly only ever reviews changes that can be applied.
+    const DRY_RUN = Symbol('dry-run');
+    await this.ds
+      .transaction(async (m) => {
+        await this.replayOption({ op, ref, body }, m);
+        throw DRY_RUN;
+      })
+      .catch((e) => {
+        if (e !== DRY_RUN) throw e;
+      });
     return this.ds.transaction(async (m) => {
       const [row] = await m.query(
         `INSERT INTO product_change_requests (product_id, vendor_branch_id, kind, payload, requested_by_user_id) VALUES ($1, $2, 'OPTIONS', $3::jsonb, $4) RETURNING id`,
@@ -192,7 +203,7 @@ export class ProductChangeRequestsService {
         for (const k of UPDATE_KEYS) if (payload[k] !== undefined) patch[k] = payload[k];
         await this.products.adminUpdateProduct(r.product_id, patch as never, m);
       } else {
-        await this.replayOption(payload as { op: OptionOp; ref: string; body: Record<string, unknown> });
+        await this.replayOption(payload as { op: OptionOp; ref: string; body: Record<string, unknown> }, m);
       }
       await this.decide(m, admin, r, 'APPROVED', note);
     });
@@ -211,13 +222,13 @@ export class ProductChangeRequestsService {
   }
 
   // -------------------------------------------------------------------------------------------------------------------------- internals
-  private async replayOption(p: { op: OptionOp; ref: string; body: Record<string, unknown> }) {
+  private async replayOption(p: { op: OptionOp; ref: string; body: Record<string, unknown> }, m?: EntityManager) {
     const any = async () => undefined;
     switch (p.op) {
-      case 'CREATE_OPTION': return this.options.createOption(p.ref, p.body as never, any);
-      case 'UPDATE_OPTION': return this.options.updateOption(p.ref, p.body as never, any);
-      case 'ADD_VALUE': return this.options.addValue(p.ref, p.body as never, any);
-      case 'UPDATE_VALUE': return this.options.updateValue(p.ref, p.body as never, any);
+      case 'CREATE_OPTION': return this.options.createOption(p.ref, p.body as never, any, m);
+      case 'UPDATE_OPTION': return this.options.updateOption(p.ref, p.body as never, any, m);
+      case 'ADD_VALUE': return this.options.addValue(p.ref, p.body as never, any, m);
+      case 'UPDATE_VALUE': return this.options.updateValue(p.ref, p.body as never, any, m);
       default: throw new BadRequestException('Unknown option change.');
     }
   }

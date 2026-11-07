@@ -129,6 +129,13 @@ describe('E2E — product governance (R7)', () => {
     const p = await s.product(vendor, { name: 'Pizza', priceMinor: 8000 });
     const asked = expectData<any>(await vendorApi('post', `/products/${p.id}/options`, { name: 'Size', isRequired: false, allowsMultiple: false, values: [{ name: 'Large', priceDeltaMinor: 2000 }] }), 201);
     expect(asked.request).toMatchObject({ kind: 'OPTIONS', payload: { op: 'CREATE_OPTION' } });
+    // an option change that could never be applied is refused NOW (validated by a rolled-back dry run), not at Hatly's approval
+    const before = (await q(`SELECT count(*)::int AS n FROM product_change_requests WHERE product_id = $1`, [p.id]))[0].n;
+    const bad = await vendorApi('post', `/products/${p.id}/options`, { name: 'Toppings', isRequired: false, allowsMultiple: true, minSelections: 3, maxSelections: 2, values: [{ name: 'A' }, { name: 'B' }, { name: 'C' }] });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error.details.code).toBe('INVALID_OPTION_LIMITS');
+    expect((await q(`SELECT count(*)::int AS n FROM product_change_requests WHERE product_id = $1`, [p.id]))[0].n).toBe(before);
+    expect(expectData<any[]>(await vendorApi('get', `/products/${p.id}/options`))).toHaveLength(0); // the dry run left nothing behind
     expect(expectData<any[]>(await vendorApi('get', `/products/${p.id}/options`))).toHaveLength(0);
     expectData(await adminApi('post', `/product-change-requests/${asked.request.id}/approve`, {}), 201);
     const [size] = expectData<any[]>(await vendorApi('get', `/products/${p.id}/options`));

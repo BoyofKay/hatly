@@ -12,15 +12,20 @@ const unique = () => `${Date.now().toString(36)}${Math.random().toString(36).sli
 test.describe('Vendor — product options', () => {
   test.use({ storageState: VENDOR_A_STORAGE_STATE });
 
-  test('create a group, change a price, add a value, see the server refuse a bad one, delete the group', async ({ page }) => {
+  // R7 (decision register 2026-11-07): VENDOR_A_PRODUCT is live, so a new group, a new value or a higher price is SENT TO HATLY; lowering a
+  // price and deleting apply at once; refusals are still shown at once (the request is validated by a dry run).
+  test('a new group is sent to Hatly (approved here via the API); lowering a price applies; a new value is sent; a refused one is shown; delete applies', async ({ page }) => {
     page.on('dialog', (d) => d.accept());
+    const { adminApi } = await import('./control-tower-fixtures');
     const name = `PW Size ${unique()}`;
     await page.goto('/products');
     await page.getByTestId(`product-options-toggle-${VENDOR_A_PRODUCT_ID}`).click();
     const editor = page.getByTestId(`options-editor-${VENDOR_A_PRODUCT_ID}`);
     await expect(editor).toBeVisible();
+    await expect(editor.getByTestId('options-review-note')).toBeVisible();
 
     let groupId: string | null = null;
+    const requestIds: string[] = [];
     try {
       await editor.getByTestId('option-group-new').click();
       const form = editor.getByTestId('option-group-form');
@@ -32,28 +37,35 @@ test.describe('Vendor — product options', () => {
         form.getByTestId('option-group-create').click(),
       ]);
       expect(created.status()).toBe(201);
-      groupId = (await created.json()).data.id as string;
+      const request = (await created.json()).data.request;
+      expect(request).toMatchObject({ kind: 'OPTIONS', status: 'PENDING' });
+      requestIds.push(request.id);
+      await expect(form.getByTestId('option-group-form-error')).toContainText('Sent to Hatly for approval');
+      expect((await adminApi().post(`/admin/product-change-requests/${request.id}/approve`, {})).status).toBe(201);
 
-      const card = editor.getByTestId(`option-group-${groupId}`);
-      await expect(card.getByTestId('option-group-summary')).toHaveText('Single choice · required');
+      await page.reload();
+      await page.getByTestId(`product-options-toggle-${VENDOR_A_PRODUCT_ID}`).click();
+      const card = editor.locator('[data-testid^="option-group-"]').filter({ hasText: name }).first();
       await expect(card).toContainText('Small');
       await expect(card).toContainText('+6.50 EGP');
+      groupId = ((await card.getAttribute('data-testid')) ?? '').replace('option-group-', '');
 
-      // change the price of "Large"
+      // lowering the price of "Large" applies directly
       const large = card.locator('li', { hasText: 'Large' });
       await large.getByTestId('option-value-price-edit').click();
-      await large.getByTestId('option-value-price-input').fill('7');
+      await large.getByTestId('option-value-price-input').fill('5');
       await large.getByTestId('option-value-price-save').click();
-      await expect(large.getByTestId('option-value-price-text')).toHaveText('+7.00 EGP');
+      await expect(large.getByTestId('option-value-price-text')).toHaveText('+5.00 EGP');
 
-      // add a value
+      // adding a value is sent to Hatly
       await card.getByTestId('option-value-name').fill('Family');
       await card.getByTestId('option-value-price').fill('12');
       await card.getByTestId('option-value-add').click();
-      await expect(card).toContainText('Family');
+      await expect(card.getByTestId('option-group-error')).toContainText('Sent to Hatly for approval');
+      await expect(card).not.toContainText('Family');
 
-      // a duplicate name is refused by the SERVER and the message is shown
-      await card.getByTestId('option-value-name').fill('family');
+      // a duplicate name is refused by the SERVER at once and the message is shown
+      await card.getByTestId('option-value-name').fill('small');
       await card.getByTestId('option-value-add').click();
       await expect(card.getByTestId('option-group-error')).toContainText(/already has a value/i);
 
@@ -63,16 +75,9 @@ test.describe('Vendor — product options', () => {
       await card.getByTestId('option-value-add').click();
       await expect(card.getByTestId('option-group-error')).toContainText('Enter the price in EGP');
     } finally {
-      if (groupId) {
-        const card = editor.getByTestId(`option-group-${groupId}`);
-        if (await card.count()) {
-          await Promise.all([
-            page.waitForResponse((r) => r.url().includes(`/vendor/product-options/${groupId}`) && r.request().method() === 'DELETE'),
-            card.getByTestId('option-group-delete').click(),
-          ]);
-          await expect(card).toHaveCount(0);
-        }
-      }
+      const pending = ((await adminApi().get('/admin/product-change-requests', { params: { status: 'PENDING' } })).data.data as any[]).filter((r) => r.productId === VENDOR_A_PRODUCT_ID && r.kind === 'OPTIONS');
+      for (const r of pending) await adminApi().post(`/admin/product-change-requests/${r.id}/reject`, { note: 'test cleanup' }).catch(() => undefined);
+      if (groupId) await adminApi().delete(`/admin/product-options/${groupId}`).catch(() => undefined);
     }
   });
 
