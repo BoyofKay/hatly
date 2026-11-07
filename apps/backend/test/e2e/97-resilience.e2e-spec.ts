@@ -59,6 +59,9 @@ describe('E2E — transaction failure, retry and provider isolation', () => {
   });
   beforeEach(async () => {
     boundary.reset();
+    // Test hygiene: a test that leaves an order with a driver would keep the one driver busy for every later test. R18 counts a driver's active
+    // orders against their capacity, so merely flagging them available is not enough — the leftover orders are closed (test data only).
+    await q("UPDATE orders SET status = 'CANCELLED' WHERE status::text IN ('ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY')");
     await q('UPDATE drivers SET is_online = true, is_available = true');
   });
   afterAll(async () => {
