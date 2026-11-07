@@ -20,6 +20,7 @@ export const CATEGORY: Record<string, Pair> = {
   OPS_CANCELLED_AFTER_ASSIGNMENT: ['An order was cancelled after a driver was assigned', 'أُلغي طلب بعد إسناده لسائق'],
   OPS_BRANCH_CHANGE_REQUEST: ['A store asks for a change', 'متجر يطلب تغييرًا'],
   VENDOR_BRANCH_CHANGE_DECIDED: ['Hatly decided on your store request', 'قرّرت هاتلي بشأن طلب متجرك'],
+  OPS_ACCEPT_FOR_VENDOR: ['Accept an order for a store', 'اقبل طلبًا نيابةً عن متجر'],
   OPS_PRODUCT_REVIEW: ['A product change needs review', 'تغيير منتج يحتاج مراجعة'],
   VENDOR_PRODUCT_REVIEW_DECIDED: ['Hatly reviewed your product change', 'راجعت هاتلي تغيير منتجك'],
 };

@@ -32,7 +32,7 @@ export default function BranchesPage() {
           { key: 'pr', header: t('Products', 'المنتجات'), align: 'end', cell: (r) => <Link className="text-hatly-orangeDark hover:underline" href="/catalog">{num(r.products)}</Link> },
           { key: 'rt', header: t('Rating', 'التقييم'), align: 'end', cell: (r) => (r.rating === null ? <span className="text-gray-400">{t('No ratings', 'لا تقييمات')}</span> : <span title={`${r.ratingCount}`}>{r.rating} ★ <span className="text-xs text-gray-500">({num(r.ratingCount)})</span></span>) },
           { key: 'cm', header: t('Commission', 'العمولة'), align: 'end', cell: (r) => `${r.commissionPercent}%` },
-          { key: 'ac', header: t('Auto-accept', 'قبول تلقائي'), cell: (r) => (r.autoAccept ? t('On', 'مفعل') : t('Off', 'متوقف')) },
+          { key: 'ac', header: t('Accepts orders', 'قبول الطلبات'), cell: (r) => { const m = r.acceptanceMode ?? (r.autoAccept ? 'AUTO' : 'VENDOR'); return m === 'AUTO' ? t('Automatic', 'تلقائي') : m === 'HATLY' ? <Badge tone="amber">{t('Hatly', 'هاتلي')}</Badge> : t('Vendor', 'البائع'); } },
           { key: 'a', header: '', align: 'end', cell: (r) => <Button size="sm" onClick={() => setPerf(r)}>{t('Performance', 'الأداء')}</Button> },
         ]} />
         {list.meta && <Pagination page={page} limit={limit} total={list.meta.total} onPage={setPage} />}

@@ -161,6 +161,17 @@ export class OrderVendorSegmentStateMachineService {
         if (!isOrderVisibleToVendor(parentOrder.paymentMethod, payment?.status)) throw new NotFoundException('Order not found.');
       }
 
+      // R12: on a branch whose orders Hatly accepts, the vendor does not accept or reject (Operations do, on its behalf); it still prepares.
+      if (
+        !params.system && !isOperations && segment.vendorBranchId && segment.status === OrderVendorSegmentStatus.PENDING &&
+        (params.to === OrderVendorSegmentStatus.CONFIRMED || params.to === OrderVendorSegmentStatus.CANCELLED)
+      ) {
+        const [b] = await manager.query(`SELECT acceptance_mode FROM vendor_branches WHERE id = $1`, [segment.vendorBranchId]);
+        if (b?.acceptance_mode === 'HATLY') {
+          throw new ForbiddenException({ message: 'Hatly accepts or rejects this branch’s orders. Prepare it once Hatly has accepted it.', details: { code: 'ACCEPTANCE_BY_HATLY' } });
+        }
+      }
+
       const rule = SEGMENT_TRANSITIONS.find((t) => t.from === segment.status && t.to === params.to);
       if (!rule) {
         throw new BadRequestException(`Cannot transition segment from ${segment.status} to ${params.to}.`);

@@ -9,6 +9,8 @@ export interface VendorBranchSummary {
   isActive: boolean;
   preparationTimeMinutes: number | null;
   autoAcceptEnabled: boolean;
+  /** R12: who accepts new orders — AUTO, VENDOR or HATLY. */
+  acceptanceMode?: 'AUTO' | 'VENDOR' | 'HATLY';
 }
 export interface VendorOverview {
   live: Partial<Record<SegmentStatus, number>>;
@@ -66,6 +68,8 @@ export interface VendorBranchProfile {
   deliveryEnabled: boolean;
   pickupEnabled: boolean;
   autoAcceptEnabled: boolean;
+  /** R12: who accepts new orders — AUTO, VENDOR or HATLY. */
+  acceptanceMode?: 'AUTO' | 'VENDOR' | 'HATLY';
   canEditProfile: boolean;
   /** Open to customers right now: the manual switch AND no active closure. */
   effectiveOpen?: boolean;

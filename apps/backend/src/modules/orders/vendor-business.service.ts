@@ -86,7 +86,7 @@ export class VendorBusinessService {
     const [store] = await this.ds.query(`SELECT v.name FROM vendor_branches b JOIN vendors v ON v.id = b.vendor_id WHERE b.id = ANY($1) ORDER BY v.name LIMIT 1`, [ids]);
     const [stars] = await this.ds.query(`SELECT coalesce(sum(rating_count), 0)::int AS n, coalesce(sum(rating_sum_stars), 0)::int AS total FROM vendor_branches WHERE id = ANY($1) AND deleted_at IS NULL`, [ids]);
     const branches = await this.ds.query(
-      `SELECT id, name, is_open, is_active, preparation_time_minutes, auto_accept_enabled FROM vendor_branches WHERE id = ANY($1) AND deleted_at IS NULL ORDER BY name`,
+      `SELECT id, name, is_open, is_active, preparation_time_minutes, auto_accept_enabled, acceptance_mode FROM vendor_branches WHERE id = ANY($1) AND deleted_at IS NULL ORDER BY name`,
       [ids],
     );
     const [ex] = await this.ds.query(
@@ -104,7 +104,7 @@ export class VendorBusinessService {
       productCount: catalogue.n,
       vendorName: store?.name ?? null,
       rating: stars.n > 0 ? { average: Math.round((stars.total / stars.n) * 10) / 10, count: stars.n } : null,
-      branches: branches.map((b: any) => ({ id: b.id, name: b.name, isOpen: b.is_open, isActive: b.is_active, preparationTimeMinutes: b.preparation_time_minutes, autoAcceptEnabled: b.auto_accept_enabled })),
+      branches: branches.map((b: any) => ({ id: b.id, name: b.name, isOpen: b.is_open, isActive: b.is_active, preparationTimeMinutes: b.preparation_time_minutes, autoAcceptEnabled: b.auto_accept_enabled, acceptanceMode: b.acceptance_mode })),
       openExceptions: ex.n,
     };
   }
@@ -274,7 +274,7 @@ export class VendorBusinessService {
   async branch(user: Actor, branchId: string) {
     const [id] = await this.branches(user, branchId);
     const [b] = await this.ds.query(
-      `SELECT id, name, address, is_open, is_active, opening_hours, preparation_time_minutes, delivery_enabled, pickup_enabled, auto_accept_enabled FROM vendor_branches WHERE id = $1 AND deleted_at IS NULL`,
+      `SELECT id, name, address, is_open, is_active, opening_hours, preparation_time_minutes, delivery_enabled, pickup_enabled, auto_accept_enabled, acceptance_mode FROM vendor_branches WHERE id = $1 AND deleted_at IS NULL`,
       [id],
     );
     if (!b) throw new NotFoundException({ message: 'Branch not found.', details: { code: 'NOT_FOUND' } });
@@ -285,7 +285,7 @@ export class VendorBusinessService {
   private branchView(b: any, user: Actor) {
     return {
       id: b.id, name: b.name, address: b.address, isOpen: b.is_open, isActive: b.is_active, openingHours: b.opening_hours ?? {}, preparationTimeMinutes: b.preparation_time_minutes,
-      deliveryEnabled: b.delivery_enabled, pickupEnabled: b.pickup_enabled, autoAcceptEnabled: b.auto_accept_enabled,
+      deliveryEnabled: b.delivery_enabled, pickupEnabled: b.pickup_enabled, autoAcceptEnabled: b.auto_accept_enabled, acceptanceMode: b.acceptance_mode,
       // What this user may change here: anyone linked to the branch can open/close it; hours and preparation time are a manager's decision.
       canEditProfile: user.role === Role.VENDOR_MANAGER,
     };

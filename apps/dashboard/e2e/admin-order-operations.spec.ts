@@ -36,18 +36,22 @@ test.describe('Admin order operations', () => {
     expect(detail.segments[0].history.at(-1)).toMatchObject({ toStatus: 'CANCELLED', onBehalfOfVendor: true });
   });
 
-  test('the branch page shows and switches the acceptance mode (automatic = accepted only); the state shown is the server\'s', async ({ page }) => {
+  // R12: three modes — Automatic / Vendor accepts / Hatly accepts. The state shown is always the server's.
+  test('the branch page shows and switches the acceptance mode between Automatic, Vendor and Hatly; the state shown is the server\'s', async ({ page }) => {
+    const original = (await adminApi().get(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}`)).data.data.acceptanceMode as string;
     await page.goto(`/branches/${VENDOR_A_BRANCH_ID}`);
     const card = page.getByTestId('branch-acceptance-mode');
     await expect(card).toBeVisible();
-    const original = (await card.getByTestId('branch-acceptance-state').innerText()).startsWith('Automatic');
+    await expect(card.getByTestId(`branch-acceptance-${original}`)).toHaveAttribute('aria-pressed', 'true');
     try {
-      await card.getByTestId('branch-acceptance-toggle').click();
-      await expect(card.getByTestId('branch-acceptance-state')).toContainText(original ? 'Manual' : 'Automatic');
-      const branch = (await adminApi().get(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}`)).data.data;
-      expect(branch.autoAcceptEnabled).toBe(!original);
+      await card.getByTestId('branch-acceptance-HATLY').click();
+      await expect(card.getByTestId('branch-acceptance-state')).toContainText('Hatly Operations accept or reject');
+      expect((await adminApi().get(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}`)).data.data).toMatchObject({ acceptanceMode: 'HATLY', autoAcceptEnabled: false });
+      await card.getByTestId('branch-acceptance-AUTO').click();
+      await expect(card.getByTestId('branch-acceptance-state')).toContainText('Automatic');
+      expect((await adminApi().get(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}`)).data.data).toMatchObject({ acceptanceMode: 'AUTO', autoAcceptEnabled: true });
     } finally {
-      await adminApi().patch(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}/auto-accept`, { autoAcceptEnabled: original });
+      await adminApi().patch(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}/acceptance-mode`, { mode: original });
     }
   });
 

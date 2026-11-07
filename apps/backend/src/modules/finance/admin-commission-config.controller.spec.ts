@@ -16,7 +16,7 @@ function buildHarness(opts: { branch?: any; driver?: any }) {
     update: jest.fn(async (_criteria: any, partial: any) => Object.assign(driverRow, partial)),
     save: jest.fn(async (d: any) => d),
   };
-  const controller = new AdminCommissionConfigController(vendorBranchesRepository as any, driversRepository as any);
+  const controller = new AdminCommissionConfigController(vendorBranchesRepository as any, driversRepository as any, { record: jest.fn(async () => undefined) } as any);
   return { controller, vendorBranchesRepository, driversRepository };
 }
 

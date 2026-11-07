@@ -1,4 +1,6 @@
-import { Body, Controller, NotFoundException, Param, Patch } from '@nestjs/common';
+import { BadRequestException, Body, Controller, NotFoundException, Param, Patch } from '@nestjs/common';
+import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AdminAuditAction, AdminAuditService } from '../audit/admin-audit.service';
 import { ApiTags } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -28,6 +30,7 @@ export class AdminCommissionConfigController {
   constructor(
     @InjectRepository(VendorBranch) private readonly vendorBranchesRepository: Repository<VendorBranch>,
     @InjectRepository(Driver) private readonly driversRepository: Repository<Driver>,
+    private readonly audit: AdminAuditService,
   ) {}
 
   @Patch('vendor-branches/:branchId/commission-rate')
@@ -68,8 +71,32 @@ export class AdminCommissionConfigController {
     if (!branch) {
       throw new NotFoundException('Vendor branch not found.');
     }
-    branch.autoAcceptEnabled = dto.autoAcceptEnabled;
+    // R12: the old switch maps onto the acceptance mode — on = AUTO; off = VENDOR (a HATLY branch stays HATLY).
+    branch.acceptanceMode = dto.autoAcceptEnabled ? 'AUTO' : branch.acceptanceMode === 'HATLY' ? 'HATLY' : 'VENDOR';
+    branch.autoAcceptEnabled = branch.acceptanceMode === 'AUTO';
     await this.vendorBranchesRepository.save(branch);
+    return { data: branch };
+  }
+
+  /**
+   * R12 (decision register 2026-11-06): who accepts this branch's new orders — AUTO, VENDOR (default) or HATLY. Applies to orders placed
+   * from now on; an order already waiting follows the CURRENT mode when someone tries to accept it (a HATLY branch's vendor cannot). Audited.
+   */
+  @Patch('vendor-branches/:branchId/acceptance-mode')
+  @RequiresPermission(Permission.MANAGE_VENDOR_COMMISSION)
+  async setAcceptanceMode(@CurrentUser() user: AuthenticatedUser, @Param('branchId') branchId: string, @Body() body: { mode?: string }) {
+    const mode = body?.mode;
+    if (mode !== 'AUTO' && mode !== 'VENDOR' && mode !== 'HATLY') {
+      throw new BadRequestException({ message: 'mode must be AUTO, VENDOR or HATLY.', details: { code: 'VALIDATION_FAILED' } });
+    }
+    if (!/^[0-9a-f-]{36}$/i.test(branchId ?? '')) throw new NotFoundException('Vendor branch not found.');
+    const branch = await this.vendorBranchesRepository.findOne({ where: { id: branchId } });
+    if (!branch) throw new NotFoundException('Vendor branch not found.');
+    const before = branch.acceptanceMode;
+    branch.acceptanceMode = mode;
+    branch.autoAcceptEnabled = mode === 'AUTO';
+    await this.vendorBranchesRepository.save(branch);
+    await this.audit.record({ actorUserId: user.id, actorRole: user.role, action: AdminAuditAction.VENDOR_BRANCH_UPDATED, targetType: 'vendor_branch', targetId: branchId, metadata: { field: 'acceptanceMode', before, after: mode } } as never);
     return { data: branch };
   }
 }

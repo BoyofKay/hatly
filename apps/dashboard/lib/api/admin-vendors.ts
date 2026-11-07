@@ -25,6 +25,8 @@ export interface VendorBranch {
   marketplaceSectorId: string | null;
   /** Automatic acceptance (accepted only — never preparing or ready). Per-branch; manual by default. */
   autoAcceptEnabled?: boolean;
+  /** R12: AUTO / VENDOR / HATLY. */
+  acceptanceMode?: 'AUTO' | 'VENDOR' | 'HATLY';
   preparationTimeMinutes?: number | null;
 }
 

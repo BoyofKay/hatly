@@ -92,6 +92,14 @@ export class VendorBranch extends BaseEntity {
   @Column({ name: 'auto_accept_enabled', type: 'boolean', default: false })
   autoAcceptEnabled: boolean;
 
+  /**
+   * R12 (decision register 2026-11-06): who accepts this branch's new orders — AUTO (accepted on placement, after every checkout check:
+   * hours, stock, product validity), VENDOR (the vendor; default) or HATLY (Hatly Operations, on the vendor's behalf). The single source
+   * of truth; `autoAcceptEnabled` is kept equal to (mode === 'AUTO') for the previous release.
+   */
+  @Column({ name: 'acceptance_mode', type: 'varchar', length: 6, default: 'VENDOR' })
+  acceptanceMode: 'AUTO' | 'VENDOR' | 'HATLY';
+
   /** Typical preparation time. The ONLY source of a preparation estimate: null means "no estimate", never a default. */
   @Column({ name: 'preparation_time_minutes', type: 'int', nullable: true })
   preparationTimeMinutes?: number | null;

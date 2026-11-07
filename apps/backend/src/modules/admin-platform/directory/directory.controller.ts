@@ -44,14 +44,14 @@ export class DirectoryController {
     if (q.open === 'true' || q.open === 'false') w.push(`b.is_open = ${q.open}`);
     const [{ total }] = await this.ds.query(`SELECT count(*)::int AS total FROM vendor_branches b JOIN vendors ven ON ven.id = b.vendor_id WHERE ${w.join(' AND ')}`, v);
     const rows = await this.ds.query(
-      `SELECT b.id, b.name, b.address, b.is_open, b.is_active, b.auto_accept_enabled, b.commission_rate_basis_points, b.rating_count, b.rating_sum_stars, ven.id AS vendor_id, ven.name AS vendor_name, ven.is_active AS vendor_active, sec.name AS sector_name,
+      `SELECT b.id, b.name, b.address, b.is_open, b.is_active, b.auto_accept_enabled, b.acceptance_mode, b.commission_rate_basis_points, b.rating_count, b.rating_sum_stars, ven.id AS vendor_id, ven.name AS vendor_name, ven.is_active AS vendor_active, sec.name AS sector_name,
               (SELECT count(*) FROM products p WHERE p.vendor_branch_id = b.id AND p.deleted_at IS NULL)::int AS products,
               (SELECT count(*) FROM order_vendor_segments s WHERE s.vendor_branch_id = b.id AND s.status = 'PENDING')::int AS pending_parts
          FROM vendor_branches b JOIN vendors ven ON ven.id = b.vendor_id LEFT JOIN marketplace_sectors sec ON sec.id = b.marketplace_sector_id WHERE ${w.join(' AND ')} ORDER BY ven.name, b.name LIMIT ${limit} OFFSET ${offset}`,
       v,
     );
     return {
-      data: rows.map((r: any) => ({ id: r.id, name: r.name, address: r.address, vendorId: r.vendor_id, vendorName: r.vendor_name, vendorActive: r.vendor_active, sector: r.sector_name, isOpen: r.is_open, isActive: r.is_active, autoAccept: r.auto_accept_enabled, commissionPercent: num(r.commission_rate_basis_points) / 100, rating: r.rating_count > 0 ? Math.round((num(r.rating_sum_stars) / r.rating_count) * 100) / 100 : null, ratingCount: r.rating_count, products: r.products, pendingParts: r.pending_parts })),
+      data: rows.map((r: any) => ({ id: r.id, name: r.name, address: r.address, vendorId: r.vendor_id, vendorName: r.vendor_name, vendorActive: r.vendor_active, sector: r.sector_name, isOpen: r.is_open, isActive: r.is_active, autoAccept: r.auto_accept_enabled, acceptanceMode: r.acceptance_mode, commissionPercent: num(r.commission_rate_basis_points) / 100, rating: r.rating_count > 0 ? Math.round((num(r.rating_sum_stars) / r.rating_count) * 100) / 100 : null, ratingCount: r.rating_count, products: r.products, pendingParts: r.pending_parts })),
       meta: { page, limit, total },
     };
   }

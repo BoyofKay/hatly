@@ -25,6 +25,7 @@ export const STAFF_ALERT_META = {
   // Operational events of the order lifecycle (2026-11-01). Each is written in the transaction that made the change (or right after it, for a
   // change committed by another service), to the staff whose permission or branch covers it.
   VENDOR_NEW_ORDER: { audience: 'VENDOR', severity: 'INFO', title: 'New order', body: 'A new order arrived for your branch.' },
+  OPS_ACCEPT_FOR_VENDOR: { audience: 'OPERATIONS', severity: 'INFO', title: 'Accept an order for a store', body: 'This store’s orders are accepted by Hatly. Accept or reject it on the vendor’s behalf.' },
   VENDOR_PART_CANCELLED: { audience: 'VENDOR', severity: 'CRITICAL', title: 'An order was cancelled', body: 'The customer or Hatly cancelled this order. Stop preparing it.' },
   OPS_DISPATCH_NEEDED: { audience: 'OPERATIONS', severity: 'INFO', title: 'An order needs a driver', body: 'Automatic assignment could not place this order; assign a driver.' },
   OPS_TRANSFER_TO_VERIFY: { audience: 'OPERATIONS', severity: 'INFO', title: 'A transfer is waiting for verification', body: 'The customer says the manual transfer was sent.' },

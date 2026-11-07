@@ -338,7 +338,8 @@ export class OrderCreationService {
 
     for (const seg of plan.segments) {
       const { group, groupView, branch, groupIndex: i } = seg;
-      const autoAcceptEnabled = branch?.autoAcceptEnabled ?? false;
+      // R12: AUTO accepts on placement (every checkout check has already passed); VENDOR and HATLY start PENDING.
+      const autoAcceptEnabled = branch ? (branch.acceptanceMode ? branch.acceptanceMode === 'AUTO' : branch.autoAcceptEnabled === true) : false;
       const subtotalPlan = plan.subtotalPlansByGroupIndex.get(i);
       const adHocLocations = plan.delivery.adHocLocations ?? {
         pickupLatitude: null,

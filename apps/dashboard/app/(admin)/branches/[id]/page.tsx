@@ -448,7 +448,7 @@ export default function BranchDetailPage() {
         </form>
       </div>
 
-      <BranchAcceptanceMode branchId={branch.id} autoAcceptEnabled={branch.autoAcceptEnabled === true} onChanged={refresh} />
+      <BranchAcceptanceMode branchId={branch.id} mode={branch.acceptanceMode ?? (branch.autoAcceptEnabled ? 'AUTO' : 'VENDOR')} onChanged={refresh} />
       <div id="sec-hours" className="scroll-mt-16"><BranchHoursEditor key={`${branch.id}-${JSON.stringify(branch.openingHours)}-${branch.preparationTimeMinutes ?? ''}`} initialHours={branch.openingHours as any} initialPrep={branch.preparationTimeMinutes ?? null} canEdit onSave={async (openingHours, preparationTimeMinutes) => { await updateVendorBranch(branch.id, { openingHours: openingHours as any, preparationTimeMinutes }); await refresh(); }} /></div>
       <div id="sec-closures" className="scroll-mt-16"><BranchClosures scope="admin" branchId={branch.id} onChanged={refresh} /></div>
 

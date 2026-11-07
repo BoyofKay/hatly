@@ -31,6 +31,12 @@ export async function setBranchAutoAccept(branchId: string, autoAcceptEnabled: b
   await apiClient.patch(`/admin/vendor-branches/${branchId}/auto-accept`, { autoAcceptEnabled });
 }
 
+export type AcceptanceMode = 'AUTO' | 'VENDOR' | 'HATLY';
+/** R12: `PATCH admin/vendor-branches/:id/acceptance-mode` — who accepts the branch's new orders. */
+export async function setBranchAcceptanceMode(branchId: string, mode: AcceptanceMode): Promise<void> {
+  await apiClient.patch(`/admin/vendor-branches/${branchId}/acceptance-mode`, { mode });
+}
+
 export interface RefundToSend {
   eventId: string;
   orderId: string | null;
