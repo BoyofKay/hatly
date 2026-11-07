@@ -49,12 +49,15 @@ export default function VendorOrdersBoard() {
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
   const inFlight = useRef<string | null>(null);
 
-  useEffect(() => { setOpenId(new URLSearchParams(window.location.search).get('order')); }, []);
+  // Read the address once, then keep it in step — never write before it was read (a write first would drop a shared ?order= link).
+  const [urlRead, setUrlRead] = useState(false);
+  useEffect(() => { setOpenId(new URLSearchParams(window.location.search).get('order')); setUrlRead(true); }, []);
   useEffect(() => {
+    if (!urlRead) return;
     const p = new URLSearchParams();
     if (openId) p.set('order', openId);
     window.history.replaceState(null, '', p.toString() ? `?${p}` : window.location.pathname);
-  }, [openId]);
+  }, [openId, urlRead]);
 
   const cards = useMemo<BoardCard[]>(() => (orders ?? []).flatMap((o) => o.segments.map((s) => ({ order: o, segment: s }))), [orders]);
   const since = (x: BoardCard) => new Date(x.segment.createdAt ?? 0).getTime();

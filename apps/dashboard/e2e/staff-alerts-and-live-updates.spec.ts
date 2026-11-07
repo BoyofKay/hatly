@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { SUPER_ADMIN_STORAGE_STATE, VENDOR_A_STORAGE_STATE } from './env';
-import { adminApi, cancelTestOrder, orderDetail, placeReadyOrder, withAutomaticDispatch } from './control-tower-fixtures';
+import { adminApi, cancelTestOrder, orderDetail, placeReadyOrder, vendorApi, withAutomaticDispatch } from './control-tower-fixtures';
 
 /**
  * Slice 2 in a real browser against the real backend: the alerts bell (Operations and vendor), financially isolated cases in the Operations
@@ -11,6 +11,8 @@ test.describe('Staff alerts, isolated cases and live updates', () => {
 
   test('a vendor sees the alert Operations raised, opens it, and the unread count goes down', async ({ browser }) => {
     await withAutomaticDispatch(false, async () => {
+      // Start from a readable count: after many runs the fixture vendor can hold over 99 unread alerts, which the bell shows as "99+".
+      await vendorApi().post('/staff/notifications/read-all');
       const order = await placeReadyOrder();
       const detail = await orderDetail(order.orderId);
       const marked = await adminApi().post(`/admin/orders/segments/${order.segmentId}/unavailable-items`, { itemIds: [detail.segments[0].items[0].id] });
