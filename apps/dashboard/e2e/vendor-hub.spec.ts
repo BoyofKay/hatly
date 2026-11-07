@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { SUPER_ADMIN_STORAGE_STATE, VENDOR_A_BRANCH_ID, VENDOR_A_STORAGE_STATE } from './env';
-import { cancelTestOrder, placeNewOrder, vendorApi } from './control-tower-fixtures';
+import { adminApi, cancelTestOrder, placeNewOrder, vendorApi } from './control-tower-fixtures';
 
 /**
  * The Vendor Business Hub in a real browser against the real backend: Arabic-first and right-to-left by default, every hub page renders real data
@@ -60,28 +60,44 @@ test.describe('Vendor Business Hub', () => {
     }
   });
 
-  test('the branch switch and the weekly hours change the backend (and are undone)', async ({ page }) => {
+  // R8/R44 (decision register 2026-11-07): pausing/reopening and new weekly hours are REQUESTS that Hatly approves; preparation time applies at once.
+  test('the branch switch and the weekly hours send requests to Hatly; hours apply only once approved (and everything is undone)', async ({ page }) => {
     const before = (await vendorApi().get(`/vendor/branches/${VENDOR_A_BRANCH_ID}`)).data.data;
+    const pending = async () => ((await vendorApi().get(`/vendor/branches/${VENDOR_A_BRANCH_ID}/change-requests`)).data.data as any[]).filter((r) => r.status === 'PENDING');
     try {
       await page.goto('/my-branches');
       await expect(page.getByRole('heading', { level: 1, name: 'My branches' })).toBeVisible();
       const sw = page.getByRole('switch').first();
       const was = (await sw.getAttribute('aria-checked')) === 'true';
       await sw.click();
-      await expect.poll(async () => (await vendorApi().get(`/vendor/branches/${VENDOR_A_BRANCH_ID}`)).data.data.isOpen).toBe(!was);
-      await sw.click();
-      await expect.poll(async () => (await vendorApi().get(`/vendor/branches/${VENDOR_A_BRANCH_ID}`)).data.data.isOpen).toBe(was);
+      await expect.poll(async () => (await pending()).map((r) => r.kind)).toContain(was ? 'PAUSE' : 'REOPEN');
+      expect((await vendorApi().get(`/vendor/branches/${VENDOR_A_BRANCH_ID}`)).data.data.isOpen).toBe(was); // unchanged until approved
+      const list = page.getByTestId(`branch-requests-${VENDOR_A_BRANCH_ID}`);
+      await expect(list).toContainText('Waiting for Hatly');
+      await list.getByRole('button', { name: 'Withdraw' }).first().click();
+      await expect.poll(async () => (await pending()).length).toBe(0);
 
-      // The manager edits Monday's hours and the preparation time.
+      // The manager edits Monday's hours and the preparation time: the time applies now, the hours wait for Hatly.
       const hours = page.getByTestId(`hours-${VENDOR_A_BRANCH_ID}`);
+      // A store with no weekly hours takes orders at any time; the editor says so instead of showing every day as closed.
+      if (!before.openingHours || Object.keys(before.openingHours).length === 0) await expect(page.getByTestId('no-hours-note')).toBeVisible();
+      const monday = hours.locator('li').filter({ hasText: 'Monday' }).getByRole('checkbox');
+      if (!(await monday.isChecked())) await monday.check();
       await hours.getByLabel('Monday opens').fill('08:30');
       await hours.getByLabel('Monday closes').fill('21:45');
       await page.getByLabel('Preparation time (minutes)').fill('35');
       await page.getByRole('button', { name: 'Save', exact: true }).click();
-      await expect.poll(async () => (await vendorApi().get(`/vendor/branches/${VENDOR_A_BRANCH_ID}`)).data.data).toMatchObject({ preparationTimeMinutes: 35, openingHours: { mon: { open: '08:30', close: '21:45' } } });
+      await expect.poll(async () => (await vendorApi().get(`/vendor/branches/${VENDOR_A_BRANCH_ID}`)).data.data.preparationTimeMinutes).toBe(35);
+      await expect.poll(async () => (await pending()).map((r) => r.kind)).toEqual(['HOURS']);
+      expect((await vendorApi().get(`/vendor/branches/${VENDOR_A_BRANCH_ID}`)).data.data.openingHours).toEqual(before.openingHours);
+      const [req] = await pending();
+      expect((await adminApi().post(`/admin/branch-change-requests/${req.id}/approve`, {})).status).toBe(201);
+      expect((await vendorApi().get(`/vendor/branches/${VENDOR_A_BRANCH_ID}`)).data.data).toMatchObject({ openingHours: { mon: { open: '08:30', close: '21:45' } } });
     } finally {
-      await vendorApi().patch(`/vendor/branches/${VENDOR_A_BRANCH_ID}`, { openingHours: before.openingHours, preparationTimeMinutes: before.preparationTimeMinutes });
-      await vendorApi().patch(`/vendor/branches/${VENDOR_A_BRANCH_ID}`, { isOpen: before.isOpen });
+      for (const r of await pending().catch(() => [] as any[])) await vendorApi().post(`/vendor/branches/${VENDOR_A_BRANCH_ID}/change-requests/${r.id}/withdraw`).catch(() => undefined);
+      await adminApi().patch(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}`, { openingHours: before.openingHours ?? {} }).catch(() => undefined);
+      await vendorApi().patch(`/vendor/branches/${VENDOR_A_BRANCH_ID}`, { preparationTimeMinutes: before.preparationTimeMinutes }).catch(() => undefined);
+      await adminApi().patch(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}/${before.isOpen ? 'open' : 'close'}`).catch(() => undefined);
     }
   });
 

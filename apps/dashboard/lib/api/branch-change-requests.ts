@@ -39,7 +39,8 @@ export function describeRequest(r: Pick<BranchChangeRequest, 'kind' | 'payload'>
     case 'HOURS': {
       const h = r.payload?.openingHours ?? {};
       const days = Object.entries(h).map(([d, v]: [string, any]) => `${d} ${v.open}–${v.close}`).join(', ');
-      return t(`New weekly hours: ${days || 'closed every day'}`, `مواعيد أسبوعية جديدة: ${days || 'مغلق كل الأيام'}`);
+      // Empty hours mean no time limit (R9): the store takes orders whenever it is open.
+      return days ? t(`New weekly hours: ${days}`, `مواعيد أسبوعية جديدة: ${days}`) : t('Remove the weekly hours (take orders at any time while open)', 'إلغاء المواعيد الأسبوعية (استقبال الطلبات في أي وقت أثناء الفتح)');
     }
     case 'CLOSURE': return t(`Temporary closure ${dateTime(r.payload.startsAt)} → ${dateTime(r.payload.endsAt)} (${r.payload.reason})`, `إغلاق مؤقت ${dateTime(r.payload.startsAt)} ← ${dateTime(r.payload.endsAt)} (${r.payload.reason})`);
     case 'CLOSURE_CANCEL': return t('End a closure early (reopen)', 'إنهاء إغلاق مبكرًا (إعادة الفتح)');

@@ -33,6 +33,7 @@ export function BranchHoursEditor({ initialHours, initialPrep, canEdit, onSave }
   }
   return (
     <Card title={t('Weekly hours and preparation time', 'المواعيد الأسبوعية ومدة التحضير')}>
+{Object.keys(hours).length === 0 && <p className="mb-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-800" data-testid="no-hours-note">{t('No weekly hours are set, so the store takes orders at any time while it is open. Tick the days you open to set hours — days left unticked will then be closed.', 'لا توجد مواعيد أسبوعية، لذلك يستقبل المتجر الطلبات في أي وقت طالما هو مفتوح. حدّد الأيام التي تعمل فيها لضبط المواعيد — الأيام غير المحددة ستكون مغلقة حينها.')}</p>}
       <ul className="space-y-2" data-testid="admin-hours">
         {DAYS.map(([d, en, ar]) => {
           const h = hours[d];
@@ -46,7 +47,7 @@ export function BranchHoursEditor({ initialHours, initialPrep, canEdit, onSave }
                   <span className="text-gray-400">→</span>
                   <input aria-label={t(`${en} closes`, `${ar} يغلق`)} type="time" disabled={!canEdit} value={h.close} onChange={(e) => setDay(d, { close: e.target.value })} className="min-h-[40px] rounded-lg border border-gray-300 px-2 text-sm disabled:bg-gray-100" />
                 </>
-              ) : <span className="text-xs text-gray-400">{t('Closed all day', 'مغلق طوال اليوم')}</span>}
+              ) : <span className="text-xs text-gray-400">{Object.keys(hours).length === 0 ? t('No set hours', 'بدون مواعيد محددة') : t('Closed all day', 'مغلق طوال اليوم')}</span>}
             </li>
           );
         })}

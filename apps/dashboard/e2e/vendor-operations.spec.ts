@@ -79,13 +79,14 @@ test.describe('Vendor — operations', () => {
     }
   });
 
-  test('closures: scheduling a closure closes the branch to customers right away, and cancelling reopens it', async ({ page }) => {
+  // R44 (decision register 2026-11-07): a vendor REQUESTS a closure and its early end; each takes effect only when Hatly approves it.
+  test('closures: a closure request waits for Hatly; once approved the branch is closed to customers; an approved early end reopens it', async ({ page }) => {
+    const approve = async (id: string) => expect((await adminApi().post(`/admin/branch-change-requests/${id}/approve`, {})).status).toBe(201);
     await page.goto('/my-branches');
     const box = page.getByTestId(`closures-${VENDOR_A_BRANCH_ID}`);
     await expect(box).toBeVisible();
     await page.getByTestId(`closure-new-${VENDOR_A_BRANCH_ID}`).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Reason').fill(`PW water cut ${unique()}`);
     // A reason shorter than 3 characters is refused by the server and the refusal is shown.
     await dialog.getByLabel('Reason').fill('x');
     await dialog.getByRole('button', { name: 'Schedule', exact: true }).click();
@@ -96,20 +97,31 @@ test.describe('Vendor — operations', () => {
       dialog.getByRole('button', { name: 'Schedule', exact: true }).click(),
     ]);
     expect(created.status()).toBe(201);
-    const closureId = (await created.json()).data.id as string;
+    const request = (await created.json()).data.request as { id: string; kind: string; status: string };
+    expect(request).toMatchObject({ kind: 'CLOSURE', status: 'PENDING' });
+    let closureId: string | null = null;
     try {
+      await expect(page.getByTestId(`branch-requests-${VENDOR_A_BRANCH_ID}`)).toContainText('Waiting for Hatly');
+      await expect(box).not.toContainText('Closed to customers'); // nothing changes before approval
+      await approve(request.id);
+      closureId = (await adminApi().get(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}/closures`)).data.data.current.active.id;
+      await page.reload();
       await expect(box).toContainText('Closed to customers');
       await expect(page.getByText('Closed by a scheduled closure')).toBeVisible();
-      const publicView = await adminApi().get(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}/closures`);
-      expect(publicView.data.data.current.active.id).toBe(closureId);
+
       await box.getByRole('button', { name: 'Cancel', exact: true }).first().click();
-      await Promise.all([
+      const [ended] = await Promise.all([
         page.waitForResponse((r) => r.url().endsWith(`/closures/${closureId}`) && r.request().method() === 'DELETE' && r.ok()),
         page.getByRole('dialog').getByRole('button', { name: 'Cancel closure' }).click(),
       ]);
+      await expect(box).toContainText('Closed to customers'); // the early end also waits for Hatly
+      await approve((await ended.json()).data.request.id);
+      await page.reload();
       await expect(box).not.toContainText('Closed to customers');
     } finally {
-      await adminApi().delete(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}/closures/${closureId}`).catch(() => undefined);
+      const reqs = (await adminApi().get('/admin/branch-change-requests', { params: { status: 'PENDING' } })).data.data as any[];
+      for (const r of reqs.filter((x) => x.branchId === VENDOR_A_BRANCH_ID)) await adminApi().post(`/admin/branch-change-requests/${r.id}/reject`, { note: 'test cleanup' }).catch(() => undefined);
+      if (closureId) await adminApi().delete(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}/closures/${closureId}`).catch(() => undefined);
     }
   });
 

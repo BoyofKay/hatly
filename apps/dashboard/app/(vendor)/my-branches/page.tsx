@@ -50,6 +50,7 @@ function BranchCard({ id, reloadKey = 0, onRequested }: { id: string; reloadKey?
     >
       <p className="mb-3 text-xs text-gray-500"><bdi>{b.address}</bdi> · {b.deliveryEnabled ? t('Delivery', 'توصيل') : ''}{b.deliveryEnabled && b.pickupEnabled ? ' + ' : ''}{b.pickupEnabled ? t('Pickup', 'استلام') : ''}{b.autoAcceptEnabled ? ` · ${t('Orders are accepted automatically', 'تُقبل الطلبات تلقائيًا')}` : ''}</p>
       <h3 className="mb-2 text-sm font-semibold">{t('Weekly hours', 'مواعيد العمل الأسبوعية')}</h3>
+{Object.keys(hours).length === 0 && <p className="mb-2 rounded-lg bg-blue-50 p-2 text-xs text-blue-800" data-testid="no-hours-note">{t('No weekly hours are set, so the store takes orders at any time while it is open. Tick the days you open to set hours — days left unticked will then be closed.', 'لا توجد مواعيد أسبوعية، لذلك يستقبل المتجر الطلبات في أي وقت طالما هو مفتوح. حدّد الأيام التي تعمل فيها لضبط المواعيد — الأيام غير المحددة ستكون مغلقة حينها.')}</p>}
       <ul className="space-y-2" data-testid={`hours-${b.id}`}>
         {DAYS.map(([d, en, ar]) => {
           const h = hours[d];
@@ -63,7 +64,7 @@ function BranchCard({ id, reloadKey = 0, onRequested }: { id: string; reloadKey?
                   <span className="text-gray-400">→</span>
                   <input aria-label={t(`${en} closes`, `${ar} يغلق`)} type="time" disabled={!b.canEditProfile} value={h.close} onChange={(e) => setDay(d, { close: e.target.value })} className="rounded-lg border border-gray-300 px-2 py-1 text-sm disabled:bg-gray-100" />
                 </>
-              ) : <span className="text-xs text-gray-400">{t('Closed all day', 'مغلق طوال اليوم')}</span>}
+              ) : <span className="text-xs text-gray-400">{Object.keys(hours).length === 0 ? t('No set hours', 'بدون مواعيد محددة') : t('Closed all day', 'مغلق طوال اليوم')}</span>}
             </li>
           );
         })}
