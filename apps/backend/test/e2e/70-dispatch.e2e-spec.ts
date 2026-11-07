@@ -95,7 +95,7 @@ describe('E2E — dispatch & drivers', () => {
       expect(await driverRow(dFar)).toMatchObject({ is_available: true });
     });
 
-    it('skips drivers who are offline, unverified, without a known location, unavailable, or outside the pickup service area', async () => {
+    it('prefers a driver with GPS (nearest first) over one without; skips drivers who are offline, unverified, unavailable, or outside the pickup service area', async () => {
       const eligible = await s.driver({ ...far }); // the ONLY valid one, and the farthest
       const offline = await s.driver({ ...near });
       const pending = await s.driver({ ...near });
@@ -129,6 +129,21 @@ describe('E2E — dispatch & drivers', () => {
       await world.ds.query('DELETE FROM dispatch_alerts');
       await setVehicle(null);
       await world.ds.query('DELETE FROM vehicle_types WHERE id = $1', [bicycleType.id]);
+    });
+
+    it('R14: GPS is never mandatory — with no GPS driver available, drivers without a location are assigned in turn (least recently assigned first)', async () => {
+      await retireAllDrivers();
+      const first = await s.driver({ ...near });
+      const second = await s.driver({ ...near });
+      await world.ds.query('UPDATE drivers SET last_latitude = NULL, last_longitude = NULL WHERE id = ANY($1)', [[first.driverId, second.driverId]]);
+      const [a, b] = [first.driverId, second.driverId].sort(); // neither was ever assigned → stable order by id
+      const o1 = await readyOrder();
+      expect((await deliveryRow(o1.id)).driver_id).toBe(a);
+      await finish(o1.id);
+      const o2 = await readyOrder();
+      expect((await deliveryRow(o2.id)).driver_id).toBe(b); // the other one's turn: `a` was just assigned
+      await finish(o2.id);
+      await retireAllDrivers();
     });
 
     it('with no eligible driver the order waits at READY_FOR_PICKUP, raises a dispatch alert, and is listed for manual dispatch', async () => {

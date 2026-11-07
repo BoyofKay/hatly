@@ -94,11 +94,17 @@ export class DriverRankingService {
     const maxBicycleDistanceMeters = await this.businessConfigService.getMaxBicyclePickupDistanceMeters();
 
     const withDistance: Array<{ driverId: string; distanceMeters: number }> = [];
+    // R14 (decision register 2026-11-06): GPS proximity when available; otherwise round-robin among the available drivers. GPS is never
+    // mandatory for eligibility — a driver with no known location (or whose distance cannot be computed) is still a candidate, AFTER every
+    // driver ranked by proximity, in turn (least recently assigned first). Bicycles stay excluded without a location: their road-distance
+    // limit cannot be checked.
+    const withoutGps: string[] = [];
     const straightLine = isMapsDisabled(this.mapProvider);
     let bicyclesExcluded = 0;
     for (const driver of eligibleDrivers) {
       if (driver.lastLatitude == null || driver.lastLongitude == null) {
-        continue; // no known location — cannot rank
+        if (!(await this.isBicycleDriver(driver))) withoutGps.push(driver.id);
+        continue;
       }
 
       // ServiceArea boundary — additive, does not replace or alter the
@@ -134,7 +140,9 @@ export class DriverRankingService {
           );
           distanceMeters = result.distanceMeters;
         } catch {
-          continue; // can't compute distance for this driver — skip, don't fabricate one
+          // can't compute a distance — never fabricate one; R14: such a driver is still eligible, in turn, after the ranked ones
+          if (!isBicycle) withoutGps.push(driver.id);
+          continue;
         }
       }
 
@@ -146,12 +154,25 @@ export class DriverRankingService {
     }
 
     withDistance.sort((a, b) => a.distanceMeters - b.distanceMeters);
+    const inTurn = await this.roundRobinOrder(withoutGps);
     if (straightLine) {
       this.logger.log(
-        `dispatch ranking basis=STRAIGHT_LINE (Maps disabled): order ${order.id} — ${withDistance.length} candidate(s), ${bicyclesExcluded} bicycle driver(s) not auto-ranked`,
+        `dispatch ranking basis=STRAIGHT_LINE (Maps disabled): order ${order.id} — ${withDistance.length} candidate(s), ${bicyclesExcluded} bicycle driver(s) not auto-ranked, ${inTurn.length} without GPS in turn`,
       );
     }
-    return withDistance.map((d) => d.driverId);
+    return [...withDistance.map((d) => d.driverId), ...inTurn];
+  }
+
+  /** R14 round-robin: the driver assigned longest ago (or never) first; ties by id so the order is stable. */
+  private async roundRobinOrder(driverIds: string[]): Promise<string[]> {
+    if (driverIds.length <= 1) return driverIds;
+    const rows: Array<{ driver_id: string; last: Date | null }> =
+      (await (this.driversRepository as unknown as { query?: (sql: string, p: unknown[]) => Promise<any[]> }).query?.(
+        `SELECT driver_id, max(assigned_at) AS last FROM deliveries WHERE driver_id = ANY($1) GROUP BY driver_id`,
+        [driverIds],
+      )) ?? [];
+    const last = new Map(rows.map((r) => [r.driver_id, r.last ? new Date(r.last).getTime() : 0]));
+    return [...driverIds].sort((a, b) => (last.get(a) ?? 0) - (last.get(b) ?? 0) || a.localeCompare(b));
   }
 
   private async isBicycleDriver(driver: Driver): Promise<boolean> {

@@ -23,6 +23,7 @@ function buildHarness(opts: {
       ),
     ),
     findOne: jest.fn(async ({ where }: any) => drivers.find((d) => d.id === where.id) ?? null),
+    query: jest.fn(async (): Promise<any[]> => []),
   };
   const vendorBranchesRepository = {
     findOne: jest.fn(async ({ where }: any) => branches.find((b) => b.id === where.id) ?? null),
@@ -57,7 +58,7 @@ function buildHarness(opts: {
     businessConfigService as any,
     serviceAreaResolverService as any,
   );
-  return { service, mapProvider, businessConfigService, serviceAreaResolverService };
+  return { service, mapProvider, businessConfigService, serviceAreaResolverService, driversRepository };
 }
 
 function makeDriver(overrides: Partial<any> = {}) {
@@ -108,13 +109,27 @@ describe('DriverRankingService', () => {
     expect(ranked).toEqual([]);
   });
 
-  it('excludes a driver with no known location — cannot rank without one', async () => {
+  // R14: GPS is never mandatory — a driver without a location is a candidate, after every driver ranked by proximity.
+  it('R14: a driver with no known location is still eligible, after the drivers ranked by distance', async () => {
     const branches = [{ id: 'branch-1', latitude: 30.1, longitude: 31.1 }];
-    const drivers = [makeDriver({ id: 'driver-no-loc', lastLatitude: null, lastLongitude: null })];
-    const { service } = buildHarness({ drivers, branches, distances: {} });
+    const drivers = [makeDriver({ id: 'driver-no-loc', lastLatitude: null, lastLongitude: null }), makeDriver({ id: 'near', lastLatitude: 30.0, lastLongitude: 31.0 })];
+    const { service } = buildHarness({ drivers, branches, distances: { '30,31->30.1,31.1': 500 } });
+    expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['near', 'driver-no-loc']);
+  });
 
-    const ranked = await service.rankCandidates(makeCatalogOrder());
-    expect(ranked).toEqual([]);
+  it('R14: drivers without GPS take turns — the one assigned longest ago (or never) first', async () => {
+    const branches = [{ id: 'branch-1', latitude: 30.1, longitude: 31.1 }];
+    const drivers = ['b', 'a', 'c'].map((id) => makeDriver({ id, lastLatitude: null, lastLongitude: null }));
+    const { service, driversRepository } = buildHarness({ drivers, branches });
+    driversRepository.query.mockResolvedValue([{ driver_id: 'a', last: new Date('2026-11-07T10:00:00Z') }, { driver_id: 'b', last: new Date('2026-11-06T10:00:00Z') }]);
+    expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['c', 'b', 'a']);
+  });
+
+  it('R14: a driver whose distance cannot be computed is kept, in turn — never given a made-up distance', async () => {
+    const branches = [{ id: 'branch-1', latitude: 30.1, longitude: 31.1 }];
+    const drivers = [makeDriver({ id: 'unknown-distance', lastLatitude: 29.0, lastLongitude: 30.0 })];
+    const { service } = buildHarness({ drivers, branches, distances: {} });
+    expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['unknown-distance']);
   });
 
   it('FAIL CLOSED: excludes a bicycle driver entirely when no max distance is configured, even if very close', async () => {
@@ -386,7 +401,7 @@ describe('DriverRankingService — Maps disabled (PD-009 G: straight-line rankin
     expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['car']);
   });
 
-  it('keeps every other eligibility rule: no location, other service area, offline', async () => {
+  it('keeps every other eligibility rule: other service area, offline (a driver without GPS is kept, after the ranked ones — R14)', async () => {
     const drivers = [
       makeDriver({ id: 'no-loc', lastLatitude: null, lastLongitude: null }),
       makeDriver({ id: 'offline', isOnline: false }),
@@ -395,7 +410,7 @@ describe('DriverRankingService — Maps disabled (PD-009 G: straight-line rankin
     ];
     const { service, serviceAreaResolverService } = disabledHarness(drivers);
     serviceAreaResolverService.resolveForPoint.mockImplementation(async (lat: number) => (lat > 31 ? { id: 'zone-other', isActive: true } : { id: 'zone-default', isActive: true }));
-    expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['ok']);
+    expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['ok', 'no-loc']);
   });
 
   it('admin named-assignment eligibility follows the same straight-line ranking', async () => {
