@@ -411,6 +411,25 @@ Production release `20261107T022800Z-feb790433010` (commit `b969ca2`, bundle ide
 * Dashboard: a store with no weekly hours now says "No set hours — takes orders any time while open" instead of showing every day as "Closed all day" (found during verification; it would have led a vendor who ticks one day to close the rest of the week).
 * **Gates:** backend unit 2,451, e2e 84 suites / 1,139 (one timestamp-coincidence test made robust), integration 314; dashboard tsc/unit 45/build; Playwright on the isolated stack: release1-register (incl. the Store Requests flow), vendor-operations, vendor-hub (rewritten for the request flow), notification-center, staff-alerts, settings, order-detail ✔; admin-nav has a pre-existing dev-server timing flake (a different link each run). Backup `hatly-prod-20261107T023124Z.dump` (sha `1595bab0…`), restore drill OK, off-host copy matched. Live: health ok, 0 backend errors, new endpoints 401 without a session, Store Requests page and new wording served, 0 requests, 32 stores open.
 
+## 3al. Release 2 package C (2026-11-07) — DEPLOYED and verified
+
+Production release `20261107T035612Z-d19b76161a80` (commit `99d8764`, bundle identical to the commit) LIVE; rollback target `20261107T022800Z-feb790433010` (2B). One migration: `ProductGovernance1700007500000` (adds `products.approval_status`, default APPROVED, and the `product_change_requests` table; schema 76). All 226 existing products are APPROVED → the live catalog is unchanged (public counts verified).
+* **R7 — product governance:** for vendors, a **price reduction** and stock/quantity/availability apply directly. A **price increase**, a **new product** and **detail changes** (name, description, category, photo, options) go to Hatly. The approved version stays live until then.
+  * A new product is saved "waiting" and unavailable, and is invisible to customers (not even listed as unavailable).
+  * Edits to a live product are merged into one waiting request per product.
+  * Option changes are one request each. They are checked by a rolled-back dry run, so a change that could never apply is refused at once.
+  * Hatly approves or rejects (with a note) under Products → **Product Requests**, and gets a staff alert; the vendor gets an alert either way.
+  * A rejected new product can be resent by editing it.
+  * Vendors see their requests on the Products page and can withdraw a pending change.
+* **Excel:** a vendor import follows the same rule per row. The result reports how many rows were sent for approval. An Admin import applies directly.
+* Admin edits apply directly. Hatly making a waiting product available (activate or bulk "Make available") counts as the approval.
+* **Gates:**
+  * backend unit 2,457; e2e 85 suites / 1,146 (new suite 135 plus 7 suites adapted to R7); integration 314;
+  * dashboard tsc, unit 45, build;
+  * Playwright on the isolated stack: release1-register (incl. two new 2C tests), vendor-product-options (rewritten), vendor-errors, vendor-hub, vendor-operations, notification-center, settings, order-detail ✔.
+* **Deploy:** backup `hatly-prod-20261107T035917Z.dump` (sha `367d0717…`), restore drill OK, off-host copy matched.
+* **Live:** health ok, 0 backend errors, new endpoints 401 without a session, the Product Requests page is served, 0 requests.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
