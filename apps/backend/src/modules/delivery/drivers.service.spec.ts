@@ -183,6 +183,7 @@ describe('DriversService.setVehicleType (Operational Completion milestone)', () 
     const driversRepository = {
       findOne: jest.fn(async () => opts.driver ?? null),
       update: jest.fn(async () => undefined),
+      manager: { query: jest.fn(async () => []) },
       save: jest.fn(),
       find: jest.fn(async () => (opts.driver ? [{ ...opts.driver, user: { fullName: 'D', phone: '+20' } }] : [])),
     };

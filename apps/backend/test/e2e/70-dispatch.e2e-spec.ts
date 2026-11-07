@@ -180,6 +180,69 @@ describe('E2E — dispatch & drivers', () => {
     });
   });
 
+  describe('R18: several active orders up to the vehicle capacity; audited override', () => {
+    const setVehicle = async (d: DriverFixture, vehicleTypeId: string | null) =>
+      expectData(await world.api('patch', `/admin/drivers/${d.driverId}/vehicle-type`, { token: superAdmin.accessToken, body: { vehicleTypeId } }));
+    const capacity = (d: DriverFixture, body: unknown, who: Actor = superAdmin) => world.api('patch', `/admin/drivers/${d.driverId}/capacity`, { token: who.accessToken, body });
+
+    it('a driver takes orders up to the vehicle capacity; the next one waits; finishing one makes room and the waiting order is assigned', async () => {
+      const d = await s.driver({ ...near });
+      const [vt] = await world.ds.query("INSERT INTO vehicle_types (name, max_active_deliveries, is_bicycle) VALUES ('Van R18', 2, false) RETURNING id");
+      await setVehicle(d, vt.id);
+      try {
+        const o1 = await readyOrder();
+        expect((await deliveryRow(o1.id)).driver_id).toBe(d.driverId);
+        expect((await driverRow(d)).is_available).toBe(true); // 1 of 2
+        const o2 = await readyOrder();
+        expect((await deliveryRow(o2.id)).driver_id).toBe(d.driverId);
+        expect((await driverRow(d)).is_available).toBe(false); // full
+        const o3 = await readyOrder();
+        expect(await status(o3.id)).toBe('READY_FOR_PICKUP');
+        await finish(o1.id);
+        expect((await driverRow(d)).is_available).toBe(true);
+        await world.ds.query("UPDATE dispatch_alerts SET updated_at = now() - interval '1 hour' WHERE order_id = $1", [o3.id]); // past the retry interval
+        await world.app.get(AutomaticDispatchService).retryOpenAlerts();
+        expect((await deliveryRow(o3.id)).driver_id).toBe(d.driverId);
+        await finish(o2.id);
+        await finish(o3.id);
+        expect((await driverRow(d)).is_available).toBe(true);
+      } finally {
+        await setVehicle(d, null);
+        await world.ds.query('DELETE FROM vehicle_types WHERE id = $1', [vt.id]);
+        await world.ds.query('DELETE FROM dispatch_alerts');
+      }
+    });
+
+    it('an override needs OVERRIDE_DISPATCH and a reason, records approver/time/before/after, and lowering it never takes an order away', async () => {
+      const d = await s.driver({ ...near });
+      const o1 = await readyOrder();
+      expect((await deliveryRow(o1.id)).driver_id).toBe(d.driverId);
+      expect((await driverRow(d)).is_available).toBe(false); // default capacity 1
+      const assigner = await s.admin([Permission.ASSIGN_REASSIGN_ORDERS], 'Assigner Only');
+      expect((await capacity(d, { capacity: 3, reason: 'Evening rush' }, assigner)).status).toBe(403);
+      expect((await capacity(d, { capacity: 3, reason: 'x' })).status).toBe(400);
+      expect((await capacity(d, { capacity: 0, reason: 'Too low' })).status).toBe(400);
+
+      const up = expectData<any>(await capacity(d, { capacity: 3, reason: 'Evening rush, car with a large box' }));
+      expect(up).toMatchObject({ capacity: 3, active: 1, override: 3 });
+      expect(up.history[0]).toMatchObject({ beforeOverride: null, afterOverride: 3, effectiveBefore: 1, effectiveAfter: 3, reason: 'Evening rush, car with a large box' });
+      expect(up.history[0].approvedBy).toBeTruthy();
+      expect((await driverRow(d)).is_available).toBe(true);
+      const o2 = await readyOrder();
+      expect((await deliveryRow(o2.id)).driver_id).toBe(d.driverId);
+
+      const down = expectData<any>(await capacity(d, { capacity: 1, reason: 'Back to normal' }));
+      expect(down).toMatchObject({ capacity: 1, active: 2 });
+      expect((await driverRow(d)).is_available).toBe(false);
+      expect((await deliveryRow(o1.id)).driver_id).toBe(d.driverId); // nothing taken away
+      expect((await deliveryRow(o2.id)).driver_id).toBe(d.driverId);
+      expect(expectData<any>(await capacity(d, { capacity: null, reason: 'Use the vehicle capacity' }))).toMatchObject({ override: null, capacity: 1 });
+      expect((await world.ds.query(`SELECT count(*)::int AS n FROM admin_audit_logs WHERE action = 'driver.capacity_overridden' AND target_id = $1`, [d.driverId]))[0].n).toBe(3);
+      await finish(o1.id);
+      await finish(o2.id);
+    });
+  });
+
   describe('contention', () => {
     it('one driver, three orders becoming ready at the same instant → exactly one is assigned, the driver is never double-booked', async () => {
       const d = await s.driver({ ...near });

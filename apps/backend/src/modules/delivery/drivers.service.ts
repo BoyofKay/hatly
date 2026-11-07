@@ -1,3 +1,4 @@
+import { recomputeDriverAvailability } from './driver-capacity';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -159,6 +160,7 @@ export class DriversService {
       }
     }
     await this.driversRepository.update({ id: driverId }, { vehicleTypeId });
+    await recomputeDriverAvailability(this.driversRepository.manager, [driverId]); // R18: the vehicle sets the capacity
     const [view] = await this.listAll({ driverId });
     return view;
   }

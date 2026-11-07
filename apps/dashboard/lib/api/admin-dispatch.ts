@@ -127,3 +127,19 @@ export async function listDispatchAlerts(openOnly = false): Promise<DispatchAler
   const res = await apiClient.get('/admin/dispatch-alerts', { params: openOnly ? { open: true } : {} });
   return res.data.data;
 }
+
+/** R18: a driver's capacity (active orders at once), current load and the override history. */
+export interface DriverCapacity {
+  capacity: number;
+  active: number;
+  override: number | null;
+  vehicleCapacity: number | null;
+  history: Array<{ beforeOverride: number | null; afterOverride: number | null; effectiveBefore: number; effectiveAfter: number; reason: string; approvedBy: string; at: string }>;
+}
+export async function getDriverCapacity(driverId: string): Promise<DriverCapacity> {
+  return (await apiClient.get(`/admin/drivers/${driverId}/capacity`)).data.data;
+}
+/** R18: override (or clear with null) one driver's capacity — OVERRIDE_DISPATCH, reason required. */
+export async function setDriverCapacity(driverId: string, capacity: number | null, reason: string): Promise<DriverCapacity> {
+  return (await apiClient.patch(`/admin/drivers/${driverId}/capacity`, { capacity, reason })).data.data;
+}

@@ -4,6 +4,7 @@ import { VehicleTypesService } from './vehicle-types.service';
 function buildMockRepo(initial: Array<any> = []) {
   const rows = [...initial];
   return {
+    manager: { query: jest.fn(async () => []) },
     find: jest.fn(async ({ where }: { where?: { isActive?: boolean } } = {}) => {
       if (where?.isActive === undefined) return [...rows];
       return rows.filter((r) => r.isActive === where.isActive);

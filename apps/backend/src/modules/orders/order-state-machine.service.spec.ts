@@ -21,6 +21,12 @@ const noopWalletRefund = { refundExcess: jest.fn(async () => 0), effectiveWallet
 const deliveryTimestampWrites: Array<{ set: Record<string, unknown>; orderId: unknown }> = [];
 /** Driver-availability releases (Group 8): `UPDATE drivers SET is_available = true` scoped to an order's delivery. */
 const driverReleases: Array<{ orderId: unknown }> = [];
+/** R18: the release recomputes the holder's capacity through raw SQL — record it as a release of that order's driver. */
+async function driverQuery(sql: string, params: unknown[] = []): Promise<any[]> {
+  if (/SELECT driver_id FROM deliveries WHERE order_id/.test(sql)) return [{ driver_id: 'driver-1', orderId: params[0] }].map(({ driver_id }) => ({ driver_id }));
+  if (/UPDATE drivers d SET is_available/.test(sql)) driverReleases.push({ orderId: params[2] });
+  return [];
+}
 function deliveryUpdateQueryBuilder() {
   const call: { entity?: string; set: Record<string, unknown>; orderId: unknown } = { set: {}, orderId: undefined };
   const qb: any = {
@@ -64,6 +70,7 @@ function buildHarness(order: any, segmentItems: any[] = [], delivery?: { driverI
     // test's implicit "this order's inventory restoration is not
     // being exercised" assumption.
     find: async (_EntityClass: any, _opts: any) => (segmentItems.length > 0 ? [{ id: 'segment-1', orderId: store.id }] : []),
+    query: driverQuery,
     createQueryBuilder: (EntityClass: any, _alias?: string) => {
       if (EntityClass && EntityClass.name === 'OrderItem') {
         const qb: any = { where: () => qb, getMany: async () => segmentItems };
@@ -147,8 +154,8 @@ function buildInventoryHarness(params: {
   const manager = {
     // The order id of a segment and the stock-ledger context (a no-op for this fake store). R40: `servicePurchased` fakes a driver's
     // recorded Hatly Service purchase.
-    query: async (sql: string) =>
-      sql.includes('ad_hoc_purchase_records')
+    query: async (sql: string, p: unknown[] = []) =>
+      /drivers|driver_id FROM deliveries/.test(sql) ? driverQuery(sql, p) : sql.includes('ad_hoc_purchase_records')
         ? (params.servicePurchased ? [{ order_id: 'order-1' }] : [])
         : sql.includes('order_vendor_segments') ? [{ order_id: 'order-1' }] : [{ set_config: '' }],
     findOne: async (_EntityClass: any, _opts: any) => ({ ...store }),
@@ -493,6 +500,7 @@ describe('OrderStateMachineService — post-commit financial hook never blocks a
   it('still returns the successfully-updated order even when OrderFinancialEventsService.handleTransition() throws', async () => {
     const store = { id: 'order-1', status: OrderStatus.PENDING };
     const manager = {
+      query: driverQuery,
       createQueryBuilder: () => deliveryUpdateQueryBuilder(),
       findOne: async () => ({ ...store }),
       save: async (entity: any) => {
@@ -555,7 +563,7 @@ describe('OrderStateMachineService — Weighted Products PICKED_UP gate (Phase G
 
     const manager = {
       // The order id of a segment and the stock-ledger context (a no-op for this fake store).
-  query: async (sql: string) => (sql.includes('order_vendor_segments') ? [{ order_id: 'order-1' }] : [{ set_config: '' }]),
+  query: async (sql: string, p: unknown[] = []) => (/drivers|driver_id FROM deliveries/.test(sql) ? driverQuery(sql, p) : sql.includes('order_vendor_segments') ? [{ order_id: 'order-1' }] : [{ set_config: '' }]),
       findOne: async (EntityClass: any, _opts: any) => {
         if (EntityClass === Order) return { ...orderStore };
         throw new Error(`unhandled findOne ${EntityClass.name}`);
@@ -702,6 +710,7 @@ describe('OrderStateMachineService — Best Selling cache hook (Discovery & Rank
   function buildDeliveredHarness(fromStatus: OrderStatus) {
     const store = { id: 'order-1', status: fromStatus };
     const manager = {
+      query: driverQuery,
       createQueryBuilder: () => deliveryUpdateQueryBuilder(),
       findOne: async () => ({ ...store }),
       save: async (entity: any) => {
@@ -770,6 +779,7 @@ describe('OrderStateMachineService — Best Selling cache hook (Discovery & Rank
   it('a failure in recordDeliveredSales never blocks the DELIVERED transition itself — same non-blocking convention as the financial-event hook', async () => {
     const store = { id: 'order-1', status: OrderStatus.ON_THE_WAY };
     const manager = {
+      query: driverQuery,
       createQueryBuilder: () => deliveryUpdateQueryBuilder(),
       findOne: async () => ({ ...store }),
       save: async (entity: any) => {
@@ -819,6 +829,7 @@ describe('OrderStateMachineService — Offers Final System: Flash Sale cancellat
   function buildHarnessWithOfferMock(order: any) {
     const store = { ...order };
     const manager = {
+      query: driverQuery,
       createQueryBuilder: () => deliveryUpdateQueryBuilder(),
       findOne: async (_EntityClass: any, _opts: any) => ({ ...store }),
       save: async (entity: any) => {
@@ -889,6 +900,7 @@ describe('OrderStateMachineService — Loyalty Earning (Chunk C) wiring', () => 
   function buildHarnessWithLoyaltyMock(order: any) {
     const store = { ...order };
     const manager = {
+      query: driverQuery,
       createQueryBuilder: () => deliveryUpdateQueryBuilder(),
       findOne: async (_EntityClass: any, _opts: any) => ({ ...store }),
       save: async (entity: any) => {
@@ -1375,6 +1387,7 @@ describe('OrderStateMachineService — Failed Delivery Metadata (Chunk 1)', () =
         if (EntityClass.name === 'Payment') return { findOne: async () => null };
         throw new Error('unhandled getRepository');
       },
+      query: driverQuery,
       createQueryBuilder: (EntityClass?: unknown) => {
         // Inventory restoration reads OrderItem rows via createQueryBuilder(OrderItem, ...): still forbidden here.
         // The no-arg form is the driver-availability release added in Group 8 (a deliberate, separate effect).
@@ -1418,6 +1431,7 @@ describe('OrderStateMachineService — Failed Delivery Metadata (Chunk 1)', () =
   it('existing CANCELLED behavior remains unchanged (Flash Sale reversal still occurs alongside the FAILED_DELIVERY metadata addition)', async () => {
     const store = { id: 'order-1', status: OrderStatus.PREPARING };
     const manager = {
+      query: driverQuery,
       createQueryBuilder: () => deliveryUpdateQueryBuilder(),
       findOne: async (_EntityClass: any, _opts: any) => ({ ...store }),
       save: async (entity: any) => {
@@ -1471,6 +1485,7 @@ describe('OrderStateMachineService — Customer Push Notifications (Chunk A)', (
         return entity;
       },
       find: async () => [],
+      query: driverQuery,
       createQueryBuilder: (EntityClass?: unknown) =>
         EntityClass === undefined
           ? deliveryUpdateQueryBuilder()
@@ -1600,6 +1615,7 @@ describe('OrderStateMachineService — structured business-event logging (Group 
   function buildLoggingHarness(order: any) {
     const store = { ...order };
     const manager = {
+      query: driverQuery,
       createQueryBuilder: () => deliveryUpdateQueryBuilder(),
       findOne: async (_EntityClass: any, _opts: any) => ({ ...store }),
       save: async (entity: any) => {

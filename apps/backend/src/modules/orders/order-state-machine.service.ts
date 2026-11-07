@@ -1,3 +1,4 @@
+import { recomputeDriverAvailability } from '../delivery/driver-capacity';
 import { notificationTypeForStatus, recordOrderNotification } from '../notifications/customer-notification-events';
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -487,8 +488,7 @@ export class OrderStateMachineService {
     // Assignment marks the driver unavailable (DeliveryAssignmentService) but nothing ever marked
     // them available again, so after ONE delivery a driver could never be dispatched again — the
     // second order of the day sat at READY_FOR_PICKUP forever (found by the Group 8 journeys).
-    // A driver is single-delivery today (vehicle_types.max_active_deliveries is not read anywhere),
-    // so they are free again as soon as their delivery ends or is handed back.
+    // R18: a driver may hold several orders up to their capacity; their availability is recomputed when one ends or is handed back.
     // (Cancelling from READY_FOR_PICKUP frees nobody: no driver holds the order then — a delivery row left behind by an earlier
     // release names a driver who may be on another order by now, and must not be marked available again.)
     const driverHoldsOrder = fromStatus !== OrderStatus.READY_FOR_PICKUP;
@@ -498,12 +498,9 @@ export class OrderStateMachineService {
       (params.to === OrderStatus.CANCELLED && driverHoldsOrder) ||
       (fromStatus === OrderStatus.ASSIGNED_TO_DRIVER && params.to === OrderStatus.READY_FOR_PICKUP);
     if (releasesDriver) {
-      await manager
-        .createQueryBuilder()
-        .update(Driver)
-        .set({ isAvailable: true })
-        .where('id IN (SELECT driver_id FROM deliveries WHERE order_id = :orderId)', { orderId: order.id })
-        .execute();
+      // R18: the order leaves the driver — recompute their spare capacity (other active orders still count).
+      const holders: Array<{ driver_id: string }> = await manager.query(`SELECT driver_id FROM deliveries WHERE order_id = $1 AND driver_id IS NOT NULL`, [order.id]);
+      await recomputeDriverAvailability(manager, holders.map((h) => h.driver_id), { excludeOrderId: order.id });
     }
 
     // R45: a cancellation while a driver is assigned — Operations tell the driver to stop and decide, case by case, whether a trip that had

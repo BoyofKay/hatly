@@ -355,7 +355,7 @@ export class Scenario {
     if (this.vehicleTypeId) return this.vehicleTypeId;
     const superAdmin = await this.superAdmin();
     const vt = expectData(
-      await this.world.api('post', '/admin/vehicle-types', { token: superAdmin.accessToken, body: { name: 'Motorbike', maxActiveDeliveries: 2 } }),
+      await this.world.api('post', '/admin/vehicle-types', { token: superAdmin.accessToken, body: { name: 'Motorbike', maxActiveDeliveries: 1 } }),
       201,
     );
     this.vehicleTypeId = vt.id as string;

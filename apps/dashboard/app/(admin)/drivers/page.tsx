@@ -12,6 +12,7 @@ import {
 } from '../../../lib/api/admin-dispatch';
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { DriverCommissionEditor } from '../../../components/drivers/DriverCommissionEditor';
+import { DriverCapacityEditor } from '../../../components/drivers/DriverCapacityEditor';
 import { ORDER_STATUS, label } from '../../../lib/admin/labels';
 import { I18nProvider, useI18n } from '../../../lib/i18n/i18n';
 import { useLang } from '../../../lib/ui/lang';
@@ -282,6 +283,7 @@ function AdminDriversScreen() {
                   )}
 
                   <DriverCommissionEditor driverId={d.id} basisPoints={d.commissionRateBasisPoints} onSaved={refresh} />
+                  <DriverCapacityEditor driverId={d.id} />
 
                   {vehicleTypes !== null && (
                     <div className="mt-auto border-t border-gray-100 pt-3" data-testid="driver-vehicle">

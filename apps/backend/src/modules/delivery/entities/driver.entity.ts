@@ -30,10 +30,14 @@ export class Driver extends BaseEntity {
   @Column({ name: 'is_online', type: 'boolean', default: false })
   isOnline: boolean;
 
-  // true only while free to accept a new delivery; flipped to false the
-  // instant a delivery is assigned (see DeliveryAssignmentService).
+  // R18: true while the driver has spare capacity (active orders < capacity) — recomputed by driver-capacity.ts whenever
+  // their active deliveries or capacity change.
   @Column({ name: 'is_available', type: 'boolean', default: false })
   isAvailable: boolean;
+
+  /** R18: an Admin override of this driver's capacity (active orders at once); null = the vehicle type's capacity. Audited. */
+  @Column({ name: 'capacity_override', type: 'int', nullable: true })
+  capacityOverride?: number | null;
 
   @Column({ name: 'verification_status', type: 'varchar', length: 20, default: 'PENDING' })
   verificationStatus: 'PENDING' | 'APPROVED' | 'REJECTED';

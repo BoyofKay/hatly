@@ -8,8 +8,7 @@ import { Badge, Button, Card, Column, ConfirmDialog, DataTable, LabeledInput, Mo
 
 /**
  * Vehicle Types — the catalogue drivers choose their vehicle from. Reuses the existing `admin/vehicle-types` endpoints exactly. `maxActiveDeliveries`
- * is scaffolding only today (nothing reads or enforces it yet — see the entity's own comment): this page manages the data the backend already stores,
- * it does not define a business rule. Only a bicycle type limits how far a driver is sent to a pickup. Deactivating is confirmed first.
+ * is each driver's capacity (R18: active orders at once; an Admin may override it per driver, audited). Only a bicycle type limits how far a driver is sent to a pickup. Deactivating is confirmed first.
  */
 export default function VehicleTypesPage() {
   const { t } = useLang();
@@ -127,7 +126,7 @@ export default function VehicleTypesPage() {
         <form id="vt-form" onSubmit={save} className="space-y-3">
           <LabeledInput label={t('Name', 'الاسم')} required value={name} onChange={(e) => setName(e.target.value)} />
           <LabeledInput label={t('Name (Arabic, optional)', 'الاسم (بالعربية، اختياري)')} dir="rtl" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
-          <LabeledInput label={t('Max active deliveries', 'الحد الأقصى للتوصيلات النشطة')} type="number" min={1} step={1} inputMode="numeric" required value={maxActive} onChange={(e) => setMaxActive(e.target.value)} hint={t('Stored for future use; not enforced yet.', 'يُخزَّن للاستخدام المستقبلي؛ لا يُطبَّق بعد.')} />
+          <LabeledInput label={t('Max active deliveries', 'الحد الأقصى للتوصيلات النشطة')} type="number" min={1} step={1} inputMode="numeric" required value={maxActive} onChange={(e) => setMaxActive(e.target.value)} hint={t('How many active orders a driver with this vehicle may carry at once (R18). Applies from the next assignment.', 'عدد الطلبات النشطة التي يحملها السائق بهذه المركبة في وقت واحد. يُطبَّق من الإسناد التالي.')} />
           <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={isBicycle} onChange={(e) => setIsBicycle(e.target.checked)} />{t('Bicycle (subject to the max pickup distance policy)', 'دراجة (تخضع لسياسة الحد الأقصى لمسافة الاستلام)')}</label>
           {formError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
         </form>

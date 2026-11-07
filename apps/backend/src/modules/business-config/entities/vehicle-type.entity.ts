@@ -7,9 +7,8 @@ import { BaseEntity } from '../../../database/base.entity';
  * types and capacity rules are not finalized... design as
  * extensible/configurable", Pre-Phase 3 Dispatch review) rather than
  * a hard-coded enum. This phase only scaffolds the entity + basic
- * CRUD; nothing reads or enforces `maxActiveDeliveries` yet — that's
- * the Route/RouteStop + dispatch-engine rework, a later approved
- * phase. No default rows are seeded here — this migration does not
+ * CRUD. R18 (2026-11-07): `maxActiveDeliveries` IS each driver's
+ * capacity (active orders at once) — see delivery/driver-capacity.ts. No default rows are seeded here — this migration does not
  * invent actual vehicle types or capacity numbers, since those aren't
  * finalized business decisions (see the Phase 2 report).
  */

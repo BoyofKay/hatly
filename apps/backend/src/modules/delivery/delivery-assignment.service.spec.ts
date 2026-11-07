@@ -36,6 +36,11 @@ function buildHarness(
       return entity;
     },
     create: (_EntityClass: any, data: any) => ({ id: 'delivery-1', ...data }),
+    // R18: the driver's availability is recomputed from their active orders and capacity (raw SQL) — recorded as the driver write.
+    query: async (sql: string) => {
+      if (/UPDATE drivers d SET is_available/.test(sql)) writes.push('save:driver');
+      return [];
+    },
     createQueryBuilder: () => {
       const qb: any = { update: () => qb, set: () => qb, where: () => qb, execute: async () => writes.push('resolve-alerts') };
       return qb;
@@ -245,7 +250,7 @@ describe('DeliveryAssignmentService — atomic assignment (Control Tower milesto
   it('assigns in ONE transaction: driver locked out, delivery written, open alerts resolved, READY→ASSIGNED — push only after commit', async () => {
     const h = buildHarness();
     await h.service.assignDriver({ orderId: 'order-1', candidateDriverIds: ['driver-1'] });
-    expect(h.writes).toEqual(['save:driver', 'save:delivery', 'resolve-alerts', 'transition:ASSIGNED_TO_DRIVER']);
+    expect(h.writes).toEqual(['save:delivery', 'save:driver', 'resolve-alerts', 'transition:ASSIGNED_TO_DRIVER']);
     expect(h.afterCommit).toHaveBeenCalledTimes(1);
     expect(h.pushNotificationService.sendOrderAssignedNotification).toHaveBeenCalledTimes(1);
   });
@@ -292,7 +297,7 @@ describe('DeliveryAssignmentService — atomic assignment (Control Tower milesto
     it('releases and re-assigns in ONE transaction; counter +1; the new driver is notified after commit', async () => {
       const h = buildHarness(assigned());
       const delivery = await h.service.reassignDriver({ orderId: 'order-1', newDriverId: 'next', expectedCurrentDriverId: 'old' });
-      expect(h.writes).toEqual(['transition:READY_FOR_PICKUP', 'save:driver', 'save:delivery', 'resolve-alerts', 'transition:ASSIGNED_TO_DRIVER']);
+      expect(h.writes).toEqual(['transition:READY_FOR_PICKUP', 'save:delivery', 'save:driver', 'resolve-alerts', 'transition:ASSIGNED_TO_DRIVER']);
       expect(delivery).toMatchObject({ driverId: 'next', reassignmentCount: 3 });
       expect(h.afterCommit).toHaveBeenCalledTimes(2);
       expect(h.pushNotificationService.sendOrderAssignedNotification).toHaveBeenCalledWith('u-next', 'order-1', 'delivery-1');

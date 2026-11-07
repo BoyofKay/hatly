@@ -1,3 +1,4 @@
+import { recomputeDriverAvailability } from './driver-capacity';
 import { BusinessConfigKey } from '../business-config/business-config-key.enum';
 import { BusinessConfig } from '../business-config/entities/business-config.entity';
 import { resolveAcknowledgementWindowMinutes } from '../business-config/business-config.service';
@@ -270,9 +271,6 @@ export class DeliveryAssignmentService {
     driver: Driver,
     lockedDelivery?: Delivery,
   ): Promise<{ delivery: Delivery; afterCommit: () => Promise<void> }> {
-    driver.isAvailable = false;
-    await manager.save(driver);
-
     const existingDelivery =
       lockedDelivery ?? (await manager.findOne(Delivery, { where: { orderId }, lock: { mode: 'pessimistic_write' } }));
     // R16: acknowledge-by deadline = now + the configured window (default 5 min), read at assignment time; same for manual and automatic.
@@ -295,6 +293,8 @@ export class DeliveryAssignmentService {
           acknowledgedAt: null,
         });
     const savedDelivery = await manager.save(delivery);
+    // R18: the driver stays available while they have spare capacity (this order counts — its status is written just after).
+    await recomputeDriverAvailability(manager, [driver.id], { includeOrderId: orderId });
 
     // DispatchAlert's documented contract: an alert is resolved once a driver is successfully assigned for its order.
     await manager

@@ -193,3 +193,27 @@ test.describe('Release 2C — vendor product changes (R7)', () => {
     }
   });
 });
+
+test.describe('Release 2D-3 — driver capacity (R18)', () => {
+  test.use({ storageState: SUPER_ADMIN_STORAGE_STATE });
+
+  test('the driver card shows active orders of capacity; an override needs a reason and records who and why', async ({ page }) => {
+    const driver = await createOnlineDriver('Capacity');
+    try {
+      await page.goto(`/drivers?search=${encodeURIComponent(driver.fullName)}`);
+      const card = page.getByTestId(`driver-row-${driver.id}`).getByTestId('driver-capacity');
+      await expect(card.getByTestId('driver-capacity-value')).toContainText('0 active of 1');
+      await card.getByTestId('driver-capacity-edit').click();
+      await card.getByTestId('driver-capacity-input').fill('3');
+      await expect(card.getByTestId('driver-capacity-save')).toBeDisabled(); // a reason is required
+      await card.getByTestId('driver-capacity-reason').fill('Playwright: car with a large box');
+      await card.getByTestId('driver-capacity-save').click();
+      await expect(card.getByTestId('driver-capacity-value')).toContainText('0 active of 3');
+      await expect(card.getByTestId('driver-capacity-last')).toContainText('1 → 3');
+      await expect(card.getByTestId('driver-capacity-last')).toContainText('Playwright: car with a large box');
+    } finally {
+      await adminApi().patch(`/admin/drivers/${driver.id}/capacity`, { capacity: null, reason: 'Playwright cleanup' }).catch(() => undefined);
+      await takeOffline(driver).catch(() => undefined);
+    }
+  });
+});

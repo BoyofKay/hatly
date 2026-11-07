@@ -1,3 +1,4 @@
+import { recomputeDriversOfVehicleType } from '../delivery/driver-capacity';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -5,9 +6,9 @@ import { VehicleType } from './entities/vehicle-type.entity';
 import { CreateVehicleTypeDto, UpdateVehicleTypeDto } from './dto/vehicle-type.dto';
 
 /**
- * Plain CRUD only — no capacity enforcement, no dispatch integration.
- * `maxActiveDeliveries` is stored but not read by anything yet; the
- * Route/RouteStop + dispatch-engine rework (a later approved phase)
+ * Plain CRUD. R18: `maxActiveDeliveries` is the capacity of every driver
+ * on the type; changing it recomputes their availability (driver-capacity.ts).
+ * (Historical note:) the Route/RouteStop + dispatch-engine rework (a later approved phase)
  * is what will actually consume it.
  */
 @Injectable()
@@ -38,6 +39,9 @@ export class VehicleTypesService {
       throw new NotFoundException('Vehicle type not found.');
     }
     Object.assign(existing, dto);
-    return this.repo.save(existing);
+    const saved = await this.repo.save(existing);
+    // R18: max_active_deliveries is each driver's capacity — recompute who has room now.
+    if (dto.maxActiveDeliveries !== undefined) await recomputeDriversOfVehicleType(this.repo.manager, id);
+    return saved;
   }
 }
