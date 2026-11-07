@@ -11,7 +11,8 @@ Work happens in the git worktree `../hatly-r1` on branch `feature/register-relea
 | 2A | `20261107T004846Z-593d380baae2` | R20 no new Pay-at-Delivery, R21 transfer verification window (Settings; **off until set**), R3 admin cancel until pickup |
 | 2B | `20261107T022800Z-feb790433010` | R8/R44 store pause/reopen, weekly hours and closures are vendor requests that Operations approve (Stores → Store Requests); R9 paused / outside-hours stores refuse new orders (no hours = no limit) |
 | 2C | `20261107T035612Z-d19b76161a80` | R7 vendor new products / price increases / detail and option changes wait for Hatly (Products → Product Requests); reductions and stock apply directly; Excel per row; Hatly activation = approval |
-| 2D-1 | `20261107T045937Z-1a61e340d9bc` (current; rollback = 2C) | R14 drivers without GPS are dispatch candidates after the GPS-ranked ones, round-robin |
+| 2D-1 | `20261107T045937Z-1a61e340d9bc` | R14 drivers without GPS are dispatch candidates after the GPS-ranked ones, round-robin |
+| 2D-2 | `20261107T053628Z-079cf82fb4dc` (current; rollback = 2D-1) | R12 acceptance mode per branch AUTO / VENDOR / HATLY |
 
 ## Built, not distributed
 Driver APK 1.0.0+6: `~/Downloads/Hatly-Driver-Release/hatly-driver-1.0.0-build6-20261106/` (SHA-256 `26bef899…6a89`, upload key `6e9dcf06…`). Waiting for the owner's approval to distribute.
@@ -41,7 +42,7 @@ Driver APK 1.0.0+6: `~/Downloads/Hatly-Driver-Release/hatly-driver-1.0.0-build6-
 ## Next packages (not started)
 1. **2D — acceptance and dispatch** (split):
    - 2D-1 R14: **live** (see LAUNCH_PROGRESS §3am).
-   - 2D-2 R12: acceptance mode per vendor AUTO / VENDOR / HATLY (replaces the auto-accept boolean).
+   - 2D-2 R12: **live** (LAUNCH_PROGRESS §3an).
    - 2D-3 R18: several active orders per vehicle capacity. This changes what `drivers.is_available` means everywhere — its own package.
 2. **2E — scheduled orders (R5).**
 3. **P2 money:**

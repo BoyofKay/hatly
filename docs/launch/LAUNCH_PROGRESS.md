@@ -440,6 +440,21 @@ Production release `20261107T045937Z-1a61e340d9bc` (commit `e9c9c08`, bundle ide
 * **Side effect:** HT-100002 (created 30 Oct, still before "Ready for pickup") was auto-assigned to the online driver without GPS 1 minute after deploy, unacknowledged. The pre-deploy check covered only undispatched "Ready for pickup" orders, but dispatch also starts during preparation (5-minute lead time). Releasing it would only re-queue it to the same driver, so the owner should cancel it in Admin if it is a stale test order.
 * The 12 other open orders (30 Oct–6 Nov) are PENDING vendor acceptance and are not dispatched unless a vendor accepts them.
 
+## 3an. Release 2 package D-2 (2026-11-07) — DEPLOYED and verified
+
+Production release `20261107T053628Z-079cf82fb4dc` (commit `177d278`, bundle identical to the commit) LIVE; rollback target `20261107T045937Z-1a61e340d9bc` (2D-1). One migration: `AcceptanceMode1700007600000` (`vendor_branches.acceptance_mode`, backfilled from the old switch; schema 77). Production after migration: 32 branches VENDOR, 1 AUTO — unchanged behaviour.
+* **R12 — acceptance mode per branch:**
+  * **Automatic:** accepted on placement, never skipping checkout checks (hours, stock, product validity).
+  * **Vendor accepts:** the default.
+  * **Hatly accepts:** Operations accept or reject on the vendor's behalf and get an "Accept an order for a store" alert. The vendor is told but cannot accept or reject (`ACCEPTANCE_BY_HATLY`), and still prepares the order once it is accepted.
+  * Set on Admin → Branch → Order acceptance (three buttons; MANAGE_VENDOR_COMMISSION; audited). The Branches list shows the mode.
+  * The old auto-accept switch maps onto the mode (on = Automatic; off = Vendor, never turning Hatly into Vendor), and `auto_accept_enabled` is kept in step for rollback.
+* Scheduling (R5) is not built yet, so "Automatic never bypasses scheduling" applies when 2E lands.
+* **Gates:** backend unit 2,459; e2e 86 suites / 1,152 (new 136-acceptance-mode); integration 314; dashboard tsc, unit 45, build; Playwright isolated: admin-order-operations (three-way mode), release1-register, vendor-hub, order-detail, notification-center, staff-alerts ✔.
+* **Deploy:** backup `hatly-prod-20261107T053944Z.dump` (sha `1ce1dd09…`), restore drill OK, off-host copy matched.
+* **Live:** health ok, 0 errors, new endpoint 401 without a session.
+* **Still open:** HT-100002 (see §3am) is assigned and unacknowledged; an ACKNOWLEDGEMENT_OVERDUE alert is open for it.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
