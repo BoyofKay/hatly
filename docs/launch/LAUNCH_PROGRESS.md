@@ -394,6 +394,15 @@ Production release `20261106T214231Z-27f40e93dabb` (commit `3967c9b`, bundle com
 * **Gates:** backend unit 2,444 / e2e 82 suites 1,126 / integration 314 all ✔; driver `flutter test` 86 ✔, analyze 0 errors/0 warnings; dashboard unit 45, tsc, build ✔; Playwright on an isolated stack (Release 1.1 code, disposable DB copy, ports 3300/3302): 13 spec files, 57 tests ✔ (auth, permissions, release1-register, control tower 15, settings, dispatch alerts, order detail/operations, segment cancellation, vendor hub, notifications, driver integrated, transfer refunds).
 * **Production checks:** backup `hatly-prod-20261106T220011Z.dump` (sha `f0ed3a7f…`), restore drill OK (74 migrations), off-host copy matched; health db+redis up; 0 backend errors; routes 401 without session; served chunks contain the new wording/setting; counts unchanged.
 
+## 3aj. Release 2 package A (2026-11-07) — DEPLOYED and verified
+
+Production release `20261107T004846Z-593d380baae2` (commit `4bd81a0`, bundle identical to the commit) LIVE; rollback target `20261106T214231Z-27f40e93dabb` (no migration; schema 74).
+* **R20:** new orders cannot use Pay at Delivery (`PAY_AT_DELIVERY_NOT_AVAILABLE`; the quote reports `payAtDelivery: false`, which the customer app already honours by hiding the option). Existing Pay-at-Delivery orders keep it (Production had 0 active).
+* **R21:** Settings → "Transfer Verification Window" (`MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES`, 15–10080, Clear = off). **Unset in Production = off** (no value invented). When set, unverified InstaPay/Vodafone Cash orders older than the window are cancelled by a 1-minute worker through the ordinary Operations cancellation (stock back, pending refund entitlement kept → late money refunded on approval, never reactivated).
+* **R3:** the admin order Cancel works until driver pickup (ASSIGNED_TO_DRIVER included; driver freed).
+* Settings: Clear buttons for the optional settings (acknowledgement window, Operations phone, transfer window).
+* **Gates:** backend unit 2,445 (one timing test needs an idle machine), e2e 83 suites / 1,133, integration 314; dashboard tsc/unit/build; Playwright on the isolated stack 9 spec files ✔ incl. the new settings check. Backup `hatly-prod-20261107T005208Z.dump` (sha `bd0f250a…`), restore drill OK, off-host copy matched. Live: health ok, 0 errors, 0 automatic cancellations, counts unchanged.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
