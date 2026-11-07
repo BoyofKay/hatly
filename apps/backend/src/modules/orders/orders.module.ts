@@ -46,6 +46,8 @@ import { ChangeFeedService } from './changes/change-feed.service';
 import { AdminChangesController, VendorChangesController } from './changes/change-feed.controllers';
 import { VendorBusinessService } from './vendor-business.service';
 import { BranchClosuresService } from './branch-closures.service';
+import { BranchChangeRequestsService } from './branch-change-requests.service';
+import { AdminBranchChangeRequestsController, VendorBranchChangeRequestsController } from './branch-change-requests.controllers';
 import { StockLedgerService } from './stock-ledger.service';
 import { VendorFinanceService } from './vendor-finance.service';
 import { VendorTeamService } from './vendor-team.service';
@@ -120,7 +122,7 @@ import { AdminOrdersService } from './admin-orders.service';
     LocationModule,
     ServiceAreasModule,
   ],
-  controllers: [OrdersController, VendorUnavailableItemsController, CustomerItemUnavailabilityController, VendorChangesController, VendorOrderHistoryController, VendorBusinessController, VendorBranchProfileController, VendorTeamController, VendorBranchClosuresController, VendorInventoryController, VendorFinanceController, AdminVendorSettlementTermsController, AdminBranchClosuresController, AdminChangesController, VendorOrdersController, AdminOrdersController, CheckoutController, GeoController],
+  controllers: [AdminBranchChangeRequestsController, VendorBranchChangeRequestsController, OrdersController, VendorUnavailableItemsController, CustomerItemUnavailabilityController, VendorChangesController, VendorOrderHistoryController, VendorBusinessController, VendorBranchProfileController, VendorTeamController, VendorBranchClosuresController, VendorInventoryController, VendorFinanceController, AdminVendorSettlementTermsController, AdminBranchClosuresController, AdminChangesController, VendorOrdersController, AdminOrdersController, CheckoutController, GeoController],
   providers: [
     OrderStateMachineService,
     OrderActorAuthorizationService,
@@ -150,6 +152,7 @@ import { AdminOrdersService } from './admin-orders.service';
     ChangeFeedService,
     VendorBusinessService,
     BranchClosuresService,
+    BranchChangeRequestsService,
     StockLedgerService,
     VendorFinanceService,
     VendorTeamService,

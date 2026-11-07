@@ -166,14 +166,19 @@ describe('E2E — Vendor Business Hub', () => {
     expect((await get(v1.manager, '/vendor/earnings', { branchId: v2.branchId })).status).toBe(404);
   });
 
-  it('branch profile: anyone linked may open/close, only a manager edits hours and preparation time, validation is strict, a deactivated branch cannot be opened, every change is audited', async () => {
+  it('branch profile (R8/R44): pausing/reopening and hours are REQUESTS (anyone linked may ask to pause/reopen, only a manager asks for hours); preparation time is direct; validation is strict; a deactivated branch cannot be reopened; every change is audited', async () => {
     const path = `/vendor/branches/${v1.branchId}`;
     const patch = (a: Actor, body: unknown) => world.api('patch', path, { token: a.accessToken, body: body as object });
+    const pending = async (kind: string) => (await world.ds.query(`SELECT id FROM vendor_branch_change_requests WHERE vendor_branch_id = $1 AND kind = $2 AND status = 'PENDING'`, [v1.branchId, kind]))[0];
+    const withdraw = async (kind: string) => expectData(await world.api('post', `${path}/change-requests/${(await pending(kind)).id}/withdraw`, { token: v1.manager.accessToken }), 201);
     expect(expectData<any>(await get(operator, path))).toMatchObject({ id: v1.branchId, canEditProfile: false });
     expect(expectData<any>(await get(v1.manager, path)).canEditProfile).toBe(true);
 
-    expect(expectData<any>(await patch(operator, { isOpen: true })).isOpen).toBe(true);
-    expect(expectData<any>(await patch(operator, { isOpen: false })).isOpen).toBe(false);
+    expect((await patch(operator, { isOpen: true })).body.error.details.code).toBe('NO_CHANGE'); // it is already open
+    const paused = expectData<any>(await patch(operator, { isOpen: false }));
+    expect(paused.isOpen).toBe(true); // still open until Hatly approves
+    expect(paused.requests[0]).toMatchObject({ kind: 'PAUSE', status: 'PENDING' });
+    await withdraw('PAUSE');
     const hours = { mon: { open: '09:00', close: '22:30' }, fri: { open: '14:00', close: '23:00' } };
     const denied = await patch(operator, { openingHours: hours });
     expect(denied.status).toBe(403);
@@ -181,7 +186,9 @@ describe('E2E — Vendor Business Hub', () => {
     expect((await patch(operator, { preparationTimeMinutes: 20 })).status).toBe(403);
 
     const saved = expectData<any>(await patch(v1.manager, { openingHours: hours, preparationTimeMinutes: 25 }));
-    expect(saved).toMatchObject({ openingHours: hours, preparationTimeMinutes: 25 });
+    expect(saved).toMatchObject({ openingHours: {}, preparationTimeMinutes: 25 }); // hours wait for approval; preparation time applies now
+    expect(saved.requests[0]).toMatchObject({ kind: 'HOURS', status: 'PENDING', payload: { openingHours: hours } });
+    await withdraw('HOURS');
     expect((await patch(v1.manager, { openingHours: { mon: { open: '9am', close: '22:00' } } })).status).toBe(400);
     expect((await patch(v1.manager, { openingHours: { funday: { open: '09:00', close: '10:00' } } })).status).toBe(400);
     expect((await patch(v1.manager, { preparationTimeMinutes: 0 })).status).toBe(400);
@@ -193,20 +200,19 @@ describe('E2E — Vendor Business Hub', () => {
     expect(expectData<any>(await patch(v1.manager, { preparationTimeMinutes: null })).preparationTimeMinutes).toBeNull();
 
     // another vendor's branch: not found, for read and write
-    expect((await world.api('patch', path, { token: v2.manager.accessToken, body: { isOpen: true } })).status).toBe(404);
+    expect((await world.api('patch', path, { token: v2.manager.accessToken, body: { isOpen: false } })).status).toBe(404);
     expect((await get(v2.manager, path)).status).toBe(404);
-    expect((await world.api('patch', path, { token: (await s.customer()).accessToken, body: { isOpen: true } })).status).toBe(403);
+    expect((await world.api('patch', path, { token: (await s.customer()).accessToken, body: { isOpen: false } })).status).toBe(403);
 
-    await world.ds.query('UPDATE vendor_branches SET is_active = false WHERE id = $1', [v1.branchId]);
+    await world.ds.query('UPDATE vendor_branches SET is_active = false, is_open = false WHERE id = $1', [v1.branchId]);
     const blocked = await patch(v1.manager, { isOpen: true });
     expect(blocked.status).toBe(409);
     expect(blocked.body.error.details.code).toBe('BRANCH_DEACTIVATED');
-    expect(expectData<any>(await patch(v1.manager, { isOpen: false })).isOpen).toBe(false); // closing is always allowed
-    await world.ds.query('UPDATE vendor_branches SET is_active = true WHERE id = $1', [v1.branchId]);
+    await world.ds.query('UPDATE vendor_branches SET is_active = true, is_open = true WHERE id = $1', [v1.branchId]);
 
     const audited = await world.ds.query("SELECT actor_role, metadata FROM admin_audit_logs WHERE action = 'vendor_branch.updated' AND target_id = $1 ORDER BY created_at", [v1.branchId]);
-    expect(audited.length).toBeGreaterThanOrEqual(5);
-    expect(audited.some((r: any) => r.actor_role === 'VENDOR' && r.metadata.fields.includes('isOpen'))).toBe(true);
-    expect(audited.some((r: any) => r.actor_role === 'VENDOR_MANAGER' && r.metadata.fields.includes('openingHours'))).toBe(true);
+    expect(audited.length).toBeGreaterThanOrEqual(3);
+    expect(audited.some((r: any) => r.actor_role === 'VENDOR' && r.metadata.kind === 'PAUSE')).toBe(true);
+    expect(audited.some((r: any) => r.actor_role === 'VENDOR_MANAGER' && r.metadata.kind === 'HOURS')).toBe(true);
   });
 });

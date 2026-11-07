@@ -1,5 +1,6 @@
+import { BranchChangeRequestsService } from './branch-change-requests.service';
 import { vendorVisibleOrderSql } from './vendor-order-visibility';
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { Role } from '../../common/enums/role.enum';
 import { VendorStaffAuthorizationService } from '../vendors/vendor-staff-authorization.service';
@@ -33,6 +34,8 @@ export class VendorBusinessService {
     private readonly ds: DataSource,
     private readonly vendorAuth: VendorStaffAuthorizationService,
     private readonly audit: AdminAuditService,
+    // R8/R44: pausing/reopening and hours become requests. Optional so hand-built unit tests keep working (then the old direct path applies).
+    @Optional() private readonly changeRequests?: BranchChangeRequestsService,
   ) {}
 
   private async branches(user: Actor, branchId?: string): Promise<string[]> {
@@ -288,8 +291,24 @@ export class VendorBusinessService {
     };
   }
 
-  async updateBranch(user: Actor, branchId: string, body: { isOpen?: boolean; openingHours?: Record<string, { open: string; close: string }>; preparationTimeMinutes?: number | null }) {
+  async updateBranch(user: Actor, branchId: string, body: { isOpen?: boolean; openingHours?: Record<string, { open: string; close: string }>; preparationTimeMinutes?: number | null; reason?: string }) {
     const [id] = await this.branches(user, branchId);
+    // R8/R44 (2026-11-07): pausing/reopening and weekly hours are REQUESTS that Hatly approves; only the preparation time is applied directly.
+    const requests: unknown[] = [];
+    if (body && typeof body === 'object' && this.changeRequests) {
+      if (body.isOpen !== undefined) {
+        if (typeof body.isOpen !== 'boolean') throw bad('isOpen must be true or false.');
+        requests.push(await this.changeRequests.request(user, id, body.isOpen ? 'REOPEN' : 'PAUSE', {}, body.reason));
+      }
+      if (body.openingHours !== undefined) requests.push(await this.changeRequests.request(user, id, 'HOURS', { openingHours: body.openingHours }, body.reason));
+      const rest: Record<string, unknown> = { ...body };
+      delete rest.isOpen; delete rest.openingHours; delete rest.reason;
+      if (Object.keys(rest).length === 0) {
+        if (requests.length === 0) throw bad('Nothing to change.');
+        return { ...(await this.branch(user, id)), requests };
+      }
+      body = rest as typeof body;
+    }
     if (!body || typeof body !== 'object') throw bad('Nothing to change.');
     const allowed = ['isOpen', 'openingHours', 'preparationTimeMinutes'];
     if (Object.keys(body).some((k) => !allowed.includes(k))) throw bad('Only open/closed, weekly hours and preparation time can be changed here.');
@@ -323,6 +342,6 @@ export class VendorBusinessService {
     if (body.isOpen === true && !current.is_active) throw new ConflictException({ message: 'Hatly has deactivated this branch, so it cannot be opened.', details: { code: 'BRANCH_DEACTIVATED' } });
     await this.ds.query(`UPDATE vendor_branches SET ${sets.join(', ')}, updated_at = now() WHERE id = $1`, values);
     await this.audit.record({ actorUserId: user.id, actorRole: user.role, action: AdminAuditAction.VENDOR_BRANCH_UPDATED, targetType: 'vendor_branch', targetId: id, metadata: { fields: Object.keys(changed).join(','), isOpen: (changed.isOpen as boolean | undefined) ?? null } });
-    return this.branch(user, id);
+    return requests.length ? { ...(await this.branch(user, id)), requests } : this.branch(user, id);
   }
 }

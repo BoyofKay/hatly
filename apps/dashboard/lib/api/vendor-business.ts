@@ -92,6 +92,6 @@ export async function getVendorTeam(): Promise<VendorTeam> {
 export async function getVendorBranch(id: string): Promise<VendorBranchProfile> {
   return (await apiClient.get(`/vendor/branches/${id}`)).data.data;
 }
-export async function updateVendorBranch(id: string, body: { isOpen?: boolean; openingHours?: OpeningHours; preparationTimeMinutes?: number | null }): Promise<VendorBranchProfile> {
+export async function updateVendorBranch(id: string, body: { isOpen?: boolean; openingHours?: OpeningHours; preparationTimeMinutes?: number | null; reason?: string }): Promise<VendorBranchProfile & { requests?: Array<{ id: string; kind: string; status: string }> }> {
   return (await apiClient.patch(`/vendor/branches/${id}`, body)).data.data;
 }

@@ -1,4 +1,4 @@
-import { branchIdsUnderClosure } from '../../../common/branch-availability';
+import { branchIdsUnderClosure, isWithinOpeningHours } from '../../../common/branch-availability';
 import { AddressMode } from '../../addresses/address-mode';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
@@ -74,6 +74,19 @@ export class CheckoutPlannerService {
         throw new BadRequestException({
           message: 'This branch is closed at the moment and is not taking orders.',
           details: { code: 'BRANCH_TEMPORARILY_CLOSED', vendorBranchId: branch.id },
+        });
+      }
+      // R9 (2026-11-06): a closed or paused store (switch off) or one outside its weekly opening hours accepts no new orders.
+      if (!branch.isOpen) {
+        throw new BadRequestException({
+          message: 'This store is closed at the moment and is not taking orders.',
+          details: { code: 'BRANCH_CLOSED', vendorBranchId: branch.id },
+        });
+      }
+      if (!isWithinOpeningHours(branch.openingHours as never)) {
+        throw new BadRequestException({
+          message: 'This store is outside its opening hours and is not taking orders right now.',
+          details: { code: 'BRANCH_OUTSIDE_OPENING_HOURS', vendorBranchId: branch.id },
         });
       }
       for (const item of group.items) {

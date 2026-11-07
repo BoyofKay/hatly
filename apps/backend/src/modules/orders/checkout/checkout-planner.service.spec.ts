@@ -25,7 +25,7 @@ const product = (id: string, over: any = {}) => ({ id, name: `P ${id}`, priceMin
 const item = (id: string, p: any, quantity = 1, extra: any = {}) => ({ id, productId: p.id, product: p, quantity, notes: null, freeTextDescription: null, imageUrls: null, selectedOptionValues: [], ...extra });
 const group = (id: string, branchId: string, items: any[]) => ({ id, groupType: CartGroupType.CATALOG, vendorBranchId: branchId, adHocPlaceName: null, vendorNote: null, items });
 const cart = (groups: any[], over: any = {}) => ({ id: 'cart-1', customerId: 'c1', fulfillmentType: FulfillmentType.DELIVERY, orderNote: null, groups, ...over });
-const branch = (id: string, over: any = {}) => ({ id, name: `B ${id}`, isActive: true, pickupEnabled: true, deliveryEnabled: true, serviceAreaId: 'area-1', preparationTimeMinutes: null, address: 'x', latitude: 30, longitude: 31, vendor: { name: `V ${id}`, isActive: true }, ...over });
+const branch = (id: string, over: any = {}) => ({ id, name: `B ${id}`, isActive: true, isOpen: true, openingHours: {}, pickupEnabled: true, deliveryEnabled: true, serviceAreaId: 'area-1', preparationTimeMinutes: null, address: 'x', latitude: 30, longitude: 31, vendor: { name: `V ${id}`, isActive: true }, ...over });
 
 function harness(opts: { branches: any[]; balance?: number; enabled?: string[]; fee?: number; couponResult?: any; subtotalPlan?: any; area?: any; eta?: number; zones?: any[]; serviceDefaults?: Record<string, any> }) {
   const businessConfig = {
@@ -632,5 +632,22 @@ describe('CheckoutPlannerService — Maps disabled (PD-009 G: the active zone pr
     const p = await h.plan(oneVendor(), { address: pinnedZoneAddr });
     expect(h.deliveryFee.calculate).toHaveBeenCalled();
     expect(p.eligibility?.pricingSource).toBe('DISTANCE');
+  });
+});
+
+describe('CheckoutPlannerService — R9 store availability', () => {
+  it('a store switched closed (paused) takes no order: BRANCH_CLOSED', async () => {
+    const h = harness({ branches: [branch('b1', { isOpen: false })] });
+    await expect(h.plan(oneVendor(), { paymentMethod: 'COD' })).rejects.toMatchObject({ response: { details: { code: 'BRANCH_CLOSED' } } });
+  });
+
+  it('a store with weekly hours that do not cover now takes no order: BRANCH_OUTSIDE_OPENING_HOURS; no hours configured = no hour limit', async () => {
+    const closedAllWeek = { mon: { open: '03:00', close: '03:01' }, tue: { open: '03:00', close: '03:01' }, wed: { open: '03:00', close: '03:01' }, thu: { open: '03:00', close: '03:01' }, fri: { open: '03:00', close: '03:01' }, sat: { open: '03:00', close: '03:01' }, sun: { open: '03:00', close: '03:01' } };
+    const { cairoClock } = await import('../../../common/branch-availability');
+    if (cairoClock(new Date()).time === '03:00') return; // the single minute this window is open
+    const h = harness({ branches: [branch('b1', { openingHours: closedAllWeek })] });
+    await expect(h.plan(oneVendor(), { paymentMethod: 'COD' })).rejects.toMatchObject({ response: { details: { code: 'BRANCH_OUTSIDE_OPENING_HOURS' } } });
+    const open = harness({ branches: [branch('b1', { openingHours: {} })] });
+    await expect(open.plan(oneVendor(), { paymentMethod: 'COD' })).resolves.toBeDefined();
   });
 });

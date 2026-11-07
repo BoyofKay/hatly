@@ -16,7 +16,9 @@ export function BranchOpenSwitch({ branchId, name, isOpen, isActive, onChanged }
     try {
       const next = await updateVendorBranch(branchId, { isOpen: !isOpen });
       onChanged(next.isOpen);
-      toast.push('success', next.isOpen ? t(`${name} is open for orders.`, `${name} مفتوح لاستقبال الطلبات.`) : t(`${name} is closed.`, `${name} مغلق.`));
+      // R8/R44: pausing or reopening is a request — the store changes only once Hatly approves it.
+      if (next.requests?.length) toast.push('success', isOpen ? t(`Pause request for ${name} sent to Hatly. The store stays open until it is approved.`, `تم إرسال طلب إيقاف ${name} إلى هاتلي. يبقى المتجر مفتوحًا حتى الموافقة.`) : t(`Reopen request for ${name} sent to Hatly.`, `تم إرسال طلب إعادة فتح ${name} إلى هاتلي.`));
+      else toast.push('success', next.isOpen ? t(`${name} is open for orders.`, `${name} مفتوح لاستقبال الطلبات.`) : t(`${name} is closed.`, `${name} مغلق.`));
     } catch (e) {
       toast.push('error', apiErrorMessage(e, t('Could not change the branch.', 'تعذّر تغيير حالة الفرع.')));
     } finally {

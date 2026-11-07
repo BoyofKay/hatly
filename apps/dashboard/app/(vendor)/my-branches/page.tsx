@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Async, Button, Card, LabeledInput, PageHeader, useToast } from '../../../components/ui';
 import { BranchOpenSwitch } from '../../../components/vendor/BranchOpenSwitch';
 import { BranchClosures } from '../../../components/vendor/BranchClosures';
+import { BranchChangeRequests } from '../../../components/vendor/BranchChangeRequests';
 import { useApi } from '../../../lib/ui/api';
 import { useLang } from '../../../lib/ui/lang';
 import { apiErrorMessage } from '../../../lib/api/errors';
@@ -11,7 +12,7 @@ import { getVendorBranch, updateVendorBranch, type OpeningHours, type VendorBran
 
 const DAYS: Array<[keyof OpeningHours, string, string]> = [['sat', 'Saturday', 'السبت'], ['sun', 'Sunday', 'الأحد'], ['mon', 'Monday', 'الإثنين'], ['tue', 'Tuesday', 'الثلاثاء'], ['wed', 'Wednesday', 'الأربعاء'], ['thu', 'Thursday', 'الخميس'], ['fri', 'Friday', 'الجمعة']];
 
-function BranchCard({ id, reloadKey = 0 }: { id: string; reloadKey?: number }) {
+function BranchCard({ id, reloadKey = 0, onRequested }: { id: string; reloadKey?: number; onRequested?: () => void }) {
   const { t } = useLang();
   const toast = useToast();
   const [b, setB] = useState<VendorBranchProfile | null>(null);
@@ -34,15 +35,18 @@ function BranchCard({ id, reloadKey = 0 }: { id: string; reloadKey?: number }) {
     setSaving(true);
     try {
       const p = prep.trim() === '' ? null : Number(prep);
-      const next = await updateVendorBranch(id, { openingHours: hours, preparationTimeMinutes: p });
+      const hoursChanged = JSON.stringify(hours) !== JSON.stringify(b?.openingHours ?? {});
+      const next = await updateVendorBranch(id, { ...(hoursChanged ? { openingHours: hours } : {}), preparationTimeMinutes: p });
       setB(next); setHours(next.openingHours);
-      toast.push('success', t('Branch settings saved.', 'تم حفظ إعدادات الفرع.'));
+      // R44: new weekly hours wait for Hatly's approval; the preparation time applies at once.
+      toast.push('success', next.requests?.length ? t('Preparation time saved. The new hours were sent to Hatly for approval.', 'تم حفظ مدة التحضير. أُرسلت المواعيد الجديدة إلى هاتلي للموافقة.') : t('Branch settings saved.', 'تم حفظ إعدادات الفرع.'));
+      onRequested?.();
     } catch (e) { toast.push('error', apiErrorMessage(e, t('The settings were refused.', 'تم رفض الإعدادات.'))); } finally { setSaving(false); }
   }
   return (
     <Card
       title={<bdi>{b.name}</bdi>}
-      actions={<span className="flex items-center gap-2 text-xs text-gray-600">{!b.isActive ? t('Deactivated by Hatly', 'معطّل من هاتلي') : b.isOpen && b.effectiveOpen === false ? t('Closed by a scheduled closure', 'مغلق بإغلاق مجدول') : b.isOpen ? t('Open', 'مفتوح') : t('Closed', 'مغلق')}<BranchOpenSwitch branchId={b.id} name={b.name} isOpen={b.isOpen} isActive={b.isActive} onChanged={(v) => setB({ ...b, isOpen: v })} /></span>}
+      actions={<span className="flex items-center gap-2 text-xs text-gray-600">{!b.isActive ? t('Deactivated by Hatly', 'معطّل من هاتلي') : b.isOpen && b.effectiveOpen === false ? t('Closed by a scheduled closure', 'مغلق بإغلاق مجدول') : b.isOpen ? t('Open', 'مفتوح') : t('Closed', 'مغلق')}<BranchOpenSwitch branchId={b.id} name={b.name} isOpen={b.isOpen} isActive={b.isActive} onChanged={(v) => { setB({ ...b, isOpen: v }); onRequested?.(); }} /></span>}
     >
       <p className="mb-3 text-xs text-gray-500"><bdi>{b.address}</bdi> · {b.deliveryEnabled ? t('Delivery', 'توصيل') : ''}{b.deliveryEnabled && b.pickupEnabled ? ' + ' : ''}{b.pickupEnabled ? t('Pickup', 'استلام') : ''}{b.autoAcceptEnabled ? ` · ${t('Orders are accepted automatically', 'تُقبل الطلبات تلقائيًا')}` : ''}</p>
       <h3 className="mb-2 text-sm font-semibold">{t('Weekly hours', 'مواعيد العمل الأسبوعية')}</h3>
@@ -80,7 +84,7 @@ export default function MyBranchesPage() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('My branches', 'فروعي')} subtitle={t('Open or close a branch for new orders, set its weekly hours and how long preparation takes.', 'افتح أو أغلق الفرع لاستقبال الطلبات، وحدّد مواعيده الأسبوعية ومدة التحضير.')} />
-      <Async state={state} rows={3}>{state.data?.branches.map((b) => <div key={b.id} className="space-y-4"><BranchCard id={b.id} reloadKey={closuresVersion} /><BranchClosures scope="vendor" branchId={b.id} onChanged={() => setClosuresVersion((v) => v + 1)} /></div>)}</Async>
+      <Async state={state} rows={3}>{state.data?.branches.map((b) => <div key={b.id} className="space-y-4"><BranchCard id={b.id} reloadKey={closuresVersion} onRequested={() => setClosuresVersion((v) => v + 1)} /><BranchChangeRequests branchId={b.id} reloadKey={closuresVersion} onChanged={() => setClosuresVersion((v) => v + 1)} /><BranchClosures scope="vendor" branchId={b.id} onChanged={() => setClosuresVersion((v) => v + 1)} /></div>)}</Async>
     </div>
   );
 }

@@ -56,6 +56,7 @@ export const NAV: NavGroup[] = [
     items: [
       { href: '/vendors', en: 'Vendors', ar: 'المتاجر', perms: P.vendors },
       { href: '/branches', en: 'Branches', ar: 'الفروع', perms: P.vendors },
+      { href: '/branch-requests', en: 'Store Requests', ar: 'طلبات المتاجر', perms: ['MANAGE_VENDORS'] },
       { href: '/vendor-staff', en: 'Vendor Staff', ar: 'موظفو المتاجر', perms: ['MANAGE_VENDOR_STAFF'] },
     ],
   },

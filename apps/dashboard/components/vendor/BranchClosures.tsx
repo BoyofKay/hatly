@@ -48,7 +48,7 @@ export function BranchClosures({ scope, branchId, onChanged }: { scope: ClosureS
     try {
       await createClosure(scope, branchId, { kind, startsAt, endsAt, reason: reason.trim() });
       setOpen(false);
-      toast.push('success', t('Closure scheduled.', 'تمت جدولة الإغلاق.'));
+      toast.push('success', scope === 'vendor' ? t('Closure request sent to Hatly. It takes effect once approved.', 'تم إرسال طلب الإغلاق إلى هاتلي. يسري بعد الموافقة.') : t('Closure scheduled.', 'تمت جدولة الإغلاق.'));
       await load();
       onChanged?.();
     } catch (err) {
@@ -60,7 +60,7 @@ export function BranchClosures({ scope, branchId, onChanged }: { scope: ClosureS
     setBusy(true);
     try {
       await cancelClosure(scope, branchId, cancelling.id);
-      toast.push('success', t('Closure cancelled.', 'تم إلغاء الإغلاق.'));
+      toast.push('success', scope === 'vendor' ? t('Request to end the closure sent to Hatly.', 'تم إرسال طلب إنهاء الإغلاق إلى هاتلي.') : t('Closure cancelled.', 'تم إلغاء الإغلاق.'));
       setCancelling(null);
       await load();
       onChanged?.();

@@ -416,6 +416,8 @@ function makeBranch(id: string, overrides: Partial<any> = {}) {
     id,
     name: `Branch ${id}`,
     isActive: true,
+    isOpen: true, // R9: an open store (a closed one takes no order)
+    openingHours: {},
     pickupEnabled: true,
     vendor: { name: `Vendor ${id}`, isActive: true },
     ...overrides,

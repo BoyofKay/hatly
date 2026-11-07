@@ -18,6 +18,8 @@ export const CATEGORY: Record<string, Pair> = {
   OPS_TRANSFER_TO_VERIFY: ['A transfer is waiting for verification', 'تحويل بانتظار التحقق'],
   OPS_FAILED_DELIVERY: ['A delivery failed', 'فشل توصيل طلب'],
   OPS_CANCELLED_AFTER_ASSIGNMENT: ['An order was cancelled after a driver was assigned', 'أُلغي طلب بعد إسناده لسائق'],
+  OPS_BRANCH_CHANGE_REQUEST: ['A store asks for a change', 'متجر يطلب تغييرًا'],
+  VENDOR_BRANCH_CHANGE_DECIDED: ['Hatly decided on your store request', 'قرّرت هاتلي بشأن طلب متجرك'],
 };
 
 export const ACTION: Record<string, Pair> = {
@@ -33,6 +35,7 @@ export const ACTION: Record<string, Pair> = {
   VERIFY_TRANSFER: ['Verify the transfer', 'تحقّق من التحويل'],
   RESOLVE_FAILED_DELIVERY: ['Resolve the failed delivery', 'عالج التوصيل الفاشل'],
   CONTACT_DRIVER: ['Tell the driver to stop; decide on any trip compensation', 'أبلغ السائق بالتوقف وقرّر أي تعويض عن المشوار'],
+  REVIEW_BRANCH_REQUEST: ['Approve or reject the request', 'وافق على الطلب أو ارفضه'],
 };
 
 /** Dispatch-alert reasons carried in an OPS_DISPATCH_NEEDED note. */
@@ -54,9 +57,10 @@ export const noteText = (a: StaffAlert, locale: 'en' | 'ar'): string | null => (
 export function adminHref(a: StaffAlert, can: (...perms: string[]) => boolean): string | null {
   if (a.exceptionId) return `/exceptions?case=${a.exceptionId}`;
   if (a.category === 'OPS_FAILED_DELIVERY' && can('MANAGE_ORDER_ISSUES')) return '/failed-deliveries';
+  if (a.category === 'OPS_BRANCH_CHANGE_REQUEST' && can('MANAGE_VENDORS')) return '/branch-requests';
   if (a.category === 'OPS_TRANSFER_TO_VERIFY' && can('VERIFY_MANUAL_PAYMENTS')) return '/manual-transfer';
   return a.orderId ? `/order-management?order=${a.orderId}` : null;
 }
 
 /** A vendor notification always leads to the vendor's own order (the server only returns their branches' rows). */
-export const vendorHref = (a: StaffAlert): string => (a.orderId ? `/orders/${a.orderId}` : '/notifications');
+export const vendorHref = (a: StaffAlert): string => (a.orderId ? `/orders/${a.orderId}` : a.category === 'VENDOR_BRANCH_CHANGE_DECIDED' ? '/my-branches' : '/notifications');

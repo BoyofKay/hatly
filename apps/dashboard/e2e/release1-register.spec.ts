@@ -103,3 +103,36 @@ test.describe('Release 2A — admin settings', () => {
     }
   });
 });
+
+test.describe('Release 2B — store requests (R8/R44)', () => {
+  test.use({ storageState: SUPER_ADMIN_STORAGE_STATE });
+
+  test('a vendor pause request appears on Store Requests; approving it closes the store; a reopen request restores it', async ({ page }) => {
+    const { vendorApi } = await import('./control-tower-fixtures');
+    const { VENDOR_A_BRANCH_ID } = await import('./env');
+    const branchState = async () => (await adminApi().get(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}`)).data?.data?.isOpen;
+    if ((await branchState()) === false) await adminApi().patch(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}/open`);
+    const paused = await vendorApi().patch(`/vendor/branches/${VENDOR_A_BRANCH_ID}`, { isOpen: false, reason: 'Playwright pause' });
+    expect(paused.status).toBe(200);
+    expect(paused.data.data.isOpen).toBe(true); // nothing changes before Hatly approves
+    const requestId = paused.data.data.requests[0].id;
+    try {
+      await page.goto('/branch-requests');
+      const row = page.getByTestId(`branch-request-${requestId}`);
+      await expect(row).toContainText('Pause the store');
+      await row.getByTestId(`approve-${requestId}`).click();
+      await expect(page.getByTestId(`branch-request-${requestId}`)).toHaveCount(0); // left the waiting list
+      expect(await branchState()).toBe(false);
+
+      const reopen = await vendorApi().patch(`/vendor/branches/${VENDOR_A_BRANCH_ID}`, { isOpen: true });
+      const reopenId = reopen.data.data.requests[0].id;
+      await page.reload();
+      await page.getByTestId(`approve-${reopenId}`).click();
+      await expect(page.getByTestId(`branch-request-${reopenId}`)).toHaveCount(0);
+      expect(await branchState()).toBe(true);
+    } finally {
+      await adminApi().patch(`/admin/vendor-branches/${VENDOR_A_BRANCH_ID}/open`).catch(() => undefined);
+      await vendorApi().post(`/vendor/branches/${VENDOR_A_BRANCH_ID}/change-requests/${requestId}/withdraw`).catch(() => undefined);
+    }
+  });
+});

@@ -247,6 +247,8 @@ export class Scenario {
     );
     expectData(await this.world.api('patch', `/admin/vendors/${vendor.id}/activate`, { token }));
     expectData(await this.world.api('patch', `/admin/vendor-branches/${branch.id}/activate`, { token }));
+    // R9: a live store is switched open by Hatly (a new branch starts closed); closed/paused stores take no orders.
+    expectData(await this.world.api('patch', `/admin/vendor-branches/${branch.id}/open`, { token }));
 
     const staffPhone = nextPhone();
     const staff = expectData(

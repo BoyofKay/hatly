@@ -1,3 +1,4 @@
+import { BranchChangeRequestsService } from './branch-change-requests.service';
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
@@ -48,21 +49,23 @@ export class VendorTeamController {
 @UseGuards(RolesGuard)
 @Roles(Role.VENDOR, Role.VENDOR_MANAGER)
 export class VendorBranchClosuresController {
-  constructor(private readonly closures: BranchClosuresService) {}
+  constructor(private readonly closures: BranchClosuresService, private readonly changeRequests: BranchChangeRequestsService) {}
 
   @Get()
   async list(@CurrentUser() user: AuthenticatedUser, @Param('branchId') branchId: string) {
     return { data: await this.closures.vendorList(user, branchId) };
   }
 
+  /** R44: a vendor REQUESTS a closure; Hatly Admin approves it (then it is created) or rejects it. */
   @Post()
   async create(@CurrentUser() user: AuthenticatedUser, @Param('branchId') branchId: string, @Body() body: any) {
-    return { data: await this.closures.vendorCreate(user, branchId, body) };
+    return { data: { request: await this.changeRequests.request(user, branchId, 'CLOSURE', body ?? {}, body?.reason) } };
   }
 
+  /** R44: cancelling a scheduled/active closure (reopening early) is also a request. */
   @Delete(':closureId')
   async cancel(@CurrentUser() user: AuthenticatedUser, @Param('branchId') branchId: string, @Param('closureId') closureId: string) {
-    return { data: await this.closures.vendorCancel(user, branchId, closureId) };
+    return { data: { request: await this.changeRequests.request(user, branchId, 'CLOSURE_CANCEL', { closureId }) } };
   }
 }
 

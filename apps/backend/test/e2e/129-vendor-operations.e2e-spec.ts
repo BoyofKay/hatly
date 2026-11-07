@@ -112,12 +112,15 @@ describe('E2E — Vendor operations', () => {
   describe('branch closures', () => {
     let closureId: string;
 
-    it('a manager schedules a closure; validation, overlap, roles and isolation are enforced', async () => {
+    // R44 (2026-11-07): a vendor REQUESTS a closure (and its early end); Hatly Admin approves it, and only then is it created / cancelled.
+    const approve = async (requestId: string) => call('post', admin, `/admin/branch-change-requests/${requestId}/approve`, {});
+
+    it('a manager requests a closure; validation, roles and isolation are enforced at the request; approval creates it; an overlap is refused at approval', async () => {
       const base = `/vendor/branches/${v1.branchId}/closures`;
       const ok = await call('post', v1.manager, base, { kind: 'HOLIDAY', startsAt: iso(48 * H), endsAt: iso(72 * H), reason: 'Eid holiday' });
       expect(ok.status).toBe(201);
-      closureId = ok.body.data.id;
-      expect((await call('post', v1.manager, base, { kind: 'HOLIDAY', startsAt: iso(60 * H), endsAt: iso(90 * H), reason: 'Overlaps' })).status).toBe(409);
+      expect(ok.body.data.request).toMatchObject({ kind: 'CLOSURE', status: 'PENDING' });
+      expect(expectData<any>(await call('get', v1.manager, base)).closures).toEqual([]); // nothing until Hatly approves
       expect((await call('post', v1.manager, base, { kind: 'X', startsAt: iso(100 * H), endsAt: iso(101 * H), reason: 'Bad kind' })).status).toBe(400);
       expect((await call('post', v1.manager, base, { kind: 'TEMPORARY', startsAt: iso(100 * H), endsAt: iso(99 * H), reason: 'Backwards' })).status).toBe(400);
       expect((await call('post', v1.manager, base, { kind: 'TEMPORARY', startsAt: iso(-5 * H), endsAt: iso(-1 * H), reason: 'In the past' })).status).toBe(400);
@@ -126,21 +129,32 @@ describe('E2E — Vendor operations', () => {
       expect((await call('get', operator, base)).status).toBe(200); // anyone linked may read
       expect((await call('get', v2.manager, base)).status).toBe(404);
       expect((await call('post', v2.manager, base, { kind: 'TEMPORARY', startsAt: iso(100 * H), endsAt: iso(101 * H), reason: 'Other vendor' })).status).toBe(404);
+
+      expect((await approve(ok.body.data.request.id)).status).toBe(201);
       const list = expectData<any>(await call('get', v1.manager, base));
-      expect(list.closures[0]).toMatchObject({ id: closureId, kind: 'HOLIDAY', status: 'SCHEDULED', reason: 'Eid holiday' });
+      closureId = list.closures[0].id;
+      expect(list.closures[0]).toMatchObject({ kind: 'HOLIDAY', status: 'SCHEDULED', reason: 'Eid holiday' });
       expect(list.canManage).toBe(true);
       expect((await world.ds.query(`SELECT 1 FROM admin_audit_logs WHERE action = 'branch_closure.created'`)).length).toBeGreaterThanOrEqual(1);
+
+      const overlap = await call('post', v1.manager, base, { kind: 'HOLIDAY', startsAt: iso(60 * H), endsAt: iso(90 * H), reason: 'Overlaps' });
+      expect(overlap.status).toBe(201);
+      expect((await approve(overlap.body.data.request.id)).status).toBe(409);
+      expect(expectData<any>(await call('get', v1.manager, base)).closures).toHaveLength(1);
+      await call('post', admin, `/admin/branch-change-requests/${overlap.body.data.request.id}/reject`, { note: 'overlaps' });
     });
 
-    it('while a closure is ACTIVE customers see the branch closed and checkout refuses; the manual switch is untouched; cancelling reopens at once', async () => {
+    it('while an approved closure is ACTIVE customers see the branch closed and checkout refuses; the switch is untouched; an approved early end reopens at once', async () => {
       const product = await s.product(v2, { priceMinor: 5000, inventoryMode: 'OPEN' });
       const shop = await s.customer();
       await s.addToCart(shop, product.id, 1, {});
       const visible = async () => (await world.api('get', `/vendor-branches/${v2.branchId}`, { token: shop.accessToken })).body.data?.isOpen;
       expect(await visible()).toBe(true);
 
-      const start = await call('post', v2.manager, `/vendor/branches/${v2.branchId}/closures`, { kind: 'TEMPORARY', startsAt: iso(-1000), endsAt: iso(2 * H), reason: 'Water cut' });
-      expect(start.status).toBe(201);
+      const req = await call('post', v2.manager, `/vendor/branches/${v2.branchId}/closures`, { kind: 'TEMPORARY', startsAt: iso(-1000), endsAt: iso(2 * H), reason: 'Water cut' });
+      expect(req.status).toBe(201);
+      expect(await visible()).toBe(true); // still open while the request waits
+      expect((await approve(req.body.data.request.id)).status).toBe(201);
       expect(await visible()).toBe(false);
       expect((await world.ds.query(`SELECT is_open FROM vendor_branches WHERE id = $1`, [v2.branchId]))[0].is_open).toBe(true); // overlay only
       const branch = expectData<any>(await call('get', v2.manager, `/vendor/branches/${v2.branchId}`));
@@ -150,9 +164,13 @@ describe('E2E — Vendor operations', () => {
       expect(refused.status).toBe(400);
       expect(JSON.stringify(refused.body)).toContain('BRANCH_TEMPORARILY_CLOSED');
 
-      expect((await call('delete', v2.manager, `/vendor/branches/${v2.branchId}/closures/${start.body.data.id}`)).status).toBe(200);
+      const [active] = await world.ds.query(`SELECT id FROM vendor_branch_closures WHERE vendor_branch_id = $1 AND cancelled_at IS NULL`, [v2.branchId]);
+      const end = await call('delete', v2.manager, `/vendor/branches/${v2.branchId}/closures/${active.id}`);
+      expect(end.status).toBe(200);
+      expect(await visible()).toBe(false); // the early end also waits for Hatly
+      expect((await approve(end.body.data.request.id)).status).toBe(201);
       expect(await visible()).toBe(true);
-      expect((await call('delete', v2.manager, `/vendor/branches/${v2.branchId}/closures/${start.body.data.id}`)).status).toBe(409); // already cancelled
+      expect((await call('delete', v2.manager, `/vendor/branches/${v2.branchId}/closures/${active.id}`)).status).toBe(404); // nothing left to end
     });
 
     it('a closure that has ended no longer closes the branch; Admin can read and cancel any branch’s closures', async () => {
