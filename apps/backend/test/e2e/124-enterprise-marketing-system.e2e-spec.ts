@@ -292,7 +292,9 @@ describe('E2E — Marketing, system, configuration, directory', () => {
       expect(ov.map((k) => k.key)).toEqual(expect.arrayContaining(['AUTOMATIC_DISPATCH_ENABLED', 'REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR', 'CUSTOMER_OTP_ENABLED']));
       const h = (await get(cfg, '/admin/config/CHECKOUT_QUOTE_TTL_SECONDS/history')).body.data as any[];
       expect(h.length).toBeGreaterThanOrEqual(1);
-      expect(JSON.stringify(h)).not.toContain('600');
+      // never the value: no value field and no 600 as a JSON value (a timestamp like "…T01:43:47.600Z" must not count)
+      expect(h.every((x) => !('value' in x) && !('newValue' in x) && !('oldValue' in x))).toBe(true);
+      expect(JSON.stringify(h)).not.toMatch(/:600[,}\]]/);
       expect((await get(await s.admin([Permission.VIEW_ORDERS]), '/admin/config/overview')).status).toBe(403);
     });
   });
