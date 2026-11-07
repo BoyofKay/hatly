@@ -341,7 +341,9 @@ describe('E2E — customer order cancellation (PD-005)', () => {
   describe('l) COD / PAY_AT_DELIVERY', () => {
     it('never get a payment row, an entitlement or a refund event', async () => {
       for (const method of ['COD', 'PAY_AT_DELIVERY']) {
-        const { customer, order: o } = await placed([p1, p2], method);
+        const { customer, order: o } = await placed([p1, p2], 'COD');
+        // R20: no NEW order can use Pay at Delivery; an order placed before R20 keeps it — simulated by marking a cash order as such.
+        if (method === 'PAY_AT_DELIVERY') await world.ds.query(`UPDATE orders SET payment_method = 'PAY_AT_DELIVERY', electronic_payment_method = 'INSTAPAY' WHERE id = $1`, [o.id]);
         expectData(await cancel(customer, o.id), 201);
         expect(await world.ds.query('SELECT 1 FROM payments WHERE order_id = $1', [o.id])).toEqual([]);
         expect(await refundEvents(o.id)).toEqual([]);

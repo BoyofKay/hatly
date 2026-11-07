@@ -84,11 +84,14 @@ describe('E2E — wallet, snapshots, ETA, tracking, order list (PD-006)', () => 
       expect(d.payment).toMatchObject({ method: 'COD', walletAmountMinor: 5000, amountDueMinor: order.totalMinor - 5000, status: 'DUE_ON_DELIVERY' });
     });
 
-    it('PARTIAL + Pay-at-Delivery keeps BOTH the wallet amount and the electronic method for the remainder', async () => {
+    it('R20: PARTIAL wallet + Pay-at-Delivery is refused for a new order (PAY_AT_DELIVERY_NOT_AVAILABLE) and nothing is debited', async () => {
       const c = await cartFor([p1]);
       await credit(c, 3000);
-      const order = expectData<any>(await place(c, { paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'WE_PAY', useWallet: true }), 201);
-      expect(order).toMatchObject({ paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'WE_PAY', walletAmountMinor: 3000, amountDueMinor: order.totalMinor - 3000 });
+      const res = await place(c, { paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'WE_PAY', useWallet: true });
+      expect(res.status).toBe(400);
+      expect(res.body.error.details.code).toBe('PAY_AT_DELIVERY_NOT_AVAILABLE');
+      const debits = await world.ds.query("SELECT 1 FROM wallet_transactions WHERE customer_id = $1 AND type = 'ORDER_PAYMENT'", [c.id]);
+      expect(debits).toEqual([]);
     });
 
     it('FULL: when the wallet covers the order the source is WALLET, nothing is due, no electronic method, and fulfilment proceeds', async () => {

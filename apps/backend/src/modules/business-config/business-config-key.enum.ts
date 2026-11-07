@@ -127,6 +127,13 @@ export enum BusinessConfigKey {
   OPERATIONS_CONTACT_PHONE = 'OPERATIONS_CONTACT_PHONE',
 
   /**
+   * R21 (2026-11-06): minutes after placing an InstaPay / Vodafone Cash order within which Operations must verify the money; past it the
+   * order is cancelled automatically and its stock released (late money is reviewed and refunded, never reactivated). Unset = off.
+   * Whole minutes from 15 to 10080 (7 days).
+   */
+  MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES = 'MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES',
+
+  /**
    * PHASE F addition. CONFIRMED: Hatly Service pricing = real road
    * distance (reusing the existing MapProvider, no separate distance
    * engine) × this configurable multiplier. Deliberately NOT seeded —

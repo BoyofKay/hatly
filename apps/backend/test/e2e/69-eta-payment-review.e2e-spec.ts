@@ -128,10 +128,12 @@ describe('E2E — ETA behaviour while a Manual Transfer is pending / after appro
 
   it('COD / PAY_AT_DELIVERY / FULL WALLET are never affected — ETA counts down normally from creation', async () => {
     await patchBranch({ preparationTimeMinutes: 20 });
-    for (const body of [{ paymentMethod: 'COD' }, { paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'VODAFONE_CASH' }]) {
+    for (const legacyPayAtDelivery of [false, true]) {
       const c = await s.customer();
       await s.addToCart(c, p1.id, 1);
-      const order = expectData<any>(await place(c, body), 201);
+      const order = expectData<any>(await place(c, { paymentMethod: 'COD' }), 201);
+      // R20: no NEW order can use Pay at Delivery; an order placed before R20 keeps it — simulated by marking a cash order as such.
+      if (legacyPayAtDelivery) await world.ds.query(`UPDATE orders SET payment_method = 'PAY_AT_DELIVERY', electronic_payment_method = 'INSTAPAY' WHERE id = $1`, [order.id]);
       const d = expectData<any>(await details(c, order.id));
       expect(d.eta.state).toBe('ESTIMATED');
     }

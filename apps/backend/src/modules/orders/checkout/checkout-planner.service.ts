@@ -159,6 +159,15 @@ export class CheckoutPlannerService {
     if (requestedMethod === 'ONLINE') {
       fail('ONLINE_PAYMENT_NOT_AVAILABLE', 'Online payment is not available yet.');
     }
+    // R20 (decision register 2026-11-06): paying electronically at the door (unverified before preparation) is not an approved method.
+    // No new order uses it; orders already placed with it keep it. InstaPay / Vodafone Cash are offered as a transfer verified BEFORE
+    // preparation (MANUAL_TRANSFER) instead.
+    if (requestedMethod === 'PAY_AT_DELIVERY') {
+      fail(
+        'PAY_AT_DELIVERY_NOT_AVAILABLE',
+        'Paying by InstaPay / Vodafone Cash at the door is no longer offered. Choose cash on delivery, or pay by transfer before the order is prepared.',
+      );
+    }
     if (requestedMethod === 'MANUAL_TRANSFER' && hasWeightedItem) {
       // The final amount of a weighed item is only known once the weight is recorded — no pre-payment against an estimate.
       fail(

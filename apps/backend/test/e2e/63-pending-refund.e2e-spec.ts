@@ -210,7 +210,9 @@ describe('E2E — Manual Transfer pending refund entitlement (PD-004)', () => {
   describe('f) COD and PAY_AT_DELIVERY', () => {
     it('never get an entitlement or a refund event, on partial or final cancellation', async () => {
       for (const method of ['COD', 'PAY_AT_DELIVERY']) {
-        const o = await order([p1, p2], method);
+        const o = await order([p1, p2], 'COD');
+        // R20: no NEW order can use Pay at Delivery; an order placed before R20 keeps it — simulated by marking a cash order as such.
+        if (method === 'PAY_AT_DELIVERY') await world.ds.query(`UPDATE orders SET payment_method = 'PAY_AT_DELIVERY', electronic_payment_method = 'INSTAPAY' WHERE id = $1`, [o.order.id]);
         expectData(await cancelSegment(v2, await segmentOf(o.order.id, v2)));
         expectData(await cancelSegment(v1, await segmentOf(o.order.id, v1)));
         expect(await world.ds.query('SELECT 1 FROM payments WHERE order_id = $1', [o.order.id])).toEqual([]);

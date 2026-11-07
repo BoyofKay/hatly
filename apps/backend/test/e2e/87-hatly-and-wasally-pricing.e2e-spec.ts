@@ -82,11 +82,11 @@ describe('E2E — Hatly vs Wasally: direction, delivery-fee-only pricing, paymen
       expect(detail.totalMinor).toBe(FEE);
     });
 
-    it('PAYMENT RULES are the ordinary ones: Pay at Delivery and Manual Transfer are offered and accepted, with the delivery fee as the amount', async () => {
+    it('PAYMENT RULES are the ordinary ones: Manual Transfer is offered and accepted with the delivery fee as the amount; Pay at Delivery is not (R20)', async () => {
       const c = await withItem(wasallyItem);
       const q = expectData<any>(await quote(c), 201);
       expect(q.payment.options.cod).toBe(true);
-      expect(q.payment.options.payAtDelivery).toBe(true);
+      expect(q.payment.options.payAtDelivery).toBe(false); // R20
       expect(q.payment.options.manualTransfer).toMatchObject({ available: true, reason: null });
       expect(q.payment.wallet.available).toBe(true);
 
@@ -96,8 +96,9 @@ describe('E2E — Hatly vs Wasally: direction, delivery-fee-only pricing, paymen
       expect(Number(payment.amount_minor)).toBe(FEE);
 
       const c2 = await withItem(wasallyItem);
-      const viaPad = expectData<any>(await order(c2, { paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'INSTAPAY' }), 201);
-      expect(viaPad).toMatchObject({ paymentMethod: 'PAY_AT_DELIVERY' });
+      const viaPad = await order(c2, { paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'INSTAPAY' });
+      expect(viaPad.status).toBe(400);
+      expect(viaPad.body.error.details.code).toBe('PAY_AT_DELIVERY_NOT_AVAILABLE');
     });
 
     it('DIRECTION: the customer-chosen start is the ORIGIN and the chosen place the DESTINATION (origin → destination), frozen in the segment and the route snapshot', async () => {

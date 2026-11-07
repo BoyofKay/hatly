@@ -111,7 +111,6 @@ describe('CheckoutPlannerService — totals', () => {
     const h = harness({ branches: [branch('b1')], balance: 50000 });
     const attempts: Array<Partial<CheckoutInput>> = [
       { paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: 'INSTAPAY' as never },
-      { paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'INSTAPAY' as never },
       { paymentMethod: 'WALLET' },
       { paymentMethod: 'COD', useWallet: true },
     ];
@@ -196,15 +195,24 @@ describe('CheckoutPlannerService — payment rules', () => {
     await expect(h.plan(weighed, { paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: 'INSTAPAY' as never })).rejects.toMatchObject({ response: { details: { code: 'MANUAL_TRANSFER_NOT_ALLOWED_FOR_WEIGHTED_ORDER' } } });
   });
 
-  it('electronic method: required for MANUAL_TRANSFER / PAY_AT_DELIVERY, refused for COD / WALLET, must be currently enabled, and is kept on the plan', async () => {
+  it('electronic method: required for MANUAL_TRANSFER, refused for COD / WALLET, must be currently enabled, and is kept on the plan', async () => {
     const h = harness({ branches: [branch('b1')], enabled: ['INSTAPAY', 'WE_PAY'] });
-    for (const method of ['MANUAL_TRANSFER', 'PAY_AT_DELIVERY'] as const) {
+    for (const method of ['MANUAL_TRANSFER'] as const) {
       await expect(h.plan(oneVendor(), { paymentMethod: method })).rejects.toMatchObject({ response: { details: { code: 'ELECTRONIC_PAYMENT_METHOD_REQUIRED' } } });
       await expect(h.plan(oneVendor(), { paymentMethod: method, electronicPaymentMethod: 'ORANGE_CASH' as never })).rejects.toMatchObject({ response: { details: { code: 'ELECTRONIC_PAYMENT_METHOD_NOT_AVAILABLE' } } });
     }
     await expect(h.plan(oneVendor(), { paymentMethod: 'COD', electronicPaymentMethod: 'INSTAPAY' as never })).rejects.toMatchObject({ response: { details: { code: 'ELECTRONIC_PAYMENT_METHOD_NOT_ALLOWED' } } });
-    const ok = await h.plan(oneVendor(), { paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'WE_PAY' as never });
-    expect(ok.payment).toMatchObject({ method: 'PAY_AT_DELIVERY', electronicMethod: 'WE_PAY', awaitsPaymentApproval: false });
+    const ok = await h.plan(oneVendor(), { paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: 'WE_PAY' as never });
+    expect(ok.payment).toMatchObject({ method: 'MANUAL_TRANSFER', electronicMethod: 'WE_PAY', awaitsPaymentApproval: true });
+  });
+
+  it('R20: PAY_AT_DELIVERY is refused for every new order (PAY_AT_DELIVERY_NOT_AVAILABLE), whatever the electronic method', async () => {
+    const h = harness({ branches: [branch('b1')], enabled: ['INSTAPAY', 'WE_PAY'] });
+    for (const electronicPaymentMethod of [undefined, 'WE_PAY', 'INSTAPAY'] as const) {
+      await expect(h.plan(oneVendor(), { paymentMethod: 'PAY_AT_DELIVERY', ...(electronicPaymentMethod ? { electronicPaymentMethod: electronicPaymentMethod as never } : {}) })).rejects.toMatchObject({
+        response: { details: { code: 'PAY_AT_DELIVERY_NOT_AVAILABLE' } },
+      });
+    }
   });
 
   it('MANUAL_TRANSFER awaits payment approval; an ORDER needs the transfer destination configured', async () => {

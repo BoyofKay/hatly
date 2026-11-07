@@ -283,7 +283,7 @@ export class CheckoutQuoteService {
           },
           options: {
             cod: true,
-            payAtDelivery: !plan.hasPendingAdHocPricing && !pickupCashOnly,
+            payAtDelivery: false, // R20: never offered for a new order (the app hides the option)
             manualTransfer: {
               available: transferConfigured && !plan.hasWeightedItem && !plan.hasPendingAdHocPricing && !pickupCashOnly,
               reason: pickupCashOnly

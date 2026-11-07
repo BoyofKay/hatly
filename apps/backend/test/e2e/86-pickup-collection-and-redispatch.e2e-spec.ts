@@ -148,7 +148,9 @@ describe('E2E — pickup collection (U2) and redispatch after a driver hand-back
         { paymentMethod: 'COD', useWallet: true },
       ]) {
         const res = await world.api('post', '/orders', { token: c.accessToken, body });
-        expect({ body, status: res.status, code: code(res) }).toEqual({ body, status: 400, code: 'PICKUP_CASH_ONLY' });
+        // R20: Pay at Delivery is refused for every new order before the pickup rule is even reached.
+        const expected = body.paymentMethod === 'PAY_AT_DELIVERY' ? 'PAY_AT_DELIVERY_NOT_AVAILABLE' : 'PICKUP_CASH_ONLY';
+        expect({ body, status: res.status, code: code(res) }).toEqual({ body, status: 400, code: expected });
       }
       expect(Number((await q('SELECT count(*)::int AS n FROM orders WHERE customer_id = $1', [c.id]))[0].n)).toBe(before);
       const cash = expectData<any>(await world.api('post', '/orders', { token: c.accessToken, body: { paymentMethod: 'COD' } }), 201);

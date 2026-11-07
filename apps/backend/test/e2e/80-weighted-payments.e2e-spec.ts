@@ -182,15 +182,15 @@ describe('E2E — weighted products & payments', () => {
       return c;
     };
 
-    it('COD and PAY_AT_DELIVERY create the order with NO payment row; unknown methods and ONLINE are refused', async () => {
+    it('COD creates the order with NO payment row; PAY_AT_DELIVERY (R20), unknown methods and ONLINE are refused', async () => {
       const a = await cartWith();
       const cod = await place(a, 'COD');
       expect(cod.status).toBe(201);
       expect(await paymentOf(cod.body.data.id)).toBeUndefined();
       const b = await cartWith();
       const pad = await place(b, 'PAY_AT_DELIVERY');
-      expect(pad.status).toBe(201);
-      expect(await paymentOf(pad.body.data.id)).toBeUndefined();
+      expect(pad.status).toBe(400); // R20: not offered for a new order
+      expect(pad.body.error.details.code).toBe('PAY_AT_DELIVERY_NOT_AVAILABLE');
 
       const c = await cartWith();
       const online = await place(c, 'ONLINE');

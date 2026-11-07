@@ -97,7 +97,7 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
       expect(d.vendors.map((v: any) => [v.name, v.subtotalMinor, v.itemCount])).toEqual([['CQ 1', 10000, 1], ['CQ 2', 20000, 1]]);
       expect(typeof d.quoteToken).toBe('string');
       expect(new Date(d.expiresAt).getTime()).toBeGreaterThan(Date.now());
-      expect(d.payment.options).toMatchObject({ cod: true, payAtDelivery: true, manualTransfer: { available: true }, electronicMethods: ['INSTAPAY', 'VODAFONE_CASH', 'ORANGE_CASH', 'ETISALAT_CASH', 'WE_PAY'] });
+      expect(d.payment.options).toMatchObject({ cod: true, payAtDelivery: false /* R20 */, manualTransfer: { available: true }, electronicMethods: ['INSTAPAY', 'VODAFONE_CASH', 'ORANGE_CASH', 'ETISALAT_CASH', 'WE_PAY'] });
 
       const order = expectData<any>(await place(c, { deliveryAddress: addr(), paymentMethod: 'COD', quoteToken: d.quoteToken }), 201);
       expect(order.totalMinor).toBe(d.summary.totalMinor);
@@ -457,11 +457,14 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
   });
 
   describe('payment methods: COD ≠ Pay at Delivery ≠ Manual Transfer', () => {
-    it('PAY_AT_DELIVERY stores the electronic method, creates no payment row, and fulfilment is NOT blocked', async () => {
+    it('R20: a new PAY_AT_DELIVERY order is refused (nothing created); an order placed with it BEFORE R20 is still fulfilled normally', async () => {
       await s.driver({ lat: 30.4212, lng: 31.5612 });
       const c = await cartFor([p1]);
-      const order = expectData<any>(await place(c, { deliveryAddress: addr(), paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'VODAFONE_CASH' }), 201);
-      expect(order).toMatchObject({ paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'VODAFONE_CASH', walletAmountMinor: 0, amountDueMinor: order.totalMinor });
+      const refused = await place(c, { deliveryAddress: addr(), paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'VODAFONE_CASH' });
+      expect(refused.status).toBe(400);
+      expect(refused.body.error.details.code).toBe('PAY_AT_DELIVERY_NOT_AVAILABLE');
+      const order = expectData<any>(await place(c, { deliveryAddress: addr(), paymentMethod: 'COD' }), 201);
+      await world.ds.query(`UPDATE orders SET payment_method = 'PAY_AT_DELIVERY', electronic_payment_method = 'VODAFONE_CASH' WHERE id = $1`, [order.id]); // as placed before R20
       expect(await paymentOf(order.id)).toBeUndefined();
       await s.vendorPrepares(v1, order.id);
       expect((await orderRow(order.id)).status).toBe('ASSIGNED_TO_DRIVER');
@@ -475,19 +478,17 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
       const c2 = await cartFor([p1]);
       const codWith = await place(c2, { deliveryAddress: addr(), paymentMethod: 'COD', electronicPaymentMethod: 'INSTAPAY' });
       expect(codWith.body.error.details.code).toBe('ELECTRONIC_PAYMENT_METHOD_NOT_ALLOWED');
-      for (const method of ['PAY_AT_DELIVERY', 'MANUAL_TRANSFER']) {
-        const missing = await place(c2, { deliveryAddress: addr(), paymentMethod: method });
-        expect(missing.body.error.details.code).toBe('ELECTRONIC_PAYMENT_METHOD_REQUIRED');
-      }
-      expect((await place(c2, { deliveryAddress: addr(), paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'PAYPAL' })).status).toBe(400);
+      const missing = await place(c2, { deliveryAddress: addr(), paymentMethod: 'MANUAL_TRANSFER' });
+      expect(missing.body.error.details.code).toBe('ELECTRONIC_PAYMENT_METHOD_REQUIRED');
+      expect((await place(c2, { deliveryAddress: addr(), paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: 'PAYPAL' })).status).toBe(400);
 
       await s.setConfig('CHECKOUT_ENABLED_ELECTRONIC_METHODS', ['INSTAPAY', 'WE_PAY']);
       try {
         const q = (await quote(c2, { deliveryAddress: addr(), paymentMethod: 'COD' })).data;
         expect(q.payment.options.electronicMethods).toEqual(['INSTAPAY', 'WE_PAY']);
-        const disabled = await place(c2, { deliveryAddress: addr(), paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'ORANGE_CASH' });
+        const disabled = await place(c2, { deliveryAddress: addr(), paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: 'ORANGE_CASH' });
         expect(disabled.body.error.details.code).toBe('ELECTRONIC_PAYMENT_METHOD_NOT_AVAILABLE');
-        expectData(await place(c2, { deliveryAddress: addr(), paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'WE_PAY' }), 201);
+        expectData(await place(c2, { deliveryAddress: addr(), paymentMethod: 'MANUAL_TRANSFER', electronicPaymentMethod: 'WE_PAY' }), 201);
       } finally {
         await clearConfig('CHECKOUT_ENABLED_ELECTRONIC_METHODS');
       }
@@ -568,10 +569,11 @@ describe('E2E — checkout quote, address, pickup, payments and coupons (PD-006)
       expect((await opsSegment(seg, 'PREPARING')).body.error.details.code).toBe('PAYMENT_NOT_APPROVED');
     });
 
-    it('COD and PAY_AT_DELIVERY never block fulfilment', async () => {
-      for (const body of [{ paymentMethod: 'COD' }, { paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: 'ETISALAT_CASH' }]) {
+    it('COD and (pre-R20) PAY_AT_DELIVERY orders never block fulfilment', async () => {
+      for (const legacyPayAtDelivery of [false, true]) {
         const c = await cartFor([p1]);
-        const order = expectData<any>(await place(c, { deliveryAddress: addr(), ...body }), 201);
+        const order = expectData<any>(await place(c, { deliveryAddress: addr(), paymentMethod: 'COD' }), 201);
+        if (legacyPayAtDelivery) await world.ds.query(`UPDATE orders SET payment_method = 'PAY_AT_DELIVERY', electronic_payment_method = 'VODAFONE_CASH' WHERE id = $1`, [order.id]);
         const seg = await segmentOf(order.id, v1);
         for (const st of ['CONFIRMED', 'PREPARING']) expectData(await vendorStatus(v1, seg, st));
       }

@@ -357,7 +357,10 @@ describe('E2E — wallet + Manual Transfer (PD-001 amended)', () => {
     ])('WALLET + %s: only the wallet-paid part (never the unpaid cash) is refundable', async (method, extra) => {
       const c = await cartFor([p1]);
       await credit(c, 500000);
-      const order = expectData<any>(await place(c, { paymentMethod: method, useWallet: true, walletAmountMinor: 3000, ...extra }), 201);
+      // R20: a new order cannot use Pay at Delivery; a wallet + Pay-at-Delivery order placed before R20 is simulated.
+      const order = expectData<any>(await place(c, { paymentMethod: 'COD', useWallet: true, walletAmountMinor: 3000 }), 201);
+      if (method === 'PAY_AT_DELIVERY') await world.ds.query(`UPDATE orders SET payment_method = 'PAY_AT_DELIVERY', electronic_payment_method = 'VODAFONE_CASH' WHERE id = $1`, [order.id]);
+      void extra;
       await fail(order.id);
       expectData(await resolveRefund(order.id, 3001), 201);
       expect((await executeRefund(order.id)).body.error.details.code).toBe('REFUND_EXCEEDS_PAYMENT_AMOUNT');
@@ -367,7 +370,10 @@ describe('E2E — wallet + Manual Transfer (PD-001 amended)', () => {
     it.each([['COD', {}], ['PAY_AT_DELIVERY', { electronicPaymentMethod: 'VODAFONE_CASH' }]])('WALLET + %s: refunding exactly the wallet part credits the wallet once', async (method, extra) => {
       const c = await cartFor([p1]);
       await credit(c, 500000);
-      const order = expectData<any>(await place(c, { paymentMethod: method, useWallet: true, walletAmountMinor: 3000, ...extra }), 201);
+      // R20: a new order cannot use Pay at Delivery; a wallet + Pay-at-Delivery order placed before R20 is simulated.
+      const order = expectData<any>(await place(c, { paymentMethod: 'COD', useWallet: true, walletAmountMinor: 3000 }), 201);
+      if (method === 'PAY_AT_DELIVERY') await world.ds.query(`UPDATE orders SET payment_method = 'PAY_AT_DELIVERY', electronic_payment_method = 'VODAFONE_CASH' WHERE id = $1`, [order.id]);
+      void extra;
       await fail(order.id);
       expectData(await resolveRefund(order.id, 3000), 201);
       expect(expectData<any>(await executeRefund(order.id), 201)).toMatchObject({ transferRefundedMinor: 0, walletRefundedMinor: 3000 });

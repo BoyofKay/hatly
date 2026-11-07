@@ -255,7 +255,7 @@ describe('E2E — Hatly Service: pending price → confirmed price', () => {
           paymentMethod: 'PAY_AT_DELIVERY',
           electronicPaymentMethod: 'INSTAPAY',
         },
-        'ELECTRONIC_PAYMENT_NOT_ALLOWED_FOR_UNPRICED_ORDER',
+        'PAY_AT_DELIVERY_NOT_AVAILABLE', // R20: refused for every new order, before any other payment rule
       ],
       [
         'MANUAL_TRANSFER',

@@ -8,11 +8,14 @@ import { OrderStateMachineService } from '../../orders/order-state-machine.servi
 import { Role } from '../../../common/enums/role.enum';
 import { assertUuid, num } from '../common/platform-sql';
 
-export const ADMIN_CANCEL_REASONS = ['CUSTOMER_REQUEST', 'VENDOR_UNAVAILABLE', 'OUT_OF_STOCK', 'PAYMENT_ISSUE', 'FRAUD_SUSPECTED', 'OPERATIONAL_ISSUE', 'OTHER'] as const;
+export const ADMIN_CANCEL_REASONS = ['CUSTOMER_REQUEST', 'VENDOR_UNAVAILABLE', 'OUT_OF_STOCK', 'PAYMENT_ISSUE', 'FRAUD_SUSPECTED', 'OPERATIONAL_ISSUE', 'OTHER', 'PAYMENT_NOT_VERIFIED'] as const;
 export type AdminCancelReason = (typeof ADMIN_CANCEL_REASONS)[number];
 
-/** States in which the (unchanged) order state machine lets an ADMIN cancel. After a driver is assigned the failed-delivery flow applies. */
-export const ADMIN_CANCELLABLE_STATUSES: string[] = [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP];
+/**
+ * States in which the order state machine lets an ADMIN cancel. R3 (2026-11-06): until the driver picks the goods up — including
+ * ASSIGNED_TO_DRIVER (the driver is freed and Operations alerted). After pickup the failed-delivery / return-to-office flow applies.
+ */
+export const ADMIN_CANCELLABLE_STATUSES: string[] = [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.READY_FOR_PICKUP, OrderStatus.ASSIGNED_TO_DRIVER];
 
 @Injectable()
 export class AdminOrderExtrasService {
@@ -27,7 +30,7 @@ export class AdminOrderExtrasService {
    * effects are exactly the ordinary cancellation's. Segments (by id) are locked before the order, as in the customer path, so a vendor
    * or a concurrent driver assignment cannot interleave. The Dashboard never computes any money; the response reports what happened.
    */
-  async cancel(orderId: string, actor: { id: string; role: string }, reasonCode: AdminCancelReason, reasonText?: string) {
+  async cancel(orderId: string, actor: { id: string | null; role: string }, reasonCode: AdminCancelReason, reasonText?: string) {
     assertUuid(orderId, 'orderId');
     if (!ADMIN_CANCEL_REASONS.includes(reasonCode)) {
       throw new BadRequestException({ message: 'Choose a cancellation reason.', details: { code: 'VALIDATION_FAILED' } });
@@ -46,7 +49,7 @@ export class AdminOrderExtrasService {
       }
       if (!ADMIN_CANCELLABLE_STATUSES.includes(order.status)) {
         throw new ConflictException({
-          message: `This order is ${order.status} and can no longer be cancelled from here. After a driver is assigned, use the failed-delivery resolution.`,
+          message: `This order is ${order.status} and can no longer be cancelled from here. After the driver picked it up, use the failed-delivery resolution.`,
           details: { code: 'STATE_CONFLICT', status: order.status },
         });
       }
@@ -54,7 +57,7 @@ export class AdminOrderExtrasService {
         orderId,
         to: OrderStatus.CANCELLED,
         actorRole: actor.role as Role,
-        actorUserId: actor.id,
+        actorUserId: actor.id ?? undefined,
         cancellationReason: `${reasonCode}${reasonText?.trim() ? `: ${reasonText.trim()}` : ''}`,
       });
       afterCommit = cancelled.afterCommit;

@@ -15,6 +15,7 @@ import { AdminFinanceService } from './finance/admin-finance.service';
 import { AdminOrderExtrasController } from './orders/admin-order-extras.controller';
 import { AdminOrderExceptionsController } from './orders/admin-order-exceptions.controller';
 import { AdminOrderExtrasService } from './orders/admin-order-extras.service';
+import { ManualTransferExpiryService } from './orders/manual-transfer-expiry.service';
 import { UploadsModule } from '../uploads/uploads.module';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { HomeProductsModule } from '../home-products/home-products.module';
@@ -37,6 +38,6 @@ import { ReportsService } from './reports/reports.service';
 @Module({
   imports: [PermissionsModule, UsersModule, OrdersModule, WalletModule, AuthModule, UploadsModule, HomeProductsModule, BusinessConfigModule],
   controllers: [ExecutiveController, PermissionTemplatesController, AdminFinanceController, AdminOrderExtrasController, AdminOrderExceptionsController, AdminCustomersExtController, ReportsController, MediaController, MarketingController, CustomerInboxController, DirectoryController, SystemController, TelemetryController, ConfigOverviewController],
-  providers: [ExecutiveService, PermissionTemplatesService, AdminFinanceService, AdminOrderExtrasService, AdminCustomersExtService, ReportsService, MediaService, MarketingService, SystemService, MetricsRecorder, { provide: APP_INTERCEPTOR, useClass: RequestMetricsInterceptor }],
+  providers: [ExecutiveService, PermissionTemplatesService, AdminFinanceService, AdminOrderExtrasService, ManualTransferExpiryService, AdminCustomersExtService, ReportsService, MediaService, MarketingService, SystemService, MetricsRecorder, { provide: APP_INTERCEPTOR, useClass: RequestMetricsInterceptor }],
 })
 export class AdminPlatformModule {}

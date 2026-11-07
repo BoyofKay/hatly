@@ -39,6 +39,10 @@ const CLEARABLE_KEYS: ReadonlySet<string> = new Set([
   BusinessConfigKey.HATLY_SERVICE_DEFAULT_PICKUP_LOCATION,
   BusinessConfigKey.HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION,
   BusinessConfigKey.WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION,
+  // Optional settings whose absence has a defined meaning: default 5 min (R16), fallback number (R17), automatic cancellation off (R21).
+  BusinessConfigKey.DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES,
+  BusinessConfigKey.OPERATIONS_CONTACT_PHONE,
+  BusinessConfigKey.MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES,
 ]);
 
 /** Keys whose value has a known shape: a write that does not match is refused (400) instead of breaking pricing later. */
@@ -74,6 +78,10 @@ const VALUE_VALIDATORS: Partial<Record<string, { valid: (v: unknown) => boolean;
   [BusinessConfigKey.DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES]: {
     valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= ACK_WINDOW_MIN_MINUTES && v <= ACK_WINDOW_MAX_MINUTES,
     message: `DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES must be a whole number of minutes from ${ACK_WINDOW_MIN_MINUTES} to ${ACK_WINDOW_MAX_MINUTES}.`,
+  },
+  [BusinessConfigKey.MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES]: {
+    valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 15 && v <= 10080,
+    message: 'MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES must be a whole number of minutes from 15 to 10080 (7 days); clear it to turn the automatic cancellation off.',
   },
   // Customer phone verification switch: a real boolean only — `0`, `""`, `"false"` or `null` must never be stored and later read
   // by truthiness (which would silently turn OTP off, or fail to).
@@ -236,6 +244,12 @@ export class BusinessConfigService {
       if (typeof value === 'string' && value.trim().length > 0) return value.trim();
     }
     return null;
+  }
+
+  /** R21: minutes Operations have to verify a Manual Transfer before the order is cancelled; null = feature off (unset or invalid). */
+  async getManualTransferVerificationWindowMinutes(): Promise<number | null> {
+    const value = await this.get<unknown>(BusinessConfigKey.MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES, null);
+    return typeof value === 'number' && Number.isInteger(value) && value >= 15 && value <= 10080 ? value : null;
   }
 
   /** R16: the driver acknowledgement window in minutes (default 5, bounds 1–30). */

@@ -986,20 +986,14 @@ describe('OrderCreationService', () => {
       expect(store.payments.size).toBe(0);
     });
 
-    it('allows PAY_AT_DELIVERY for a weighted order, creating no Payment row — same shape as COD, no gateway invented', async () => {
+    it('R20: refuses PAY_AT_DELIVERY for a new (weighted) order — PAY_AT_DELIVERY_NOT_AVAILABLE, no order or Payment row written', async () => {
       const weightProduct = makeProduct('p1', { priceMinor: 20000, pricingUnit: PricingUnit.WEIGHT });
       const cart = makeCart([makeCatalogGroup('g1', 'branch-1', [makeWeightItem('i1', weightProduct, 1000)])]);
       const { service, store } = buildHarness({ cart, branches: [makeBranch('branch-1')] });
 
-      const order = await service.createOrder('customer-1', {
-        deliveryAddress: address,
-        paymentMethod: 'PAY_AT_DELIVERY',
-        electronicPaymentMethod: ElectronicPaymentMethod.VODAFONE_CASH,
-      });
-
-      expect(order.paymentMethod).toBe('PAY_AT_DELIVERY');
-      // PD-006: Pay-at-Delivery is NOT COD — the electronic method the customer chose is stored, not lost.
-      expect(order.electronicPaymentMethod).toBe('VODAFONE_CASH');
+      await expect(
+        service.createOrder('customer-1', { deliveryAddress: address, paymentMethod: 'PAY_AT_DELIVERY', electronicPaymentMethod: ElectronicPaymentMethod.VODAFONE_CASH }),
+      ).rejects.toMatchObject({ response: { details: { code: 'PAY_AT_DELIVERY_NOT_AVAILABLE' } } });
       expect(store.payments.size).toBe(0);
     });
 

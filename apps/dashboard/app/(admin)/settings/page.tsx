@@ -39,6 +39,8 @@ interface ConfigFieldDef {
   options?: string[];
   unit?: string;
   help?: string;
+  /** The setting may be cleared (its absence has a defined meaning, e.g. a default or "off"). */
+  clearable?: boolean;
 }
 
 const CONFIG_FIELDS: ConfigFieldDef[] = [
@@ -65,13 +67,22 @@ const CONFIG_FIELDS: ConfigFieldDef[] = [
     type: 'integer',
     unit: 'minutes',
     help: 'How long a driver has to acknowledge an assignment (manual or automatic). Default 5 when empty; allowed 1 to 30. When it passes, Operations get an alert — the order is never released or reassigned automatically. Applies to new assignments only.',
+    clearable: true,
+  },
+  {
+    key: 'MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES',
+    label: 'Transfer Verification Window',
+    type: 'integer',
+    unit: 'minutes',
+    help: 'An InstaPay / Vodafone Cash order whose money is not verified within this time after it was placed is cancelled automatically and its stock released. Money that arrives later is reviewed and refunded; the order is not reactivated. Empty = never cancelled automatically. Allowed 15 to 10080 (7 days).',
+    clearable: true,
   },
   { key: 'LOYALTY_POINTS_PER_EGP', label: 'Loyalty Points per EGP', type: 'integer', unit: 'points' },
   { key: 'LOYALTY_WALLET_CONVERSION_POINTS_PER_EGP', label: 'Loyalty→Wallet Conversion Rate', type: 'integer', unit: 'points per EGP' },
   { key: 'CHECKOUT_QUOTE_TTL_SECONDS', label: 'Checkout Quote TTL', type: 'integer', unit: 'seconds' },
   { key: 'ETA_RANGE_BUFFER_MINUTES', label: 'ETA Range Buffer', type: 'integer', unit: 'minutes' },
   { key: 'CUSTOMER_SERVICE_WHATSAPP_NUMBER', label: 'Customer Service WhatsApp Number', type: 'string' },
-  { key: 'OPERATIONS_CONTACT_PHONE', label: 'Operations Phone (for drivers)', type: 'string', help: 'The number the driver app\'s "Call Operations" button dials. Empty: the Customer Service number above is used; if both are empty the button is hidden.' },
+  { key: 'OPERATIONS_CONTACT_PHONE', label: 'Operations Phone (for drivers)', type: 'string', help: 'The number the driver app\'s "Call Operations" button dials. Empty: the Customer Service number above is used; if both are empty the button is hidden.', clearable: true },
 ];
 
 function ConfigRow({ field }: { field: ConfigFieldDef }) {
@@ -134,6 +145,23 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
     }
   }
 
+  async function handleClear() {
+    if (isSaving) return;
+    setError(null);
+    setSaved(false);
+    setIsSaving(true);
+    try {
+      await clearBusinessConfigValue(field.key);
+      edited.current = false;
+      setValue('');
+      setSaved(true);
+    } catch (err: any) {
+      setError(apiErrorMessage(err, 'Failed to clear.'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-1 border-b py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between">
       <div>
@@ -183,6 +211,16 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
         >
           {isSaving ? 'Saving...' : 'Save'}
         </button>
+        {field.clearable && (
+          <button
+            onClick={handleClear}
+            disabled={isSaving || !loaded}
+            data-testid={`config-clear-${field.key}`}
+            className="min-h-[40px] rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:opacity-50 hover:bg-gray-50"
+          >
+            Clear
+          </button>
+        )}
         {saved && <span className="text-xs text-green-700">Saved</span>}
         {error && <span className="text-xs text-red-600">{error}</span>}
       </div>
