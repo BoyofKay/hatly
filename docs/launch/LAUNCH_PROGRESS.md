@@ -468,6 +468,17 @@ Production release `20261107T053628Z-079cf82fb4dc` (commit `177d278`, bundle ide
 - Migration 78 applied. Health ok. Smoke ok. `GET/PATCH /admin/drivers/:id/capacity` → 401 without a session.
 - Live limits: vehicle types Motocycle 5, Car 5, Bike 2 (owner approved "deploy as is").
 
+## 3ap. Admin and Vendor UX release (2026-11-07) — DEPLOYED and verified
+
+- Release `20261107T223459Z-7b9dd3cbe3b3` (commit eeaedb6). Rollback = `20261107T072134Z-b308f21c41d3`. No migration (still 78).
+- Details, the audit and the before/after step counts are in `docs/launch/ADMIN_UX_RELEASE_2026-11-07.md`.
+- Backup `hatly-prod-20261107T223848Z.dump` (sha256 dd6b176c7bfc…). Restore drill OK. Off-host copy OK.
+- Live checks:
+  - Health ok; smoke ok.
+  - The new endpoints return 401 without a session.
+  - The Home chunk serves "Needs your action now"; the transfer page serves the order-number refund lookup.
+  - HT-100034 (the first order after the reset) was untouched by the switch.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
