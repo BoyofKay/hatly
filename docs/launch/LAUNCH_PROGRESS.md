@@ -403,6 +403,14 @@ Production release `20261107T004846Z-593d380baae2` (commit `4bd81a0`, bundle ide
 * Settings: Clear buttons for the optional settings (acknowledgement window, Operations phone, transfer window).
 * **Gates:** backend unit 2,445 (one timing test needs an idle machine), e2e 83 suites / 1,133, integration 314; dashboard tsc/unit/build; Playwright on the isolated stack 9 spec files ✔ incl. the new settings check. Backup `hatly-prod-20261107T005208Z.dump` (sha `bd0f250a…`), restore drill OK, off-host copy matched. Live: health ok, 0 errors, 0 automatic cancellations, counts unchanged.
 
+## 3ak. Release 2 package B (2026-11-07) — DEPLOYED and verified
+
+Production release `20261107T022800Z-feb790433010` (commit `b969ca2`, bundle identical to the commit) LIVE; rollback target `20261107T004846Z-593d380baae2` (2A). One migration: `BranchChangeRequests1700007400000` (new table only; schema 75).
+* **R8/R44 — store changes need Hatly's approval:** a vendor's pause/reopen switch, new weekly hours, a temporary closure and the early end of a closure now create a *request* (vendor sees "Waiting for Hatly" and can withdraw it). Operations see them under Stores → **Store Requests** (and as a staff alert), approve (applied at once, new orders only) or reject with a note; the vendor gets an alert either way. Hours/closures requests are branch-manager only. Preparation time still applies directly. Admin can still change everything directly on the Branches page.
+* **R9 — enforcement at checkout:** a paused store or one outside its weekly hours (Cairo time) refuses new orders (`BRANCH_CLOSED` / `BRANCH_OUTSIDE_OPENING_HOURS`). A store with **no** weekly hours has no time limit. Production pre-check: 32 active stores, all open, none with hours or closures → **nothing changed for live stores**.
+* Dashboard: a store with no weekly hours now says "No set hours — takes orders any time while open" instead of showing every day as "Closed all day" (found during verification; it would have led a vendor who ticks one day to close the rest of the week).
+* **Gates:** backend unit 2,451, e2e 84 suites / 1,139 (one timestamp-coincidence test made robust), integration 314; dashboard tsc/unit 45/build; Playwright on the isolated stack: release1-register (incl. the Store Requests flow), vendor-operations, vendor-hub (rewritten for the request flow), notification-center, staff-alerts, settings, order-detail ✔; admin-nav has a pre-existing dev-server timing flake (a different link each run). Backup `hatly-prod-20261107T023124Z.dump` (sha `1595bab0…`), restore drill OK, off-host copy matched. Live: health ok, 0 backend errors, new endpoints 401 without a session, Store Requests page and new wording served, 0 requests, 32 stores open.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
