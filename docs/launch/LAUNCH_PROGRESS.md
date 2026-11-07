@@ -455,6 +455,19 @@ Production release `20261107T053628Z-079cf82fb4dc` (commit `177d278`, bundle ide
 * **Live:** health ok, 0 errors, new endpoint 401 without a session.
 * **Still open:** HT-100002 (see §3am) is assigned and unacknowledged; an ACKNOWLEDGEMENT_OVERDUE alert is open for it.
 
+## 3ao. Production test-data reset + Release 2D-3 R18 (2026-11-07) — DONE and verified
+
+**Test-data reset (owner-authorised; plan and counts in `docs/launch/TEST_DATA_RESET_2026-11-07.md`).**
+- Backup `hatly-prod-20261107T210039Z.dump` (sha256 53fc10436bbd…) + uploads `hatly-prod-uploads-20261107T210040Z.tar.gz`. Restore drill OK; both copied off-host with matching checksums.
+- One transaction with guards (abort if any order newer than HT-100033, or any non-manual payment). Dry-run with ROLLBACK first.
+- Removed: 33 orders and every dependent operational/financial row (36 tables emptied). Reset `products.delivered_*` counters on 5 products. Driver marked free. 3 proof-of-delivery photos moved to `backups/reset-20261107-proof-photos`.
+- Kept: users 16, vendors 34, branches 33, products 226, categories 63, config, offers, carts, addresses. `admin_audit_logs` (202) kept: append-only by trigger and a security record.
+- The order-number sequence was not reset; the next order is HT-100034, so a number is never reused in the audit trail.
+
+**R18 driver capacity** — release `20261107T072134Z-b308f21c41d3` (commit f3600f8). Rollback = `20261107T053628Z-079cf82fb4dc` (2D-2); DriverCapacity migration only adds a column and table.
+- Migration 78 applied. Health ok. Smoke ok. `GET/PATCH /admin/drivers/:id/capacity` → 401 without a session.
+- Live limits: vehicle types Motocycle 5, Car 5, Bike 2 (owner approved "deploy as is").
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
