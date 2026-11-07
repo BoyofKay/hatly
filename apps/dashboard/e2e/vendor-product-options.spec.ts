@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { VENDOR_A_PRODUCT_ID, VENDOR_A_STORAGE_STATE } from './env';
+import { adminApi } from './control-tower-fixtures';
 
 /**
  * Vendor product options ("modifiers") in a real browser against the REAL dev backend/database. The vendor manages the option groups of
@@ -16,7 +17,6 @@ test.describe('Vendor — product options', () => {
   // price and deleting apply at once; refusals are still shown at once (the request is validated by a dry run).
   test('a new group is sent to Hatly (approved here via the API); lowering a price applies; a new value is sent; a refused one is shown; delete applies', async ({ page }) => {
     page.on('dialog', (d) => d.accept());
-    const { adminApi } = await import('./control-tower-fixtures');
     const name = `PW Size ${unique()}`;
     await page.goto('/products');
     await page.getByTestId(`product-options-toggle-${VENDOR_A_PRODUCT_ID}`).click();
