@@ -28,6 +28,13 @@ export class AdminManualTransferController {
     return { data: payments };
   }
 
+  /** The Manual Transfer payment of an order, by its number (HT-…) — what the refund form uses instead of an internal id. */
+  @Get('by-order/:orderNumber')
+  @RequiresPermission(Permission.VERIFY_MANUAL_PAYMENTS)
+  async byOrder(@Param('orderNumber') orderNumber: string) {
+    return { data: await this.adminManualTransferService.findByOrderNumber(orderNumber) };
+  }
+
   /** Recorded refund obligations; `?sent=false` = still to be sent, `?sent=true` = already sent. */
   @Get('refunds')
   @RequiresPermission(Permission.VERIFY_MANUAL_PAYMENTS)

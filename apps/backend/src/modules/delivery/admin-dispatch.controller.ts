@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { RequiresPermission } from '../permissions/decorators/requires-permission.decorator';
 import { Permission } from '../permissions/permission.enum';
 import { PermissionsService } from '../permissions/permissions.service';
@@ -77,7 +77,8 @@ export class AdminDispatchAlertsController {
   @RequiresPermission(Permission.ASSIGN_REASSIGN_ORDERS)
   async list(@Query() query: ListDispatchAlertsQueryDto) {
     const alerts = await this.dispatchAlertsRepository.find({
-      where: query.open ? { resolvedAt: IsNull() } : {},
+      // An open alert on an order that has already ended is not actionable — never shown as open.
+      where: query.open ? { resolvedAt: IsNull(), order: { status: Not(In(['CANCELLED', 'DELIVERED', 'COLLECTED'])) as any } } : {},
       relations: { order: true },
       order: { createdAt: 'DESC' },
       take: query.limit ?? 100,

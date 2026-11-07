@@ -126,7 +126,7 @@ test.describe('Staff alerts, isolated cases and live updates', () => {
       expect(feeds).toBeGreaterThanOrEqual(3);
 
       order = await placeReadyOrder();
-      await expect(page.getByText(`Order #${order.orderId.slice(0, 8)}`).first()).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText(order.orderNumber, { exact: true }).first()).toBeVisible({ timeout: 20_000 });
       expect(lists).toBe(2); // exactly one reload, caused by the change
     } finally {
       await ctx.close();

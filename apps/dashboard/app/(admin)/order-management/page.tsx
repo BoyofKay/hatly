@@ -15,6 +15,7 @@ import { Drawer } from '../../../components/ui/Drawer';
 import { DispatchAction } from '../../../components/operations/DispatchAction';
 import { OrderDetailView } from '../../../components/orders/OrderDetailView';
 import { ExportButton } from '../../../components/reports/ExportButton';
+import { PaymentPill, paymentState } from '../../../components/orders/PaymentPill';
 
 /**
  * The Orders workspace — one place to find an order, understand it and act on it.
@@ -27,13 +28,15 @@ import { ExportButton } from '../../../components/reports/ExportButton';
  *  • Keyboard: j/k (or ↑/↓) move, Enter opens, Esc closes, "/" searches. The list refreshes itself while the tab is visible.
  *  The state lives in the URL (`?view=&search=&order=`), so any view or open order can be shared or reloaded.
  */
-type ViewId = 'all' | 'needsDriver' | 'pending' | 'preparing' | 'withDriver' | 'readyPickup' | 'failed' | 'done' | 'cancelled';
+type ViewId = 'all' | 'needsDriver' | 'pending' | 'toVerify' | 'preparing' | 'withDriver' | 'readyPickup' | 'failed' | 'done' | 'cancelled';
 interface View {
   id: ViewId;
   en: string;
   ar: string;
   statuses?: string[];
   fulfillment?: 'DELIVERY' | 'PICKUP';
+  /** Only orders whose payment is in this state. */
+  paymentStatus?: string;
   /** The backend's own number for the view, or null when there is none to show. */
   count?: (s: ControlTowerSummary) => number | null;
 }
@@ -42,6 +45,7 @@ const VIEWS: View[] = [
   { id: 'all', en: 'All orders', ar: 'كل الطلبات' },
   { id: 'needsDriver', en: 'Needs a driver', ar: 'تحتاج سائقًا', statuses: ['READY_FOR_PICKUP'], fulfillment: 'DELIVERY', count: (s) => s.attention.awaitingAssignment },
   { id: 'pending', en: 'New', ar: 'جديدة', statuses: ['PENDING'], count: (s) => by(s, 'PENDING') },
+  { id: 'toVerify', en: 'Transfer to verify', ar: 'تحويل للتحقق', paymentStatus: 'UNDER_REVIEW', count: (s) => s.operations?.transfersToVerify ?? null },
   { id: 'preparing', en: 'In preparation', ar: 'قيد التحضير', statuses: ['CONFIRMED', 'PREPARING'], count: (s) => by(s, 'CONFIRMED', 'PREPARING') },
   { id: 'withDriver', en: 'With a driver', ar: 'مع السائق', statuses: ['ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY'], count: (s) => by(s, 'ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY') },
   { id: 'readyPickup', en: 'Ready for pickup', ar: 'جاهزة للاستلام', statuses: ['READY_FOR_PICKUP'], fulfillment: 'PICKUP', count: (s) => s.attention.readyForCustomerPickup },
@@ -149,6 +153,7 @@ function OrdersWorkspace() {
         statuses: current.statuses?.length ? current.statuses.join(',') : view === 'all' && rawStatus ? rawStatus : undefined,
         fulfillmentType: current.fulfillment ?? (view === 'all' && rawFulfillment ? rawFulfillment : undefined),
         paymentMethod: payment || undefined,
+        paymentStatus: current.paymentStatus,
         vendorBranchId: branch || undefined,
         from: from || undefined,
         to: to || undefined,
@@ -348,8 +353,8 @@ function OrdersWorkspace() {
               <table className="min-w-full text-sm" data-testid="orders-table">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                    {[t('Order', 'الطلب'), t('Status', 'الحالة'), t('Vendors', 'الموردون'), t('Customer', 'العميل'), t('Driver', 'السائق'), t('Total', 'الإجمالي')].map((h, i) => (
-                      <th key={i} scope="col" className={`px-3 py-2 font-medium ${i === 5 ? 'text-end' : 'text-start'}`}>{h}</th>
+                    {[t('Order', 'الطلب'), t('Status', 'الحالة'), t('Vendors', 'الموردون'), t('Customer', 'العميل'), t('Driver', 'السائق'), t('Payment', 'الدفع'), t('Total', 'الإجمالي')].map((h, i) => (
+                      <th key={i} scope="col" className={`px-3 py-2 font-medium ${i === 6 ? 'text-end' : 'text-start'}`}>{h}</th>
                     ))}
                     <th className="w-8" />
                   </tr>
@@ -363,7 +368,7 @@ function OrdersWorkspace() {
                     >
                       <td className="whitespace-nowrap px-3 py-2.5">
                         <span className="font-mono text-xs font-semibold text-gray-900"><bdi>{o.orderNumber}</bdi></span>
-                        <span className="ms-2 text-xs text-gray-400" title={dateTime(o.createdAt)}>{age(o.createdAt, now)}</span>
+                        <span className={`ms-2 text-xs ${o.status === 'PENDING' && now - new Date(o.createdAt).getTime() > (summary?.operations?.pendingAcceptanceAlertMinutes ?? 5) * 60000 ? 'font-semibold text-red-600' : 'text-gray-400'}`} title={o.status === 'PENDING' ? `${dateTime(o.createdAt)} — ${t('still waiting for the store to accept', 'ما زال بانتظار قبول المتجر')}` : dateTime(o.createdAt)}>{age(o.createdAt, now)}</span>
                         <span className="ms-1.5 inline-flex gap-1">
                           {o.hasPendingHatlyServicePricing && <span data-testid="pending-price-badge"><Badge tone="amber">{t('Price pending', 'سعر معلّق')}</Badge></span>}
                           {o.fulfillmentType === 'PICKUP' && <Badge tone="blue">{t('Pickup', 'استلام')}</Badge>}
@@ -389,9 +394,9 @@ function OrdersWorkspace() {
                           <span className="text-gray-400">—</span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-end tabular-nums text-gray-900">
+                      <td className="whitespace-nowrap px-3 py-2.5"><PaymentPill method={o.paymentMethod} status={o.paymentStatus} t={t} /></td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-end tabular-nums font-medium text-gray-900">
                         {o.totalMinor != null ? money(o.totalMinor) : o.hasPendingHatlyServicePricing ? t('Pending', 'معلّق') : '—'}
-                        <span className="block text-[11px] font-normal text-gray-500">{o.paymentMethod.replace(/_/g, ' ')}{o.paymentStatus ? ` · ${o.paymentStatus.replace(/_/g, ' ').toLowerCase()}` : ''}</span>
                       </td>
                       <td className="px-2 text-gray-300 rtl:rotate-180" aria-hidden>›</td>
                     </tr>
@@ -411,6 +416,7 @@ function OrdersWorkspace() {
                       <StatusPill status={o.status} label={label(ORDER_STATUS, o.status, t)} />
                       {o.hasPendingHatlyServicePricing && <Badge tone="amber">{t('Price pending', 'سعر معلّق')}</Badge>}
                       {o.fulfillmentType === 'PICKUP' && <Badge tone="blue">{t('Pickup', 'استلام')}</Badge>}
+                      <Badge tone={paymentState(o.paymentMethod, o.paymentStatus, t).tone}>{paymentState(o.paymentMethod, o.paymentStatus, t).text}</Badge>
                     </span>
                     <span className="mt-1 block truncate text-xs text-gray-500"><bdi>{(o.vendorNames ?? []).join(' · ') || '—'}</bdi>{o.driver ? <> · <bdi>{o.driver.fullName}</bdi></> : null}</span>
                   </button>

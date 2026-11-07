@@ -53,19 +53,22 @@ export function OperationsBanner({ facts }: { facts: OperationsFacts | null }) {
   const [hiddenFor, setHiddenFor] = useState<string | null>(null);
   const signature = facts ? JSON.stringify(facts) : '';
 
+  // Every line opens the exact list or page that resolves it — one click from the problem to the fix.
   const lines = useMemo(() => {
     if (!facts) return [];
     const t = translator(locale);
+    const ar = locale === 'ar';
     const a = facts.openDispatchAlerts;
-    const out: string[] = [];
-    if (a.NO_ELIGIBLE_DRIVER) out.push(t('opBannerNoDriver', { count: a.NO_ELIGIBLE_DRIVER }));
-    if (a.AUTO_ASSIGN_DISABLED) out.push(t('opBannerAutoOff', { count: a.AUTO_ASSIGN_DISABLED }));
-    if (a.ASSIGNMENT_ERROR) out.push(t('opBannerAssignError', { count: a.ASSIGNMENT_ERROR }));
-    if (a.DRIVER_NOT_RESPONDING) out.push(t('opBannerNotResponding', { count: a.DRIVER_NOT_RESPONDING }));
-    if (a.ACKNOWLEDGEMENT_OVERDUE) out.push(t('opBannerNotAcknowledged', { count: a.ACKNOWLEDGEMENT_OVERDUE }));
-    if (facts.pendingAcceptanceOverdue) out.push(t('opBannerPendingOverdue', { count: facts.pendingAcceptanceOverdue, minutes: facts.pendingAcceptanceAlertMinutes }));
-    if (facts.preparationOverdue) out.push(t('opBannerPrepOverdue', { count: facts.preparationOverdue }));
-    if (facts.refundsToSend) out.push(t('opBannerRefunds', { count: facts.refundsToSend }));
+    const out: Array<{ text: string; href: string }> = [];
+    if (a.NO_ELIGIBLE_DRIVER) out.push({ text: t('opBannerNoDriver', { count: a.NO_ELIGIBLE_DRIVER }), href: '/order-management?view=needsDriver' });
+    if (a.AUTO_ASSIGN_DISABLED) out.push({ text: t('opBannerAutoOff', { count: a.AUTO_ASSIGN_DISABLED }), href: '/order-management?view=needsDriver' });
+    if (a.ASSIGNMENT_ERROR) out.push({ text: t('opBannerAssignError', { count: a.ASSIGNMENT_ERROR }), href: '/control-tower' });
+    if (a.DRIVER_NOT_RESPONDING) out.push({ text: t('opBannerNotResponding', { count: a.DRIVER_NOT_RESPONDING }), href: '/control-tower' });
+    if (a.ACKNOWLEDGEMENT_OVERDUE) out.push({ text: t('opBannerNotAcknowledged', { count: a.ACKNOWLEDGEMENT_OVERDUE }), href: '/control-tower' });
+    if (facts.pendingAcceptanceOverdue) out.push({ text: t('opBannerPendingOverdue', { count: facts.pendingAcceptanceOverdue, minutes: facts.pendingAcceptanceAlertMinutes }), href: '/order-management?view=pending' });
+    if (facts.preparationOverdue) out.push({ text: t('opBannerPrepOverdue', { count: facts.preparationOverdue }), href: '/order-management?view=preparing' });
+    if (facts.refundsToSend) out.push({ text: t('opBannerRefunds', { count: facts.refundsToSend }), href: '/manual-transfer' });
+    if (facts.transfersToVerify) out.push({ text: ar ? `${facts.transfersToVerify} تحويل يدوي بانتظار التحقق من وصول المبلغ` : `${facts.transfersToVerify} manual transfer(s) waiting for you to verify the money arrived`, href: '/manual-transfer' });
     return out;
   }, [facts, locale]);
 
@@ -91,7 +94,7 @@ export function OperationsBanner({ facts }: { facts: OperationsFacts | null }) {
         {/* On a phone the list is folded behind a toggle (the title and count stay visible); from `sm` up it is always shown. */}
         <ul className={`mt-0.5 list-disc ps-5 ${expanded ? '' : 'hidden sm:block'}`}>
           {lines.map((line) => (
-            <li key={line}>{line}</li>
+            <li key={line.text}><a href={line.href} className="underline-offset-2 hover:underline" data-testid="operations-banner-link">{line.text}</a></li>
           ))}
         </ul>
       </div>

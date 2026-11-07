@@ -18,6 +18,28 @@ export interface ManualTransferPayment {
   verifiedByUserId: string | null;
   verifiedAt: string | null;
   rejectionReason: string | null;
+  /** Context for the reviewer (added 2026-11-07; optional for older backends). */
+  orderNumber?: string | null;
+  orderStatus?: string | null;
+  orderTotalMinor?: number | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+}
+
+/** The Manual Transfer payment of an order, found by its number (HT-…). */
+export interface TransferByOrder {
+  paymentId: string;
+  orderId: string;
+  orderNumber: string;
+  status: string;
+  amountMinor: number | null;
+  refundedMinor: number;
+  customerName: string | null;
+}
+
+export async function findTransferByOrderNumber(orderNumber: string): Promise<TransferByOrder> {
+  const res = await apiClient.get(`/admin/manual-transfer-payments/by-order/${encodeURIComponent(orderNumber.trim())}`);
+  return res.data.data;
 }
 
 export async function listUnderReviewPayments(): Promise<ManualTransferPayment[]> {

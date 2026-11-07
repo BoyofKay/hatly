@@ -36,6 +36,8 @@ export interface OperationsFacts {
   openDispatchAlerts: Record<DispatchAlertReason, number>;
   refundsToSend: number;
   partiallyRejectedActiveOrders: number;
+  /** Manual transfers waiting for an admin to verify (optional: older backends omit it). */
+  transfersToVerify?: number;
   actionRequired: number;
 }
 

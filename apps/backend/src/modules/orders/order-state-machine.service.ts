@@ -503,6 +503,12 @@ export class OrderStateMachineService {
       await recomputeDriverAvailability(manager, holders.map((h) => h.driver_id), { excludeOrderId: order.id });
     }
 
+    // An order that has ended needs no driver any more: its open dispatch alerts ("no eligible driver", "not acknowledged", …) are closed
+    // with it, so they never sit in Operations' "needs attention" list for an order nobody can act on.
+    if (params.to === OrderStatus.CANCELLED || params.to === OrderStatus.DELIVERED || params.to === OrderStatus.COLLECTED) {
+      await manager.query(`UPDATE dispatch_alerts SET resolved_at = now(), updated_at = now() WHERE order_id = $1 AND resolved_at IS NULL`, [order.id]);
+    }
+
     // R45: a cancellation while a driver is assigned — Operations tell the driver to stop and decide, case by case, whether a trip that had
     // already started deserves compensation (a Hatly operational expense, never automatic, never a deduction from the driver).
     if (fromStatus === OrderStatus.ASSIGNED_TO_DRIVER && params.to === OrderStatus.CANCELLED && this.staffAlerts) {

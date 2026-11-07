@@ -215,7 +215,7 @@ export function VendorOrderDetailView({ id, embedded = false, onChanged }: { id:
   return (
     <div className={embedded ? "space-y-4" : "max-w-4xl space-y-5"} data-testid={embedded ? "vendor-drawer-body" : undefined}>
       <div className="rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
-        <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{t('Order', 'طلب')} #{order.id.slice(0, 8)}</h1>
+        <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{t('Order', 'طلب')} <bdi dir="ltr">{order.orderNumber ?? `#${order.id.slice(0, 8)}`}</bdi></h1>
         <p className="mt-1 text-sm text-gray-500">
           {t('Order status:', 'حالة الطلب:')} <span data-testid="vendor-order-status">{order.status}</span>
           {order.fulfillmentType === 'PICKUP'

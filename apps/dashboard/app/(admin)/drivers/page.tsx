@@ -46,6 +46,8 @@ function AdminDriversScreen() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [shown, setShown] = useState(PAGE);
+  // A driver's settings (commission · orders at once · vehicle) open on demand, so the list stays a list; one search result opens by itself.
+  const [editing, setEditing] = useState<Record<string, boolean>>({});
 
   const [createOpen, setCreateOpen] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -282,10 +284,25 @@ function AdminDriversScreen() {
                     </div>
                   )}
 
-                  <DriverCommissionEditor driverId={d.id} basisPoints={d.commissionRateBasisPoints} onSaved={refresh} />
-                  <DriverCapacityEditor driverId={d.id} />
+                  {(() => {
+                    const open = editing[d.id] ?? visible.length === 1;
+                    return (
+                      <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-3 text-xs text-gray-600">
+                        <span data-testid="driver-settings-summary">
+                          {tl('Commission', 'العمولة')}: <b className="font-medium text-gray-800">{d.commissionRateBasisPoints != null ? `${d.commissionRateBasisPoints / 100}%` : tl('not set', 'غير محددة')}</b>
+                        </span>
+                        <button type="button" onClick={() => setEditing((e) => ({ ...e, [d.id]: !open }))} aria-expanded={open} data-testid={`driver-edit-${d.id}`}
+                          className="min-h-[36px] rounded-lg border border-gray-200 px-3 font-medium text-gray-700 hover:bg-gray-50">
+                          {open ? tl('Close settings', 'إغلاق الإعدادات') : tl('Edit settings', 'تعديل الإعدادات')}
+                        </button>
+                      </div>
+                    );
+                  })()}
 
-                  {vehicleTypes !== null && (
+                  {(editing[d.id] ?? visible.length === 1) && <DriverCommissionEditor driverId={d.id} basisPoints={d.commissionRateBasisPoints} onSaved={refresh} />}
+                  {(editing[d.id] ?? visible.length === 1) && <DriverCapacityEditor driverId={d.id} />}
+
+                  {vehicleTypes !== null && (editing[d.id] ?? visible.length === 1) && (
                     <div className="mt-auto border-t border-gray-100 pt-3" data-testid="driver-vehicle">
                       <label htmlFor={`vehicle-${d.id}`} className="mb-1 block text-xs font-medium text-gray-700">{t('drvVehicleLabel')}</label>
                       <div className="flex gap-2">

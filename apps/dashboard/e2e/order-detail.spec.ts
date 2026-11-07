@@ -17,7 +17,7 @@ test.describe('Vendor order detail — critical path', () => {
     await link.click();
 
     await expect(page).toHaveURL(new RegExp(`/orders/${order.orderId}$`));
-    await expect(page.getByRole('heading', { name: `Order #${order.orderId.slice(0, 8)}` })).toBeVisible();
+    await expect(page.getByRole('heading', { name: new RegExp(`^Order (HT-\\d+|#${order.orderId.slice(0, 8)})$`) })).toBeVisible();
     await expect(page.getByText('Your items — status: PENDING')).toBeVisible();
 
     await page.goBack();

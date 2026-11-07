@@ -168,6 +168,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
     </div>
   );
 
+  // Work waiting behind a tab, shown on the tab itself so nobody has to open each page to find it (counts are the backend's own).
+  const tabCounts: Record<string, number | undefined> = {
+    '/manual-transfer': operations?.transfersToVerify,
+    '/refunds': operations?.refundsToSend,
+  };
+
   // The pages of the current section, as tabs above the page — only when the section has more than one page this admin may open.
   const tabs = here.group && here.group.items.length > 1 ? (
     <nav aria-label={t('Section pages', 'صفحات القسم')} data-testid="section-tabs" className="-mx-4 mb-5 overflow-x-auto px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -179,6 +185,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <Link href={i.href} aria-current={current ? 'page' : undefined}
                 className={`-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium ${current ? 'border-hatly-orange text-hatly-orangeDark' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-800'}`}>
                 {t(i.en, i.ar)}
+                <TabCount n={tabCounts[i.href]} />
               </Link>
             </li>
           );
@@ -225,4 +232,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <CommandPalette open={search} onClose={() => setSearch(false)} />
     </div>
   );
+}
+
+/** A small count on a section tab; nothing when there is nothing waiting. */
+function TabCount({ n }: { n?: number }) {
+  if (!n) return null;
+  return <span data-testid="tab-count" className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-semibold text-white">{n}</span>;
 }

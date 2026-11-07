@@ -80,6 +80,8 @@ export interface ControlTowerSummary {
     refundsToSend: number;
     /** Active orders where some — not all — vendor parts were rejected. */
     partiallyRejectedActiveOrders: number;
+    /** Manual transfers waiting for an admin to verify the money arrived. */
+    transfersToVerify: number;
     /** Everything above that needs a person (drives the navigation counter). */
     actionRequired: number;
   };
@@ -135,7 +137,7 @@ export class AdminControlTowerService {
 
   private async operationsFacts(): Promise<ControlTowerSummary['operations']> {
     const minutes = AdminControlTowerService.PENDING_ACCEPTANCE_ALERT_MINUTES;
-    const [[segments], alertRows, [refunds], [partial]] = await Promise.all([
+    const [[segments], alertRows, [refunds], [partial], [transfers]] = await Promise.all([
       this.dataSource.query(
         `SELECT
            count(*) FILTER (WHERE s.status = 'PENDING')::int AS pending,
@@ -145,7 +147,10 @@ export class AdminControlTowerService {
         WHERE s.deleted_at IS NULL AND o.status IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP','ASSIGNED_TO_DRIVER')`,
         [minutes],
       ),
-      this.dataSource.query(`SELECT reason, count(*)::int AS n FROM dispatch_alerts WHERE resolved_at IS NULL AND deleted_at IS NULL GROUP BY reason`),
+      this.dataSource.query(
+        `SELECT a.reason, count(*)::int AS n FROM dispatch_alerts a JOIN orders o ON o.id = a.order_id
+          WHERE a.resolved_at IS NULL AND a.deleted_at IS NULL AND o.status NOT IN ('CANCELLED','DELIVERED','COLLECTED') GROUP BY a.reason`,
+      ),
       this.dataSource.query(
         `SELECT count(*)::int AS n FROM financial_events e
           WHERE e.type = 'MANUAL_TRANSFER_REFUND_RECORDED' AND NOT EXISTS (SELECT 1 FROM refund_payouts p WHERE p.financial_event_id = e.id)`,
@@ -156,6 +161,8 @@ export class AdminControlTowerService {
             AND EXISTS (SELECT 1 FROM order_vendor_segments s WHERE s.order_id = o.id AND s.status = 'CANCELLED')
             AND EXISTS (SELECT 1 FROM order_vendor_segments s WHERE s.order_id = o.id AND s.status <> 'CANCELLED')`,
       ),
+      // Manual transfers the customer says were sent, waiting for an admin to check the money arrived (display only; not part of actionRequired).
+      this.dataSource.query(`SELECT count(*)::int AS n FROM payments WHERE status = 'UNDER_REVIEW' AND deleted_at IS NULL`),
     ]);
     const openDispatchAlerts = { NO_ELIGIBLE_DRIVER: 0, AUTO_ASSIGN_DISABLED: 0, ASSIGNMENT_ERROR: 0, DRIVER_NOT_RESPONDING: 0, ACKNOWLEDGEMENT_OVERDUE: 0 };
     for (const row of alertRows as Array<{ reason: keyof typeof openDispatchAlerts; n: number }>) {
@@ -170,6 +177,7 @@ export class AdminControlTowerService {
       openDispatchAlerts,
       refundsToSend: Number(refunds.n),
       partiallyRejectedActiveOrders: Number(partial.n),
+      transfersToVerify: Number(transfers.n),
       actionRequired: alertTotal + Number(segments.overdue) + Number(segments.prep_overdue) + Number(refunds.n),
     };
   }

@@ -44,6 +44,8 @@ export default function VendorOrdersBoard() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [mobileTab, setMobileTab] = useState<Column>('new');
   const [busy, setBusy] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(id); }, []);
   const [actionError, setActionError] = useState<{ id: string; message: string } | null>(null);
   const inFlight = useRef<string | null>(null);
 
@@ -55,7 +57,13 @@ export default function VendorOrdersBoard() {
   }, [openId]);
 
   const cards = useMemo<BoardCard[]>(() => (orders ?? []).flatMap((o) => o.segments.map((s) => ({ order: o, segment: s }))), [orders]);
-  const byColumn = (c: Column) => cards.filter((x) => COLUMNS.find((k) => k.id === c)!.statuses.includes(x.segment.status) && !(c !== 'new' && LOCKED_ORDER_STATUSES.includes(x.order.status)));
+  const since = (x: BoardCard) => new Date(x.segment.createdAt ?? 0).getTime();
+  const readyBy = (x: BoardCard) => (x.segment.expectedReadyAt ? new Date(x.segment.expectedReadyAt).getTime() : Number.MAX_SAFE_INTEGER);
+  const byColumn = (c: Column) =>
+    cards
+      .filter((x) => COLUMNS.find((k) => k.id === c)!.statuses.includes(x.segment.status) && !(c !== 'new' && LOCKED_ORDER_STATUSES.includes(x.order.status)))
+      // The order that has waited longest (or is due first) is on top: that is the one to handle next.
+      .sort((a, b) => (c === 'new' ? since(a) - since(b) : readyBy(a) - readyBy(b)));
   const counts = { new: byColumn('new').length, preparing: byColumn('preparing').length, ready: byColumn('ready').length };
   const other = cards.length - counts.new - counts.preparing - counts.ready;
 
@@ -87,11 +95,23 @@ export default function VendorOrdersBoard() {
       <li key={segment.id} data-testid={`vendor-order-${order.id}`} className={`rounded-xl border bg-white p-3 shadow-sm ${isNew ? 'border-green-400 ring-2 ring-green-200' : 'border-gray-200'}`}>
         <div className="flex items-start justify-between gap-2">
           <Link href={`/orders/${order.id}`} className="font-semibold text-gray-900 hover:underline">
-            {t('Order', 'طلب')} #{order.id.slice(0, 8)}
+            {order.orderNumber ? <bdi dir="ltr">{order.orderNumber}</bdi> : <>{t('Order', 'طلب')} #{order.id.slice(0, 8)}</>}
             {isNew && <span className="ms-2 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">{t('NEW', 'جديد')}</span>}
           </Link>
           <SegmentBadge status={segment.status} />
         </div>
+        {segment.status === 'PENDING' && segment.createdAt && (() => {
+          const mins = Math.max(0, Math.floor((now - new Date(segment.createdAt).getTime()) / 60000));
+          const late = mins >= 5;
+          return (
+            <p data-testid={`vendor-waiting-${segment.id}`} className={`mt-1 inline-flex rounded-md px-1.5 py-0.5 text-xs font-medium ${late ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-800'}`}>
+              {(() => {
+                const [en, ar] = mins < 60 ? [`${mins} min`, `${mins} دقيقة`] : mins < 2880 ? [`${Math.floor(mins / 60)} h`, `${Math.floor(mins / 60)} ساعة`] : [`${Math.floor(mins / 1440)} days`, `${Math.floor(mins / 1440)} يوم`];
+                return late ? t(`Waiting ${en} — please accept or reject`, `ينتظر منذ ${ar} — اقبل أو ارفض`) : t(`Waiting ${en}`, `ينتظر منذ ${ar}`);
+              })()}
+            </p>
+          );
+        })()}
         <p className="mt-0.5 text-xs text-gray-500">
           {pick(FULFILLMENT, order.fulfillmentType, t)} · {pick(PAYMENT_METHOD, order.paymentMethod, t)}
           {segment.expectedReadyAt && <> · {t('ready by', 'جاهز بحلول')} {new Date(segment.expectedReadyAt).toLocaleTimeString(locale === 'ar' ? 'ar-EG' : 'en-GB', { hour: '2-digit', minute: '2-digit' })}</>}
@@ -175,7 +195,8 @@ export default function VendorOrdersBoard() {
                 {byColumn(c.id).length === 0 ? (
                   <p className="rounded-xl bg-white/70 px-3 py-6 text-center text-sm text-gray-400">{c.id === 'new' ? t('Nothing is waiting for you.', 'لا شيء بانتظارك.') : t('Nothing here.', 'لا شيء هنا.')}</p>
                 ) : (
-                  <ul className="space-y-2.5">{byColumn(c.id).map(renderCard)}</ul>
+                  // Each column scrolls on its own from a laptop up, so a long backlog never turns the page into one endless list.
+                  <ul className="space-y-2.5 lg:max-h-[calc(100vh-16rem)] lg:overflow-y-auto lg:pe-1" data-testid={`vendor-col-list-${c.id}`}>{byColumn(c.id).map(renderCard)}</ul>
                 )}
               </section>
             ))}
@@ -189,7 +210,7 @@ export default function VendorOrdersBoard() {
       )}
 
       <Drawer open={!!openId} onClose={() => setOpenId(null)} title={t('Order', 'طلب')} testId="vendor-drawer"
-        header={<p className="truncate text-sm font-semibold text-gray-900">{t('Order', 'طلب')} {openId ? `#${openId.slice(0, 8)}` : ''}</p>}>
+        header={<p className="truncate text-sm font-semibold text-gray-900">{t('Order', 'طلب')} {openId ? <bdi dir="ltr">{orders?.find((o) => o.id === openId)?.orderNumber ?? `#${openId.slice(0, 8)}`}</bdi> : ''}</p>}>
         {openId && <VendorOrderDetailView key={openId} id={openId} embedded onChanged={() => void refresh()} />}
       </Drawer>
     </div>
