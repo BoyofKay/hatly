@@ -1,3 +1,4 @@
+import { OpsAlertsService } from '../notifications/ops-alerts.service';
 import { StaffAlertsService } from '../notifications/staff-alerts.service';
 import { notifyVendorsOfNewOrder } from '../orders/vendor-new-order-alerts';
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
@@ -51,6 +52,8 @@ export class PaymentStateMachineService {
     private readonly manualTransferRefundService: ManualTransferRefundService,
     // Staff inbox. Optional so unit tests that build this service by hand keep working unchanged.
     @Optional() private readonly staffAlerts?: StaffAlertsService,
+    // Operations alerts (P0 2026-11-08): an InstaPay order becomes "new" for Operations when it reaches the stores. Optional for unit tests.
+    @Optional() private readonly opsAlerts?: OpsAlertsService,
   ) {}
 
   async transition(params: {
@@ -120,6 +123,10 @@ export class PaymentStateMachineService {
           if (order && order.paymentMethod === 'MANUAL_TRANSFER' && order.status !== 'CANCELLED') {
             await notifyVendorsOfNewOrder(manager, this.staffAlerts, order);
           }
+        }
+        if (this.opsAlerts) {
+          const order = await manager.findOne(Order, { where: { id: saved.orderId } });
+          if (order && order.paymentMethod === 'MANUAL_TRANSFER' && order.status !== 'CANCELLED') await this.opsAlerts.raiseNewOrder(manager, order);
         }
       } else if (params.to === PaymentStatus.REJECTED) {
         await this.manualTransferRefundService.voidPendingRefund(saved, manager);

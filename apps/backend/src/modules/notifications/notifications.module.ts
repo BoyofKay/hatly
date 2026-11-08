@@ -15,6 +15,10 @@ import { StaffAlertsService } from './staff-alerts.service';
 import { StaffNotificationsController } from './staff-notifications.controller';
 import { AdminNotificationOutboxController } from './admin-notification-outbox.controller';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { OpsAlertsService } from './ops-alerts.service';
+import { AdminOpsAlertsController, AdminPushController, PushReceiptsController } from './ops-alerts.controllers';
+import { AdminPushService } from './web-push/admin-push.service';
+import { VapidWebPushSender, WEB_PUSH_SENDER } from './web-push/web-push-sender';
 import { VendorsModule } from '../vendors/vendors.module';
 
 /**
@@ -25,7 +29,7 @@ import { VendorsModule } from '../vendors/vendors.module';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([DeviceToken, CustomerNotification]), PermissionsModule, VendorsModule],
-  controllers: [DeviceTokensController, CustomerDeviceTokensController, CustomerNotificationsController, StaffNotificationsController, AdminNotificationOutboxController],
+  controllers: [DeviceTokensController, CustomerDeviceTokensController, CustomerNotificationsController, StaffNotificationsController, AdminNotificationOutboxController, AdminOpsAlertsController, AdminPushController, PushReceiptsController],
   providers: [
     DeviceTokensService,
     CustomerNotificationsService,
@@ -34,7 +38,10 @@ import { VendorsModule } from '../vendors/vendors.module';
     StaffAlertsService,
     FirebasePushNotificationProvider,
     { provide: PUSH_NOTIFICATION_PROVIDER, useClass: FirebasePushNotificationProvider },
+    { provide: WEB_PUSH_SENDER, useClass: VapidWebPushSender },
+    AdminPushService,
+    OpsAlertsService,
   ],
-  exports: [PushNotificationService, NotificationOutboxService, StaffAlertsService],
+  exports: [PushNotificationService, NotificationOutboxService, StaffAlertsService, OpsAlertsService, AdminPushService],
 })
 export class NotificationsModule {}

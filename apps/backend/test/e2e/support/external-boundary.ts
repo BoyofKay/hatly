@@ -13,6 +13,7 @@
 import { DUMMY_MAPS_KEY, DUMMY_UNIFONIC_APP_SID } from './config';
 
 export interface CapturedSms { to: string; body: string; code: string | null }
+export interface CapturedWebPush { endpoint: string; payload: any; ttlSeconds: number; urgency: string; topic?: string }
 export interface CapturedPush { tokens: string[]; title: string; body: string; data: Record<string, string> }
 
 export const boundary = {
@@ -30,7 +31,14 @@ export const boundary = {
    * (provider throws), or 'invalid' (provider reports every token as invalid/unregistered).
    */
   pushMode: 'ok' as 'ok' | 'fail' | 'throw' | 'invalid',
+  /** Admin Web Push (standard VAPID push, via the web-push library — not fetch): every message the API handed to a push service. */
+  webPush: [] as CapturedWebPush[],
+  /** HTTP status the fake push service answers with (201 = accepted); 'network' = no answer at all. One-shot queue first, then the default. */
+  webPushStatus: 201 as number | 'network',
+  webPushQueue: [] as Array<number | 'network'>,
+  webPushConfigured: true,
   reset(): void {
+    this.webPush.length = 0; this.webPushStatus = 201; this.webPushQueue.length = 0; this.webPushConfigured = true;
     this.sms.length = 0; this.push.length = 0; this.mapsCalls = 0; this.forbiddenCalls.length = 0; this.smsOutage = false; this.mapsOutage = false; this.pushMode = 'ok';
   },
   lastOtpFor(phone: string): string {

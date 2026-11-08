@@ -1,5 +1,6 @@
 import { notifyVendorsOfNewOrder } from './vendor-new-order-alerts';
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { OpsAlertsService } from '../notifications/ops-alerts.service';
 import { StaffAlertsService } from '../notifications/staff-alerts.service';
 import { AdHocFulfilmentService } from './ad-hoc-fulfilment.service';
 import { recordSegmentEvent } from './segment-events.util';
@@ -64,6 +65,8 @@ export class OrderCreationService {
     private readonly adHocFulfilmentService: AdHocFulfilmentService,
     // Staff inbox (vendor notification centre). Optional so unit tests that build this service by hand keep working unchanged.
     @Optional() private readonly staffAlerts?: StaffAlertsService,
+    // Operations alerts (P0 2026-11-08): Operations are told of every new order in the same transaction. Optional for hand-built unit tests.
+    @Optional() private readonly opsAlerts?: OpsAlertsService,
   ) {}
 
   /**
@@ -231,6 +234,7 @@ export class OrderCreationService {
       if (this.staffAlerts && order.paymentMethod !== 'MANUAL_TRANSFER') {
         await notifyVendorsOfNewOrder(manager, this.staffAlerts, order);
       }
+      if (this.opsAlerts && order.paymentMethod !== 'MANUAL_TRANSFER') await this.opsAlerts.raiseNewOrder(manager, order);
 
       const createdOrder = await manager.findOne(Order, { where: { id: order.id }, relations: { segments: { items: true } } });
       return createdOrder!;

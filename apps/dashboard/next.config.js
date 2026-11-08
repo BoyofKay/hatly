@@ -37,7 +37,12 @@ const securityHeaders = [
 
 const nextConfig = {
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      // The Admin alert service worker must never be cached (by the browser or Cloudflare): a stale worker would keep old click/receipt logic.
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }, { key: 'Service-Worker-Allowed', value: '/' }] },
+      { source: '/manifest.webmanifest', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
+    ];
   },
   // The dashboard does not use `next/image`, so the built-in image optimizer (`/_next/image`) has no job here. It is switched off
   // because it is the attack surface behind several Next.js 14 advisories (image-optimizer DoS, disk-cache growth and an AVIF

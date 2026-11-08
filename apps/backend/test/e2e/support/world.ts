@@ -12,6 +12,7 @@ import { JwtStrategy } from '../../../src/modules/auth/strategies/jwt.strategy';
 import { AppModule } from '../../../src/app.module';
 import { configureApp } from '../../../src/app.setup';
 import { PUSH_NOTIFICATION_PROVIDER, PushNotificationProvider } from '../../../src/modules/notifications/push-provider.interface';
+import { WEB_PUSH_SENDER, WebPushSender } from '../../../src/modules/notifications/web-push/web-push-sender';
 import { boundary } from './external-boundary';
 import { E2E_REDIS_URL } from './config';
 import { resetE2eInfrastructure } from './db';
@@ -57,6 +58,18 @@ const capturingPush: PushNotificationProvider = {
     if (boundary.pushMode === 'fail') return { success: false, invalidTokens: [] };
     if (boundary.pushMode === 'invalid') return { success: false, invalidTokens: [...params.tokens] };
     return { success: true, invalidTokens: [] };
+  },
+};
+
+/** Admin Web Push at the network edge: the real queue, worker, receipts and subscription rules run; only the push service is simulated. */
+const capturingWebPush: WebPushSender = {
+  isConfigured: () => boundary.webPushConfigured,
+  publicKey: () => (boundary.webPushConfigured ? 'BE2E-test-public-key' : null),
+  async send(target, payload, options) {
+    boundary.webPush.push({ endpoint: target.endpoint, payload: JSON.parse(payload), ttlSeconds: options.ttlSeconds, urgency: options.urgency, topic: options.topic });
+    const status = boundary.webPushQueue.length > 0 ? boundary.webPushQueue.shift()! : boundary.webPushStatus;
+    if (status === 'network') throw new Error('socket hang up');
+    return { statusCode: status };
   },
 };
 
@@ -107,7 +120,9 @@ export async function bootWorld(options: BootOptions = {}): Promise<World> {
 
   let builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(PUSH_NOTIFICATION_PROVIDER)
-    .useValue(capturingPush);
+    .useValue(capturingPush)
+    .overrideProvider(WEB_PUSH_SENDER)
+    .useValue(capturingWebPush);
   if ((options.throttling ?? 'relaxed') === 'relaxed') {
     builder = builder.overrideProvider(ThrottlerStorage).useValue(relaxedThrottlerStorage);
   }

@@ -479,6 +479,14 @@ Production release `20261107T053628Z-079cf82fb4dc` (commit `177d278`, bundle ide
   - The Home chunk serves "Needs your action now"; the transfer page serves the order-number refund lookup.
   - HT-100034 (the first order after the reset) was untouched by the switch.
 
+## 3aq. P0 Admin real-time alerts and Web Push (2026-11-08) — BUILT and tested; production switch HELD for the Web Push keys
+
+- Why: a new order alerted nobody (no Operations new-order event, no vendor staff accounts, no sound/notification/service worker in Admin,
+  push unconfigured) — `OPERATIONS_AUDIT_2026-11-08.md` §3.
+- What, how, security, device checklist: `docs/launch/P0_ADMIN_ALERTS_2026-11-08.md`. Migration 79 `OpsAlertsWebPush` (3 new tables, additive).
+- Held because production has no `WEB_PUSH_*` settings (the authorisation says to stop before deploying when a required secret is missing).
+  One-time step: `deploy/production/setup-web-push-keys.sh <contact>` on the server, then deploy.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |

@@ -81,6 +81,8 @@ describe('E2E — HTTP contract', () => {
     // Routes that are public BY DESIGN. Anything else answering without a token is a hole.
     const PUBLIC = [
       /^GET \/api\/v1\/health(\/ready)?$/,
+      // P0 Admin alerts (2026-11-08): service-worker delivery receipts, proven by a one-time token from the push message (404 without it).
+      /^POST \/api\/v1\/push-receipts$/,
       /^POST \/api\/v1\/auth\/(register|driver\/login|password\/login|refresh|customer\/password\/login|customer\/password\/register|customer\/register\/request-code|dashboard\/(login|refresh|logout))$/,
       /^GET \/api\/v1\/sectors$/,
       // Admin-managed Home banners (2026-10-28): public like /sectors — only banners eligible to be shown right now, nothing administrative.

@@ -313,6 +313,13 @@ export function collectEnvIssues(env: Env): EnvIssues {
       else errors.push('FCM_PROJECT_ID, FCM_CLIENT_EMAIL and FCM_PRIVATE_KEY are required in production/staging for push notifications. If this deployment intentionally has no push, set ALLOW_MISSING_PUSH_PROVIDER=true to acknowledge it.');
     }
 
+    // Admin Web Push (P0 2026-11-08) is optional: without it Admin still gets the in-app alarm, but no notification reaches a backgrounded or
+    // closed dashboard. A half-set configuration is an error (it would look configured to someone reading the env file, yet send nothing).
+    const webPushSet = ['WEB_PUSH_VAPID_PUBLIC_KEY', 'WEB_PUSH_VAPID_PRIVATE_KEY', 'WEB_PUSH_SUBJECT'].filter((k) => str(env, k)).length;
+    if (webPushSet === 0) warnings.push('Admin Web Push is not configured (WEB_PUSH_VAPID_PUBLIC_KEY, WEB_PUSH_VAPID_PRIVATE_KEY, WEB_PUSH_SUBJECT): Admin alerts sound only while the dashboard is open.');
+    else if (webPushSet < 3) errors.push('WEB_PUSH_VAPID_PUBLIC_KEY, WEB_PUSH_VAPID_PRIVATE_KEY and WEB_PUSH_SUBJECT must be set together (generate the key pair once with `npx web-push generate-vapid-keys`).');
+    else if (!/^(mailto:|https:\/\/)/.test(str(env, 'WEB_PUSH_SUBJECT') ?? '')) errors.push('WEB_PUSH_SUBJECT must be a mailto: or https:// contact address.');
+
     if (!str(env, 'TRUST_PROXY')) warnings.push('TRUST_PROXY is not set: forwarded headers are ignored, so behind a load balancer every client shares the proxy IP for rate limiting. Set TRUST_PROXY to the number of proxies in front of the API if there is one.');
     if (str(env, 'ENABLE_API_DOCS') === 'true') warnings.push('ENABLE_API_DOCS=true: the Swagger UI is publicly reachable.');
   }

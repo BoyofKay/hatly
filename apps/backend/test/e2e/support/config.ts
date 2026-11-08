@@ -44,7 +44,8 @@ export function e2eEnv(): Record<string, string> {
     CORS_ALLOWED_ORIGINS: '', TRUST_PROXY: '', ENABLE_API_DOCS: '', DB_SSL_REJECT_UNAUTHORIZED: '', ALLOW_INSECURE_DB: '', ALLOW_MISSING_SMS_PROVIDER: '', ALLOW_MISSING_PUSH_PROVIDER: '', UPLOADS_PUBLIC_URL_PREFIX: '/uploads/files',
     FCM_PROJECT_ID: '', FCM_CLIENT_EMAIL: '', FCM_PRIVATE_KEY: '',
     // Background timers off: the specs drive the outbox worker and the feed pruning explicitly, so outcomes are deterministic.
-    NOTIFICATION_OUTBOX_WORKER_INTERVAL_MS: '0', CHANGE_FEED_PRUNE_INTERVAL_MS: '0',
+    NOTIFICATION_OUTBOX_WORKER_INTERVAL_MS: '0', CHANGE_FEED_PRUNE_INTERVAL_MS: '0', OPS_ALERT_SCAN_INTERVAL_MS: '0', ADMIN_PUSH_WORKER_INTERVAL_MS: '0',
+    WEB_PUSH_VAPID_PUBLIC_KEY: '', WEB_PUSH_VAPID_PRIVATE_KEY: '', WEB_PUSH_SUBJECT: '', OPS_ALERT_REPEAT_MINUTES: '', OPS_ALERT_MAX_PUSH_ROUNDS: '',
     // Pinned explicitly, never inherited from whatever the developer's own .env happens to say — E2E always
     // exercises the REAL GoogleMapsProvider (against the fake-fetch boundary below), never the deterministic
     // dev-only approximation, regardless of local MAPS_PROVIDER settings.

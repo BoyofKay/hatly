@@ -29,6 +29,9 @@ const PUBLIC_ALLOWED = new Set<string>([
   // account deletion WITHOUT the app (Google Play policy): password-verified self-service, or a request that deletes nothing by itself
   'POST /account-deletion/delete', 'POST /account-deletion/requests',
   'GET /health', 'GET /health/ready',
+  // P0 Admin alerts (2026-11-08): a service worker reports "displayed/clicked" with no session; the proof is the one-time token inside that
+  // encrypted push message (hashed at rest, timing-safe check, throttled); it can only stamp that one delivery and reveals nothing.
+  'POST /push-receipts',
   'GET /catalog-products/:id', 'GET /products', 'GET /products/:id', 'GET /search', 'GET /sectors', 'GET /sectors/:sectorId/subcategories', 'GET /home-banners',
   // Home aggregation (public catalogue composition) and the privacy-safe client telemetry intake / client config (no identifiers, throttled, size-limited)
   'GET /home/product-sections', 'POST /telemetry/client-metrics', 'GET /config/client',

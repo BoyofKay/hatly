@@ -14,6 +14,8 @@ import { NAV, NavGroup, NavItem, locate } from './nav';
 import { StaffAlertsBell } from './StaffAlertsBell';
 import { adminHref } from '../../lib/notifications/wording';
 import { fetchAdminChanges } from '../../lib/api/changes';
+import { OpsAlarmBar, OpsAlarmProvider } from '../alerts/OpsAlarm';
+import { forgetThisDevice } from '../../lib/alerts/push-client';
 
 const ICONS: Record<string, ReactNode> = {
   home: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -195,6 +197,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   ) : null;
 
   return (
+    <OpsAlarmProvider>
     <div data-role-scope="admin" className="flex min-h-screen bg-gray-50 text-gray-900">
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-e border-gray-100 bg-white shadow-[1px_0_0_rgba(16,24,40,0.02)] lg:block">{sidebar}</aside>
       {open && (
@@ -222,15 +225,18 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full bg-hatly-orange text-white shadow-sm"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></svg></span>
               <span className="hidden min-w-0 leading-tight sm:block"><span className="block max-w-[9rem] truncate text-xs font-medium text-gray-800"><bdi>{user?.fullName ?? user?.phone ?? ''}</bdi></span><span className="block text-[10px] text-gray-400">{perms.role === 'SUPER_ADMIN' ? t('Super admin', 'مدير النظام') : t('Admin', 'مشرف')}</span></span>
             </span>
-            <Button variant="ghost" size="sm" onClick={() => logout().finally(() => router.replace('/login'))}>{t('Sign out', 'تسجيل الخروج')}</Button>
+            {/* Signing out also unregisters this browser from push, so a shared device stops showing this admin's alerts. */}
+            <Button variant="ghost" size="sm" onClick={() => forgetThisDevice().finally(() => logout().finally(() => router.replace('/login')))}>{t('Sign out', 'تسجيل الخروج')}</Button>
           </div>
         </header>
+        <OpsAlarmBar />
         {/* The Control Tower and the Orders workspace show these same facts as their own queues, so the shell banner stays out of their way. */}
         {!['/control-tower', '/order-management'].some((p) => pathname === p) && <OperationsBanner facts={operations} />}
         <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{tabs}{children}</main>
       </div>
       <CommandPalette open={search} onClose={() => setSearch(false)} />
     </div>
+    </OpsAlarmProvider>
   );
 }
 

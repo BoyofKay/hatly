@@ -46,6 +46,7 @@ export const NAV: NavGroup[] = [
       { href: '/failed-deliveries', en: 'Failed Deliveries', ar: 'التوصيلات الفاشلة', perms: ['MANAGE_ORDER_ISSUES'] },
       { href: '/alerts', en: 'Alerts', ar: 'التنبيهات', perms: P.orders },
       { href: '/inbox', en: 'Notifications', ar: 'الإشعارات', perms: P.orders },
+      { href: '/notification-setup', en: 'Notification setup', ar: 'إعداد الإشعارات', perms: P.orders },
       { href: '/payments', en: 'Payments', ar: 'المدفوعات', perms: ['VERIFY_MANUAL_PAYMENTS', 'VIEW_FINANCIALS'] },
       { href: '/manual-transfer', en: 'Manual Transfer', ar: 'التحويل اليدوي', perms: ['VERIFY_MANUAL_PAYMENTS'] },
       { href: '/refunds', en: 'Refunds', ar: 'المستردات', perms: ['VERIFY_MANUAL_PAYMENTS', 'VIEW_FINANCIALS'] },

@@ -37,6 +37,12 @@ export const STAFF_ALERT_META = {
   VENDOR_PRODUCT_REVIEW_DECIDED: { audience: 'VENDOR', severity: 'INFO', title: 'Hatly reviewed your product change', body: 'Your new product or product change was approved or rejected.' },
   // R45 (2026-11-06): the order was cancelled while a driver was assigned (before pickup).
   OPS_CANCELLED_AFTER_ASSIGNMENT: { audience: 'OPERATIONS', severity: 'CRITICAL', title: 'An order was cancelled after a driver was assigned', body: 'Tell the driver to stop. If the trip had started, decide whether to compensate it (a Hatly operational expense).' },
+  // P0 Admin alerts (2026-11-08): the inbox copy of an Operations alert. INFO on purpose: the urgent, unmutable channel is OpsAlertsService
+  // (alarm + Web Push, repeated until acknowledged); a CRITICAL inbox row would also queue a mobile (FCM) push and duplicate it.
+  OPS_NEW_ORDER: { audience: 'OPERATIONS', severity: 'INFO', title: 'New order', body: 'A new order arrived. Make sure the store accepts it.' },
+  OPS_ACCEPTANCE_OVERDUE: { audience: 'OPERATIONS', severity: 'INFO', title: 'The store has not accepted an order', body: 'The store has not accepted this order in time. Call the store.' },
+  OPS_PREPARATION_LATE: { audience: 'OPERATIONS', severity: 'INFO', title: 'Preparation is late', body: 'The order is past its expected ready time.' },
+  OPS_DRIVER_ACK_OVERDUE: { audience: 'OPERATIONS', severity: 'INFO', title: 'The driver has not acknowledged an order', body: 'Contact the driver; release or reassign it if needed.' },
 } as const;
 export type StaffAlertCategory = keyof typeof STAFF_ALERT_META;
 export const STAFF_ALERT_CATEGORIES = Object.keys(STAFF_ALERT_META) as StaffAlertCategory[];
