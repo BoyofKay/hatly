@@ -111,4 +111,20 @@ test.describe('Admin alarm', () => {
     await expect(page.getByTestId('setup-message')).not.toContainText('will now receive');
     await expect(status.getByTestId('setup-row-device')).toHaveAttribute('data-tone', 'bad');
   });
+
+  test('on a phone the bar shows the newest alert only, with "see all", and never scrolls sideways', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const order = await placeNewOrder();
+    try {
+      await page.goto('/home');
+      const bar = page.getByTestId('ops-alarm-bar');
+      await expect(bar.locator('li', { hasText: order.orderNumber })).toBeVisible({ timeout: 20_000 });
+      const visibleItems = await bar.locator('li[data-testid^="ops-alarm-item-"]:visible').count();
+      expect(visibleItems).toBe(1);
+      await expect(bar.getByTestId('ops-alarm-see-all')).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+    } finally {
+      await cancelTestOrder(order);
+    }
+  });
 });

@@ -295,28 +295,36 @@ export function OpsAlarmBar() {
       </div>
       {pending.length > 0 && (
         <ul className="mt-2 space-y-1.5">
-          {pending.slice(0, 3).map((a) => (
-            <li key={a.id} data-testid={`ops-alarm-item-${a.id}`} className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 ${a.priority === 'CRITICAL' ? 'bg-white ring-1 ring-red-200' : 'bg-white ring-1 ring-amber-200'}`}>
-              <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${a.priority === 'CRITICAL' ? 'animate-pulse bg-red-600' : 'bg-amber-500'}`} />
-              <span className="min-w-0 flex-1 text-sm">
-                <strong className="text-gray-900">{t(...OPS_CATEGORY[a.category])}</strong>
-                {a.orderNumber && <> · <bdi className="font-mono">{a.orderNumber}</bdi></>}
-                <span className="text-gray-500"> · {age(a.openedAt, now, locale)} · {t(...OPS_ACTION[a.category])}</span>
+          {/* Phones show the newest urgent alert only (the rest are one tap away); larger screens show three. */}
+          {pending.slice(0, 3).map((a, i) => (
+            <li key={a.id} data-testid={`ops-alarm-item-${a.id}`} className={`${i > 0 ? 'hidden sm:flex' : 'flex'} flex-col gap-2 rounded-lg px-3 py-2 sm:flex-row sm:items-center sm:gap-3 ${a.priority === 'CRITICAL' ? 'bg-white ring-1 ring-red-200' : 'bg-white ring-1 ring-amber-200'}`}>
+              <span className="flex min-w-0 flex-1 items-start gap-2 text-sm">
+                <span aria-hidden className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${a.priority === 'CRITICAL' ? 'animate-pulse bg-red-600' : 'bg-amber-500'}`} />
+                <span className="min-w-0">
+                  <strong className="text-gray-900">{t(...OPS_CATEGORY[a.category])}</strong>
+                  {a.orderNumber && <> · <bdi dir="ltr" className="whitespace-nowrap font-mono">{a.orderNumber}</bdi></>}
+                  <span className="text-gray-500"> · <span className="whitespace-nowrap">{age(a.openedAt, now, locale)}</span> · {t(...OPS_ACTION[a.category])}</span>
+                </span>
               </span>
-              <Link href={a.href} className="rounded-lg bg-hatly-orange px-3 py-1 text-xs font-semibold text-white hover:bg-hatly-orangeDark" data-testid="ops-alarm-open">
-                {t('Open order', 'افتح الطلب')}
-              </Link>
-              {ctx.canAck && (
-                <button type="button" disabled={busy === a.id} onClick={() => void ack(a.id)} className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50" data-testid="ops-alarm-ack">
-                  {t('Seen — stop alarm', 'تم الاطلاع — أوقف التنبيه')}
-                </button>
-              )}
-              {failed === a.id && <span role="alert" className="text-xs text-red-700">{t('Not saved — try again.', 'لم يُحفظ — حاول مجددًا.')}</span>}
+              <span className="flex shrink-0 flex-wrap items-center gap-2">
+                <Link href={a.href} className="rounded-lg bg-hatly-orange px-3 py-1.5 text-xs font-semibold text-white hover:bg-hatly-orangeDark" data-testid="ops-alarm-open">
+                  {t('Open order', 'افتح الطلب')}
+                </Link>
+                {ctx.canAck && (
+                  <button type="button" disabled={busy === a.id} onClick={() => void ack(a.id)} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50" data-testid="ops-alarm-ack">
+                    {t('Seen — stop alarm', 'تم الاطلاع — أوقف التنبيه')}
+                  </button>
+                )}
+                {failed === a.id && <span role="alert" className="text-xs text-red-700">{t('Not saved — try again.', 'لم يُحفظ — حاول مجددًا.')}</span>}
+              </span>
             </li>
           ))}
-          {pending.length > 3 && (
-            <li>
-              <Link href="/inbox" className="text-xs font-medium text-red-800 underline">{t(`+${pending.length - 3} more — see all`, `+${pending.length - 3} أخرى — عرض الكل`)}</Link>
+          {pending.length > 1 && (
+            <li className={pending.length > 3 ? '' : 'sm:hidden'}>
+              <Link href="/inbox" className="text-xs font-medium text-red-800 underline" data-testid="ops-alarm-see-all">
+                <span className="sm:hidden">{t(`+${pending.length - 1} more — see all`, `+${pending.length - 1} أخرى — عرض الكل`)}</span>
+                <span className="hidden sm:inline">{t(`+${pending.length - 3} more — see all`, `+${pending.length - 3} أخرى — عرض الكل`)}</span>
+              </Link>
             </li>
           )}
         </ul>
