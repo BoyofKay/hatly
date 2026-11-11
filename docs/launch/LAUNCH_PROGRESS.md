@@ -479,13 +479,21 @@ Production release `20261107T053628Z-079cf82fb4dc` (commit `177d278`, bundle ide
   - The Home chunk serves "Needs your action now"; the transfer page serves the order-number refund lookup.
   - HT-100034 (the first order after the reset) was untouched by the switch.
 
-## 3aq. P0 Admin real-time alerts and Web Push (2026-11-08) — BUILT and tested; production switch HELD for the Web Push keys
+## 3aq. P0 Admin real-time alerts and Web Push (2026-11-08 → deployed 2026-11-10) — DEPLOYED and verified
 
 - Why: a new order alerted nobody (no Operations new-order event, no vendor staff accounts, no sound/notification/service worker in Admin,
   push unconfigured) — `OPERATIONS_AUDIT_2026-11-08.md` §3.
 - What, how, security, device checklist: `docs/launch/P0_ADMIN_ALERTS_2026-11-08.md`. Migration 79 `OpsAlertsWebPush` (3 new tables, additive).
-- Held because production has no `WEB_PUSH_*` settings (the authorisation says to stop before deploying when a required secret is missing).
-  One-time step: `deploy/production/setup-web-push-keys.sh <contact>` on the server, then deploy.
+- Owner chose "create keys + deploy" (2026-11-11): VAPID pair generated on the server by `setup-web-push-keys.sh https://admin.hatly.dev`
+  (private key never printed; env file backed up, mode 600). Env check: Web Push warning gone.
+- Release `20261108T052118Z-02c8091cd3e1` (commit 1b259bb), migration 79 applied by the guarded migrate (own backup first). Backup
+  `hatly-prod-20261110T222436Z.dump` (sha256 25db9b94a8d2…), restore drill OK (101 tables, 16 users), off-host copy OK. Rollback = UX-1.
+- Live checks: health ok, backend ready ~5 s, no errors; first scan raised 6 real alerts with true start times (HT-100034/37 driver not
+  acknowledged, HT-100036/39 store not accepted, HT-100038 needs a driver, HT-100039 new order); `/sw.js` served no-store (Cloudflare BYPASS);
+  new endpoints 401 without session; bad receipt 404.
+- Follow-up `20261110T225253Z-d5d27b5c0c3e` (commit 1c6a433): phone-friendly alarm bar.
+- Server note: the 522 seen on mobile data was an OVH hypervisor-initiated power-off on 2026-11-10 08:27 UTC (down 5 h 25 min until 13:53 UTC);
+  everything restarted healthy on its own.
 
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
