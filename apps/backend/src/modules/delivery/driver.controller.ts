@@ -67,9 +67,10 @@ export class DriverController {
     return { data: r.items, meta: { page: r.page, limit: r.limit, total: r.total } };
   }
 
+  /** `scope=active` (current apps): only orders that still need the driver; `finished`: history rows; omitted: both (older apps, R38). */
   @Get('deliveries')
-  async listDeliveries(@CurrentUser() user: AuthenticatedUser) {
-    const deliveries = await this.driverDeliveriesService.listForUser(user.id);
+  async listDeliveries(@CurrentUser() user: AuthenticatedUser, @Query('scope') scope?: string) {
+    const deliveries = await this.driverDeliveriesService.listForUser(user.id, scope === 'active' || scope === 'finished' ? scope : 'all');
     return { data: deliveries };
   }
 

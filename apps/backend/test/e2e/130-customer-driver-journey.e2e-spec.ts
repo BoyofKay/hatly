@@ -263,7 +263,13 @@ describe('E2E — customer cart compatibility, financial consistency and the dri
       const wantEarnings = commissions.reduce((a: number, e: any) => a + Number(e.rate_snapshot?.baseAmountMinor ?? 0), 0);
       const wantCommission = commissions.reduce((a: number, e: any) => a + Number(e.amount_minor), 0);
       const wantReimb = events.filter((e: any) => e.type === 'DRIVER_REIMBURSEMENT_OWED').reduce((a: number, e: any) => a + Number(e.amount_minor), 0);
-      expect(earnings.open).toMatchObject({ earningsMinor: wantEarnings, commissionMinor: wantCommission, reimbursementsMinor: wantReimb, netMinor: wantEarnings - wantCommission + wantReimb });
+      // 2026-11-13: the driver sees the Admin closing preview exactly (one source). COD: goods pass through, the courier keeps the fee
+      // cash, so the net is −commission (owed by the courier) — no longer fee − commission.
+      const driverId = d.driverId ?? (await world.ds.query(`SELECT id FROM drivers WHERE user_id = $1`, [d.id]))[0].id;
+      const preview = expectData<any>(await world.api('get', `/admin/settlement/drivers/${driverId}/close-preview`, { token: (await s.superAdmin()).accessToken }));
+      expect(earnings.open).toMatchObject({ earningsMinor: wantEarnings, commissionMinor: wantCommission, reimbursementsMinor: wantReimb, netMinor: preview.totals.netToCourierMinor });
+      expect(earnings.open.breakdown).toEqual(preview.totals);
+      expect(preview.totals.netToCourierMinor).toBe(-wantCommission); // all-cash COD order
       expect(earnings.open.deliveries).toBe(commissions.length);
       expect(earnings.deliveredToday).toBeGreaterThanOrEqual(1);
       expect(earnings.closedPeriods).toEqual([]);
@@ -272,7 +278,8 @@ describe('E2E — customer cart compatibility, financial consistency and the dri
       expect(tx.status).toBe(200);
       const row = tx.body.data.find((r: any) => r.orderNumber === order.orderNumber);
       expect(row).toBeTruthy();
-      expect(row.netMinor).toBe(row.earningsMinor - row.commissionMinor + row.reimbursementMinor);
+      expect(row.netMinor).toBe(preview.lines.find((l: any) => l.orderNumber === order.orderNumber).netToCourierMinor);
+      expect(row).toMatchObject({ settlementState: 'PENDING', breakdown: expect.objectContaining({ paymentFlow: 'COD', goodsReimbursementMinor: 0 }) });
       expect(row.cashDueAtDoorMinor).toBe(order.amountDueMinor); // a COD order: what was owed at the door, as a fact
       expect(tx.body.meta.total).toBe(commissions.length);
       expect(JSON.stringify(earnings)).not.toMatch(/cashInHand|balance due|owes you/i);
@@ -288,7 +295,12 @@ describe('E2E — customer cart compatibility, financial consistency and the dri
       expect([200, 201]).toContain(closed.status);
       const after = expectData<any>(await call('get', earningsDriver, '/driver/earnings'));
       expect(after.closedPeriods).toHaveLength(1);
-      expect(after.closedPeriods[0]).toMatchObject({ earningsMinor: before.open.earningsMinor, commissionMinor: before.open.commissionMinor, reimbursementsMinor: before.open.reimbursementsMinor, netMinor: before.open.netMinor, frequency: 'WEEKLY' });
+      // Courier closing (2026-11-13): fee and commission carry over unchanged; the closing also counts the goods the courier paid the stores
+      // and the cash taken at the door (R25/R29), so its net is the real settlement amount, not the earlier earnings − commission +
+      // reimbursements preview. (The Driver App's earnings card was built for the earlier formula — see the closing report.)
+      const c = closed.body.data;
+      expect(after.closedPeriods[0]).toMatchObject({ earningsMinor: before.open.earningsMinor, commissionMinor: before.open.commissionMinor, netMinor: c.netPayableMinor, frequency: 'DAILY' });
+      expect(c.netPayableMinor).toBe(c.totals.courierCompensationMinor + c.totals.goodsReimbursementMinor - c.totals.cashHeldMinor - c.totals.changeKeptMinor);
       expect(after.open).toMatchObject({ earningsMinor: 0, commissionMinor: 0, netMinor: 0 });
     });
 

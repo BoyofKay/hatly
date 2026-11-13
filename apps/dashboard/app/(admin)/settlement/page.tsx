@@ -1,158 +1,244 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { listVendorBranches, VendorBranch } from '../../../lib/api/admin-vendors';
-import { listDrivers, AdminDriver } from '../../../lib/api/admin-dispatch';
-import {
-  closeVendorSettlementPeriod,
-  closeDriverSettlementPeriod,
-  VendorSettlementPeriod,
-  DriverSettlementPeriod,
-} from '../../../lib/api/admin-settlement';
-import { apiErrorMessage } from '../../../lib/api/errors';
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { Badge, Button, Card, ConfirmDialog, DataTable, ErrorState, LabeledInput, PageHeader, Tabs, cairoDate } from '../../../components/ui';
+import { send, useApi } from '../../../lib/ui/api';
+import { apiErrorCode, apiErrorMessage } from '../../../lib/api/errors';
 import { useLang } from '../../../lib/ui/lang';
-import { Badge, Button, Card, ConfirmDialog, ErrorState, LabeledSelect, PageHeader } from '../../../components/ui';
+import { usePermissions } from '../../../lib/ui/permissions';
+import { CourierBreakdown, CourierNet, UnresolvedList, useCourierLineColumns } from '../../../components/settlement/CourierMoney';
 
 /**
- * Settlement — closes the current settlement period for one vendor branch or one driver (the two close endpoints of the settlement service). Closing is
- * financial and irreversible, so it is confirmed in a dialog first. SettlementService is the ONLY place any total here is computed: this page shows the
- * numbers the backend returned and derives nothing from them. In particular it does NOT show a "payable to the vendor" figure — the vendor ledger records
- * the commission Hatly is owed, and no vendor net-payable rule has been defined, so inventing one here would be a misleading balance.
- *
- * There is deliberately no history list on this page: the backend has only the two close endpoints (no GET of past periods). See the Vendor Financial
- * Centre for read-only vendor statements.
+ * Closing — courier shift closing (R29: at the office, by Operations, from the previous closing until now) and store period closing
+ * (R32/R33/R35). Flow: pick → PREVIEW (writes nothing) → review every order / part, the money parts and what is held back → confirm →
+ * a unique reference and a link to the saved statement. Every figure is the backend's; this page computes nothing. The confirm sends the
+ * preview's token, so if anything changed meanwhile (another operator closed it, a new delivery) the close is refused and re-previewed.
  */
-export default function SettlementPage() {
-  const { t, money, dateTime } = useLang();
-  const [branches, setBranches] = useState<VendorBranch[]>([]);
-  const [drivers, setDrivers] = useState<AdminDriver[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  const [selectedBranchId, setSelectedBranchId] = useState('');
-  const [vendorResult, setVendorResult] = useState<VendorSettlementPeriod | null>(null);
-  const [vendorError, setVendorError] = useState<string | null>(null);
-  const [closingVendor, setClosingVendor] = useState(false);
-
-  const [selectedDriverId, setSelectedDriverId] = useState('');
-  const [driverResult, setDriverResult] = useState<DriverSettlementPeriod | null>(null);
-  const [driverError, setDriverError] = useState<string | null>(null);
-  const [closingDriver, setClosingDriver] = useState(false);
-
-  const [confirm, setConfirm] = useState<'vendor' | 'driver' | null>(null);
-
-  const loadPickers = useCallback(async () => {
-    setLoadError(null);
-    try {
-      const [branchList, driverList] = await Promise.all([listVendorBranches(), listDrivers()]);
-      setBranches(branchList);
-      setDrivers(driverList);
-    } catch (err: any) {
-      setLoadError(apiErrorMessage(err, t('Failed to load vendor branches / drivers.', 'تعذّر تحميل فروع المتاجر / السائقين.')));
-    }
-  }, [t]);
-
-  useEffect(() => {
-    void loadPickers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function closeVendor() {
-    if (!selectedBranchId || closingVendor) return;
-    setClosingVendor(true);
-    setVendorError(null);
-    try {
-      setVendorResult(await closeVendorSettlementPeriod(selectedBranchId));
-    } catch (err: any) {
-      setVendorError(apiErrorMessage(err, t('Failed to close the vendor settlement period.', 'تعذّر إغلاق فترة تسوية المتجر.')));
-    } finally {
-      setClosingVendor(false);
-      setConfirm(null);
-    }
-  }
-
-  async function closeDriver() {
-    if (!selectedDriverId || closingDriver) return;
-    setClosingDriver(true);
-    setDriverError(null);
-    try {
-      setDriverResult(await closeDriverSettlementPeriod(selectedDriverId));
-    } catch (err: any) {
-      setDriverError(apiErrorMessage(err, t('Failed to close the driver settlement period.', 'تعذّر إغلاق فترة تسوية السائق.')));
-    } finally {
-      setClosingDriver(false);
-      setConfirm(null);
-    }
-  }
-
-  const branch = branches.find((b) => b.id === selectedBranchId);
-  const driver = drivers.find((d) => d.id === selectedDriverId);
-  const Row = ({ l, v, strong }: { l: string; v: string; strong?: boolean }) => (
-    <div className="flex items-baseline justify-between gap-3 py-1"><dt className="text-gray-600">{l}</dt><dd className={`tabular-nums ${strong ? 'font-semibold text-gray-900' : ''}`}>{v}</dd></div>
+export default function ClosingPage() {
+  const { t } = useLang();
+  const { can } = usePermissions();
+  const canCourier = can('CLOSE_DRIVER_SETTLEMENTS');
+  const canVendor = can('CLOSE_VENDOR_SETTLEMENTS');
+  // permissions arrive after the first render: the default tab follows them until the user picks one
+  const [picked, setTab] = useState<'courier' | 'vendor' | null>(null);
+  const tab = picked ?? (canCourier ? 'courier' : 'vendor');
+  const tabs = [
+    ...(canCourier ? [{ id: 'courier', label: t('Courier shift closing', 'تقفيل وردية المندوب') }] : []),
+    ...(canVendor ? [{ id: 'vendor', label: t('Store period closing', 'تقفيل فترة المتجر') }] : []),
+  ];
+  return (
+    <div className="max-w-6xl">
+      <PageHeader
+        title={t('Closing', 'التقفيل')}
+        subtitle={t('Preview first, then confirm. A closing settles each order once and gets its own reference; payments are recorded on the saved statement.', 'عاين أولًا ثم أكّد. التقفيل يسوّي كل طلب مرة واحدة ويأخذ رقمًا مرجعيًا؛ وتُسجَّل المدفوعات على الكشف المحفوظ.')}
+        actions={<Link href="/settlement-statements" className="text-sm font-medium text-hatly-orangeDark hover:underline">{t('Statements by period →', 'الكشوف حسب الفترة ←')}</Link>}
+      />
+      {tabs.length > 1 && <Tabs tabs={tabs} value={tab} onChange={(x) => setTab(x as 'courier' | 'vendor')} />}
+      {tab === 'courier' ? <CourierClosing /> : <VendorClosing />}
+    </div>
   );
+}
+
+function PartyPicker<T extends { id: string }>({ rows, loading, label, render, value, onPick, testId }: { rows: T[] | undefined; loading: boolean; label: (r: T) => string; render: (r: T) => React.ReactNode; value: string; onPick: (id: string) => void; testId: string }) {
+  const { t } = useLang();
+  const [q, setQ] = useState('');
+  const list = (rows ?? []).filter((r) => !q.trim() || label(r).toLowerCase().includes(q.trim().toLowerCase()));
+  return (
+    <div className="space-y-2" data-testid={testId}>
+      <LabeledInput label={t('Search', 'بحث')} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('Name or phone', 'الاسم أو الهاتف')} />
+      <ul className="max-h-72 divide-y divide-gray-100 overflow-auto rounded-lg border border-gray-200">
+        {loading && <li className="px-3 py-2 text-sm text-gray-500">{t('Loading…', 'جارٍ التحميل…')}</li>}
+        {!loading && list.length === 0 && <li className="px-3 py-2 text-sm text-gray-500">{t('Nothing found', 'لا نتائج')}</li>}
+        {list.map((r) => (
+          <li key={r.id}>
+            <button type="button" onClick={() => onPick(r.id)} className={`w-full px-3 py-2 text-start text-sm hover:bg-orange-50 ${value === r.id ? 'bg-orange-50 font-semibold' : ''}`} data-testid={`${testId}-${r.id}`}>
+              {render(r)}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CourierClosing() {
+  const { t, money, dateTime } = useLang();
+  const couriers = useApi<any[]>('/admin/settlement/couriers/open');
+  const [driverId, setDriverId] = useState('');
+  const preview = useApi<any>(driverId ? `/admin/settlement/drivers/${driverId}/close-preview` : null);
+  const [ack, setAck] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [closed, setClosed] = useState<any>(null);
+  const columns = useCourierLineColumns();
+  const p = preview.data;
+  const held = (p?.unresolved ?? []).filter((u: any) => u.reason !== 'IN_PROGRESS');
+  const needsAck = (p?.unresolved?.length ?? 0) > 0;
+
+  const close = async () => {
+    setBusy(true); setError(null);
+    try {
+      const res = await send<any>('post', `/admin/settlement/drivers/${driverId}/close`, { previewToken: p.previewToken });
+      setClosed(res); setConfirm(false); couriers.reload();
+    } catch (e) {
+      const code = apiErrorCode(e);
+      setError(code === 'PREVIEW_CHANGED' || code === 'ALREADY_SETTLED'
+        ? t('The orders changed since this preview (another closing or a new delivery). The preview was refreshed — review it and confirm again.', 'تغيّرت الطلبات منذ هذه المعاينة (تقفيل آخر أو تسليم جديد). حُدّثت المعاينة — راجعها وأكّد مرة أخرى.')
+        : apiErrorMessage(e, t('The closing could not be saved.', 'تعذّر حفظ التقفيل.')));
+      setConfirm(false); preview.reload();
+    } finally { setBusy(false); }
+  };
 
   return (
-    <div className="max-w-5xl">
-      <PageHeader title={t('Settlement', 'التسويات')} subtitle={t('Close the current settlement period for a vendor branch or a driver. Closing is final.', 'أغلق فترة التسوية الحالية لفرع متجر أو لسائق. الإغلاق نهائي.')} />
-      {loadError && <div className="mb-4"><ErrorState message={loadError} onRetry={loadPickers} /></div>}
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[18rem_1fr]">
+      <Card title={t('Courier', 'المندوب')}>
+        {couriers.error ? <ErrorState message={couriers.error} onRetry={couriers.reload} /> : (
+          <PartyPicker rows={couriers.data} loading={couriers.loading} value={driverId} testId="courier-picker"
+            label={(c: any) => `${c.name} ${c.phone ?? ''}`}
+            onPick={(id) => { setDriverId(id); setClosed(null); setAck(false); setError(null); }}
+            render={(c: any) => (<span className="flex items-center justify-between gap-2"><bdi>{c.name}</bdi><span className="flex gap-1">{c.deliveredOpen > 0 && <Badge tone="orange">{t(`${c.deliveredOpen} to close`, `${c.deliveredOpen} للتقفيل`)}</Badge>}{c.inProgress > 0 && <Badge>{t(`${c.inProgress} on road`, `${c.inProgress} بالطريق`)}</Badge>}</span></span>)} />
+        )}
+      </Card>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card title={t('Vendor Branch Settlement', 'تسوية فرع متجر')}>
-          <div className="space-y-3">
-            <LabeledSelect label={t('Vendor branch', 'فرع المتجر')} value={selectedBranchId} onChange={(e) => { setSelectedBranchId(e.target.value); setVendorResult(null); setVendorError(null); }}>
-              <option value="">{t('Select a vendor branch...', 'اختر فرع متجر...')}</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </LabeledSelect>
-            <Button variant="primary" className="min-h-[44px] w-full" disabled={!selectedBranchId} loading={closingVendor} onClick={() => setConfirm('vendor')}>{closingVendor ? t('Closing...', 'جارٍ الإغلاق...') : t('Close Period', 'إغلاق الفترة')}</Button>
-            {vendorError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{vendorError}</p>}
-            {vendorResult && (
-              <div role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-900">
-                <p className="font-medium">{t('Period closed successfully.', 'تم إغلاق الفترة بنجاح.')}</p>
-                <p className="mt-1 text-xs text-gray-700">{dateTime(vendorResult.periodStart)} → {dateTime(vendorResult.periodEnd)} <Badge>{vendorResult.frequency}</Badge></p>
-                <dl className="mt-2 divide-y divide-green-100">
-                  <Row l={t('Gross sales', 'إجمالي المبيعات')} v={money(vendorResult.grossSalesMinor)} />
-                  <Row l={t('Commission owed to Hatly', 'العمولة المستحقة لهاتلي')} v={money(vendorResult.totalCommissionOwedMinor)} strong />
-                </dl>
-              </div>
-            )}
+      <div className="space-y-4">
+        {!driverId && <p className="rounded-lg bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">{t('Choose a courier to preview their shift.', 'اختر مندوبًا لمعاينة ورديته.')}</p>}
+        {closed && (
+          <div role="status" className="rounded-xl border border-green-200 bg-green-50 p-4" data-testid="courier-closed">
+            <p className="font-semibold text-green-900">{t('Shift closed', 'تم تقفيل الوردية')} · <bdi className="font-mono">{closed.reference}</bdi></p>
+            <p className="mt-1 text-sm text-green-900">{dateTime(closed.periodStart)} → {dateTime(closed.periodEnd)} · {t(`${closed.totals.orders} orders`, `${closed.totals.orders} طلب`)} · <CourierNet minor={closed.netPayableMinor} /></p>
+            <Link href={`/settlements/driver/${closed.id}`} className="mt-2 inline-block text-sm font-medium text-hatly-orangeDark hover:underline">{t('Open the saved statement (record payments) →', 'افتح الكشف المحفوظ (تسجيل المدفوعات) ←')}</Link>
           </div>
-        </Card>
-
-        <Card title={t('Driver Settlement', 'تسوية سائق')}>
-          <div className="space-y-3">
-            <LabeledSelect label={t('Driver', 'السائق')} value={selectedDriverId} onChange={(e) => { setSelectedDriverId(e.target.value); setDriverResult(null); setDriverError(null); }}>
-              <option value="">{t('Select a driver...', 'اختر سائقًا...')}</option>
-              {drivers.map((d) => <option key={d.id} value={d.id}>{d.fullName}</option>)}
-            </LabeledSelect>
-            <Button variant="primary" className="min-h-[44px] w-full" disabled={!selectedDriverId} loading={closingDriver} onClick={() => setConfirm('driver')}>{closingDriver ? t('Closing...', 'جارٍ الإغلاق...') : t('Close Period', 'إغلاق الفترة')}</Button>
-            {driverError && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{driverError}</p>}
-            {driverResult && (
-              <div role="status" className="rounded-lg bg-green-50 p-3 text-sm text-green-900">
-                <p className="font-medium">{t('Period closed successfully.', 'تم إغلاق الفترة بنجاح.')}</p>
-                <p className="mt-1 text-xs text-gray-700">{dateTime(driverResult.periodStart)} → {dateTime(driverResult.periodEnd)} <Badge>{driverResult.frequency}</Badge></p>
-                <dl className="mt-2 divide-y divide-green-100">
-                  <Row l={t('Total earnings', 'إجمالي الأرباح')} v={money(driverResult.totalEarningsMinor)} />
-                  <Row l={t('Commission owed', 'العمولة المستحقة')} v={money(driverResult.totalCommissionOwedMinor)} />
-                  <Row l={t('Reimbursements owed', 'التعويضات المستحقة')} v={money(driverResult.totalReimbursementsOwedMinor)} />
-                  <Row l={t('Net payable', 'صافي المستحق')} v={money(driverResult.netPayableMinor)} strong />
-                </dl>
+        )}
+        {driverId && preview.error && <ErrorState message={preview.error} onRetry={preview.reload} />}
+        {driverId && p && !closed && (
+          <>
+            <Card title={t(`Preview — ${p.courier.name}`, `معاينة — ${p.courier.name}`)} testId="courier-preview">
+              <p className="mb-3 text-xs text-gray-500">
+                {p.previousClosing ? t(`Since the previous closing ${p.previousClosing.reference} (${dateTime(p.previousClosing.periodEnd)}) until now.`, `من التقفيل السابق ${p.previousClosing.reference} (${dateTime(p.previousClosing.periodEnd)}) حتى الآن.`) : t('First closing for this courier: every delivered order not settled before.', 'أول تقفيل لهذا المندوب: كل طلب مُسلّم لم يُسوَّ من قبل.')}
+                {p.courier.commissionRateBasisPoints == null && <span className="ms-2 font-semibold text-red-700">{t('This courier has no commission rate: their orders cannot be settled.', 'لا توجد نسبة عمولة لهذا المندوب: لا يمكن تسوية طلباته.')}</span>}
+              </p>
+              <div className="grid gap-4 md:grid-cols-[1fr_16rem]">
+                <CourierBreakdown totals={p.totals} testId="courier-preview-totals" />
+                <div className="rounded-lg bg-gray-50 p-3 text-sm">
+                  <p>{t('Orders to settle', 'طلبات للتسوية')}: <strong>{p.totals.orders}</strong></p>
+                  <p>{t('Cash orders', 'طلبات نقدية')}: {p.totals.codOrders} · {t('Electronic', 'إلكترونية')}: {p.totals.electronicOrders}</p>
+                  <p className="mt-2 text-xs text-gray-500">{t('Cash orders: the goods were collected from the customer and paid to the store, so they are not in the net; the courier keeps the delivery fee and owes Hatly its commission. Electronic orders: Hatly owes the courier the goods he paid plus the fee, less the commission.', 'الطلبات النقدية: البضاعة حُصّلت من العميل ودُفعت للمتجر فهي خارج الصافي؛ المندوب يحتفظ برسوم التوصيل ويدين لـHatly بعمولتها. الطلبات الإلكترونية: Hatly تدين للمندوب بالبضاعة التي دفعها والرسوم ناقص العمولة.')}</p>
+                </div>
               </div>
+            </Card>
+            <Card title={t('Orders in this closing', 'طلبات هذا التقفيل')} pad={false}>
+              <DataTable rows={p.lines} rowKey={(x: any) => x.orderId} columns={columns} emptyTitle={t('No delivered orders to settle', 'لا توجد طلبات مُسلّمة للتسوية')} emptyHint=" " />
+            </Card>
+            {p.unresolved.length > 0 && (
+              <Card title={t(`Held for the next closing (${p.unresolved.length})`, `طلبات مؤجلة للتقفيلة التالية (${p.unresolved.length})`)}>
+                <UnresolvedList items={p.unresolved} />
+                {held.length > 0 && <p className="mt-2 text-xs text-gray-500">{t('They are not settled now and will appear again in the next closing once resolved. Late settlement never blocks new orders (R29).', 'لا تُسوّى الآن وتظهر في التقفيل التالي بعد حلّها. تأخر التسوية لا يوقف الطلبات الجديدة (R29).')}</p>}
+              </Card>
             )}
-          </div>
-        </Card>
+            {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="courier-close-error">{error}</p>}
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              {needsAck && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} data-testid="courier-ack" />{t('I reviewed the held orders', 'راجعت الطلبات المؤجلة')}</label>}
+              <Button variant="primary" className="min-h-[44px]" disabled={p.lines.length === 0 || (needsAck && !ack)} onClick={() => setConfirm(true)} data-testid="courier-confirm">{t('Confirm closing', 'تأكيد التقفيل')}</Button>
+            </div>
+            <ConfirmDialog open={confirm} title={t('Confirm this shift closing?', 'تأكيد تقفيل هذه الوردية؟')}
+              message={`${t(`${p.totals.orders} orders`, `${p.totals.orders} طلب`)} · ${p.totals.netToCourierMinor >= 0 ? t('owed to the courier', 'مستحق للمندوب') : t('owed by the courier', 'مستحق على المندوب')} ${money(Math.abs(p.totals.netToCourierMinor))}. ${t('A closing cannot be edited; corrections are new entries.', 'لا يُعدَّل التقفيل؛ التصحيح يكون بقيد جديد.')}`}
+              confirmLabel={t('Close the shift', 'تقفيل الوردية')} busy={busy} onConfirm={() => void close()} onClose={() => setConfirm(false)} />
+          </>
+        )}
       </div>
+    </div>
+  );
+}
 
-      <ConfirmDialog
-        open={confirm !== null}
-        title={t('Close this settlement period?', 'إغلاق فترة التسوية هذه؟')}
-        message={confirm === 'vendor'
-          ? t(`Close the current settlement period for "${branch?.name ?? ''}"? This is a financial, irreversible action and cannot be undone.`, `إغلاق فترة التسوية الحالية لـ "${branch?.name ?? ''}"؟ هذا إجراء مالي لا رجعة فيه.`)
-          : t(`Close the current settlement period for driver "${driver?.fullName ?? ''}"? This is a financial, irreversible action and cannot be undone.`, `إغلاق فترة التسوية الحالية للسائق "${driver?.fullName ?? ''}"؟ هذا إجراء مالي لا رجعة فيه.`)}
-        confirmLabel={t('Close Period', 'إغلاق الفترة')}
-        danger
-        busy={closingVendor || closingDriver}
-        onConfirm={() => void (confirm === 'vendor' ? closeVendor() : closeDriver())}
-        onClose={() => setConfirm(null)}
-      />
+function VendorClosing() {
+  const { t, money, dateTime } = useLang();
+  const branches = useApi<any[]>('/admin/settlement/vendor-branches/open');
+  const [branchId, setBranchId] = useState('');
+  const [end, setEnd] = useState('');
+  const preview = useApi<any>(branchId ? `/admin/settlement/vendor-branches/${branchId}/close-preview` : null, { periodEnd: end || undefined });
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [closed, setClosed] = useState<any>(null);
+  const p = preview.data;
+  const columns = useMemo(() => [
+    { key: 'o', header: t('Order', 'الطلب'), cell: (x: any) => <Link className="text-hatly-orangeDark hover:underline" href={`/order-search/${x.orderId}`}><bdi>{x.orderNumber}</bdi></Link> },
+    { key: 'at', header: t('Handed over', 'التسليم من المتجر'), cell: (x: any) => dateTime(x.handedOverAt) },
+    { key: 'f', header: t('Type', 'النوع'), cell: (x: any) => (x.fulfillmentType === 'PICKUP' ? t('Pickup', 'استلام') : t('Delivery', 'توصيل')) },
+    { key: 's', header: t('Sales', 'المبيعات'), align: 'end' as const, cell: (x: any) => money(x.segmentSubtotalMinor) },
+    { key: 'c', header: t('Commission owed by the store', 'عمولة مستحقة على المتجر'), align: 'end' as const, cell: (x: any) => (x.rateUndefined ? <Badge tone="red">{t('Rate not set', 'نسبة غير محددة')}</Badge> : money(x.commissionMinor)) },
+  ], [t, money, dateTime]);
+
+  const close = async () => {
+    setBusy(true); setError(null);
+    try {
+      const res = await send<any>('post', `/admin/settlement/vendor-branches/${branchId}/close`, { previewToken: p.previewToken, ...(end ? { periodEnd: end } : {}) });
+      setClosed(res); setConfirm(false); branches.reload();
+    } catch (e) {
+      const code = apiErrorCode(e);
+      setError(code === 'PREVIEW_CHANGED' || code === 'ALREADY_SETTLED'
+        ? t('The store parts changed since this preview. The preview was refreshed — review it and confirm again.', 'تغيّرت أجزاء المتجر منذ هذه المعاينة. حُدّثت المعاينة — راجعها وأكّد مرة أخرى.')
+        : apiErrorMessage(e, t('The closing could not be saved.', 'تعذّر حفظ التقفيل.')));
+      setConfirm(false); preview.reload();
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[18rem_1fr]">
+      <Card title={t('Store branch', 'فرع المتجر')}>
+        {branches.error ? <ErrorState message={branches.error} onRetry={branches.reload} /> : (
+          <PartyPicker rows={branches.data} loading={branches.loading} value={branchId} testId="branch-picker"
+            label={(b: any) => `${b.vendorName} ${b.vendorNameAr ?? ''} ${b.branchName}`}
+            onPick={(id) => { setBranchId(id); setClosed(null); setError(null); }}
+            render={(b: any) => (<span className="flex items-center justify-between gap-2"><bdi>{b.vendorName} — {b.branchName}</bdi>{b.partsOpen > 0 && <Badge tone="orange">{t(`${b.partsOpen} to close`, `${b.partsOpen} للتقفيل`)}</Badge>}</span>)} />
+        )}
+      </Card>
+      <div className="space-y-4">
+        {!branchId && <p className="rounded-lg bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">{t('Choose a store branch to preview its period.', 'اختر فرع متجر لمعاينة فترته.')}</p>}
+        {closed && (
+          <div role="status" className="rounded-xl border border-green-200 bg-green-50 p-4" data-testid="vendor-closed">
+            <p className="font-semibold text-green-900">{t('Period closed', 'تم تقفيل الفترة')} · <bdi className="font-mono">{closed.reference}</bdi></p>
+            <p className="mt-1 text-sm text-green-900">{dateTime(closed.periodStart)} → {dateTime(closed.periodEnd)} · {t('Commission owed by the store', 'عمولة مستحقة على المتجر')} {money(closed.totalCommissionOwedMinor)}</p>
+            <Link href={`/settlements/vendor/${closed.id}`} className="mt-2 inline-block text-sm font-medium text-hatly-orangeDark hover:underline">{t('Open the saved statement (record collection) →', 'افتح الكشف المحفوظ (تسجيل التحصيل) ←')}</Link>
+          </div>
+        )}
+        {branchId && !closed && (
+          <Card>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-56"><LabeledInput type="date" label={t('Period ends (end of day, Cairo) — optional', 'نهاية الفترة (آخر اليوم بتوقيت القاهرة) — اختياري')} value={end} max={cairoDate(0)} onChange={(e) => setEnd(e.target.value)} data-testid="vendor-period-end" /></div>
+              <p className="text-xs text-gray-500">{t('Empty = up to now. Parts handed over after the end stay for the next period.', 'فارغ = حتى الآن. الأجزاء المسلّمة بعد النهاية تبقى للفترة التالية.')}</p>
+            </div>
+          </Card>
+        )}
+        {branchId && preview.error && <ErrorState message={preview.error} onRetry={preview.reload} />}
+        {branchId && p && !closed && (
+          <>
+            <Card title={t(`Preview — ${p.branch.vendorName} — ${p.branch.branchName}`, `معاينة — ${p.branch.vendorNameAr ?? p.branch.vendorName} — ${p.branch.branchName}`)} testId="vendor-preview">
+              <p className="mb-3 text-xs text-gray-500">{p.previousClosing ? `${t('From', 'من')} ${p.previousClosing.reference} (${dateTime(p.previousClosing.periodEnd)})` : t('First closing for this branch', 'أول تقفيل لهذا الفرع')} → {dateTime(p.periodEnd)}</p>
+              <dl className="grid gap-3 sm:grid-cols-4 text-sm">
+                <div className="rounded-lg bg-gray-50 p-3"><dt className="text-xs text-gray-500">{t('Orders', 'الطلبات')}</dt><dd className="text-lg font-semibold">{p.totals.orders}</dd></div>
+                <div className="rounded-lg bg-gray-50 p-3"><dt className="text-xs text-gray-500">{t('Gross sales', 'إجمالي المبيعات')}</dt><dd className="text-lg font-semibold tabular-nums">{money(p.totals.grossSalesMinor)}</dd></div>
+                <div className="rounded-lg bg-red-50 p-3"><dt className="text-xs text-red-800">{t('Owed by the store (Hatly commission)', 'مستحق على المتجر (عمولة Hatly)')}</dt><dd className="text-lg font-semibold tabular-nums text-red-800" data-testid="vendor-preview-commission">{money(p.totals.commissionOwedByVendorMinor)}</dd></div>
+                <div className="rounded-lg bg-gray-50 p-3"><dt className="text-xs text-gray-500">{t('Owed to the store (collected by Hatly)', 'مستحق للمتجر (حصّلته Hatly)')}</dt><dd className="text-lg font-semibold tabular-nums">{money(p.totals.collectedByHatlyForVendorMinor)}</dd></div>
+              </dl>
+              <p className="mt-2 text-xs text-gray-500">{t('The courier pays the store for the goods at pickup (R25/R26), so Hatly holds no store money; commission is collected separately and never netted (R32). Refunds do not reverse commission (R34).', 'المندوب يدفع للمتجر ثمن البضاعة عند الاستلام (R25/R26) فلا تحتفظ Hatly بأموال للمتجر؛ والعمولة تُحصَّل منفصلة دون مقاصة (R32). الاسترداد لا يعكس العمولة (R34).')}</p>
+              {p.totals.rateUndefinedParts > 0 && <p role="alert" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{t(`${p.totals.rateUndefinedParts} part(s) had no commission rate (R43): included in sales, no commission assumed.`, `${p.totals.rateUndefinedParts} جزء بلا نسبة عمولة (R43): ضمن المبيعات دون افتراض عمولة.`)}</p>}
+            </Card>
+            <Card title={t('Store parts in this closing', 'أجزاء المتجر في هذا التقفيل')} pad={false}>
+              <DataTable rows={p.lines} rowKey={(x: any) => x.segmentId} columns={columns} emptyTitle={t('Nothing handed over in this period', 'لا شيء سُلّم في هذه الفترة')} emptyHint=" " />
+            </Card>
+            {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+            <div className="flex justify-end">
+              <Button variant="primary" className="min-h-[44px]" disabled={p.lines.length === 0} onClick={() => setConfirm(true)} data-testid="vendor-confirm">{t('Confirm closing', 'تأكيد التقفيل')}</Button>
+            </div>
+            <ConfirmDialog open={confirm} title={t('Confirm this store period closing?', 'تأكيد تقفيل فترة المتجر؟')}
+              message={`${t(`${p.totals.parts} part(s)`, `${p.totals.parts} جزء`)} · ${t('commission owed by the store', 'عمولة مستحقة على المتجر')} ${money(p.totals.commissionOwedByVendorMinor)}. ${t('A closing cannot be edited.', 'لا يُعدَّل التقفيل.')}`}
+              confirmLabel={t('Close the period', 'تقفيل الفترة')} busy={busy} onConfirm={() => void close()} onClose={() => setConfirm(false)} />
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -41,6 +41,7 @@ export const NAV: NavGroup[] = [
     id: 'orders', en: 'Orders', ar: 'الطلبات', icon: 'clipboard', match: ['/order-search', '/dispatch'],
     items: [
       { href: '/order-management', en: 'Orders', ar: 'الطلبات', perms: P.orders },
+      { href: '/operations', en: 'Operations board', ar: 'لوحة التشغيل', perms: P.orders },
       { href: '/control-tower', en: 'Control Tower', ar: 'برج المراقبة', perms: P.orders },
       { href: '/exceptions', en: 'Exceptions', ar: 'الاستثناءات', perms: P.orders },
       { href: '/failed-deliveries', en: 'Failed Deliveries', ar: 'التوصيلات الفاشلة', perms: ['MANAGE_ORDER_ISSUES'] },
@@ -97,6 +98,7 @@ export const NAV: NavGroup[] = [
   {
     id: 'delivery', en: 'Delivery', ar: 'التوصيل', icon: 'truck',
     items: [
+      { href: '/drivers-today', en: 'Drivers today', ar: 'المندوبون اليوم', perms: ['CLOSE_DRIVER_SETTLEMENTS'] },
       { href: '/fleet', en: 'Live fleet', ar: 'الأسطول المباشر', perms: P.fleet },
       { href: '/drivers', en: 'Drivers', ar: 'السائقون', perms: ['MANAGE_DRIVERS'] },
       { href: '/delivery-zones', en: 'Delivery Zones', ar: 'مناطق التوصيل', perms: ['MANAGE_SERVICE_AREAS'] },
@@ -117,8 +119,9 @@ export const NAV: NavGroup[] = [
       { href: '/finance/receivables', en: 'Vendor receivables', ar: 'مستحقات المتاجر', perms: P.fin },
       { href: '/finance/liabilities', en: 'Liabilities', ar: 'الالتزامات', perms: P.fin },
       { href: '/finance/reconciliation', en: 'Reconciliation', ar: 'المطابقة', perms: P.fin },
-      { href: '/settlement', en: 'Settlement', ar: 'إغلاق التسوية', perms: ['CLOSE_VENDOR_SETTLEMENTS', 'CLOSE_DRIVER_SETTLEMENTS'] },
-      { href: '/settlements', en: 'Settlement periods', ar: 'فترات التسوية', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
+      { href: '/settlement', en: 'Closing', ar: 'التقفيل', perms: ['CLOSE_VENDOR_SETTLEMENTS', 'CLOSE_DRIVER_SETTLEMENTS'] },
+      { href: '/settlement-statements', en: 'Statements by period', ar: 'الكشوف حسب الفترة', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
+      { href: '/settlements', en: 'Settlement history', ar: 'سجل التسويات', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
     ],
   },
   {

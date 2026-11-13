@@ -28,6 +28,7 @@ test.describe('Admin UX release — admin', () => {
   test('Home: "Needs your action now" shows the transfers to verify and opens the review page in one click', async ({ page }) => {
     await claimedTransferOrder();
     await page.goto('/home');
+    await page.getByTestId('home-mode-overview').click(); // operations staff land on the board; the overview is one tap away
     const panel = page.getByTestId('action-center');
     await expect(panel).toBeVisible();
     const tile = panel.getByTestId('action-transfers');

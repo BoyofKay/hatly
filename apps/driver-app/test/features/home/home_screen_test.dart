@@ -153,6 +153,17 @@ Future<(FakeDriverApi, FakeLocationService, FakePollingService)> pump(WidgetTest
 }
 
 void main() {
+  group('active orders (2026-11-13)', () {
+    test('only assigned / picked up / on the way are active — delivered, cancelled, failed, collected and released orders are not', () {
+      for (final st in ['ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY']) {
+        expect(Delivery.activeStatuses.contains(st), isTrue, reason: st);
+      }
+      for (final st in ['DELIVERED', 'CANCELLED', 'FAILED_DELIVERY', 'COLLECTED', 'READY_FOR_PICKUP', 'PENDING']) {
+        expect(Delivery.activeStatuses.contains(st), isFalse, reason: st);
+      }
+    });
+  });
+
   group('Driver Core + Dispatch Foundation milestone — Home (availability + assigned deliveries)', () {
     testWidgets('starts OFFLINE, with no location timer running', (tester) async {
       final (_, fakeLocation, fakePolling) = await pump(tester);

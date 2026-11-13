@@ -12,8 +12,9 @@ function buildHarness(opts: {
     closeVendorPeriod: jest.fn(opts.closeVendorPeriodImpl ?? (async () => ({ id: 'vp-1', status: 'CLOSED' }))),
     closeDriverPeriod: jest.fn(opts.closeDriverPeriodImpl ?? (async () => ({ id: 'dp-1', status: 'CLOSED' }))),
   };
-  const controller = new AdminSettlementController(settlementService as any);
-  return { controller, settlementService };
+  const closing = { courierPreview: jest.fn(async () => ({ lines: [] })), vendorPreview: jest.fn(async () => ({ lines: [] })), courierStatement: jest.fn(async () => ({})), vendorStatement: jest.fn(async () => ({})), openCouriers: jest.fn(async () => []), openVendorBranches: jest.fn(async () => []) };
+  const controller = new AdminSettlementController(settlementService as any, closing as any);
+  return { controller, settlementService, closing };
 }
 
 const adminUser = { id: 'admin-1', role: 'ADMIN' };
@@ -25,7 +26,7 @@ describe('AdminSettlementController', () => {
 
       const result = await controller.closeVendorPeriod(adminUser as any, 'branch-1');
 
-      expect(settlementService.closeVendorPeriod).toHaveBeenCalledWith('branch-1', 'admin-1');
+      expect(settlementService.closeVendorPeriod).toHaveBeenCalledWith('branch-1', 'admin-1', {});
       expect(result.data.status).toBe('CLOSED');
     });
 
@@ -54,7 +55,7 @@ describe('AdminSettlementController', () => {
 
       const result = await controller.closeDriverPeriod(adminUser as any, 'driver-1');
 
-      expect(settlementService.closeDriverPeriod).toHaveBeenCalledWith('driver-1', 'admin-1');
+      expect(settlementService.closeDriverPeriod).toHaveBeenCalledWith('driver-1', 'admin-1', {});
       expect(result.data.status).toBe('CLOSED');
     });
 
@@ -74,6 +75,27 @@ describe('AdminSettlementController', () => {
         AdminSettlementController.prototype.closeDriverPeriod,
       );
       expect(permissions).toEqual([Permission.CLOSE_DRIVER_SETTLEMENTS]);
+    });
+  });
+
+  describe('preview, statements and lists', () => {
+    it('passes the preview token and period end through to the close', async () => {
+      const { controller, settlementService } = buildHarness({});
+      await controller.closeVendorPeriod(adminUser as any, 'branch-1', { previewToken: 't', periodEnd: '2026-11-01' });
+      expect(settlementService.closeVendorPeriod).toHaveBeenCalledWith('branch-1', 'admin-1', { previewToken: 't', periodEnd: '2026-11-01' });
+      await controller.closeDriverPeriod(adminUser as any, 'driver-1', { previewToken: 'x' });
+      expect(settlementService.closeDriverPeriod).toHaveBeenCalledWith('driver-1', 'admin-1', { previewToken: 'x' });
+    });
+
+    it.each([
+      ['courierPreview', Permission.CLOSE_DRIVER_SETTLEMENTS],
+      ['openCouriers', Permission.CLOSE_DRIVER_SETTLEMENTS],
+      ['vendorPreview', Permission.CLOSE_VENDOR_SETTLEMENTS],
+      ['openVendorBranches', Permission.CLOSE_VENDOR_SETTLEMENTS],
+      ['courierStatement', Permission.VIEW_DRIVER_SETTLEMENTS],
+      ['vendorStatement', Permission.VIEW_VENDOR_FINANCIAL_REPORTS],
+    ])('%s is gated by exactly %s (no new permission)', (method, permission) => {
+      expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, (AdminSettlementController.prototype as any)[method])).toEqual([permission]);
     });
   });
 });

@@ -33,7 +33,9 @@ export class DriverProfileService {
    */
   async setOnlineStatus(userId: string, isOnline: boolean): Promise<Driver> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
-    await this.driversRepository.update({ id: driver.id }, { isOnline });
+    // Presence: the time of the switch marks one online/offline incident (only when it really changes).
+    if (driver.isOnline !== isOnline) await this.driversRepository.update({ id: driver.id }, { isOnline, onlineChangedAt: new Date() });
+    else await this.driversRepository.update({ id: driver.id }, { isOnline });
     return this.driversRepository.findOneOrFail({ where: { id: driver.id } });
   }
 

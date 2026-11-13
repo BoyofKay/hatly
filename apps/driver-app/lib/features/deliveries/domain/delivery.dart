@@ -296,6 +296,11 @@ class Delivery {
   /// (Pickup/On The Way/Delivered/Failed); there is no separate
   /// Accept/Reject action or state anywhere in this app.
   final String orderStatus;
+
+  /// Order states in which the order still needs the driver. Everything else (delivered, cancelled, failed, collected, or released back to
+  /// "waiting for a driver") is not active — whatever any vendor part's own status says (a multi-store order is one order for the driver).
+  static const activeStatuses = {'ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY'};
+  bool get isActive => activeStatuses.contains(orderStatus);
   final String fulfillmentType;
   final String? orderNote;
   final String paymentMethod;

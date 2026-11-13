@@ -57,9 +57,11 @@ class DriverApi {
     );
   }
 
+  /// The orders that still need the driver (`scope=active`, decided by the server). The result is also filtered to the active order states
+  /// on the phone — an older backend ignores `scope` and returns finished orders too, which must never appear as active.
   Future<List<Delivery>> listDeliveries() async {
-    final response = await retryTransient(() => _apiClient.dio.get('/driver/deliveries'));
-    return (response.data['data'] as List).map((e) => Delivery.fromJson(e as Map<String, dynamic>)).toList();
+    final response = await retryTransient(() => _apiClient.dio.get('/driver/deliveries', queryParameters: {'scope': 'active'}));
+    return (response.data['data'] as List).map((e) => Delivery.fromJson(e as Map<String, dynamic>)).where((d) => d.isActive).toList();
   }
 
   Future<Delivery> getDelivery(String id) async {

@@ -47,8 +47,9 @@ export class ProofOfDelivery extends BaseEntity {
   driverId: string;
 
   /** A real, already-uploaded (`POST uploads`) photo URL owned by this driver — never client-asserted content. */
-  @Column({ name: 'photo_url', type: 'varchar' })
-  photoUrl: string;
+  /** Optional since 2026-11-13 (owner decision): null = delivered without a photo. */
+  @Column({ name: 'photo_url', type: 'varchar', nullable: true })
+  photoUrl: string | null;
 
   /** Optional recipient/customer confirmation (e.g. who accepted the delivery at the door). Free text, never validated against a customer record — purely operational evidence. */
   @Column({ name: 'recipient_name', type: 'varchar', nullable: true })

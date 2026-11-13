@@ -122,18 +122,18 @@ export class DriverDeliveriesService {
    * only the newest DRIVER_FINISHED_DELIVERIES_LIMIT. The list used to return the driver's whole history — each row carrying a past
    * customer's name, phone and address — growing forever with every delivery (data minimisation + per-request cost).
    */
-  async listForUser(userId: string): Promise<DriverDeliveryView[]> {
+  async listForUser(userId: string, scope: 'active' | 'finished' | 'all' = 'all'): Promise<DriverDeliveryView[]> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
     const relations = { order: { customer: true, segments: { items: true } } };
     const [active, finished] = await Promise.all([
-      this.deliveriesRepository.find({
+      scope === 'finished' ? Promise.resolve([] as Delivery[]) : this.deliveriesRepository.find({
         // A READY_FOR_PICKUP order is waiting for a driver: a delivery row may still name the driver it was RELEASED from (hand-back or
         // timeout), who is no longer on the order and must not see it — nor the customer's name, phone and address on it.
         where: { driverId: driver.id, order: { status: Not(In([...FINISHED_ORDER_STATUSES, OrderStatus.READY_FOR_PICKUP])) } },
         relations,
         order: { createdAt: 'DESC' },
       }),
-      this.deliveriesRepository.find({
+      scope === 'active' ? Promise.resolve([] as Delivery[]) : this.deliveriesRepository.find({
         where: { driverId: driver.id, order: { status: In(FINISHED_ORDER_STATUSES) } },
         relations,
         order: { createdAt: 'DESC' },

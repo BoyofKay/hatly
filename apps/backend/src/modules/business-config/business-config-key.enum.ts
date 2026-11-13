@@ -51,6 +51,13 @@ export enum BusinessConfigKey {
   DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES = 'DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES',
 
   /**
+   * Presence (2026-11-13): minutes without any call from a driver's app after which Operations is alerted that a driver holding an active
+   * order may not be reachable. OPTIONAL with no default — no approved figure exists; unset = this alert is off (an explicit offline switch
+   * still alerts). Admin may set a whole number from 2 to 240. Never reassigns or cancels anything.
+   */
+  DRIVER_PRESENCE_STALE_MINUTES = 'DRIVER_PRESENCE_STALE_MINUTES',
+
+  /**
    * PHASE 3 DELIVERY-FEE addition. Registered-vendor (CATALOG-only)
    * pricing parameters — see DeliveryFeeCalculationService. Deliberately
    * NOT seeded with any value by any migration: "do not invent business

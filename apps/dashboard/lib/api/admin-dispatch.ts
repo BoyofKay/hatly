@@ -25,6 +25,10 @@ export interface AdminDriver {
   activeDelivery: { orderId: string; orderNumber: string; status: string } | null;
   /** R28: Hatly's commission on the driver's delivery compensation, basis points (null = not set). */
   commissionRateBasisPoints?: number | null;
+  /** R18: every active order of the driver and their configured capacity. */
+  activeCount?: number;
+  capacity?: number;
+  lastSeenAt?: string | null;
 }
 
 /** Reuses the real backend `admin/orders/dispatchable` endpoint (Chunk 6 backend addition). */

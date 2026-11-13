@@ -1,4 +1,4 @@
-import { recomputeDriverAvailability } from './driver-capacity';
+import { ACTIVE_DRIVER_ORDER_STATUSES, recomputeDriverAvailability } from './driver-capacity';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -29,6 +29,11 @@ export interface AdminDriverView {
   activeDelivery: { orderId: string; orderNumber: string; status: string } | null;
   /** R28: Hatly's commission on this driver's delivery compensation, basis points (null = not set yet — nothing is recognised). */
   commissionRateBasisPoints: number | null;
+  /** R18: every active order of the driver (assigned / picked up / on the way) and the configured capacity (override, else vehicle, else 1). */
+  activeCount: number;
+  capacity: number;
+  /** Presence (2026-11-13): last call from the driver's app (not GPS). */
+  lastSeenAt: Date | null;
 }
 
 @Injectable()
@@ -109,6 +114,19 @@ export class DriversService {
           )
         : [];
     const activeByDriver = new Map(active.map((a) => [a.driver_id, { orderId: a.order_id, orderNumber: a.order_number, status: a.status }]));
+    // R18: load and capacity in one batched query (same definitions as driver-capacity.ts).
+    const loads: Array<{ id: string; active: number; capacity: number; last_seen_at: Date | null }> =
+      drivers.length > 0
+        ? await this.dataSource.query(
+            `SELECT d.id, d.last_seen_at,
+                    (SELECT count(*)::int FROM deliveries x JOIN orders o ON o.id = x.order_id
+                      WHERE x.driver_id = d.id AND x.deleted_at IS NULL AND o.status::text = ANY($2::text[])) AS active,
+                    GREATEST(1, COALESCE(d.capacity_override, (SELECT v.max_active_deliveries FROM vehicle_types v WHERE v.id = d.vehicle_type_id), 1))::int AS capacity
+               FROM drivers d WHERE d.id = ANY($1)`,
+            [drivers.map((d) => d.id), ACTIVE_DRIVER_ORDER_STATUSES],
+          )
+        : [];
+    const loadByDriver = new Map(loads.map((l) => [l.id, l]));
     return drivers.map((driver) => ({
       id: driver.id,
       fullName: driver.user.fullName,
@@ -121,6 +139,9 @@ export class DriversService {
       lastLocationAt: driver.lastLocationAt ?? null,
       activeDelivery: activeByDriver.get(driver.id) ?? null,
       commissionRateBasisPoints: driver.commissionRateBasisPoints ?? null,
+      activeCount: loadByDriver.get(driver.id)?.active ?? 0,
+      capacity: loadByDriver.get(driver.id)?.capacity ?? 1,
+      lastSeenAt: loadByDriver.get(driver.id)?.last_seen_at ?? null,
     }));
   }
 

@@ -5,7 +5,8 @@ import { StaffAlertsService, StaffAlertCategory } from './staff-alerts.service';
 import { AdminPushService, opsAlertHref } from './web-push/admin-push.service';
 
 export type OpsAlertCategory =
-  | 'NEW_ORDER' | 'ACCEPTANCE_OVERDUE' | 'PREPARATION_LATE' | 'DRIVER_ACK_OVERDUE' | 'NO_DRIVER' | 'DRIVER_NOT_RESPONDING' | 'ASSIGNMENT_ERROR' | 'FAILED_DELIVERY';
+  | 'NEW_ORDER' | 'ACCEPTANCE_OVERDUE' | 'PREPARATION_LATE' | 'DRIVER_ACK_OVERDUE' | 'NO_DRIVER' | 'DRIVER_NOT_RESPONDING' | 'ASSIGNMENT_ERROR' | 'FAILED_DELIVERY'
+  | 'DRIVER_OFFLINE';
 export type OpsAlertPriority = 'CRITICAL' | 'HIGH';
 
 /**
@@ -13,7 +14,10 @@ export type OpsAlertPriority = 'CRITICAL' | 'HIGH';
  *  - store acceptance: AdminControlTowerService.PENDING_ACCEPTANCE_ALERT_MINUTES (5, approved initial value) — passed in, same figure the Control Tower counts;
  *  - preparation: the segment's own `expected_ready_at`;
  *  - driver acknowledgement and "needs a driver": the dispatch alerts AutomaticDispatchService already raises (R15/R16, configured window);
- *  - failed delivery: FAILED_DELIVERY with no resolution yet (same as the Control Tower).
+ *  - failed delivery: FAILED_DELIVERY with no resolution yet (same as the Control Tower);
+ *  - driver offline (2026-11-13): the driver holding an active order switched to offline, or — only when the optional setting
+ *    DRIVER_PRESENCE_STALE_MINUTES is set — their app has not called the API for that long. One alert per order per incident
+ *    (key: order, driver, incident time); resolved when the driver is back, the order moves to another driver, or it ends.
  * The only numbers here are notification behaviour (how often to repeat an unacknowledged critical push, how often to scan), not business rules.
  */
 const ACTIVE = `('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP','ASSIGNED_TO_DRIVER','PICKED_UP','ON_THE_WAY')`;
@@ -179,14 +183,55 @@ export class OpsAlertsService implements OnApplicationBootstrap, OnModuleDestroy
         LIMIT 200`,
     )) candidates.push({ key: `failed:${r.id}`, category: 'FAILED_DELIVERY', priority: 'CRITICAL', orderId: r.id, orderNumber: r.order_number, openedAt: r.began });
 
+    candidates.push(...(await this.driverOfflineCandidates()));
+
     for (const c of candidates) if (await this.raise(this.ds.manager, c)) raised++;
     const resolved = await this.resolveEnded();
     const repeated = await this.repeatUnacknowledged();
     return { raised, resolved, repeated };
   }
 
+  /** Minutes of app silence that count as "not reachable", or null when the optional setting is unset (that alert is then off). */
+  async presenceStaleMinutes(): Promise<number | null> {
+    const [row] = await this.ds.query(`SELECT value FROM business_config WHERE key = 'DRIVER_PRESENCE_STALE_MINUTES'`);
+    const v = row?.value;
+    return typeof v === 'number' && Number.isInteger(v) && v >= 2 ? v : null;
+  }
+
+  /**
+   * DRIVER_OFFLINE: an active order (assigned / picked up / on the way) whose driver is OFFLINE (their own switch) or SILENT (no API call
+   * for DRIVER_PRESENCE_STALE_MINUTES, when set). The key names the incident — `driver-offline:<order>:<driver>:<since>` — so the same
+   * incident never raises twice, and a later, separate disconnection raises a fresh alert. Detail = reason|last-seen ISO (no personal data).
+   */
+  async driverOfflineCandidates(): Promise<RaiseInput[]> {
+    const stale = await this.presenceStaleMinutes();
+    const rows = await this.ds.query(
+      `SELECT o.id, o.order_number, d.id AS driver_id, d.last_seen_at,
+              CASE WHEN NOT d.is_online THEN 'OFFLINE' ELSE 'SILENT' END AS reason,
+              CASE WHEN NOT d.is_online THEN coalesce(d.online_changed_at, dl.assigned_at, o.updated_at) ELSE coalesce(d.last_seen_at, dl.assigned_at) END AS since
+         FROM orders o JOIN deliveries dl ON dl.order_id = o.id AND dl.deleted_at IS NULL JOIN drivers d ON d.id = dl.driver_id
+        WHERE o.deleted_at IS NULL AND o.status IN ('ASSIGNED_TO_DRIVER','PICKED_UP','ON_THE_WAY')
+          AND (NOT d.is_online OR ($1::int IS NOT NULL AND coalesce(d.last_seen_at, dl.assigned_at) < now() - ($1::int * interval '1 minute')))
+        LIMIT 200`,
+      [stale],
+    );
+    const out: RaiseInput[] = [];
+    for (const r of rows) {
+      const since = new Date(r.since);
+      const key = `driver-offline:${r.id}:${r.driver_id}:${Math.floor(since.getTime() / 1000)}`;
+      const [exists] = await this.ds.query(`SELECT 1 FROM ops_alerts WHERE alert_key = $1`, [key]);
+      if (exists) continue;
+      out.push({
+        key, category: 'DRIVER_OFFLINE', priority: 'CRITICAL', orderId: r.id, orderNumber: r.order_number,
+        detail: `${r.reason}|${r.last_seen_at ? new Date(r.last_seen_at).toISOString() : ''}`, openedAt: since,
+      });
+    }
+    return out;
+  }
+
   /** Closes every open alert whose condition no longer holds. Set-based; records why. */
   async resolveEnded(): Promise<number> {
+    const stale = await this.presenceStaleMinutes();
     const [rows] = await this.ds.query(
       `UPDATE ops_alerts x SET resolved_at = now(), updated_at = now(), resolution = r.resolution
          FROM (
@@ -195,6 +240,12 @@ export class OpsAlertsService implements OnApplicationBootstrap, OnModuleDestroy
                WHEN o.status NOT IN ${ACTIVE} THEN 'ORDER_ENDED'
                WHEN a.category = 'NEW_ORDER' THEN CASE WHEN NOT EXISTS (SELECT 1 FROM order_vendor_segments s WHERE s.order_id = o.id AND s.status = 'PENDING' AND s.deleted_at IS NULL) THEN 'STORE_RESPONDED' END
                WHEN a.category = 'ACCEPTANCE_OVERDUE' THEN CASE WHEN NOT EXISTS (SELECT 1 FROM order_vendor_segments s WHERE s.id = a.segment_id AND s.status = 'PENDING' AND s.deleted_at IS NULL) THEN 'STORE_RESPONDED' END
+               WHEN a.category = 'DRIVER_OFFLINE' THEN CASE
+                   WHEN o.status NOT IN ('ASSIGNED_TO_DRIVER','PICKED_UP','ON_THE_WAY') THEN 'DRIVER_RELEASED'
+                   WHEN NOT EXISTS (SELECT 1 FROM deliveries dl WHERE dl.order_id = o.id AND dl.deleted_at IS NULL AND dl.driver_id::text = split_part(a.alert_key, ':', 3)) THEN 'DRIVER_REASSIGNED'
+                   WHEN EXISTS (SELECT 1 FROM drivers d WHERE d.id::text = split_part(a.alert_key, ':', 3) AND d.is_online
+                                  AND ($1::int IS NULL OR d.last_seen_at >= now() - ($1::int * interval '1 minute'))) THEN 'DRIVER_RECONNECTED'
+                 END
                WHEN a.category = 'PREPARATION_LATE' THEN CASE WHEN NOT EXISTS (SELECT 1 FROM order_vendor_segments s WHERE s.id = a.segment_id AND s.status IN ('CONFIRMED','PREPARING') AND s.deleted_at IS NULL AND s.expected_ready_at < now()) THEN 'PREPARATION_DONE' END
                WHEN a.dispatch_alert_id IS NOT NULL THEN CASE
                    WHEN NOT EXISTS (SELECT 1 FROM dispatch_alerts d WHERE d.id = a.dispatch_alert_id AND d.resolved_at IS NULL AND d.deleted_at IS NULL) THEN 'DISPATCH_ALERT_CLOSED'
@@ -207,6 +258,7 @@ export class OpsAlertsService implements OnApplicationBootstrap, OnModuleDestroy
          ) r
         WHERE x.id = r.id AND r.resolution IS NOT NULL
         RETURNING x.id`,
+      [stale],
     );
     return rows.length;
   }

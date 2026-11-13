@@ -51,6 +51,14 @@ export class Driver extends BaseEntity {
   @Column({ name: 'last_location_at', type: 'timestamptz', nullable: true })
   lastLocationAt?: Date | null;
 
+  /** Presence (2026-11-13): the last time the driver's app called the API (written at most every 30 s). Not GPS. */
+  @Column({ name: 'last_seen_at', type: 'timestamptz', nullable: true })
+  lastSeenAt?: Date | null;
+
+  /** Presence (2026-11-13): when the driver last switched their own online/offline toggle. */
+  @Column({ name: 'online_changed_at', type: 'timestamptz', nullable: true })
+  onlineChangedAt?: Date | null;
+
   /**
    * PHASE F addition. CONFIRMED: driver commission is NOT one global
    * fixed percentage — each driver has their own configurable rate.

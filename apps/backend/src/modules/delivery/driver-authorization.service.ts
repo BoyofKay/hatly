@@ -28,7 +28,23 @@ export class DriverAuthorizationService {
     if (!driver) {
       throw new NotFoundException('Driver profile not found.');
     }
+    await this.touchPresence(driver.id);
     return driver;
+  }
+
+  /**
+   * Presence (2026-11-13): every driver API call (the app polls every ~25 s while open) is proof the app is reachable. Column-targeted and
+   * throttled to one write per 30 s per driver; never touches is_online / is_available. A failure here never blocks the driver's request.
+   */
+  private async touchPresence(driverId: string): Promise<void> {
+    try {
+      await this.driversRepository.query(
+        `UPDATE drivers SET last_seen_at = now() WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - interval '30 seconds')`,
+        [driverId],
+      );
+    } catch {
+      /* presence is best-effort */
+    }
   }
 
   /**

@@ -201,66 +201,77 @@ describe('Real PostgreSQL uniqueness / idempotency under concurrency', () => {
   });
 
   /**
-   * M2 (Launch-Readiness Gap Audit, G-13). Same pattern as the
-   * `FinancialEventService.record` race test above, applied to
-   * `SettlementService.closeVendorPeriod`/`closeDriverPeriod`: both read
-   * the same "previous closed period" row before either commits, so both
-   * compute the SAME `periodStart` — exactly the overlap the audit
-   * flagged. `idx_vendor_settlement_periods_branch_start_unique` /
-   * `idx_driver_settlement_periods_driver_start_unique` (see the
-   * `SettlementPeriodConcurrencyIndex` migration) make the DB reject every
-   * loser; the service's own pre-check/race-fallback (mirroring
-   * `FinancialEventService.record` exactly) turns that into "everyone
-   * gets the one real, committed period" rather than a raw DB error.
+   * Courier / vendor closing (2026-11-13; replaces the M2 event-window race tests). Concurrent closes for the SAME courier / branch are
+   * serialised by a per-party advisory lock: exactly ONE succeeds and settles everything; every other caller is refused cleanly
+   * (nothing left to close) — never a second period, never an order or store part in two closings.
    */
-  it('SettlementService.closeVendorPeriod (real service): concurrent closes for the SAME branch all SUCCEED with the SAME period — exactly one row exists', async () => {
+  async function deliveredForCourier(driverId: string, branchId: string) {
+    const customer = await data.user();
+    const order = await data.order(customer.id);
+    await ds.query(`UPDATE orders SET status = 'DELIVERED', total_minor = 1000, amount_due_minor = 1000 WHERE id = $1`, [order.id]);
+    const seg = await data.segment(order.id, branchId);
+    await ds.query(`UPDATE order_vendor_segments SET subtotal_minor = 700 WHERE id = $1`, [seg.id]);
+    const delivery = await data.delivery(order.id, driverId);
+    for (const st of ['PICKED_UP', 'DELIVERED']) {
+      const [r] = await ds.query(`INSERT INTO order_status_events (order_id, to_status, created_at) VALUES ($1, $2, now() - interval '5 minutes') RETURNING id`, [order.id, st]);
+      data.track('order_status_events', r.id);
+    }
+    await data.save<FinancialEvent>(FinancialEvent, {
+      createdAt: new Date(Date.now() - 300_000), type: FinancialEventType.VENDOR_COMMISSION_RECOGNIZED, direction: FinancialEventDirection.RECEIVABLE,
+      idempotencyKey: `vendor-commission:${seg.id}`, vendorBranchId: branchId, orderId: order.id, orderVendorSegmentId: seg.id, amountMinor: 70,
+    });
+    await data.save<FinancialEvent>(FinancialEvent, {
+      createdAt: new Date(Date.now() - 300_000), type: FinancialEventType.DRIVER_COMMISSION_RECOGNIZED, direction: FinancialEventDirection.RECEIVABLE,
+      idempotencyKey: `driver-commission:${order.id}`, driverId, orderId: order.id, deliveryId: delivery.id, amountMinor: 30,
+      rateSnapshot: { commissionRateBasisPoints: 1000, baseAmountMinor: 300 },
+    });
+    return order;
+  }
+
+  async function trackLines(table: 'driver_settlement_periods' | 'vendor_settlement_periods', periodId: string) {
+    data.track(table, periodId);
+    const lines = table === 'driver_settlement_periods' ? 'driver_settlement_period_orders' : 'vendor_settlement_period_lines';
+    for (const r of await ds.query(`SELECT id FROM ${lines} WHERE period_id = $1`, [periodId])) data.track(lines, r.id);
+  }
+
+  it('SettlementService.closeVendorPeriod (real service): concurrent closes for the SAME branch — exactly one succeeds, the rest are refused, one period, each part once', async () => {
     const settlement = app.get(SettlementService);
     const branch = await data.vendorBranch();
-    const admin = await data.user();
-    // One past event gives closeVendorPeriod a real, non-degenerate window
-    // (periodStart = this event's createdAt, strictly before periodEnd = "now").
-    await data.save<FinancialEvent>(FinancialEvent, {
-      type: FinancialEventType.VENDOR_COMMISSION_RECOGNIZED,
-      direction: FinancialEventDirection.RECEIVABLE,
-      idempotencyKey: `settlement-vendor-race-seed-${branch.id}`,
-      vendorBranchId: branch.id,
-      amountMinor: 100,
-    });
-
-    const results = await settle(
-      Array.from({ length: PARALLEL }, () => settlement.closeVendorPeriod(branch.id, admin.id)),
-    );
-
-    const fulfilled = results.filter((r): r is PromiseFulfilledResult<VendorSettlementPeriod> => r.status === 'fulfilled');
-    expect(fulfilled).toHaveLength(PARALLEL); // never surfaces the race as an error
-    expect(new Set(fulfilled.map((r) => r.value.id)).size).toBe(1); // every caller got the SAME row
-    expect(await rowCount('SELECT count(*)::int AS n FROM vendor_settlement_periods WHERE vendor_branch_id = $1', [branch.id])).toBe(1);
-    data.track('vendor_settlement_periods', fulfilled[0].value.id);
-  });
-
-  it('SettlementService.closeDriverPeriod (real service): concurrent closes for the SAME driver all SUCCEED with the SAME period — exactly one row exists', async () => {
-    const settlement = app.get(SettlementService);
     const driverUser = await data.user({ role: Role.DRIVER });
     const driver = await data.driver(driverUser.id);
     const admin = await data.user();
-    await data.save<FinancialEvent>(FinancialEvent, {
-      type: FinancialEventType.DRIVER_COMMISSION_RECOGNIZED,
-      direction: FinancialEventDirection.RECEIVABLE,
-      idempotencyKey: `settlement-driver-race-seed-${driver.id}`,
-      driverId: driver.id,
-      amountMinor: 50,
-      rateSnapshot: { commissionRateBasisPoints: 1000, baseAmountMinor: 500 },
-    });
+    await deliveredForCourier(driver.id, branch.id);
+    await deliveredForCourier(driver.id, branch.id);
 
-    const results = await settle(
-      Array.from({ length: PARALLEL }, () => settlement.closeDriverPeriod(driver.id, admin.id)),
-    );
+    const results = await settle(Array.from({ length: PARALLEL }, () => settlement.closeVendorPeriod(branch.id, admin.id)));
 
-    const fulfilled = results.filter((r): r is PromiseFulfilledResult<DriverSettlementPeriod> => r.status === 'fulfilled');
-    expect(fulfilled).toHaveLength(PARALLEL);
-    expect(new Set(fulfilled.map((r) => r.value.id)).size).toBe(1);
+    const fulfilled = results.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled');
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected.map((r) => r.reason?.response?.details?.code)).toEqual(Array(PARALLEL - 1).fill('NOTHING_TO_CLOSE'));
+    await trackLines('vendor_settlement_periods', fulfilled[0].value.id);
+    expect(await rowCount('SELECT count(*)::int AS n FROM vendor_settlement_periods WHERE vendor_branch_id = $1', [branch.id])).toBe(1);
+    expect(await rowCount('SELECT count(*)::int AS n FROM vendor_settlement_period_lines WHERE period_id = $1', [fulfilled[0].value.id])).toBe(2);
+  });
+
+  it('SettlementService.closeDriverPeriod (real service): concurrent closes for the SAME courier — exactly one succeeds, the rest are refused, one period, each order once', async () => {
+    const settlement = app.get(SettlementService);
+    const branch = await data.vendorBranch();
+    const driverUser = await data.user({ role: Role.DRIVER });
+    const driver = await data.driver(driverUser.id);
+    const admin = await data.user();
+    await deliveredForCourier(driver.id, branch.id);
+    await deliveredForCourier(driver.id, branch.id);
+
+    const results = await settle(Array.from({ length: PARALLEL }, () => settlement.closeDriverPeriod(driver.id, admin.id)));
+
+    const fulfilled = results.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled');
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected.map((r) => r.reason?.response?.details?.code)).toEqual(Array(PARALLEL - 1).fill('NOTHING_TO_CLOSE'));
+    await trackLines('driver_settlement_periods', fulfilled[0].value.id);
     expect(await rowCount('SELECT count(*)::int AS n FROM driver_settlement_periods WHERE driver_id = $1', [driver.id])).toBe(1);
-    data.track('driver_settlement_periods', fulfilled[0].value.id);
+    expect(await rowCount('SELECT count(*)::int AS n FROM driver_settlement_period_orders WHERE period_id = $1', [fulfilled[0].value.id])).toBe(2);
   });
 
   it('vendor_settlement_periods unique index: a second period at the same (vendor_branch_id, period_start) is rejected by PostgreSQL directly', async () => {

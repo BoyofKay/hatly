@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { SUPER_ADMIN_STORAGE_STATE } from './env';
-import { cancelTestOrder, orderDetail, placeNewOrder } from './control-tower-fixtures';
+import { cancelTestOrder, createOnlineDriver, ensureAssignedTo, orderDetail, placeNewOrder, placeReadyOrder, takeOffline, withAutomaticDispatch } from './control-tower-fixtures';
 
 /**
  * P0 Admin real-time alerts (2026-11-08). Against the real backend: a new order appears in the alarm bar of every open Admin tab without a
@@ -153,8 +153,32 @@ test.describe('Admin alarm', () => {
     await prompt.getByTestId('push-setup-later').click();
     await expect(prompt).toHaveCount(0);
     await page.reload();
-    await expect(page.getByTestId('admin-overview')).toBeVisible();
+    await expect(page.getByTestId('home-page')).toBeVisible();
     await expect(page.getByTestId('push-setup-prompt')).toHaveCount(0);
     await page.evaluate(() => localStorage.removeItem('hatly_push_prompt_later_until'));
+  });
+
+  test('a driver holding an order switches offline: a DRIVER_OFFLINE alert (reason + last seen) links to the order; going online again resolves it', async ({ page }) => {
+    test.setTimeout(150_000);
+    const { driver, order } = await withAutomaticDispatch(false, async () => {
+      const d = await createOnlineDriver('Offline');
+      const o = await placeReadyOrder();
+      await ensureAssignedTo(o.orderId, d);
+      return { driver: d, order: o };
+    });
+    try {
+      await takeOffline(driver);
+      await page.goto('/inbox');
+      const row = page.getByTestId('ops-alerts-panel').locator('li', { hasText: order.orderNumber }).filter({ hasText: 'Driver offline' });
+      await expect(row).toBeVisible({ timeout: 60_000 }); // the operations scan runs every 30 s
+      await expect(row.getByTestId('ops-alert-driver-offline')).toContainText('driver switched to offline');
+      await expect(row.getByRole('link', { name: 'Open order' })).toHaveAttribute('href', new RegExp(order.orderId));
+      expect((await orderDetail(order.orderId)).status).toBe('ASSIGNED_TO_DRIVER'); // never reassigned automatically
+      await driver.api.patch('/driver/online-status', { isOnline: true });
+      await expect(page.getByTestId('ops-alerts-panel').locator('li', { hasText: order.orderNumber }).filter({ hasText: 'Driver offline' })).toHaveCount(0, { timeout: 60_000 });
+    } finally {
+      await takeOffline(driver);
+      await cancelTestOrder(order);
+    }
   });
 });

@@ -6,8 +6,10 @@ import '../../../core/utils/money.dart';
 import '../../../shared_widgets/driver_ui.dart';
 import '../../deliveries/data/driver_providers.dart';
 import '../../earnings/domain/earnings.dart';
+import '../../earnings/presentation/money_breakdown_view.dart';
 
-/// Completed deliveries and what each one recorded for the driver, newest first, loaded a page at a time.
+/// The driver's delivered orders (from the server — never local history), newest first, a page at a time, each with its money state:
+/// settled (closing reference), waiting for the next closing, or held with the reason. Amounts are the server's; nothing is computed here.
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
@@ -75,7 +77,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           return MessageView(icon: Icons.cloud_off_outlined, message: context.t('Could not load your history.', 'تعذّر تحميل السجل.'), onRetry: () => _loadMore());
         }
         if (_items.isEmpty) {
-          return MessageView(icon: Icons.history, message: context.t('No completed deliveries yet.', 'لا توجد توصيلات مكتملة بعد.'));
+          return MessageView(icon: Icons.history, message: context.t('No delivered orders yet.', 'لا توجد طلبات مُسلّمة بعد.'));
         }
         return RefreshIndicator(
           onRefresh: () => _loadMore(reset: true),
@@ -91,27 +93,37 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 return const SizedBox.shrink();
               }
               final tx = _items[i];
+              final state = tx.settlementState;
+              final (stateText, stateColor) = switch (state) {
+                'SETTLED' => (context.t('Settled · ${tx.settlementReference ?? ''}', 'تمت التسوية · ${tx.settlementReference ?? ''}'), const Color(0xFF1B7F3B)),
+                'PENDING' => (context.t('Waiting for the next closing', 'بانتظار التقفيلة التالية'), const Color(0xFF6B6B6B)),
+                'EXCLUDED' => (excludedReasonText(context, tx.excludedReason), const Color(0xFF8A5A00)),
+                'LEGACY_SETTLED' => (context.t('Settled earlier', 'سُوّي سابقًا'), const Color(0xFF6B6B6B)),
+                _ => (null, const Color(0xFF6B6B6B)),
+              };
               return DriverCard(
                 key: Key('tx-${tx.id}'),
-                onTap: () => context.push('/deliveries/${tx.orderId}'),
+                // opens the delivery (its id); an older backend sends none, and then the row simply does not open
+                onTap: tx.deliveryId == null ? null : () => context.push('/deliveries/${tx.deliveryId}'),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
                     Expanded(child: Text(tx.orderNumber, textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w800))),
-                    Text(formatMinor(tx.netMinor, arabic: ar), textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFE0650A))),
+                    if (state != 'EXCLUDED' && state != 'LEGACY_SETTLED')
+                      Text(
+                        '${tx.netMinor >= 0 ? context.t('Owed to you', 'مستحق للمندوب') : context.t('You owe', 'مستحق عليك')} ${formatMinor(tx.netMinor.abs(), arabic: ar)}',
+                        key: Key('tx-net-${tx.id}'),
+                        style: TextStyle(fontWeight: FontWeight.w800, color: tx.netMinor >= 0 ? const Color(0xFF1B7F3B) : const Color(0xFFB3261E)),
+                      ),
                   ]),
                   const SizedBox(height: 4),
-                  Text(_date(tx.at), textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${context.t('Earned', 'الربح')} ${formatMinor(tx.earningsMinor, arabic: ar)} · ${context.t('Commission', 'العمولة')} ${formatMinor(tx.commissionMinor, arabic: ar)}'
-                    '${tx.reimbursementMinor > 0 ? ' · ${context.t('Reimbursed', 'مستردّ')} ${formatMinor(tx.reimbursementMinor, arabic: ar)}' : ''}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  if (tx.cashDueAtDoorMinor != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text('${context.t('Cash due at the door', 'نقد مستحق عند التسليم')}: ${formatMinor(tx.cashDueAtDoorMinor, arabic: ar)}', style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
-                    ),
+                  Text('${context.t('Delivered', 'سُلّم')} ${_date(tx.at)}', textDirection: ar ? TextDirection.rtl : TextDirection.ltr, style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
+                  if (tx.vendors != null) Text(tx.vendors!, style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
+                  if (tx.orderTotalMinor != null)
+                    Text('${context.t('Order total', 'إجمالي الطلب')} ${formatMinor(tx.orderTotalMinor, arabic: ar)} · ${tx.paymentMethod == 'COD' ? context.t('Cash', 'نقدي') : context.t('Paid electronically', 'مدفوع إلكترونيًا')}',
+                        style: const TextStyle(fontSize: 12)),
+                  if (tx.breakdown != null) ...[const SizedBox(height: 6), MoneyBreakdownView(b: tx.breakdown!, showNet: false)],
+                  if (stateText != null)
+                    Padding(padding: const EdgeInsets.only(top: 6), child: Text(stateText, key: Key('tx-state-${tx.id}'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: stateColor))),
                 ]),
               );
             },

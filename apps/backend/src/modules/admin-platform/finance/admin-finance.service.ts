@@ -1,3 +1,4 @@
+import { COURIER_MONEY_COLUMNS } from '../../finance/settlement-closing.service';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { addCairoRange, assertDate, assertMaxRange, assertUuid, num, pageParams, REPORTING_TIMEZONE, returned } from '../common/platform-sql';
@@ -375,17 +376,26 @@ export class AdminFinanceService {
     };
   }
 
-  async listPeriods(party: 'VENDOR' | 'DRIVER', q: { partyId?: string; paymentStatus?: string; from?: string; to?: string; page?: string | number; limit?: string | number }) {
+  async listPeriods(party: 'VENDOR' | 'DRIVER', q: { partyId?: string; paymentStatus?: string; from?: string; to?: string; search?: string; page?: string | number; limit?: string | number }) {
     const s = this.periodSelect(party);
     const params: unknown[] = [];
     const where: string[] = [`p.status = 'CLOSED'`, 'p.deleted_at IS NULL'];
     addCairoRange(where, params, 'p.period_end', q.from, q.to);
     const id = assertUuid(q.partyId, 'partyId');
     if (id) { params.push(id); where.push(party === 'VENDOR' ? `p.vendor_branch_id = $${params.length}` : `p.driver_id = $${params.length}`); }
+    // Search by closing reference or by name (vendor / branch / courier) or courier phone. LIKE wildcards in the input are escaped.
+    const search = typeof q.search === 'string' ? q.search.trim().slice(0, 80) : '';
+    if (search) {
+      params.push(`%${search.replace(/[\\%_]/g, (c) => '\\' + c)}%`);
+      const n = params.length;
+      where.push(party === 'VENDOR'
+        ? `(p.reference ILIKE $${n} OR v.name ILIKE $${n} OR coalesce(v.name_ar, '') ILIKE $${n} OR b.name ILIKE $${n})`
+        : `(p.reference ILIKE $${n} OR u.full_name ILIKE $${n} OR coalesce(u.phone, '') ILIKE $${n})`);
+    }
     const { page, limit, offset } = pageParams(q);
     const partyCols = party === 'VENDOR'
-      ? `p.vendor_branch_id AS party_id, v.name AS vendor_name, b.name AS party_name, p.gross_sales_minor, p.total_commission_owed_minor`
-      : `p.driver_id AS party_id, u.full_name AS party_name, p.total_earnings_minor, p.total_commission_owed_minor, p.total_reimbursements_owed_minor, p.net_payable_minor`;
+      ? `p.vendor_branch_id AS party_id, v.name AS vendor_name, b.name AS party_name, p.gross_sales_minor, p.total_commission_owed_minor, p.reference, p.method_version, p.orders_count, p.rate_undefined_count`
+      : `p.driver_id AS party_id, u.full_name AS party_name, p.total_earnings_minor, p.total_commission_owed_minor, p.total_reimbursements_owed_minor, p.net_payable_minor, p.reference, p.method_version, p.orders_count, p.unresolved_count, p.courier_compensation_minor, p.goods_paid_to_stores_minor, p.goods_pass_through_minor, p.goods_reimbursement_minor, p.cash_collected_minor, p.cash_held_minor, p.change_kept_minor`;
     const base = `SELECT p.id, p.period_start, p.period_end, p.closed_at, ${partyCols}, ${s.dueExpr} AS due, ${s.settledExpr} AS settled FROM ${s.from} WHERE ${where.join(' AND ')}`;
     const wrapped = `SELECT t.*, ${STATUS_SQL('t.due', 't.settled')} AS payment_status FROM (${base}) t`;
     const filtered = q.paymentStatus ? `SELECT * FROM (${wrapped}) w WHERE w.payment_status = $${params.length + 1}` : wrapped;
@@ -401,6 +411,11 @@ export class AdminFinanceService {
     const settled = num(r.settled);
     return {
       id: r.id, party, partyId: r.party_id, partyName: r.party_name, vendorName: r.vendor_name ?? null,
+      reference: r.reference ?? null, methodVersion: r.method_version == null ? 1 : Number(r.method_version), ordersCount: r.orders_count ?? null,
+      unresolvedAtClose: party === 'DRIVER' ? (r.unresolved_count ?? null) : null, rateUndefinedParts: party === 'VENDOR' ? (r.rate_undefined_count ?? null) : null,
+      // courier closings by the order method (2026-11-13) keep every money part; earlier closings have only their stored totals (null here)
+      ...Object.fromEntries((['courier_compensation_minor', 'goods_paid_to_stores_minor', 'goods_pass_through_minor', 'goods_reimbursement_minor', 'cash_collected_minor', 'cash_held_minor', 'change_kept_minor'] as const)
+        .map((c) => [c.replace(/_([a-z])/g, (_m, x: string) => x.toUpperCase()), party === 'DRIVER' && r[c] != null ? num(r[c]) : null])),
       periodStart: new Date(r.period_start).toISOString(), periodEnd: new Date(r.period_end).toISOString(), closedAt: r.closed_at ? new Date(r.closed_at).toISOString() : null,
       grossSalesMinor: party === 'VENDOR' ? num(r.gross_sales_minor) : null,
       totalEarningsMinor: party === 'DRIVER' ? num(r.total_earnings_minor) : null,
@@ -416,8 +431,8 @@ export class AdminFinanceService {
     assertUuid(id, 'id');
     const s = this.periodSelect(party);
     const partyCols = party === 'VENDOR'
-      ? `p.vendor_branch_id AS party_id, v.name AS vendor_name, b.name AS party_name, p.gross_sales_minor, p.total_commission_owed_minor`
-      : `p.driver_id AS party_id, u.full_name AS party_name, p.total_earnings_minor, p.total_commission_owed_minor, p.total_reimbursements_owed_minor, p.net_payable_minor`;
+      ? `p.vendor_branch_id AS party_id, v.name AS vendor_name, b.name AS party_name, p.gross_sales_minor, p.total_commission_owed_minor, p.reference, p.method_version, p.orders_count, p.rate_undefined_count`
+      : `p.driver_id AS party_id, u.full_name AS party_name, p.total_earnings_minor, p.total_commission_owed_minor, p.total_reimbursements_owed_minor, p.net_payable_minor, p.reference, p.method_version, p.orders_count, p.unresolved_count, p.courier_compensation_minor, p.goods_paid_to_stores_minor, p.goods_pass_through_minor, p.goods_reimbursement_minor, p.cash_collected_minor, p.cash_held_minor, p.change_kept_minor`;
     const [r] = await this.ds.query(`SELECT p.id, p.period_start, p.period_end, p.closed_at, ${partyCols}, ${s.dueExpr} AS due, ${s.settledExpr} AS settled FROM ${s.from} WHERE p.id = $1 AND p.deleted_at IS NULL`, [id]);
     if (!r) throw new NotFoundException('Settlement period not found.');
     const period = this.periodView(party, r);
@@ -427,7 +442,25 @@ export class AdminFinanceService {
     );
     let lines: Array<Record<string, unknown>> = [];
     let exceptions: string[] = [];
-    if (party === 'VENDOR') {
+    if (period.methodVersion === 2) {
+      // Closed by order / segment lines (2026-11-13): the statement IS the stored lines; the stored totals are re-checked against them.
+      if (party === 'VENDOR') {
+        const rows = await this.ds.query(`SELECT l.*, o.order_number FROM vendor_settlement_period_lines l JOIN orders o ON o.id = l.order_id WHERE l.period_id = $1 ORDER BY l.handed_over_at, o.order_number`, [id]);
+        lines = rows.map((x: any) => ({ orderId: x.order_id, orderNumber: x.order_number, segmentId: x.segment_id, at: new Date(x.handed_over_at).toISOString(), fulfillmentType: x.fulfillment_type, segmentSubtotalMinor: num(x.segment_subtotal_minor), commissionMinor: x.commission_minor == null ? null : num(x.commission_minor), rateUndefined: x.commission_minor == null }));
+        const g = rows.reduce((t: number, x: any) => t + num(x.segment_subtotal_minor), 0);
+        const c = rows.reduce((t: number, x: any) => t + num(x.commission_minor), 0);
+        if (g !== num(r.gross_sales_minor)) exceptions.push(`GROSS_MISMATCH stored=${num(r.gross_sales_minor)} lines=${g}`);
+        if (c !== num(r.total_commission_owed_minor)) exceptions.push(`COMMISSION_MISMATCH stored=${num(r.total_commission_owed_minor)} lines=${c}`);
+        const undefinedParts = rows.filter((x: any) => x.commission_minor == null).length;
+        if (undefinedParts) exceptions.push(`RATE_UNDEFINED parts=${undefinedParts}`);
+      } else {
+        const rows = await this.ds.query(`SELECT l.*, o.order_number FROM driver_settlement_period_orders l JOIN orders o ON o.id = l.order_id WHERE l.period_id = $1 ORDER BY l.delivered_at, o.order_number`, [id]);
+        lines = rows.map((x: any) => ({ orderId: x.order_id, orderNumber: x.order_number, at: x.delivered_at ? new Date(x.delivered_at).toISOString() : null, paymentMethod: x.payment_method, paymentFlow: x.payment_flow, ...Object.fromEntries(COURIER_MONEY_COLUMNS.map(([k, c]) => [k, num(x[c])])) }));
+        const sum = (k: string) => rows.reduce((t: number, x: any) => t + num(x[k]), 0);
+        if (sum('commission_minor') !== num(r.total_commission_owed_minor)) exceptions.push(`COMMISSION_MISMATCH stored=${num(r.total_commission_owed_minor)} lines=${sum('commission_minor')}`);
+        if (sum('net_to_courier_minor') !== num(r.net_payable_minor)) exceptions.push(`NET_MISMATCH stored=${num(r.net_payable_minor)} lines=${sum('net_to_courier_minor')}`);
+      }
+    } else if (party === 'VENDOR') {
       const commission = await this.ds.query(
         `SELECT e.id, e.created_at, e.amount_minor, e.order_id, o.order_number, e.rate_snapshot FROM financial_events e LEFT JOIN orders o ON o.id = e.order_id
           WHERE e.vendor_branch_id = $1 AND e.type = 'VENDOR_COMMISSION_RECOGNIZED' AND e.created_at >= $2 AND e.created_at < $3 ORDER BY e.created_at`,
@@ -462,7 +495,9 @@ export class AdminFinanceService {
       payments: payments.map((x: any) => ({ id: x.id, direction: x.direction, amountMinor: num(x.amount_minor), method: x.method, reference: x.reference, paidOn: x.paid_on instanceof Date ? x.paid_on.toISOString().slice(0, 10) : String(x.paid_on).slice(0, 10), status: x.status, overpaymentAuthorised: x.overpayment_authorised, overpaymentReason: x.overpayment_reason, recordedBy: x.recorded_by_name, voidedAt: x.voided_at, voidReason: x.void_reason, createdAt: new Date(x.created_at).toISOString() })),
       accountingNote: party === 'VENDOR'
         ? 'Vendor settlement is a receivable for Hatly: the commission the vendor owes. Gross sales are shown for reference and are not an amount Hatly owes the vendor.'
-        : 'Driver settlement: net payable = earnings − commission + reimbursements. Positive: Hatly pays the driver. Negative: the driver owes Hatly.',
+        : period.methodVersion === 2
+          ? 'Courier closing: compensation (delivery fee − Hatly commission) + goods Hatly owes back (electronic) − cash the courier still holds after paying the stores (COD) − change kept. COD goods are pass-through (collected and paid on) and excluded. Positive: Hatly pays the courier. Negative: the courier owes Hatly.'
+          : 'Driver settlement (closed before 2026-11-13, kept as stored): net payable = earnings − commission + reimbursements. Positive: Hatly pays the driver. Negative: the driver owes Hatly.',
     };
   }
 

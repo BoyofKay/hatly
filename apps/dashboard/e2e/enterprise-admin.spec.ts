@@ -75,7 +75,7 @@ test.describe('Enterprise Admin — shell', () => {
     // Every page of the section is one click away as a tab, and the page itself is marked.
     const tabs = page.getByRole('navigation', { name: 'Section pages' });
     await expect(tabs.getByRole('link', { name: 'Executive overview' })).toHaveAttribute('aria-current', 'page');
-    for (const name of ['Reports', 'Exports', 'Ledger', 'Revenue', 'Reconciliation', 'Settlement periods']) await expect(tabs.getByRole('link', { name, exact: true })).toBeVisible();
+    for (const name of ['Reports', 'Exports', 'Ledger', 'Revenue', 'Reconciliation', 'Settlement history']) await expect(tabs.getByRole('link', { name, exact: true })).toBeVisible();
   });
 
   test('switching to Arabic makes the page right-to-left, translates the shell, and survives a reload', async ({ page }) => {

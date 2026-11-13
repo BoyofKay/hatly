@@ -243,5 +243,5 @@ export function AdminShell({ children }: { children: ReactNode }) {
 /** A small count on a section tab; nothing when there is nothing waiting. */
 function TabCount({ n }: { n?: number }) {
   if (!n) return null;
-  return <span data-testid="tab-count" className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-semibold text-white">{n}</span>;
+  return <span data-testid="tab-count" className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 text-xs font-semibold text-white">{n}</span>;
 }

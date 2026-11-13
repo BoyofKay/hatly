@@ -10,7 +10,7 @@ import { acknowledgeOpsAlert, OpsAlert } from '../../lib/api/ops-alerts';
 import { decideRing, newSince, ringing, needsAttention, SNOOZE_MS } from '../../lib/alerts/alarm-logic';
 import { audioState, AudioState, onAudioStateChange, playAlarm, unlockAudio, unlockOnFirstGesture } from '../../lib/alerts/sound';
 import { currentDevice, ensureServiceWorker, permissionState, showLocalNotification } from '../../lib/alerts/push-client';
-import { OPS_ACTION, OPS_CATEGORY, age } from '../../lib/alerts/words';
+import { OPS_ACTION, OPS_CATEGORY, age, driverOfflineDetail } from '../../lib/alerts/words';
 import { updateSegmentOnBehalf } from '../../lib/api/admin-operations';
 import { apiErrorMessage } from '../../lib/api/errors';
 import { useToast } from '../ui';
@@ -307,6 +307,7 @@ export function OpsAlarmBar() {
                   <strong className="text-gray-900">{t(...OPS_CATEGORY[a.category])}</strong>
                   {a.orderNumber && <> · <bdi dir="ltr" className="whitespace-nowrap font-mono">{a.orderNumber}</bdi></>}
                   <span className="text-gray-500"> · <span className="whitespace-nowrap">{age(a.openedAt, now, locale)}</span> · {t(...OPS_ACTION[a.category])}</span>
+                  {a.category === 'DRIVER_OFFLINE' && <span className="block text-xs text-red-700" data-testid="ops-alarm-driver-offline">{driverOfflineDetail(a.detail, now, locale)}</span>}
                 </span>
               </span>
               <span className="flex shrink-0 flex-wrap items-center gap-2">

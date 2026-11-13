@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useApi } from '../../lib/ui/api';
 import { useLang } from '../../lib/ui/lang';
 import { OpsAlert } from '../../lib/api/ops-alerts';
-import { OPS_ACTION, OPS_CATEGORY, OPS_RESOLUTION, age } from '../../lib/alerts/words';
+import { OPS_ACTION, OPS_CATEGORY, OPS_RESOLUTION, age, driverOfflineDetail } from '../../lib/alerts/words';
 import { AcceptForStore, useOpsAlarm } from './OpsAlarm';
 
 /**
@@ -50,13 +50,14 @@ export function OpsAlertsPanel() {
                 : { tone: a.priority === 'CRITICAL' ? 'bg-red-50 text-red-800' : 'bg-amber-50 text-amber-800', text: t('Waiting for someone', 'بانتظار من يتابع') };
             return (
               <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5" data-testid={`ops-alert-row-${a.id}`}>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${a.priority === 'CRITICAL' ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'}`}>{a.priority === 'CRITICAL' ? t('Urgent', 'عاجل') : t('Check', 'متابعة')}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${a.priority === 'CRITICAL' ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'}`}>{a.priority === 'CRITICAL' ? t('Urgent', 'عاجل') : t('Check', 'متابعة')}</span>
                 <span className="min-w-0 flex-1 text-sm">
                   <strong>{t(...OPS_CATEGORY[a.category])}</strong>
                   {a.orderNumber && <> · <bdi className="font-mono">{a.orderNumber}</bdi></>}
                   <span className="text-gray-500"> · {age(a.openedAt, now, locale)} · {t(...OPS_ACTION[a.category])}</span>
+                  {a.category === 'DRIVER_OFFLINE' && <span className="block text-xs text-red-700" data-testid="ops-alert-driver-offline">{driverOfflineDetail(a.detail, now, locale)}</span>}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${state.tone}`} data-testid="ops-alert-state">{state.text}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${state.tone}`} data-testid="ops-alert-state">{state.text}</span>
                 <Link href={a.href} className="text-xs font-semibold text-hatly-orangeDark underline">{t('Open order', 'افتح الطلب')}</Link>
                 {!a.resolvedAt && ctx.canAck && view === 'open' && (a.pendingParts ?? []).map((part) => <AcceptForStore key={part.segmentId} alert={a} part={part} />)}
                 {!a.acknowledgedAt && !a.resolvedAt && ctx.canAck && (

@@ -101,7 +101,7 @@ DriverEarnings _earnings() => DriverEarnings(
       deliveredToday: 2,
       closedPeriods: [
         ClosedPeriod(id: 'p1', frequency: 'WEEKLY', periodStart: DateTime.utc(2026, 10, 1), periodEnd: DateTime.utc(2026, 10, 8), earningsMinor: 5000, commissionMinor: 500, reimbursementsMinor: 0, netMinor: 4500, payments: [
-          SettlementPayment(direction: 'HATLY_TO_DRIVER', amountMinor: 4500, method: 'CASH', paidOn: DateTime.utc(2026, 10, 9), status: 'RECORDED'),
+          SettlementPayment(direction: 'PAYOUT', amountMinor: 4500, method: 'CASH', paidOn: DateTime.utc(2026, 10, 9), status: 'RECORDED'),
         ]),
       ],
     );
@@ -133,10 +133,12 @@ void main() {
       final api = _Api()..earnings = _earnings();
       await tester.pumpWidget(_app(api, const EarningsScreen()));
       await tester.pumpAndSettle();
-      expect(find.text('95.00 EGP'), findsOneWidget); // net so far
+      expect(find.text('95.00 EGP'), findsOneWidget); // owed to you (older backend: the four legacy figures only)
+      expect(find.text('Owed to you'), findsNWidgets(2)); // open shift + the legacy closed period's net
       expect(find.text('90.00 EGP'), findsOneWidget);
       expect(find.text('- 15.00 EGP'), findsOneWidget);
-      expect(find.textContaining('preview of the open period'), findsOneWidget);
+      expect(find.textContaining('Preview of your open shift'), findsOneWidget);
+      expect(find.byKey(const Key('closed-legacy')), findsOneWidget); // a period closed before 2026-11-13 is shown as recorded
       expect(find.byKey(const Key('closed-period-p1')), findsOneWidget);
       expect(find.textContaining('Paid to you: 45.00 EGP'), findsOneWidget);
     });
@@ -182,7 +184,104 @@ void main() {
       final api = _Api()..pages.add(const TransactionsPage(items: [], page: 1, limit: 20, total: 0));
       await tester.pumpWidget(_app(api, const HistoryScreen()));
       await tester.pumpAndSettle();
-      expect(find.text('No completed deliveries yet.'), findsOneWidget);
+      expect(find.text('No delivered orders yet.'), findsOneWidget);
+    });
+  });
+
+  group('Earnings — COD and electronic shown separately (backend figures, nothing computed on the phone)', () {
+    const cod = MoneyBreakdown(
+      paymentFlow: null, feeEntitlementMinor: 4000, commissionMinor: 1000, courierCompensationMinor: 3000, goodsPaidToStoresMinor: 30000,
+      goodsPassThroughMinor: 30000, goodsReimbursementMinor: 0, cashCollectedMinor: 34000, cashHeldMinor: 4000, changeKeptMinor: 0, netToCourierMinor: -1000,
+    );
+    const electronic = MoneyBreakdown(
+      paymentFlow: null, feeEntitlementMinor: 4000, commissionMinor: 1000, courierCompensationMinor: 3000, goodsPaidToStoresMinor: 30000,
+      goodsPassThroughMinor: 0, goodsReimbursementMinor: 30000, cashCollectedMinor: 0, cashHeldMinor: 0, changeKeptMinor: 0, netToCourierMinor: 33000,
+    );
+    DriverEarnings withOpen(MoneyBreakdown b, {List<ExcludedOrder> excluded = const []}) => DriverEarnings(
+          open: OpenPeriod(periodStart: null, deliveries: 1, earningsMinor: b.feeEntitlementMinor, commissionMinor: b.commissionMinor, reimbursementsMinor: b.goodsReimbursementMinor, netMinor: b.netToCourierMinor, breakdown: b, excluded: excluded),
+          deliveredToday: 1,
+          closedPeriods: const [],
+        );
+
+    testWidgets('COD 300 + 40, commission 10: owes Hatly 10; goods shown as excluded; no extra 30 payable; no goods reimbursement', (tester) async {
+      final api = _Api()..earnings = withOpen(cod);
+      await tester.pumpWidget(_app(api, const EarningsScreen()));
+      await tester.pumpAndSettle();
+      expect(find.text('You owe Hatly'), findsOneWidget);
+      expect(find.text('10.00 EGP'), findsOneWidget);
+      expect(find.byKey(const Key('mb-goods-pass-through')), findsOneWidget);
+      expect(find.textContaining('not part of your net'), findsOneWidget);
+      expect(find.byKey(const Key('mb-goods-reimbursement')), findsNothing);
+      expect(find.byKey(const Key('mb-cash-held')), findsOneWidget);
+      expect(find.text('30.00 EGP'), findsOneWidget); // compensation, shown once — never as a separate payable
+    });
+
+    testWidgets('electronic 300 + 40, commission 10: owed to the courier 330, every part separate', (tester) async {
+      final api = _Api()..earnings = withOpen(electronic);
+      await tester.pumpWidget(_app(api, const EarningsScreen()));
+      await tester.pumpAndSettle();
+      expect(find.text('Owed to you'), findsOneWidget);
+      expect(find.text('330.00 EGP'), findsOneWidget);
+      expect(find.text('+ 300.00 EGP'), findsOneWidget);
+      expect(find.text('40.00 EGP'), findsOneWidget);
+      expect(find.text('- 10.00 EGP'), findsOneWidget);
+      expect(find.byKey(const Key('mb-goods-pass-through')), findsNothing);
+    });
+
+    testWidgets('Arabic labels; a delivered order without a commission rate is listed as held for the next closing with the reason', (tester) async {
+      final api = _Api()..earnings = withOpen(cod, excluded: const [ExcludedOrder(orderNumber: 'HT-100009', reason: 'RATE_UNDEFINED')]);
+      await tester.pumpWidget(_app(api, const EarningsScreen(), locale: const Locale('ar')));
+      await tester.pumpAndSettle();
+      expect(find.text('مستحق على المندوب'), findsOneWidget);
+      expect(find.text('عمولة Hatly'), findsOneWidget);
+      expect(find.text('رسوم التوصيل'), findsOneWidget);
+      expect(find.text('تعويض المندوب'), findsOneWidget);
+      expect(find.text('النقدية المحصلة من العميل'), findsOneWidget);
+      expect(find.text('طلبات مؤجلة للتقفيلة التالية'), findsOneWidget);
+      expect(find.text('HT-100009'), findsOneWidget);
+      expect(find.textContaining('نسبة العمولة الخاصة بك غير محددة'), findsOneWidget);
+    });
+
+    testWidgets('a closed shift by orders shows its reference, settled and remaining', (tester) async {
+      final api = _Api()
+        ..earnings = DriverEarnings(open: const OpenPeriod(periodStart: null, deliveries: 0, earningsMinor: 0, commissionMinor: 0, reimbursementsMinor: 0, netMinor: 0), deliveredToday: 0, closedPeriods: [
+          ClosedPeriod(id: 'p2', frequency: 'DAILY', periodStart: DateTime.utc(2026, 11, 13, 6), periodEnd: DateTime.utc(2026, 11, 13, 18), earningsMinor: 4000, commissionMinor: 1000, reimbursementsMinor: 30000, netMinor: 33000,
+              payments: const [], reference: 'CS-20261113-ABC123', methodVersion: 2, breakdown: electronic, settledMinor: 20000, remainingMinor: 13000),
+        ]);
+      await tester.pumpWidget(_app(api, const EarningsScreen(), locale: const Locale('ar')));
+      await tester.pumpAndSettle();
+      expect(find.text('CS-20261113-ABC123'), findsOneWidget);
+      expect(find.text('تم تسويته'), findsOneWidget);
+      expect(find.text('المتبقي للتسوية'), findsOneWidget);
+      expect(find.text('130.00 ج.م'), findsOneWidget);
+      expect(find.byKey(const Key('closed-legacy')), findsNothing);
+    });
+  });
+
+  group('History — delivered orders with their money state', () {
+    testWidgets('settled, waiting and excluded orders each say so; the row opens the delivery by its delivery id', (tester) async {
+      final settled = DriverTransaction(id: 'a', at: DateTime.utc(2026, 11, 13, 10), orderId: 'oa', orderNumber: 'HT-A', paymentMethod: 'COD', cashDueAtDoorMinor: 34000, earningsMinor: 4000, commissionMinor: 1000, reimbursementMinor: 0, netMinor: -1000,
+          deliveryId: 'da', vendors: 'Store One', orderTotalMinor: 34000, settlementState: 'SETTLED', settlementReference: 'CS-20261113-ABC123');
+      final pending = DriverTransaction(id: 'b', at: DateTime.utc(2026, 11, 13, 11), orderId: 'ob', orderNumber: 'HT-B', paymentMethod: 'MANUAL_TRANSFER', cashDueAtDoorMinor: null, earningsMinor: 4000, commissionMinor: 1000, reimbursementMinor: 30000, netMinor: 33000,
+          deliveryId: 'db', settlementState: 'PENDING');
+      final excluded = DriverTransaction(id: 'c', at: DateTime.utc(2026, 11, 13, 12), orderId: 'oc', orderNumber: 'HT-C', paymentMethod: 'COD', cashDueAtDoorMinor: 1000, earningsMinor: 0, commissionMinor: 0, reimbursementMinor: 0, netMinor: 0,
+          deliveryId: 'dc', settlementState: 'EXCLUDED', excludedReason: 'RATE_UNDEFINED');
+      final api = _Api()..pages.add(TransactionsPage(items: [settled, pending, excluded], page: 1, limit: 20, total: 3));
+      await tester.pumpWidget(_app(api, const HistoryScreen()));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Settled · CS-20261113-ABC123'), findsOneWidget);
+      expect(find.text('Waiting for the next closing'), findsOneWidget);
+      expect(find.textContaining('commission rate is not set'), findsOneWidget);
+      expect(find.byKey(const Key('tx-net-c')), findsNothing); // no amount is invented for an excluded order
+      expect(find.textContaining('You owe 10.00 EGP'), findsOneWidget);
+      expect(find.textContaining('Owed to you 330.00 EGP'), findsOneWidget);
+    });
+
+    test('an older backend row (no new fields) still parses', () {
+      final t = DriverTransaction.fromJson({'id': 'x', 'at': '2026-11-01T10:00:00.000Z', 'orderId': 'o', 'orderNumber': 'HT-1', 'paymentMethod': 'COD', 'earningsMinor': 1, 'commissionMinor': 0, 'reimbursementMinor': 0, 'netMinor': 1});
+      expect(t.settlementState, isNull);
+      expect(t.deliveryId, isNull);
+      expect(t.breakdown, isNull);
     });
   });
 

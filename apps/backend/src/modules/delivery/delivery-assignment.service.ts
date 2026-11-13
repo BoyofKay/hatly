@@ -1,4 +1,4 @@
-import { recomputeDriverAvailability } from './driver-capacity';
+import { driverLoad, recomputeDriverAvailability } from './driver-capacity';
 import { BusinessConfigKey } from '../business-config/business-config-key.enum';
 import { BusinessConfig } from '../business-config/entities/business-config.entity';
 import { resolveAcknowledgementWindowMinutes } from '../business-config/business-config.service';
@@ -156,10 +156,39 @@ export class DeliveryAssignmentService {
       orderId: params.orderId,
       candidateCount: params.candidateDriverIds.length,
     });
+    // One named driver (a manual assignment): say exactly why — full (with the numbers) or offline — instead of the generic refusal.
+    if (params.candidateDriverIds.length === 1) await this.throwNamedDriverRefusal(params.candidateDriverIds[0], 'NO_AVAILABLE_DRIVER');
     throw new ConflictException({
       message: 'No available driver could be assigned.',
       details: { code: 'NO_AVAILABLE_DRIVER' },
     });
+  }
+
+  /**
+   * R18: why a named driver could not take the order, in plain words. The error CODE stays the one each endpoint always returned
+   * (`code`: NO_AVAILABLE_DRIVER for an assignment, DRIVER_UNAVAILABLE for a reassignment — existing clients keep working); the reason is
+   * added in `details.reason`: AT_CAPACITY (with the configured capacity and the active count — every active order of the driver, not only
+   * those on any screen) or OFFLINE. Returns quietly if neither applies (e.g. another assignment for the same driver was mid-flight).
+   */
+  private async throwNamedDriverRefusal(driverId: string, code: 'NO_AVAILABLE_DRIVER' | 'DRIVER_UNAVAILABLE', db: { query: (sql: string, params?: unknown[]) => Promise<any> } = this.dataSource): Promise<void> {
+    let d: { is_online: boolean } | undefined;
+    let load: { active: number; capacity: number } | undefined;
+    try {
+      [d] = await db.query(`SELECT is_online FROM drivers WHERE id = $1`, [driverId]);
+      if (d?.is_online) load = await driverLoad(db, driverId);
+    } catch {
+      return; // the explanation is best-effort; the caller's own refusal stands
+    }
+    if (!d) return;
+    if (!d.is_online) {
+      throw new ConflictException({ message: 'This driver is offline. Ask them to go online, or choose another driver.', details: { code, reason: 'OFFLINE' } });
+    }
+    if (load && load.active >= load.capacity) {
+      throw new ConflictException({
+        message: `This driver already has ${load.active} active order(s) — their limit is ${load.capacity}. Choose another driver, or change their capacity first.`,
+        details: { code, reason: 'AT_CAPACITY', active: load.active, capacity: load.capacity },
+      });
+    }
   }
 
   /**
@@ -209,6 +238,7 @@ export class DeliveryAssignmentService {
           if (id === params.newDriverId) newDriver = row;
         }
         if (!newDriver || !newDriver.isOnline || !newDriver.isAvailable) {
+          if (newDriver) await this.throwNamedDriverRefusal(newDriver.id, 'DRIVER_UNAVAILABLE', manager);
           throw new ConflictException({
             message: 'The selected driver is not online and available right now.',
             details: { code: 'DRIVER_UNAVAILABLE' },

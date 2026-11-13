@@ -267,6 +267,8 @@ function AdminDriversScreen() {
                       <Badge tone={d.isAvailable ? 'blue' : 'gray'}>{d.isAvailable ? t('drvFree') : d.activeDelivery ? t('drvOnDelivery') : t('drvUnavailable')}</Badge>{' '}
                       <span data-testid="driver-vehicle-name">{d.vehicleTypeName ?? t('drvNoVehicle')}</span>
                     </p>
+                    {d.capacity != null && <p data-testid="driver-load">{t('drvLoad', { active: d.activeCount ?? 0, capacity: d.capacity })}</p>}
+                    {d.lastSeenAt && <p data-testid="driver-last-seen">{t('drvLastSeen', { time: dateTime(d.lastSeenAt) })}</p>}
                     {d.lastLocationAt && <p>{t('drvLocationUpdated', { time: dateTime(d.lastLocationAt) })}</p>}
                     {d.activeDelivery && (
                       <p data-testid="driver-active-delivery">

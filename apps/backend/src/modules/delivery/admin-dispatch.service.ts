@@ -1,3 +1,4 @@
+import { ACTIVE_DRIVER_ORDER_STATUSES } from './driver-capacity';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -135,6 +136,24 @@ export class AdminDispatchService {
       });
     }
     return [driverId];
+  }
+
+  /**
+   * Operations board (2026-11-13): the drivers automatic dispatch would try first for this order — the SAME ranking (eligibility, service
+   * area, GPS proximity / round-robin, spare capacity), read-only. Nothing is assigned; the operator still chooses.
+   */
+  async suggestDrivers(orderId: string, limit = 3): Promise<Array<{ id: string; name: string; active: number; capacity: number }>> {
+    const ids = (await this.rankForOrder(orderId)).slice(0, limit);
+    if (ids.length === 0) return [];
+    const rows: any[] = await this.ordersRepository.manager.query(
+      `SELECT d.id, u.full_name AS name,
+              (SELECT count(*)::int FROM deliveries x JOIN orders o ON o.id = x.order_id WHERE x.driver_id = d.id AND x.deleted_at IS NULL AND o.status::text = ANY($2::text[])) AS active,
+              GREATEST(1, COALESCE(d.capacity_override, (SELECT v.max_active_deliveries FROM vehicle_types v WHERE v.id = d.vehicle_type_id), 1))::int AS capacity
+         FROM drivers d JOIN users u ON u.id = d.user_id WHERE d.id = ANY($1::uuid[])`,
+      [ids, ACTIVE_DRIVER_ORDER_STATUSES],
+    );
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return ids.filter((id) => byId.has(id)).map((id) => ({ id, name: byId.get(id).name, active: byId.get(id).active, capacity: byId.get(id).capacity }));
   }
 
   private async rankForOrder(orderId: string): Promise<string[]> {

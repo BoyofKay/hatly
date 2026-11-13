@@ -541,6 +541,84 @@ export const REPORTS: ReportDefinition[] = [
       values: [],
     }),
   },
+  {
+    id: 'S26', family: 'FINANCE', en: 'Courier closings — orders', ar: 'تقفيلات المندوبين — الطلبات',
+    descriptionEn: 'Every order settled by a courier closing, COD and electronic computed separately: fee, Hatly commission, compensation, goods reimbursed (electronic), COD goods pass-through (excluded), cash collected and held, net (+ owed to the courier, − owed by the courier).',
+    descriptionAr: 'كل طلب سُوّي في تقفيل مندوب، النقدي والإلكتروني كلٌ بحسابه: الرسوم، عمولة Hatly، تعويض المندوب، البضاعة المستردة (إلكتروني)، البضاعة النقدية المارّة (مستبعدة)، النقدية المحصلة والمتبقية، الصافي (+ مستحق للمندوب، − مستحق على المندوب).',
+    view: [P.VIEW_REPORTS, P.VIEW_DRIVER_SETTLEMENTS], moneyPermission: P.VIEW_DRIVER_SETTLEMENTS, exportPermission: P.FINANCE_EXPORT, maxRows: 100000,
+    params: [...RANGE, { key: 'driverId', type: 'uuid', en: 'Courier', ar: 'المندوب' }, { key: 'reference', type: 'text', en: 'Closing reference', ar: 'رقم التقفيل' }],
+    columns: [
+      { key: 'reference', en: 'Closing', ar: 'رقم التقفيل', type: 'text' },
+      { key: 'closedAt', en: 'Closed (Cairo)', ar: 'وقت التقفيل (القاهرة)', type: 'datetime' },
+      { key: 'courier', en: 'Courier', ar: 'المندوب', type: 'text' },
+      { key: 'orderNumber', en: 'Order', ar: 'الطلب', type: 'text' },
+      { key: 'paymentMethod', en: 'Payment', ar: 'الدفع', type: 'enum' },
+      { key: 'deliveredAt', en: 'Delivered (Cairo)', ar: 'وقت التسليم (القاهرة)', type: 'datetime' },
+      { key: 'paymentFlow', en: 'Flow (COD / electronic)', ar: 'نوع الدفع (نقدي / إلكتروني)', type: 'enum' },
+      { key: 'feeMinor', en: 'Delivery fee', ar: 'رسوم التوصيل', type: 'money', total: 'sum' },
+      { key: 'commissionMinor', en: 'Hatly commission', ar: 'عمولة Hatly', type: 'money', total: 'sum' },
+      { key: 'compensationMinor', en: 'Courier compensation', ar: 'تعويض المندوب', type: 'money', total: 'sum' },
+      { key: 'goodsReimbursementMinor', en: 'Goods reimbursed to courier (electronic)', ar: 'قيمة البضاعة التي دفعها المندوب (للطلبات الإلكترونية فقط)', type: 'money', total: 'sum' },
+      { key: 'goodsPassThroughMinor', en: 'COD goods pass-through (excluded from net)', ar: 'بضاعة نقدية محصلة ومدفوعة للمتجر (مستبعدة من الصافي)', type: 'money', total: 'sum' },
+      { key: 'cashCollectedMinor', en: 'Cash collected from customer', ar: 'النقدية المحصلة من العميل', type: 'money', total: 'sum' },
+      { key: 'cashHeldMinor', en: 'Cash held by courier after paying stores', ar: 'النقدية المتبقية مع المندوب', type: 'money', total: 'sum' },
+      { key: 'changeKeptMinor', en: 'Change kept (credited to wallet)', ar: 'الباقي المحتفظ به (أضيف للمحفظة)', type: 'money', total: 'sum' },
+      { key: 'collectedByHatlyMinor', en: 'Collected by Hatly', ar: 'محصّل بواسطة Hatly', type: 'money', total: 'sum' },
+      { key: 'netMinor', en: 'Net (+ owed to courier, − owed by courier)', ar: 'الصافي (+ مستحق للمندوب، − مستحق على المندوب)', type: 'money', total: 'sum' },
+    ],
+    build: (p) => {
+      const v: unknown[] = []; const w: string[] = [`dp.status = 'CLOSED'`, 'dp.deleted_at IS NULL'];
+      range(p, 'dp.closed_at', v, w);
+      const drv = assertUuid(p.driverId, 'driverId');
+      if (drv) { v.push(drv); w.push(`dp.driver_id = $${v.length}`); }
+      if (p.reference) { v.push(String(p.reference).trim().slice(0, 40)); w.push(`dp.reference = $${v.length}`); }
+      return {
+        sql: `SELECT dp.reference, ${dt('dp.closed_at')} AS "closedAt", u.full_name AS courier, o.order_number AS "orderNumber", l.payment_method AS "paymentMethod",
+                ${dt('l.delivered_at')} AS "deliveredAt", l.payment_flow AS "paymentFlow", l.fee_entitlement_minor AS "feeMinor", l.commission_minor AS "commissionMinor",
+                l.courier_compensation_minor AS "compensationMinor", l.goods_reimbursement_minor AS "goodsReimbursementMinor", l.goods_pass_through_minor AS "goodsPassThroughMinor",
+                l.cash_collected_minor AS "cashCollectedMinor", l.cash_held_minor AS "cashHeldMinor", l.change_kept_minor AS "changeKeptMinor",
+                l.collected_by_hatly_minor AS "collectedByHatlyMinor", l.net_to_courier_minor AS "netMinor"
+              FROM driver_settlement_period_orders l JOIN driver_settlement_periods dp ON dp.id = l.period_id JOIN orders o ON o.id = l.order_id
+              JOIN drivers dr ON dr.id = dp.driver_id JOIN users u ON u.id = dr.user_id ${clause(w)}
+              ORDER BY dp.closed_at DESC, dp.reference, l.delivered_at, o.order_number`,
+        values: v,
+      };
+    },
+  },
+  {
+    id: 'S27', family: 'FINANCE', en: 'Vendor closings — parts', ar: 'تقفيلات المتاجر — الأجزاء',
+    descriptionEn: 'Every store part (segment) covered by a vendor closing: handed over, sales and the commission the store owes Hatly; rate-undefined parts flagged.',
+    descriptionAr: 'كل جزء متجر شمله تقفيل متجر: وقت التسليم، المبيعات، والعمولة المستحقة على المتجر لـ Hatly؛ مع تمييز الأجزاء بلا نسبة عمولة.',
+    view: [P.VIEW_REPORTS, P.VIEW_VENDOR_FINANCIAL_REPORTS], moneyPermission: P.VIEW_VENDOR_FINANCIAL_REPORTS, exportPermission: P.FINANCE_EXPORT, maxRows: 100000,
+    params: [...RANGE, { key: 'vendorBranchId', type: 'uuid', en: 'Vendor branch', ar: 'فرع المتجر' }, { key: 'reference', type: 'text', en: 'Closing reference', ar: 'رقم التقفيل' }],
+    columns: [
+      { key: 'reference', en: 'Closing', ar: 'رقم التقفيل', type: 'text' },
+      { key: 'closedAt', en: 'Closed (Cairo)', ar: 'وقت التقفيل (القاهرة)', type: 'datetime' },
+      { key: 'vendor', en: 'Store', ar: 'المتجر', type: 'text' },
+      { key: 'branch', en: 'Branch', ar: 'الفرع', type: 'text' },
+      { key: 'orderNumber', en: 'Order', ar: 'الطلب', type: 'text' },
+      { key: 'fulfillmentType', en: 'Fulfilment', ar: 'نوع الاستلام', type: 'enum' },
+      { key: 'handedOverAt', en: 'Handed over (Cairo)', ar: 'وقت التسليم (القاهرة)', type: 'datetime' },
+      { key: 'salesMinor', en: 'Sales', ar: 'المبيعات', type: 'money', total: 'sum' },
+      { key: 'commissionMinor', en: 'Commission owed by store', ar: 'عمولة مستحقة على المتجر', type: 'money', total: 'sum' },
+      { key: 'rateUndefined', en: 'Rate undefined', ar: 'بلا نسبة عمولة', type: 'bool' },
+    ],
+    build: (p) => {
+      const v: unknown[] = []; const w: string[] = [`vp.status = 'CLOSED'`, 'vp.deleted_at IS NULL'];
+      range(p, 'vp.closed_at', v, w);
+      const br = assertUuid(p.vendorBranchId, 'vendorBranchId');
+      if (br) { v.push(br); w.push(`vp.vendor_branch_id = $${v.length}`); }
+      if (p.reference) { v.push(String(p.reference).trim().slice(0, 40)); w.push(`vp.reference = $${v.length}`); }
+      return {
+        sql: `SELECT vp.reference, ${dt('vp.closed_at')} AS "closedAt", ven.name AS vendor, b.name AS branch, o.order_number AS "orderNumber", l.fulfillment_type AS "fulfillmentType",
+                ${dt('l.handed_over_at')} AS "handedOverAt", l.segment_subtotal_minor AS "salesMinor", coalesce(l.commission_minor, 0)::bigint AS "commissionMinor", (l.commission_minor IS NULL) AS "rateUndefined"
+              FROM vendor_settlement_period_lines l JOIN vendor_settlement_periods vp ON vp.id = l.period_id JOIN orders o ON o.id = l.order_id
+              JOIN vendor_branches b ON b.id = vp.vendor_branch_id JOIN vendors ven ON ven.id = b.vendor_id ${clause(w)}
+              ORDER BY vp.closed_at DESC, vp.reference, l.handed_over_at, o.order_number`,
+        values: v,
+      };
+    },
+  },
 ];
 
 export const REPORT_BY_ID = new Map(REPORTS.map((r) => [r.id, r]));

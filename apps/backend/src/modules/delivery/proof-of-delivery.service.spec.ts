@@ -39,18 +39,18 @@ describe('ProofOfDeliveryService', () => {
     orderId: 'order-1',
   };
 
-  it('CRITICAL: rejects with PROOF_PHOTO_REQUIRED when no photo URL is supplied — never persists anything', async () => {
-    const { service, proofOfDeliveryRepository } = buildHarness();
-
-    await expect(service.recordForDelivery({ ...baseParams })).rejects.toMatchObject({
-      response: { details: { code: 'PROOF_PHOTO_REQUIRED' } },
-    });
-    expect(proofOfDeliveryRepository.create).toBeDefined(); // sanity: repo wired
+  it('owner decision 2026-11-13: no photo is fine — the proof row is still written, with photoUrl null and no upload lookup', async () => {
+    const { service, store, uploadsService } = buildHarness();
+    const result = await service.recordForDelivery({ ...baseParams, recipientName: '  Sara ' });
+    expect(result).toMatchObject({ deliveryId: 'delivery-1', photoUrl: null, recipientName: 'Sara' });
+    expect(uploadsService.findOwnedUrls).not.toHaveBeenCalled();
+    expect(store.size).toBe(1);
   });
 
-  it('rejects a blank/whitespace-only photo URL the same as a missing one', async () => {
-    const { service } = buildHarness();
-    await expect(service.recordForDelivery({ ...baseParams, photoUrl: '   ' })).rejects.toThrow(BadRequestException);
+  it('a blank/whitespace-only photo URL is treated as no photo (never as a URL to validate)', async () => {
+    const { service, uploadsService } = buildHarness();
+    await expect(service.recordForDelivery({ ...baseParams, photoUrl: '   ' })).resolves.toMatchObject({ photoUrl: null });
+    expect(uploadsService.findOwnedUrls).not.toHaveBeenCalled();
   });
 
   it('CRITICAL: rejects with INVALID_PROOF_PHOTO when the URL is not a real upload owned by this driver', async () => {

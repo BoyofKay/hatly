@@ -39,6 +39,7 @@ test.describe('Admin — Home (the reference dashboard)', () => {
 
   test('one welcome heading; the Home section is marked; the KPI cards show the executive figures of the last 7 days', async ({ page }) => {
     await page.goto('/home');
+    await page.getByTestId('home-mode-overview').click(); // operations staff land on the board; the overview is one tap away
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Welcome to your dashboard');
     await expect(page.getByTestId('nav-section-home')).toHaveAttribute('aria-current', 'page');
@@ -65,6 +66,7 @@ test.describe('Admin — Home (the reference dashboard)', () => {
 
   test('the donut total equals the period\'s orders by status from the executive figures (and so the order count)', async ({ page }) => {
     await page.goto('/home');
+    await page.getByTestId('home-mode-overview').click(); // operations staff land on the board; the overview is one tap away
     await expect(page.getByTestId('overview-donut-total')).toBeVisible();
     // Orders keep arriving from other tests' fixtures, so compare against fresh figures until both agree.
     await expect
@@ -81,6 +83,7 @@ test.describe('Admin — Home (the reference dashboard)', () => {
 
   test('"Orders per day" has one point per day of the selected period, ending today (days without orders are 0)', async ({ page }) => {
     await page.goto('/home');
+    await page.getByTestId('home-mode-overview').click(); // operations staff land on the board; the overview is one tap away
     const rows = page.getByTestId('overview-chart').locator('table tr');
     await expect(rows).toHaveCount(7);
     await expect(rows.first().locator('th')).toHaveText(cairoDate(-6));
@@ -98,6 +101,7 @@ test.describe('Admin — Home (the reference dashboard)', () => {
 
   test('recent orders show the customer-facing numbers; a row opens that order in the Orders workspace drawer', async ({ page }) => {
     await page.goto('/home');
+    await page.getByTestId('home-mode-overview').click(); // operations staff land on the board; the overview is one tap away
     const recent = page.getByTestId('overview-recent');
     await expect(recent.locator('tbody tr').first()).toBeVisible();
     const first = recent.locator('a').first();
@@ -120,6 +124,7 @@ test.describe('Admin — Home (the reference dashboard)', () => {
     const page = await ctx.newPage();
     try {
       await page.goto('/home');
+      await page.getByTestId('home-mode-overview').click(); // operations staff land on the board; the overview is one tap away
       await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
       await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
       await expect(page.getByRole('heading', { level: 1 })).toHaveText('مرحباً بك في لوحة التحكم');

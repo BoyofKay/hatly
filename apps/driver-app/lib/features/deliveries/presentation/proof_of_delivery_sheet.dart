@@ -5,18 +5,16 @@ import '../../../core/localization/bilingual.dart';
 typedef PickPhotoBytes = Future<({Uint8List bytes, String filename})?> Function();
 
 class ProofOfDeliveryResult {
-  const ProofOfDeliveryResult({required this.photoUrl, this.recipientName});
+  const ProofOfDeliveryResult({this.photoUrl, this.recipientName});
 
-  final String photoUrl;
+  /// Null = delivered without a photo (optional since 2026-11-13).
+  final String? photoUrl;
   final String? recipientName;
 }
 
-/// M4 — Proof of Delivery. A photo is REQUIRED before a delivery can be marked
-/// DELIVERED — the backend itself refuses the transition without one (see
-/// `ProofOfDeliveryService.recordForDelivery`, `PROOF_PHOTO_REQUIRED`); this sheet
-/// is what makes that unreachable in practice, not just unreachable server-side.
-/// Recipient name is optional real evidence, never validated against a customer
-/// record.
+/// M4 — Proof of Delivery. Since 2026-11-13 (owner decision) the PHOTO IS OPTIONAL end to end: the driver may confirm the delivery without
+/// one (the backend records the delivery with no photo), with one, or after a failed upload. While an upload is in progress Confirm waits
+/// for it, so a half-sent photo is never attached. Recipient name is optional real evidence, never validated against a customer record.
 ///
 /// `pickPhoto`/`uploadPhoto` are both injected — real implementations come from
 /// `driver_providers.dart` (`proofOfDeliveryPhotoPickerProvider`), which a widget
@@ -60,17 +58,22 @@ class _ProofOfDeliverySheetState extends State<ProofOfDeliverySheet> {
       if (!mounted) return;
       setState(() => _uploadedUrl = url);
     } catch (_) {
-      if (mounted) setState(() => _error = context.t('Could not upload the photo. Try again.', 'تعذّر رفع الصورة. حاول مرة أخرى.'));
+      if (mounted) {
+        setState(() {
+          _photoBytes = null; // a photo that did not upload is not attached
+          _error = context.t('Could not upload the photo. Try again, or confirm without a photo.', 'تعذّر رفع الصورة. حاول مرة أخرى أو أكّد التسليم بدون صورة.');
+        });
+      }
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
   }
 
   void _confirm() {
-    if (_uploadedUrl == null) return;
+    if (_isUploading) return;
     final recipientName = _recipientController.text.trim();
     Navigator.of(context).pop(
-      ProofOfDeliveryResult(photoUrl: _uploadedUrl!, recipientName: recipientName.isEmpty ? null : recipientName),
+      ProofOfDeliveryResult(photoUrl: _uploadedUrl, recipientName: recipientName.isEmpty ? null : recipientName),
     );
   }
 
@@ -90,7 +93,7 @@ class _ProofOfDeliverySheetState extends State<ProofOfDeliverySheet> {
         children: [
           Text(context.t('Proof of Delivery', 'إثبات التسليم'), style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text(context.t('Take a photo to confirm this delivery.', 'التقط صورة لتأكيد هذا التسليم.')),
+          Text(context.t('A photo is optional. You can confirm the delivery without one.', 'الصورة اختيارية. يمكنك تأكيد التسليم بدونها.'), key: const Key('pod-photo-optional')),
           const SizedBox(height: 12),
           if (_photoBytes != null)
             ClipRRect(
@@ -116,7 +119,7 @@ class _ProofOfDeliverySheetState extends State<ProofOfDeliverySheet> {
             key: const Key('pod-pick-photo'),
             onPressed: _isUploading ? null : _pickAndUpload,
             icon: const Icon(Icons.camera_alt_outlined),
-            label: Text(_photoBytes == null ? context.t('Take Photo', 'التقاط صورة') : context.t('Retake Photo', 'إعادة التقاط')),
+            label: Text(_photoBytes == null ? context.t('Add photo (optional)', 'إضافة صورة (اختياري)') : context.t('Retake Photo', 'إعادة التقاط')),
           ),
           if (_isUploading) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator()),
           if (_uploadedUrl != null)
@@ -153,7 +156,7 @@ class _ProofOfDeliverySheetState extends State<ProofOfDeliverySheet> {
               Expanded(
                 child: FilledButton(
                   key: const Key('pod-confirm'),
-                  onPressed: _uploadedUrl != null ? _confirm : null,
+                  onPressed: _isUploading ? null : _confirm,
                   child: Text(context.t('Confirm Delivered', 'تأكيد التسليم')),
                 ),
               ),

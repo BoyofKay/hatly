@@ -69,16 +69,22 @@ describe('DriversService.listAll (Phase I-A, Chunk 6; operational fields — Con
     { id: 'driver-2', isOnline: false, isAvailable: true, verificationStatus: 'PENDING', vehicleType: null, user: { fullName: 'Sara', phone: '+201000000008' } },
   ];
 
-  it('maps Driver+User into the flat AdminDriverView shape, with vehicle and the order the driver is on (ONE batched lookup)', async () => {
+  it('maps Driver+User into the flat AdminDriverView shape, with vehicle, the order the driver is on and R18 load / capacity (two batched lookups, never one per driver)', async () => {
     const driversRepository = { find: jest.fn(async () => rows) };
     const dataSource = {
-      query: jest.fn(async () => [{ driver_id: 'driver-1', order_id: 'order-9', order_number: 'HT-100009', status: 'PICKED_UP' }]),
+      query: jest
+        .fn()
+        .mockResolvedValueOnce([{ driver_id: 'driver-1', order_id: 'order-9', order_number: 'HT-100009', status: 'PICKED_UP' }])
+        .mockResolvedValueOnce([
+          { id: 'driver-1', active: 2, capacity: 2, last_seen_at: new Date('2026-10-03T10:05:00Z') },
+          { id: 'driver-2', active: 0, capacity: 1, last_seen_at: null },
+        ]),
     };
     const service = new DriversService(dataSource as any, driversRepository as any, {} as any);
 
     const result = await service.listAll();
 
-    expect(dataSource.query).toHaveBeenCalledTimes(1);
+    expect(dataSource.query).toHaveBeenCalledTimes(2);
     expect(result).toEqual([
       {
         id: 'driver-1',
@@ -92,6 +98,9 @@ describe('DriversService.listAll (Phase I-A, Chunk 6; operational fields — Con
         lastLocationAt: new Date('2026-10-03T10:00:00Z'),
         activeDelivery: { orderId: 'order-9', orderNumber: 'HT-100009', status: 'PICKED_UP' },
         commissionRateBasisPoints: null,
+        activeCount: 2,
+        capacity: 2,
+        lastSeenAt: new Date('2026-10-03T10:05:00Z'),
       },
       {
         id: 'driver-2',
@@ -105,6 +114,9 @@ describe('DriversService.listAll (Phase I-A, Chunk 6; operational fields — Con
         lastLocationAt: null,
         activeDelivery: null,
         commissionRateBasisPoints: null,
+        activeCount: 0,
+        capacity: 1,
+        lastSeenAt: null,
       },
     ]);
   });

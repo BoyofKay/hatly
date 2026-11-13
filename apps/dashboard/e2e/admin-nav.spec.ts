@@ -15,8 +15,11 @@ test.describe('Admin navigation', () => {
   const expectedLinks: Array<{ name: string; href: string; section: string }> = [
     { name: 'Sectors', href: '/sectors', section: 'Categories' },
     { name: 'Users', href: '/users', section: 'Settings' },
+    { name: 'Drivers today', href: '/drivers-today', section: 'Delivery' },
     { name: 'Drivers', href: '/drivers', section: 'Delivery' },
-    { name: 'Settlement', href: '/settlement', section: 'Reports' },
+    { name: 'Closing', href: '/settlement', section: 'Reports' },
+    { name: 'Statements by period', href: '/settlement-statements', section: 'Reports' },
+    { name: 'Settlement history', href: '/settlements', section: 'Reports' },
     { name: 'Cash Remainders', href: '/cash-remainders', section: 'Delivery' },
     { name: 'Employee Loans', href: '/employee-loans', section: 'Delivery' },
     { name: 'Vehicle Types', href: '/vehicle-types', section: 'Delivery' },

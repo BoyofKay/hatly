@@ -184,21 +184,18 @@ void main() {
       expect(api.statusCalls, isEmpty); // no submission until the sheet is confirmed
     });
 
-    testWidgets('CRITICAL: "Confirm Delivered" stays disabled until a photo has been taken and uploaded', (tester) async {
-      await pump(tester, _codDelivery(paymentMethod: 'MANUAL_TRANSFER'));
+    testWidgets('owner decision 2026-11-13: the photo is OPTIONAL — Confirm is enabled at once and submits DELIVERED with no photo', (tester) async {
+      final api = await pump(tester, _codDelivery(paymentMethod: 'MANUAL_TRANSFER'));
 
       await tester.tap(find.text('Delivered'));
       await tester.pumpAndSettle();
 
-      final confirmButton = tester.widget<FilledButton>(find.byKey(const Key('pod-confirm')));
-      expect(confirmButton.onPressed, isNull);
-
-      await tester.tap(find.byKey(const Key('pod-pick-photo')));
+      expect(find.byKey(const Key('pod-photo-optional')), findsOneWidget);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('pod-confirm'))).onPressed, isNotNull);
+      await tester.tap(find.byKey(const Key('pod-confirm')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Photo uploaded'), findsOneWidget);
-      final confirmAfter = tester.widget<FilledButton>(find.byKey(const Key('pod-confirm')));
-      expect(confirmAfter.onPressed, isNotNull);
+      expect(api.statusCalls, [('DELIVERED', null, null, null)]);
     });
 
     testWidgets('confirming with an uploaded photo submits DELIVERED with that exact photo URL and no recipient name when left blank', (tester) async {
@@ -242,7 +239,7 @@ void main() {
       expect(api.statusCalls, isEmpty);
     });
 
-    testWidgets('an upload failure shows an error and never submits DELIVERED', (tester) async {
+    testWidgets('an upload failure shows an error; the driver can still confirm WITHOUT the photo (the failed one is never attached)', (tester) async {
       final api = await pump(tester, _codDelivery(paymentMethod: 'MANUAL_TRANSFER'));
       api.uploadPhotoError = Exception('network error');
 
@@ -252,8 +249,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Could not upload'), findsOneWidget);
-      expect(tester.widget<FilledButton>(find.byKey(const Key('pod-confirm'))).onPressed, isNull);
-      expect(api.statusCalls, isEmpty);
+      expect(api.statusCalls, isEmpty); // nothing submitted by the failure itself
+      await tester.tap(find.byKey(const Key('pod-confirm')));
+      await tester.pumpAndSettle();
+      expect(api.statusCalls, [('DELIVERED', null, null, null)]);
     });
   });
 

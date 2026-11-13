@@ -77,6 +77,11 @@ export interface DispatchDriver {
   vehicleTypeName: string | null;
   lastLocationAt: string | null;
   activeDelivery: { orderId: string; orderNumber: string; status: string } | null;
+  /** R18: every active order of the driver and their configured capacity (older backends: undefined). */
+  activeCount?: number;
+  capacity?: number;
+  /** Last call from the driver's app (not GPS). */
+  lastSeenAt?: string | null;
 }
 
 export async function getControlTowerSummary(): Promise<ControlTowerSummary> {

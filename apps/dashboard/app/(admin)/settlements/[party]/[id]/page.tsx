@@ -11,6 +11,10 @@ import { useLang } from '../../../../../lib/ui/lang';
 import { usePermissions } from '../../../../../lib/ui/permissions';
 import { ExportButton } from '../../../../../components/reports/ExportButton';
 import { FINANCIAL_EVENT_TYPE, label } from '../../../../../lib/admin/labels';
+import { CourierBreakdown, useCourierLineColumns } from '../../../../../components/settlement/CourierMoney';
+
+/** The Cairo calendar day of an instant (report ranges are Cairo dates). */
+const cairoDay = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' }) : undefined);
 
 export default function SettlementStatementPage() {
   const { t, money, date, dateTime } = useLang();
@@ -34,6 +38,8 @@ export default function SettlementStatementPage() {
   const d = st.data;
   const p = d?.period;
   const canPay = can('MANAGE_SETTLEMENT_PAYMENTS');
+  const courierColumns = useCourierLineColumns();
+  const v2 = p?.methodVersion === 2;
 
   const record = async () => {
     const parsed = parseEgpToMinor(amount);
@@ -59,7 +65,7 @@ export default function SettlementStatementPage() {
     <div>
       <PageHeader
         title={t('Settlement statement', 'كشف التسوية')}
-        subtitle={p ? `${party === 'vendor' ? `${p.vendorName} — ${p.partyName}` : p.partyName} · ${date(p.periodStart)} → ${date(p.periodEnd)}` : undefined}
+        subtitle={p ? `${p.reference ? `${p.reference} · ` : ''}${party === 'vendor' ? `${p.vendorName} — ${p.partyName}` : p.partyName} · ${dateTime(p.periodStart)} → ${dateTime(p.periodEnd)}` : undefined}
         actions={<><Link href="/settlements" className="text-sm text-gray-600 hover:underline">{t('← All periods', '← كل الفترات')}</Link>{canPay && p && p.remainingMinor > 0 && <Button variant="primary" onClick={() => setOpen(true)}>{p.direction === 'COLLECTION' ? t('Record collection', 'تسجيل تحصيل') : t('Record payout', 'تسجيل دفعة')}</Button>}</>}
       />
       <Async state={st}>
@@ -71,7 +77,8 @@ export default function SettlementStatementPage() {
                 <div key={en} className="rounded-xl border border-gray-200 bg-white p-4"><p className="text-xs text-gray-500">{t(en, ar)}</p><p className="mt-1 text-lg font-semibold">{en === 'Status' ? <StatusPill status={p.paymentStatus} /> : v}</p></div>
               ))}
             </div>
-            {party === 'vendor' ? <p className="text-xs text-gray-500">{t('Gross sales for reference only', 'إجمالي المبيعات للاطلاع فقط')}: {money(p.grossSalesMinor)}</p> : <p className="text-xs text-gray-500">{t('Earnings', 'الأرباح')} {money(p.totalEarningsMinor)} − {t('commission', 'العمولة')} {money(p.commissionMinor)} + {t('reimbursements', 'التعويضات')} {money(p.reimbursementsMinor)}</p>}
+            {party === 'driver' && v2 && <Card title={t('Closing breakdown', 'تفصيل التقفيل')}><CourierBreakdown totals={{ ...p, feeEntitlementMinor: p.totalEarningsMinor, commissionMinor: p.commissionMinor, netToCourierMinor: p.netPayableMinor }} testId="period-breakdown" /></Card>}
+            {party === 'vendor' ? <p className="text-xs text-gray-500">{t('Gross sales for reference only', 'إجمالي المبيعات للاطلاع فقط')}: {money(p.grossSalesMinor)}</p> : v2 ? null : <p className="text-xs text-gray-500">{t('Earnings', 'الأرباح')} {money(p.totalEarningsMinor)} − {t('commission', 'العمولة')} {money(p.commissionMinor)} + {t('reimbursements', 'التعويضات')} {money(p.reimbursementsMinor)}</p>}
             {d.exceptions.length > 0 && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{t('This statement has exceptions:', 'يوجد استثناءات في هذا الكشف:')} {d.exceptions.join(' · ')}</p>}
             <Card title={t('Payments', 'المدفوعات')} pad={false}>
               <DataTable rows={d.payments} rowKey={(x: any) => x.id} emptyTitle={t('No payments recorded yet', 'لا توجد مدفوعات مسجلة بعد')} emptyHint=" " columns={[
@@ -89,8 +96,8 @@ export default function SettlementStatementPage() {
                 { key: 'o', header: t('Order', 'الطلب'), cell: (x: any) => <Link className="text-hatly-orangeDark hover:underline" href={`/order-search/${x.orderId}`}><bdi>{x.orderNumber}</bdi></Link> },
                 { key: 'at', header: t('Time', 'الوقت'), cell: (x: any) => dateTime(x.at) },
                 { key: 's', header: t('Part subtotal', 'مجموع الجزء'), align: 'end', cell: (x: any) => money(x.segmentSubtotalMinor) },
-                { key: 'c', header: t('Commission', 'العمولة'), align: 'end', cell: (x: any) => money(x.commissionMinor) },
-              ] : [
+                { key: 'c', header: t('Commission', 'العمولة'), align: 'end', cell: (x: any) => (x.rateUndefined ? t('Rate not set', 'نسبة غير محددة') : money(x.commissionMinor)) },
+              ] : v2 ? courierColumns : [
                 { key: 'o', header: t('Order', 'الطلب'), cell: (x: any) => <bdi>{x.orderNumber ?? '—'}</bdi> },
                 { key: 'at', header: t('Time', 'الوقت'), cell: (x: any) => dateTime(x.at) },
                 { key: 't', header: t('Type', 'النوع'), cell: (x: any) => label(FINANCIAL_EVENT_TYPE, x.type, t) },
@@ -98,7 +105,7 @@ export default function SettlementStatementPage() {
                 { key: 'a', header: t('Amount', 'المبلغ'), align: 'end', cell: (x: any) => money(x.amountMinor) },
               ]} />
             </Card>
-            {can('FINANCE_EXPORT') && <div className="flex justify-end"><ExportButton report={party === 'vendor' ? 'S15' : 'S11'} params={{}} label={t('Export statements (all periods)', 'تصدير الكشوف (كل الفترات)')} /></div>}
+            {can('FINANCE_EXPORT') && <div className="flex justify-end gap-2">{v2 && p.reference && <ExportButton report={party === 'vendor' ? 'S27' : 'S26'} params={{ from: cairoDay(p.closedAt), to: cairoDay(p.closedAt), reference: p.reference }} label={t('Export this closing', 'تصدير هذا التقفيل')} />}<ExportButton report={party === 'vendor' ? 'S15' : 'S11'} params={{}} label={t('Export statements (all periods)', 'تصدير الكشوف (كل الفترات)')} /></div>}
           </div>
         )}
       </Async>

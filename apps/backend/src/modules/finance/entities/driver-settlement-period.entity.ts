@@ -15,7 +15,7 @@ export class DriverSettlementPeriod extends BaseEntity {
   driverId: string;
 
   @Column({ type: 'varchar', length: 20 })
-  frequency: SettlementFrequency;
+  frequency: SettlementFrequency | 'DAILY'; // DAILY: courier shift closings (R29)
 
   @Column({ name: 'period_start', type: 'timestamptz' })
   periodStart: Date;

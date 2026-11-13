@@ -8,7 +8,8 @@ import { logBusinessEvent } from '../../common/logging/log-business-event';
 import { BusinessEvent } from '../../common/logging/business-events';
 
 /**
- * M4 — Proof of Delivery. Called by DriverOrderActionsService BEFORE
+ * M4 — Proof of Delivery. Since 2026-11-13 the PHOTO is optional (owner decision); the proof row itself is still always written.
+ * Called by DriverOrderActionsService BEFORE
  * the ON_THE_WAY→DELIVERED transition ever runs (see that service's
  * own comment) — CONFIRMED this is what makes POD non-bypassable: a
  * driver cannot reach the DELIVERED state without first passing this
@@ -53,19 +54,15 @@ export class ProofOfDeliveryService {
     photoUrl?: string;
     recipientName?: string;
   }): Promise<ProofOfDelivery> {
-    const photoUrl = params.photoUrl?.trim();
-    if (!photoUrl) {
-      throw new BadRequestException({
-        message: 'A delivery photo is required before a delivery can be marked as delivered.',
-        details: { code: 'PROOF_PHOTO_REQUIRED' },
-      });
-    }
+    // Owner decision 2026-11-13: the photo is OPTIONAL. Without one the delivery is still recorded (driver, time, optional recipient);
+    // a photo, when sent, is validated exactly as before.
+    const photoUrl = params.photoUrl?.trim() || null;
 
     // Never trust a client-asserted URL: it must be a real Hatly upload the
     // submitting driver themselves created (same pattern CartService already
     // uses for prescription/custom-item photos — see UploadsService.findOwnedUrls).
-    const ownedUrls = await this.uploadsService.findOwnedUrls([photoUrl], params.driverUserId);
-    if (!ownedUrls.has(photoUrl)) {
+    const ownedUrls = photoUrl ? await this.uploadsService.findOwnedUrls([photoUrl], params.driverUserId) : null;
+    if (photoUrl && !ownedUrls!.has(photoUrl)) {
       throw new BadRequestException({
         message: 'The delivery photo must be uploaded via /uploads by this driver first.',
         details: { code: 'INVALID_PROOF_PHOTO' },

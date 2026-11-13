@@ -5,9 +5,10 @@ import '../../../core/utils/money.dart';
 import '../../../shared_widgets/driver_ui.dart';
 import '../../deliveries/data/driver_providers.dart';
 import '../domain/earnings.dart';
+import 'money_breakdown_view.dart';
 
-/// What the platform has recorded for the driver. The open period is the server's preview of the period that has not been closed yet; closed
-/// periods are shown as stored together with the payments recorded against them. Nothing here is computed on the phone.
+/// The driver's money, exactly as Hatly's backend computed it — the same figures Operations see when they close the shift. The open period
+/// is the preview of the next closing; closed periods show what was settled and what remains. Nothing is computed on the phone.
 class EarningsScreen extends ConsumerWidget {
   const EarningsScreen({super.key});
 
@@ -22,63 +23,93 @@ class EarningsScreen extends ConsumerWidget {
       body: earnings.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => MessageView(icon: Icons.cloud_off_outlined, message: context.t('Could not load your earnings.', 'تعذّر تحميل أرباحك.'), onRetry: () => ref.invalidate(earningsProvider)),
-        data: (data) => RefreshIndicator(
-          onRefresh: () async => ref.refresh(earningsProvider.future),
-          child: ListView(
-            key: const Key('earnings-list'),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            children: [
-              SectionTitle(context.t('Current period (not closed yet)', 'الفترة الحالية (لم تُغلق بعد)')),
-              DriverCard(
-                key: const Key('earnings-open'),
-                child: Column(children: [
-                  Row(children: [
-                    KpiTile(label: context.t('Net so far', 'الصافي حتى الآن'), value: money(data.open.netMinor), emphasis: true),
-                    const SizedBox(width: 10),
-                    KpiTile(label: context.t('Deliveries', 'التوصيلات'), value: '${data.open.deliveries}'),
+        data: (data) {
+          final open = data.open;
+          return RefreshIndicator(
+            onRefresh: () async => ref.refresh(earningsProvider.future),
+            child: ListView(
+              key: const Key('earnings-list'),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                SectionTitle(context.t('Current shift (not closed yet)', 'الوردية الحالية (لم تُقفل بعد)')),
+                DriverCard(
+                  key: const Key('earnings-open'),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      KpiTile(
+                        label: open.netMinor >= 0 ? context.t('Owed to you', 'مستحق للمندوب') : context.t('You owe Hatly', 'مستحق على المندوب'),
+                        value: money(open.netMinor.abs()),
+                        emphasis: true,
+                      ),
+                      const SizedBox(width: 10),
+                      KpiTile(label: context.t('Delivered orders', 'طلبات مُسلّمة'), value: '${open.deliveries}'),
+                    ]),
+                    const SizedBox(height: 12),
+                    if (open.breakdown != null)
+                      MoneyBreakdownView(b: open.breakdown!, showNet: false)
+                    else ...[
+                      // older backend: only the four recorded figures exist
+                      MoneyLine(context.t('Delivery fee', 'رسوم التوصيل'), money(open.earningsMinor)),
+                      MoneyLine(context.t('Hatly commission', 'عمولة Hatly'), '- ${money(open.commissionMinor)}'),
+                      MoneyLine(context.t('Reimbursements', 'المبالغ المستردة'), money(open.reimbursementsMinor)),
+                    ],
+                    if (open.inProgress > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(context.t('${open.inProgress} order(s) still in progress — counted after delivery.', '${open.inProgress} طلب ما زال قيد التوصيل — يُحتسب بعد التسليم.'),
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
+                      ),
                   ]),
-                  const SizedBox(height: 12),
-                  _Line(context.t('Delivery earnings', 'أرباح التوصيل'), money(data.open.earningsMinor)),
-                  _Line(context.t('Platform commission', 'عمولة المنصة'), '- ${money(data.open.commissionMinor)}'),
-                  _Line(context.t('Reimbursements', 'المبالغ المستردة'), money(data.open.reimbursementsMinor)),
-                ]),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Text(
-                  context.t('This is a preview of the open period. It becomes final when Hatly closes the period and records the payment.', 'هذه معاينة للفترة المفتوحة. تصبح نهائية عندما تغلق هاتلي الفترة وتسجّل الدفع.'),
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
                 ),
-              ),
-              SectionTitle(context.t('Closed periods', 'الفترات المغلقة')),
-              if (data.closedPeriods.isEmpty)
-                Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Center(child: Text(context.t('No closed periods yet.', 'لا توجد فترات مغلقة بعد.'), style: const TextStyle(color: Color(0xFF6B6B6B)))))
-              else
-                for (final p in data.closedPeriods) _ClosedPeriodCard(period: p),
-            ],
-          ),
-        ),
+                if (open.excluded.isNotEmpty) ...[
+                  SectionTitle(context.t('Orders held for the next closing', 'طلبات مؤجلة للتقفيلة التالية')),
+                  DriverCard(
+                    key: const Key('earnings-excluded'),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      for (final x in open.excluded)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(x.orderNumber, textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w700)),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(excludedReasonText(context, x.reason), style: const TextStyle(fontSize: 12, color: Color(0xFF8A5A00)))),
+                          ]),
+                        ),
+                    ]),
+                  ),
+                ],
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    context.t(
+                      'Preview of your open shift. It becomes final when Hatly Operations close it at the office and record the payment.',
+                      'هذه معاينة لورديتك المفتوحة. تصبح نهائية عندما تقفلها عمليات هاتلي في المكتب وتسجّل الدفع.',
+                    ),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                  ),
+                ),
+                SectionTitle(context.t('Closed shifts', 'الورديات المُقفلة')),
+                if (data.closedPeriods.isEmpty)
+                  Padding(padding: const EdgeInsets.symmetric(vertical: 16), child: Center(child: Text(context.t('No closed shifts yet.', 'لا توجد ورديات مُقفلة بعد.'), style: const TextStyle(color: Color(0xFF6B6B6B)))))
+                else
+                  for (final p in data.closedPeriods) _ClosedPeriodCard(period: p),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
-}
-
-class _Line extends StatelessWidget {
-  const _Line(this.label, this.value);
-  final String label;
-  final String value;
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(children: [Expanded(child: Text(label)), Text(value, textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w700))]),
-      );
 }
 
 class _ClosedPeriodCard extends StatelessWidget {
   const _ClosedPeriodCard({required this.period});
   final ClosedPeriod period;
 
-  String _date(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  String _date(DateTime d) {
+    final l = d.toLocal();
+    return '${l.year}-${l.month.toString().padLeft(2, '0')}-${l.day.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,20 +118,31 @@ class _ClosedPeriodCard extends StatelessWidget {
     return DriverCard(
       key: Key('closed-period-${period.id}'),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('${_date(period.periodStart)}  →  ${_date(period.periodEnd)}', textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w800)),
+        Row(children: [
+          Expanded(child: Text('${_date(period.periodStart)}  →  ${_date(period.periodEnd)}', textDirection: TextDirection.ltr, style: const TextStyle(fontWeight: FontWeight.w800))),
+          if (period.reference != null) Text(period.reference!, textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
+        ]),
         const SizedBox(height: 8),
-        _Line(context.t('Delivery earnings', 'أرباح التوصيل'), money(period.earningsMinor)),
-        _Line(context.t('Platform commission', 'عمولة المنصة'), '- ${money(period.commissionMinor)}'),
-        _Line(context.t('Reimbursements', 'المبالغ المستردة'), money(period.reimbursementsMinor)),
-        const Divider(),
-        _Line(context.t('Net', 'الصافي'), money(period.netMinor)),
+        if (period.breakdown != null)
+          MoneyBreakdownView(b: period.breakdown!)
+        else ...[
+          // closed before 2026-11-13: shown exactly as stored (never recomputed)
+          Text(context.t('Earlier settlement — shown as recorded', 'تسوية سابقة — معروضة كما سُجّلت'), key: const Key('closed-legacy'), style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
+          MoneyLine(context.t('Delivery fee', 'رسوم التوصيل'), money(period.earningsMinor)),
+          MoneyLine(context.t('Hatly commission', 'عمولة Hatly'), '- ${money(period.commissionMinor)}'),
+          MoneyLine(context.t('Reimbursements', 'المبالغ المستردة'), money(period.reimbursementsMinor)),
+          const Divider(),
+          NetLine(netMinor: period.netMinor),
+        ],
+        if (period.settledMinor != null) MoneyLine(context.t('Settled', 'تم تسويته'), money(period.settledMinor!), key: const Key('closed-settled')),
+        if (period.remainingMinor != null) MoneyLine(context.t('Remaining to settle', 'المتبقي للتسوية'), money(period.remainingMinor!), bold: true, key: const Key('closed-remaining')),
         const SizedBox(height: 6),
         if (period.payments.isEmpty)
           Text(context.t('No payment recorded yet.', 'لم يُسجَّل أي دفع بعد.'), style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)))
         else
-          for (final pay in period.payments)
+          for (final pay in period.payments.where((p) => p.status != 'VOIDED'))
             Text(
-              '${pay.direction == 'HATLY_TO_DRIVER' ? context.t('Paid to you', 'دُفع لك') : context.t('Paid by you', 'دفعتَه أنت')}: ${money(pay.amountMinor)}${pay.paidOn == null ? '' : ' · ${_date(pay.paidOn!)}'}',
+              '${pay.direction == 'PAYOUT' ? context.t('Paid to you', 'دُفع لك') : context.t('Paid by you', 'دفعتَه أنت')}: ${money(pay.amountMinor)}${pay.paidOn == null ? '' : ' · ${_date(pay.paidOn!)}'}',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
       ]),

@@ -76,10 +76,13 @@ export function DispatchAction({
     }
   }
 
-  const label = (d: DispatchDriver) =>
-    `${d.fullName} — ${
-      !d.isOnline ? t('dxOptionOffline') : d.activeDelivery ? t('dxOptionBusy', { order: d.activeDelivery.orderNumber }) : t('dxOptionFree')
-    }${d.vehicleTypeName ? ` · ${d.vehicleTypeName}` : ''}`;
+  // R18: a driver may carry several orders up to their configured capacity — show the load, and "full" at the limit (the backend refuses).
+  const loadText = (d: DispatchDriver) => {
+    if (d.capacity == null || d.activeCount == null) return d.activeDelivery ? t('dxOptionBusy', { order: d.activeDelivery.orderNumber }) : t('dxOptionFree');
+    if (d.activeCount >= d.capacity) return t('dxOptionFull', { active: d.activeCount, capacity: d.capacity });
+    return t('dxOptionLoad', { active: d.activeCount, capacity: d.capacity });
+  };
+  const label = (d: DispatchDriver) => `${d.fullName} — ${!d.isOnline ? t('dxOptionOffline') : loadText(d)}${d.vehicleTypeName ? ` · ${d.vehicleTypeName}` : ''}`;
 
   return (
     <div data-testid={`dispatch-action-${orderId}`} className="space-y-1">

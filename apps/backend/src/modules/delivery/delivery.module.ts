@@ -1,4 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { FinanceModule } from '../finance/finance.module';
+import { AdminOperationsBoardController } from './admin-operations-board.controller';
+import { OperationsBoardService } from './operations-board.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Driver } from './entities/driver.entity';
 import { Delivery } from './entities/delivery.entity';
@@ -51,9 +54,12 @@ import { UploadsModule } from '../uploads/uploads.module';
     // M4 — Proof of Delivery reuses the existing generic uploads module
     // (UploadsService.findOwnedUrls) rather than inventing new storage.
     UploadsModule,
+    // Courier money (Driver App earnings / history) is computed by the settlement closing service — one source with the Admin closing.
+    FinanceModule,
   ],
-  controllers: [AdminDriversController, DriverController, AdminDispatchController, AdminDispatchAlertsController, AdminControlTowerController],
+  controllers: [AdminDriversController, DriverController, AdminDispatchController, AdminDispatchAlertsController, AdminControlTowerController, AdminOperationsBoardController],
   providers: [
+    OperationsBoardService,
     DeliveryAssignmentService,
     DriversService,
     AdminControlTowerService,

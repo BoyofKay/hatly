@@ -70,6 +70,14 @@ const CONFIG_FIELDS: ConfigFieldDef[] = [
     clearable: true,
   },
   {
+    key: 'DRIVER_PRESENCE_STALE_MINUTES',
+    label: 'Driver App Silent Alert',
+    type: 'integer',
+    unit: 'minutes',
+    help: 'If a driver holding an active order has not been heard from by the driver app for this long, Operations get an alert ("assignment may not have reached the driver"). Empty = this alert is off (a driver switching to offline still alerts). Allowed 2 to 240. Nothing is reassigned or cancelled automatically.',
+    clearable: true,
+  },
+  {
     key: 'MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES',
     label: 'Transfer Verification Window',
     type: 'integer',

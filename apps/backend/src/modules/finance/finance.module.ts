@@ -16,6 +16,7 @@ import { OrderFinancialEventsService } from './order-financial-events.service';
 import { HatlyServicePricingService } from './hatly-service-pricing.service';
 import { EmployeeLoanService } from './employee-loan.service';
 import { SettlementService } from './settlement.service';
+import { SettlementClosingService } from './settlement-closing.service';
 import { AdminEmployeeLoansController } from './admin-employee-loans.controller';
 import { AdminCommissionConfigController } from './admin-commission-config.controller';
 import { AdminSettlementController } from './admin-settlement.controller';
@@ -60,7 +61,8 @@ import { DeliveryFeeCalculationModule } from '../delivery-fee/delivery-fee-calcu
     HatlyServicePricingService,
     EmployeeLoanService,
     SettlementService,
+    SettlementClosingService,
   ],
-  exports: [FinancialEventService, OrderFinancialEventsService, HatlyServicePricingService, EmployeeLoanService],
+  exports: [SettlementClosingService, FinancialEventService, OrderFinancialEventsService, HatlyServicePricingService, EmployeeLoanService],
 })
 export class FinanceModule {}

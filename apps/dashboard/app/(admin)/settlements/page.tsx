@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Card, DataTable, DateRange, FilterBar, LabeledSelect, PageHeader, Pagination, StatusPill, Tabs, usePaging } from '../../../components/ui';
+import { Badge, Card, DataTable, DateRange, FilterBar, LabeledInput, LabeledSelect, PageHeader, Pagination, StatusPill, Tabs, useDebounced, usePaging } from '../../../components/ui';
 import { useApi } from '../../../lib/ui/api';
 import { useLang } from '../../../lib/ui/lang';
 import { usePermissions } from '../../../lib/ui/permissions';
@@ -17,26 +17,30 @@ export default function SettlementPeriodsPage() {
   const [status, setStatus] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const { page, setPage, limit } = usePaging(JSON.stringify([tab, status, from, to]));
-  const list = useApi<any[]>(`/admin/settlements/${tab}-periods`, { paymentStatus: status || undefined, from: from || undefined, to: to || undefined, page, limit });
+  const [search, setSearch] = useState('');
+  const q = useDebounced(search.trim());
+  const { page, setPage, limit } = usePaging(JSON.stringify([tab, status, from, to, q]));
+  const list = useApi<any[]>(`/admin/settlements/${tab}-periods`, { paymentStatus: status || undefined, from: from || undefined, to: to || undefined, search: q || undefined, page, limit });
   const summary = useApi<any>('/admin/settlements/summary');
   const tabs = [...(canVendor ? [{ id: 'vendor', label: t('Vendors (commission receivable)', 'الموردون (عمولات مستحقة)') }] : []), ...(canDriver ? [{ id: 'driver', label: t('Drivers', 'السائقون') }] : [])];
   return (
     <div>
       <PageHeader
-        title={t('Settlement periods', 'فترات التسوية')}
+        title={t('Settlement history', 'سجل التسويات')}
         subtitle={t('Closed is not paid. A closed period is frozen; money movement is recorded against it as payments. Vendors owe Hatly their commission (collection); a driver period is paid out or collected according to its net.', 'المغلقة ليست مدفوعة. الفترة المغلقة مجمّدة وتُسجَّل الحركات المالية عليها كمدفوعات. الموردون يدينون لحاتلي بعمولتهم (تحصيل)، وتُدفع فترة السائق أو تُحصَّل حسب صافيها.')}
         actions={<>{canVendor && can('FINANCE_EXPORT') && <ExportButton report="S15" params={{ from, to }} label={t('Export vendor periods', 'تصدير فترات الموردين')} />}{canDriver && can('FINANCE_EXPORT') && <ExportButton report="S11" params={{ from, to }} label={t('Export driver periods', 'تصدير فترات السائقين')} />}<Link href="/settlement" className="text-sm font-medium text-hatly-orangeDark hover:underline">{t('Close a period →', 'إغلاق فترة ←')}</Link></>}
       />
       {summary.data && <div className="mb-4 grid gap-3 sm:grid-cols-3">{[['Vendor commission receivable', 'عمولات الموردين المستحقة', summary.data.vendorCommissionReceivableMinor], ['Driver payable', 'مستحقات السائقين', summary.data.driverPayableMinor], ['Driver receivable', 'مستحقات على السائقين', summary.data.driverReceivableMinor]].map(([en, ar, v]) => <div key={en as string} className="rounded-xl border border-gray-200 bg-white p-4"><p className="text-xs text-gray-500">{t(en as string, ar as string)}</p><p className="mt-1 text-xl font-semibold tabular-nums">{money(v as number)}</p></div>)}</div>}
       {tabs.length > 1 && <Tabs tabs={tabs} value={tab} onChange={(x) => setTab(x as 'vendor' | 'driver')} />}
-      <FilterBar onClear={() => { setStatus(''); setFrom(''); setTo(''); }}>
+      <FilterBar onClear={() => { setStatus(''); setFrom(''); setTo(''); setSearch(''); }}>
+        <div className="w-64"><LabeledInput label={t('Reference or name', 'المرجع أو الاسم')} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="CS-… / VS-…" data-testid="settlements-search" /></div>
         <div className="w-48"><LabeledSelect label={t('Payment status', 'حالة السداد')} value={status} onChange={(e) => setStatus(e.target.value)}><option value="">{t('All', 'الكل')}</option>{['UNPAID', 'PARTIAL', 'PAID', 'OVERPAID', 'NOTHING_DUE'].map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}</LabeledSelect></div>
         <DateRange from={from} to={to} onChange={(f, tt) => { setFrom(f); setTo(tt); }} />
       </FilterBar>
       <Card pad={false}>
         <DataTable rows={list.data} rowKey={(r) => r.id} loading={list.loading} error={list.error} status={list.status} onRetry={list.reload} emptyTitle={t('No closed periods yet', 'لا توجد فترات مغلقة بعد')} columns={[
           { key: 'p', header: tab === 'vendor' ? t('Vendor / branch', 'المورد / الفرع') : t('Driver', 'السائق'), cell: (r) => <Link className="font-medium text-hatly-orangeDark hover:underline" href={`/settlements/${tab}/${r.id}`}><bdi>{tab === 'vendor' ? `${r.vendorName} — ${r.partyName}` : r.partyName}</bdi></Link> },
+          { key: 'ref', header: t('Reference', 'المرجع'), cell: (r) => <span className="flex items-center gap-1"><bdi className="font-mono text-xs">{r.reference ?? '—'}</bdi>{r.methodVersion !== 2 && <Badge>{t('earlier method', 'طريقة سابقة')}</Badge>}</span> },
           { key: 'per', header: t('Period', 'الفترة'), cell: (r) => `${date(r.periodStart)} → ${date(r.periodEnd)}` },
           { key: 'dir', header: t('Direction', 'الاتجاه'), cell: (r) => <StatusPill status={r.direction === 'COLLECTION' ? 'PENDING' : 'APPROVED'} label={r.direction === 'COLLECTION' ? t('Collect', 'تحصيل') : t('Pay out', 'دفع')} /> },
           { key: 'due', header: t('Due', 'المستحق'), align: 'end', cell: (r) => money(r.dueMinor) },

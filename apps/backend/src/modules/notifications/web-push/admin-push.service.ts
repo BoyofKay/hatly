@@ -302,6 +302,7 @@ export class AdminPushService implements OnApplicationBootstrap, OnModuleDestroy
 
 const CATEGORY_TEXT: Record<string, [string, string]> = {
   NEW_ORDER: ['New order', 'طلب جديد'],
+  DRIVER_OFFLINE: ['Driver offline — order may not have reached them', 'المندوب غير متصل — قد لا يكون الطلب وصله'],
   ACCEPTANCE_OVERDUE: ['Store has not accepted', 'المتجر لم يقبل الطلب'],
   PREPARATION_LATE: ['Preparation is late', 'التحضير متأخر'],
   DRIVER_ACK_OVERDUE: ['Driver has not acknowledged', 'السائق لم يؤكد الاستلام'],
