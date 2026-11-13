@@ -124,6 +124,25 @@ describe('E2E — Operations alerts and Admin Web Push (P0)', () => {
     expect((await world.api('post', '/admin/ops-alerts/not-a-uuid/acknowledge', { token: ops.accessToken })).status).toBe(400); // the global id check
   });
 
+  it('an open new-order alert carries the store parts still waiting, so Operations can accept on the store\'s behalf from the alert; that resolves it and records "on behalf"', async () => {
+    const { order, segmentId } = await placeOrder();
+    const listed = expectData<any[]>(await world.api('get', '/admin/ops-alerts', { token: ops.accessToken }));
+    const alert = listed.find((a) => a.orderId === order.id && a.category === 'NEW_ORDER');
+    expect(alert.pendingParts).toEqual([{ segmentId, vendorName: 'Alert Vendor', vendorNameAr: null, branchName: expect.any(String) }]);
+
+    // A viewer may see it but not accept (same permission as the order page); an operator accepts with the existing endpoint.
+    expect((await world.api('patch', `/admin/orders/segments/${segmentId}/status`, { token: viewer.accessToken, body: { status: 'CONFIRMED' } })).status).toBe(403);
+    expectData(await world.api('patch', `/admin/orders/segments/${segmentId}/status`, { token: ops.accessToken, body: { status: 'CONFIRMED' } }));
+    const [ev] = await q(`SELECT on_behalf_of_vendor FROM order_vendor_segment_events WHERE segment_id = $1 AND to_status = 'CONFIRMED'`, [segmentId]);
+    expect(ev.on_behalf_of_vendor).toBe(true);
+
+    await alerts.scan();
+    const [row] = await q(`SELECT resolution, acknowledged_at FROM ops_alerts WHERE order_id = $1 AND category = 'NEW_ORDER'`, [order.id]);
+    expect(row).toMatchObject({ resolution: 'STORE_RESPONDED', acknowledged_at: null });
+    const after = expectData<any[]>(await world.api('get', '/admin/ops-alerts', { token: ops.accessToken }));
+    expect(after.find((a) => a.orderId === order.id && a.category === 'NEW_ORDER')).toBeUndefined();
+  });
+
   it('a store that has not accepted in time raises ACCEPTANCE_OVERDUE once; accepting resolves it and the new-order alert; a late preparation raises a HIGH alert that clears when ready', async () => {
     const { order, segmentId } = await placeOrder();
     await q(`UPDATE order_vendor_segments SET created_at = now() - interval '6 minutes' WHERE id = $1`, [segmentId]);

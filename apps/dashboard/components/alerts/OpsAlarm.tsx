@@ -11,6 +11,9 @@ import { decideRing, newSince, ringing, needsAttention, SNOOZE_MS } from '../../
 import { audioState, AudioState, onAudioStateChange, playAlarm, unlockAudio, unlockOnFirstGesture } from '../../lib/alerts/sound';
 import { currentDevice, ensureServiceWorker, permissionState, showLocalNotification } from '../../lib/alerts/push-client';
 import { OPS_ACTION, OPS_CATEGORY, age } from '../../lib/alerts/words';
+import { updateSegmentOnBehalf } from '../../lib/api/admin-operations';
+import { apiErrorMessage } from '../../lib/api/errors';
+import { useToast } from '../ui';
 
 /**
  * The Admin alarm: one per tab, mounted in the Admin shell.
@@ -310,6 +313,8 @@ export function OpsAlarmBar() {
                 <Link href={a.href} className="rounded-lg bg-hatly-orange px-3 py-1.5 text-xs font-semibold text-white hover:bg-hatly-orangeDark" data-testid="ops-alarm-open">
                   {t('Open order', 'افتح الطلب')}
                 </Link>
+                {ctx.canAck && (a.pendingParts ?? []).length > 0 && (a.pendingParts ?? []).length <= 2 &&
+                  (a.pendingParts ?? []).map((part) => <AcceptForStore key={part.segmentId} alert={a} part={part} />)}
                 {ctx.canAck && (
                   <button type="button" disabled={busy === a.id} onClick={() => void ack(a.id)} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-50" data-testid="ops-alarm-ack">
                     {t('Seen — stop alarm', 'تم الاطلاع — أوقف التنبيه')}
@@ -330,5 +335,54 @@ export function OpsAlarmBar() {
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * "Accept for <store>" straight from an alert: the SAME on-behalf transition the order page offers (PATCH admin/orders/segments/:id/status,
+ * MANAGE_ORDER_FULFILMENT, recorded "on behalf of the store"). Two taps (button, then Confirm) so it is never accidental. On success the alert
+ * is also marked seen, so the alarm stops at once; the backend closes the alert itself on its next check (the store part is no longer waiting).
+ */
+export function AcceptForStore({ alert, part }: { alert: OpsAlert; part: NonNullable<OpsAlert['pendingParts']>[number] }) {
+  const ctx = useOpsAlarm();
+  const { t, locale } = useLang();
+  const toast = useToast();
+  const [stage, setStage] = useState<'idle' | 'confirm' | 'busy' | 'done'>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const store = (locale === 'ar' ? part.vendorNameAr || part.vendorName : part.vendorName) || part.branchName || t('the store', 'المتجر');
+  if (!ctx) return null;
+  const run = async () => {
+    setStage('busy');
+    setError(null);
+    try {
+      await updateSegmentOnBehalf(part.segmentId, { status: 'CONFIRMED' });
+      setStage('done');
+      // The alert row disappears once it is seen, so the confirmation must outlive it.
+      toast.push('success', t(`${alert.orderNumber ?? 'Order'} accepted for ${store}. It moves to preparation.`, `تم قبول ${alert.orderNumber ?? 'الطلب'} نيابة عن ${store}. ينتقل الآن إلى التحضير.`));
+      await ctx.acknowledge(alert.id).catch(() => undefined);
+    } catch (e) {
+      setError(apiErrorMessage(e, t('Could not accept. Open the order to check its state.', 'تعذّر القبول. افتح الطلب لمعرفة حالته.')));
+      setStage('idle');
+    }
+  };
+  if (stage === 'done') {
+    return <span role="status" className="rounded-lg bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-800" data-testid="ops-alarm-accepted">✓ {t(`Accepted for ${store}`, `تم القبول نيابة عن ${store}`)}</span>;
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      {stage === 'idle' ? (
+        <button type="button" onClick={() => setStage('confirm')} className="rounded-lg border border-green-600 bg-white px-3 py-1.5 text-xs font-semibold text-green-800 hover:bg-green-50" data-testid="ops-alarm-accept">
+          {t(`Accept for ${store}`, `اقبل نيابة عن ${store}`)}
+        </button>
+      ) : (
+        <>
+          <button type="button" disabled={stage === 'busy'} onClick={() => void run()} className="rounded-lg bg-green-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-800 disabled:opacity-50" data-testid="ops-alarm-accept-confirm">
+            {t(`Confirm — accept ${alert.orderNumber ?? ''}`, `تأكيد — قبول ${alert.orderNumber ?? ''}`)}
+          </button>
+          <button type="button" disabled={stage === 'busy'} onClick={() => setStage('idle')} className="text-xs text-gray-600 underline">{t('Cancel', 'إلغاء')}</button>
+        </>
+      )}
+      {error && <span role="alert" className="text-xs text-red-700" data-testid="ops-alarm-accept-error">{error}</span>}
+    </span>
   );
 }

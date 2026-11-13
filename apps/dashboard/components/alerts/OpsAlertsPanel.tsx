@@ -6,7 +6,7 @@ import { useApi } from '../../lib/ui/api';
 import { useLang } from '../../lib/ui/lang';
 import { OpsAlert } from '../../lib/api/ops-alerts';
 import { OPS_ACTION, OPS_CATEGORY, OPS_RESOLUTION, age } from '../../lib/alerts/words';
-import { useOpsAlarm } from './OpsAlarm';
+import { AcceptForStore, useOpsAlarm } from './OpsAlarm';
 
 /**
  * Top of the Notification Center: every open Operations alert (urgent first), with its state — waiting, seen by whom, or (in "Recent")
@@ -58,6 +58,7 @@ export function OpsAlertsPanel() {
                 </span>
                 <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${state.tone}`} data-testid="ops-alert-state">{state.text}</span>
                 <Link href={a.href} className="text-xs font-semibold text-hatly-orangeDark underline">{t('Open order', 'افتح الطلب')}</Link>
+                {!a.resolvedAt && ctx.canAck && view === 'open' && (a.pendingParts ?? []).map((part) => <AcceptForStore key={part.segmentId} alert={a} part={part} />)}
                 {!a.acknowledgedAt && !a.resolvedAt && ctx.canAck && (
                   <button type="button" disabled={busy === a.id} className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-800 disabled:opacity-50"
                     onClick={async () => { setBusy(a.id); try { await ctx.acknowledge(a.id); } finally { setBusy(null); } }}>

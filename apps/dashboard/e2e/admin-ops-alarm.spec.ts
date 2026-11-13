@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { SUPER_ADMIN_STORAGE_STATE } from './env';
-import { cancelTestOrder, placeNewOrder } from './control-tower-fixtures';
+import { cancelTestOrder, orderDetail, placeNewOrder } from './control-tower-fixtures';
 
 /**
  * P0 Admin real-time alerts (2026-11-08). Against the real backend: a new order appears in the alarm bar of every open Admin tab without a
@@ -126,5 +126,35 @@ test.describe('Admin alarm', () => {
     } finally {
       await cancelTestOrder(order);
     }
+  });
+
+  test('Accept for store, straight from the alarm: two taps, the store part is accepted on its behalf and the alarm for it stops', async ({ page }) => {
+    const order = await placeNewOrder();
+    try {
+      await page.goto('/home');
+      const item = page.getByTestId('ops-alarm-bar').locator('li', { hasText: order.orderNumber }).filter({ hasText: 'New order' });
+      await expect(item).toBeVisible({ timeout: 20_000 });
+      await item.getByTestId('ops-alarm-accept').click();
+      await expect(item.getByTestId('ops-alarm-accept-confirm')).toContainText(order.orderNumber); // nothing happens on the first tap
+      await item.getByTestId('ops-alarm-accept-confirm').click();
+      await expect(page.getByRole('status').filter({ hasText: `${order.orderNumber} accepted for` })).toBeVisible(); // the confirmation outlives the row
+      await expect.poll(async () => (await orderDetail(order.orderId)).segments.find((s: any) => s.id === order.segmentId)?.status, { timeout: 10_000 }).toBe('CONFIRMED');
+      await expect(page.getByTestId('ops-alarm-bar').locator('li', { hasText: order.orderNumber }).filter({ hasText: 'New order' })).toHaveCount(0, { timeout: 15_000 });
+    } finally {
+      await cancelTestOrder(order);
+    }
+  });
+
+  test('Home asks to turn on notifications on a device that is not registered; "Later" hides it for this browser', async ({ page }) => {
+    await page.goto('/home');
+    const prompt = page.getByTestId('push-setup-prompt');
+    await expect(prompt).toBeVisible({ timeout: 20_000 });
+    await expect(prompt).toContainText('will not alert you when Hatly is closed');
+    await prompt.getByTestId('push-setup-later').click();
+    await expect(prompt).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByTestId('admin-overview')).toBeVisible();
+    await expect(page.getByTestId('push-setup-prompt')).toHaveCount(0);
+    await page.evaluate(() => localStorage.removeItem('hatly_push_prompt_later_until'));
   });
 });

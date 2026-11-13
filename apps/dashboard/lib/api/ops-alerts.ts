@@ -16,6 +16,9 @@ export interface OpsAlert {
   resolution: string | null;
   pushRounds: number;
   href: string;
+  segmentId?: string | null;
+  /** Store parts of this order still waiting for acceptance (open new-order / store-not-accepted alerts only). */
+  pendingParts?: Array<{ segmentId: string; vendorName: string | null; vendorNameAr: string | null; branchName: string | null }>;
 }
 
 export async function acknowledgeOpsAlert(id: string): Promise<OpsAlert> {

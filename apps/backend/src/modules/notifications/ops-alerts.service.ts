@@ -236,7 +236,27 @@ export class OpsAlertsService implements OnApplicationBootstrap, OnModuleDestroy
         ORDER BY (a.resolved_at IS NULL) DESC, a.opened_at DESC, a.id
         LIMIT ${recent ? 200 : 300}`,
     );
-    return { items: rows.map(toView), serverTime: new Date().toISOString() };
+    const items = rows.map(toView);
+    // For open "new order" / "store has not accepted" alerts: the store parts still waiting for acceptance, so Operations can accept on the
+    // store's behalf straight from the alert (the same PATCH admin/orders/segments/:id/status the order page uses — no new rule).
+    const waiting = items.filter((a: any) => !a.resolvedAt && (a.category === 'NEW_ORDER' || a.category === 'ACCEPTANCE_OVERDUE') && a.orderId);
+    if (waiting.length > 0) {
+      const parts: Array<{ order_id: string; segment_id: string; vendor_name: string | null; vendor_name_ar: string | null; branch_name: string | null }> = await this.ds.query(
+        `SELECT s.order_id, s.id AS segment_id, v.name AS vendor_name, v.name_ar AS vendor_name_ar, b.name AS branch_name
+           FROM order_vendor_segments s
+           LEFT JOIN vendor_branches b ON b.id = s.vendor_branch_id
+           LEFT JOIN vendors v ON v.id = b.vendor_id
+          WHERE s.order_id = ANY($1) AND s.status = 'PENDING' AND s.deleted_at IS NULL
+          ORDER BY s.created_at, s.id`,
+        [[...new Set(waiting.map((a: any) => a.orderId))]],
+      );
+      for (const a of waiting as any[]) {
+        a.pendingParts = parts
+          .filter((p) => p.order_id === a.orderId && (a.category === 'NEW_ORDER' || !a.segmentId || p.segment_id === a.segmentId))
+          .map((p) => ({ segmentId: p.segment_id, vendorName: p.vendor_name, vendorNameAr: p.vendor_name_ar, branchName: p.branch_name }));
+      }
+    }
+    return { items, serverTime: new Date().toISOString() };
   }
 
   /** Records that a person saw the alert: stops the repeats and the alarm for everyone. Idempotent (the first acknowledgement is kept). Never resolves. */
@@ -261,6 +281,7 @@ function toView(r: any) {
   return {
     id: r.id, category: r.category as OpsAlertCategory, priority: r.priority as OpsAlertPriority, orderId: r.order_id, orderNumber: r.order_number, detail: r.detail,
     openedAt: r.opened_at, acknowledgedAt: r.acknowledged_at, acknowledgedBy: r.acknowledged_by_user_id ? { id: r.acknowledged_by_user_id, name: r.acknowledged_by_name ?? null } : null,
-    resolvedAt: r.resolved_at, resolution: r.resolution, pushRounds: r.push_rounds, href: opsAlertHref(r),
+    resolvedAt: r.resolved_at, resolution: r.resolution, pushRounds: r.push_rounds, href: opsAlertHref(r), segmentId: r.segment_id ?? null,
+    pendingParts: [] as Array<{ segmentId: string; vendorName: string | null; vendorNameAr: string | null; branchName: string | null }>,
   };
 }

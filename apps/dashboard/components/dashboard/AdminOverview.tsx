@@ -12,6 +12,7 @@ import { getCurrentUser } from '../../lib/auth/session';
 import { ago } from '../../lib/ui/time';
 import { ORDER_STATUS, label } from '../../lib/admin/labels';
 import { ActionCenter } from './ActionCenter';
+import { PushSetupPrompt } from '../alerts/PushSetupPrompt';
 
 /**
  * The Admin Home, laid out as the approved reference (`docs/transformation/reference/admin-vendor-reference.jpg`): a welcome line, four KPI cards
@@ -73,6 +74,7 @@ export function AdminOverview() {
         actions={reports ? <div className="-mb-4"><Tabs tabs={PRESETS.map((x) => ({ id: x.id, label: t(x.en, x.ar) }))} value={preset} onChange={setPreset} /></div> : undefined}
       />
 
+      <PushSetupPrompt />
       <ActionCenter />
 
       {reports && (
