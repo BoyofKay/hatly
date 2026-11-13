@@ -506,6 +506,21 @@ Production release `20261107T053628Z-079cf82fb4dc` (commit `177d278`, bundle ide
 - Owner actions still open: register Android + computer for push from Home; handle HT-100036/39/40/43 (waiting for stores) and the 5
   driver-acknowledgement orders; approve Driver build 7 distribution.
 
+## 3as. Settlement closing, driver operations, Operations board (2026-11-13) — DEPLOYED and verified (no signed-in check)
+
+- Release `20261113T211742Z-96b47a8d0cb3` (commits 4f5e712, d8e7583, 4d2def0). Migrations 80–82 (SettlementClosingLines, OptionalProofPhoto,
+  DriverPresence) applied: 79 → 82, nothing pending. Rollback = app switch to `20261113T130702Z-6955b8b05679` (schema stays; all additive).
+- Plan: `docs/launch/RELEASE_PLAN_2026-11-13_SETTLEMENT_OPS.md`. Gates on the committed tree: backend unit 2488/2488, integration 318/318,
+  e2e 1194/1194 (3 chunks), dashboard tsc + unit 55/55 + production build. Bundle = `git archive` of the commit (only the usual exclusions).
+- Backup `hatly-prod-20261113T213557Z.dump` (sha256 57b2b04ef5aa…), uploads 85 files, restore drill OK (104 tables, 79 migrations, 17 users),
+  off-host copy OK; `migrate` took its own backup `…T213630Z.dump`. Quiet window: 0 orders on the road.
+- Live checks: backend ready ~5 s; health ok; dashboard 200 (`/login`, `/operations`, `/drivers-today`); new admin routes 401 without a session;
+  0 errors in the backend log; new tables/columns present; settlement periods/payments still 0 (nothing created by the release).
+- Not verified live: signed-in screens (needs the owner's admin sign-in; the agent does not enter credentials).
+- Owner actions: set both drivers' commission rate (Delivery → Drivers); set DRIVER_PRESENCE_STALE_MINUTES (suggested 10); decide the 8 delivered
+  COD orders without a commission event (R43 — shown as held back, no rate assumed); then distribute Driver APK 1.0.0+8
+  (`~/Downloads/Hatly-Driver-Release/hatly-driver-1.0.0-build8-20261113/`, sha256 fc877725…, upload key 6e9dcf06).
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
