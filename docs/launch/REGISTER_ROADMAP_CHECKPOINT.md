@@ -15,7 +15,8 @@ Work happens in the git worktree `../hatly-r1` on branch `feature/register-relea
 | 2D-2 | `20261107T053628Z-079cf82fb4dc` (rollback = 2D-1) | R12 acceptance mode per branch AUTO / VENDOR / HATLY |
 | 2D-3 | `20261107T072134Z-b308f21c41d3` (rollback = 2D-2) | R18 driver capacity per vehicle type + audited per-driver override; prod test-data reset done the same day |
 | UX-1 | `20261107T223459Z-7b9dd3cbe3b3` (rollback = 2D-3) | Admin/Vendor UX: action center, linked alerts, transfer review by order number, payment column, compact drivers, vendor board numbers + waiting time; ended orders close dispatch alerts |
-| P0-ALERTS | `20261108T052118Z-02c8091cd3e1` + follow-up `20261110T225253Z-d5d27b5c0c3e` (current; rollback = UX-1) | Operations alerts for new order / store not accepting / late preparation / driver not acknowledging / dispatch / failed delivery; alarm bar with sound, one sounding tab, acknowledge ≠ resolve; Admin Web Push (VAPID) with honest stages; setup page. Migration 79 |
+| P0-ALERTS | `20261108T052118Z-02c8091cd3e1` + follow-up `20261110T225253Z-d5d27b5c0c3e` (rollback = UX-1) | Operations alerts for new order / store not accepting / late preparation / driver not acknowledging / dispatch / failed delivery; alarm bar with sound, one sounding tab, acknowledge ≠ resolve; Admin Web Push (VAPID) with honest stages; setup page. Migration 79 |
+| P0-OPS | `20261113T130702Z-6955b8b05679` (current; rollback = P0-ALERTS follow-up) | Accept for store from the alert (existing on-behalf endpoint); Home prompt to turn on push. No migration |
 
 ## Built, not distributed
 Driver APK 1.0.0+6: `~/Downloads/Hatly-Driver-Release/hatly-driver-1.0.0-build6-20261106/` (SHA-256 `26bef899…6a89`, upload key `6e9dcf06…`). Waiting for the owner's approval to distribute.

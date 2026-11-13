@@ -495,6 +495,17 @@ Production release `20261107T053628Z-079cf82fb4dc` (commit `177d278`, bundle ide
 - Server note: the 522 seen on mobile data was an OVH hypervisor-initiated power-off on 2026-11-10 08:27 UTC (down 5 h 25 min until 13:53 UTC);
   everything restarted healthy on its own.
 
+## 3ar. P0 operations follow-up (2026-11-13) — DEPLOYED and verified
+
+- Release `20261113T130702Z-6955b8b05679` (commit 2c7bfd6; docs 1c4ffed). No migration (still 79). Rollback = `20261110T225253Z-d5d27b5c0c3e`.
+- From the notifications/order-management audit (2026-11-13): production had **0 registered push devices** and orders waiting days for stores
+  that have no staff accounts. Shipped: "Accept for <store>" on open new-order / store-not-accepted alerts (two taps; existing on-behalf endpoint;
+  alert marked seen; toast confirms; alert closes on the next scan) and a Home card "Turn on notifications" until this browser is registered.
+- Backup `hatly-prod-20261113T132228Z.dump` (sha256 4052e13b09cc…), restore drill OK (104 tables, 79 migrations, 16 users), off-host copy OK.
+- Live checks: health 10/10, backend ready ~5 s, 0 errors, new code served, 401 without session.
+- Owner actions still open: register Android + computer for push from Home; handle HT-100036/39/40/43 (waiting for stores) and the 5
+  driver-acknowledgement orders; approve Driver build 7 distribution.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
