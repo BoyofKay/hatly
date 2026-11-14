@@ -222,7 +222,7 @@ export function BarChart({ points, format, label, xLabel, tick }: { points: Arra
         </svg>
       </div>
       {points.length <= 7 ? (
-        <div className={`mt-1 flex text-xs text-gray-500 ${tick ? 'ms-10' : ''}`} aria-hidden>{points.map((p, i) => <span key={i} className={`flex-1 truncate text-center ${(points.length - 1 - i) % 2 ? 'invisible sm:visible' : ''}`}>{name(p.label)}</span>)}</div>
+        <div className={`mt-1 flex text-xs text-gray-500 ${tick ? 'ms-10' : ''}`} aria-hidden>{points.map((p, i) => <span key={i} className={`min-w-0 flex-1 truncate text-center ${(points.length - 1 - i) % 2 ? 'invisible sm:visible' : ''}`}>{name(p.label)}</span>)}</div>
       ) : (
         <div className={`mt-1 flex justify-between text-xs text-gray-500 ${tick ? 'ms-10' : ''}`} aria-hidden><span>{name(points[0]?.label ?? '')}</span><span>{name(points[points.length - 1]?.label ?? '')}</span></div>
       )}
@@ -332,11 +332,17 @@ export function CursorMore({ hasMore, loading, onMore }: { hasMore: boolean; loa
 export function Modal({ open, title, onClose, children, footer, wide }: { open: boolean; title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Callers pass `onClose` as an inline arrow, a NEW function on every render. With it in the effect's dependencies, each keystroke in a
+  // field (which re-renders the caller) tore the effect down and set it up again: focus jumped back to the opener and then to the FIRST
+  // field — typing stopped after one character (owner report, 2026-11-15). The latest onClose is read from a ref; the effect runs only
+  // when the modal opens or closes.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
       if (e.key === 'Tab' && ref.current) {
         const f = ref.current.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
         if (f.length === 0) return;
@@ -348,7 +354,7 @@ export function Modal({ open, title, onClose, children, footer, wide }: { open: 
     document.addEventListener('keydown', onKey);
     setTimeout(() => ref.current?.querySelector<HTMLElement>('input,select,textarea,button')?.focus(), 0);
     return () => { document.removeEventListener('keydown', onKey); prev?.focus?.(); };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>

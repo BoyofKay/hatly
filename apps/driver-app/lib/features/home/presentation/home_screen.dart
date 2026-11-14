@@ -34,6 +34,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _startPolling();
+    // The switch shows the server's state, not a default "offline" (2026-11-15).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(driverOnlineStateProvider.notifier).syncFromServer();
+    });
   }
 
   void _startPolling() {
@@ -48,6 +52,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     switch (state) {
       case AppLifecycleState.resumed:
         _startPolling();
+        ref.read(driverOnlineStateProvider.notifier).syncFromServer();
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:

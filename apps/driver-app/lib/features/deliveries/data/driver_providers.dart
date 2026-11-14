@@ -71,6 +71,30 @@ class DriverOnlineStateNotifier extends StateNotifier<AsyncValue<bool>> {
     }
   }
 
+  /// Owner report (2026-11-15): after closing and reopening the app the switch showed OFFLINE although the server still had the driver
+  /// online (and dispatching to him) — the switch only ever started at `false`. This reads the server's switch on launch and whenever the
+  /// app comes back to the front, and starts / stops the location timer to match. Never while a toggle is in flight; an unreadable status
+  /// changes nothing.
+  Future<void> syncFromServer() async {
+    if (state.isLoading) return;
+    final serverOnline = await _driverApi.getOnlineStatus();
+    if (serverOnline == null || state.isLoading) return;
+    if (serverOnline) {
+      _startLocation();
+    } else {
+      _locationService.stop();
+    }
+    state = AsyncValue.data(serverOnline);
+  }
+
+  void _startLocation() {
+    _locationService.start((position) {
+      _driverApi
+          .updateLocation(latitude: position.latitude, longitude: position.longitude)
+          .catchError((_) {});
+    });
+  }
+
   /// Called on logout — CONFIRMED: stop the location timer and reset
   /// local state; does not itself call the online-status API (not
   /// part of the approved logout behavior — "stop location timer →

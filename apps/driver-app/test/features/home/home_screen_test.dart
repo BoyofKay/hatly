@@ -21,7 +21,17 @@ class FakeDriverApi implements DriverApi {
   @override
   Future<String?> getOperationsPhone() async => null;
 
-  FakeDriverApi({this.deliveries = const [], this.setOnlineError});
+  FakeDriverApi({this.deliveries = const [], this.setOnlineError, this.serverOnline});
+
+  /// What GET /driver/online-status answers (null = unreadable / older backend).
+  bool? serverOnline;
+  int onlineStatusReads = 0;
+
+  @override
+  Future<bool?> getOnlineStatus() async {
+    onlineStatusReads++;
+    return serverOnline;
+  }
 
   List<Delivery> deliveries;
   Object? setOnlineError;
@@ -130,8 +140,8 @@ Delivery _delivery(String id, String orderId, String customerName, String status
   );
 }
 
-Future<(FakeDriverApi, FakeLocationService, FakePollingService)> pump(WidgetTester tester, {List<Delivery> deliveries = const []}) async {
-  final fakeApi = FakeDriverApi(deliveries: deliveries);
+Future<(FakeDriverApi, FakeLocationService, FakePollingService)> pump(WidgetTester tester, {List<Delivery> deliveries = const [], FakeDriverApi? api}) async {
+  final fakeApi = api ?? FakeDriverApi(deliveries: deliveries);
   final fakeLocation = FakeLocationService();
   final fakePolling = FakePollingService();
   final router = GoRouter(routes: [
@@ -161,6 +171,37 @@ void main() {
       for (final st in ['DELIVERED', 'CANCELLED', 'FAILED_DELIVERY', 'COLLECTED', 'READY_FOR_PICKUP', 'PENDING']) {
         expect(Delivery.activeStatuses.contains(st), isFalse, reason: st);
       }
+    });
+  });
+
+  group('online switch follows the server (2026-11-15)', () {
+    testWidgets('reopening the app while the server still has the driver online shows ONLINE and restarts the location timer', (tester) async {
+      final api = FakeDriverApi(serverOnline: true);
+      final (_, fakeLocation, _) = await pump(tester, api: api);
+      expect(api.onlineStatusReads, greaterThanOrEqualTo(1));
+      expect(find.text('You are ONLINE'), findsOneWidget);
+      expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+      expect(fakeLocation.started, isTrue);
+      expect(api.onlineStatusCalls, isEmpty); // reading never changes the server's switch
+    });
+
+    testWidgets('an unreadable status (older backend / no network) keeps OFFLINE and starts nothing', (tester) async {
+      final api = FakeDriverApi(serverOnline: null);
+      final (_, fakeLocation, _) = await pump(tester, api: api);
+      expect(find.text('You are OFFLINE'), findsOneWidget);
+      expect(fakeLocation.started, isFalse);
+    });
+
+    testWidgets('coming back to the front re-reads the status (switched offline elsewhere → OFFLINE, timer stopped)', (tester) async {
+      final api = FakeDriverApi(serverOnline: true);
+      final (_, fakeLocation, _) = await pump(tester, api: api);
+      expect(find.text('You are ONLINE'), findsOneWidget);
+      api.serverOnline = false;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('You are OFFLINE'), findsOneWidget);
+      expect(fakeLocation.stopped, isTrue);
     });
   });
 

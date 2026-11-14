@@ -12,6 +12,8 @@ import 'package:hatly_driver/features/deliveries/presentation/delivery_detail_sc
 /// A fake of the real `DriverApi` — no real Dio/ApiClient/secure-storage plumbing needed for these
 /// widget tests, since `DeliveryDetailScreen` only ever calls it through `driverApiProvider`.
 class FakeDriverApi implements DriverApi {
+  @override
+  Future<bool?> getOnlineStatus() async => null;
   FakeDriverApi(this._delivery);
 
   Delivery _delivery;

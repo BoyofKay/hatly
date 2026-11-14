@@ -39,6 +39,12 @@ export class DriverProfileService {
     return this.driversRepository.findOneOrFail({ where: { id: driver.id } });
   }
 
+  /** Read-only: is this driver online for dispatch right now (the server's switch, not the app's memory). */
+  async getOnlineStatus(userId: string): Promise<{ isOnline: boolean }> {
+    const driver = await this.driverAuthorizationService.getDriverForUser(userId);
+    return { isOnline: Boolean(driver.isOnline) };
+  }
+
   async updateLocation(userId: string, latitude: number, longitude: number): Promise<Driver> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
     await this.driversRepository.update({ id: driver.id }, { lastLatitude: latitude, lastLongitude: longitude, lastLocationAt: new Date() });

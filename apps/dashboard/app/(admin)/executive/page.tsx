@@ -103,7 +103,7 @@ function ExecutiveDashboard() {
         )}
       </Async>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-3">
+      <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">{/* grid-cols-1 = minmax(0,1fr): a card never makes the page wider than the phone */}
         <Card title={t('Orders per day', 'الطلبات يوميًا')} className="xl:col-span-2">
           <Async state={series} empty={series.data && series.data.points.length === 0} emptyTitle={t('No orders in this period', 'لا توجد طلبات في هذه الفترة')} rows={3}>
             {series.data && <BarChart label={t('Orders per day', 'الطلبات يوميًا')} points={series.data.points.map((p: any) => ({ label: p.bucketStart, value: p.value }))} />}

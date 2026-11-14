@@ -33,6 +33,18 @@ class DriverApi {
     }
   }
 
+  /// The online switch as the SERVER holds it (2026-11-15), so the app shows the truth after it was closed and reopened. `null` when it
+  /// cannot be read (an older backend without the endpoint, or no network) — the caller then keeps what it shows.
+  Future<bool?> getOnlineStatus() async {
+    try {
+      final response = await _apiClient.dio.get('/driver/online-status');
+      final value = (response.data['data'] as Map<String, dynamic>?)?['isOnline'];
+      return value is bool ? value : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> setOnlineStatus(bool isOnline) async {
     await _apiClient.dio.patch('/driver/online-status', data: {'isOnline': isOnline});
   }

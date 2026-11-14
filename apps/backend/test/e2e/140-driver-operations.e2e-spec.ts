@@ -319,4 +319,15 @@ describe('E2E — driver operations: photo, active list, history, earnings, capa
       }
     });
   });
+  it('2026-11-15: the driver app reads its online switch from the server (GET); only the driver may read it', async () => {
+    const d = await s.driver({ ...near });
+    expect(expectData<any>(await api('get', d, '/driver/online-status'))).toEqual({ isOnline: true }); // s.driver() brings the driver online
+    expectData(await api('patch', d, '/driver/online-status', { isOnline: false }));
+    expect(expectData<any>(await api('get', d, '/driver/online-status'))).toEqual({ isOnline: false });
+    expectData(await api('patch', d, '/driver/online-status', { isOnline: true }));
+    expect(expectData<any>(await api('get', d, '/driver/online-status'))).toEqual({ isOnline: true });
+    expect((await api('get', admin, '/driver/online-status')).status).toBe(403);
+    expect((await api('get', await s.customer(), '/driver/online-status')).status).toBe(403);
+    expect((await api('get', undefined, '/driver/online-status')).status).toBe(401);
+  });
 });

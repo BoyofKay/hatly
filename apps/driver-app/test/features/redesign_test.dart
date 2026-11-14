@@ -22,6 +22,8 @@ const _delegates = [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizat
 
 class _Api implements DriverApi {
   @override
+  Future<bool?> getOnlineStatus() async => null;
+  @override
   Future<Delivery> acknowledgeDelivery(String id) async => throw UnimplementedError();
 
   @override

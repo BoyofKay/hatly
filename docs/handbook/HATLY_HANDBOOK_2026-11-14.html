@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hatly Platform Handbook</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  :root { --ink:#1d2433; --muted:#5b6474; --line:#d9dee7; --soft:#f4f6f9; --brand:#e8650a; --brand-soft:#fff3ea; --red:#b42318; --red-soft:#fef3f2; --amber:#8a5a00; --amber-soft:#fffaeb; --green:#05603a; --green-soft:#ecfdf3; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; color: var(--ink); font-size: 10.2pt; line-height: 1.45; margin: 0; }
+  h1 { font-size: 20pt; margin: 0 0 6pt; color: var(--ink); page-break-before: always; border-bottom: 2.5pt solid var(--brand); padding-bottom: 4pt; }
+  h1.first { page-break-before: avoid; }
+  h2 { font-size: 13.5pt; margin: 16pt 0 5pt; color: var(--ink); page-break-after: avoid; }
+  h3 { font-size: 11pt; margin: 11pt 0 4pt; color: #2b3445; page-break-after: avoid; }
+  p { margin: 4pt 0 6pt; }
+  ul, ol { margin: 3pt 0 7pt 0; padding-left: 16pt; }
+  li { margin: 1.5pt 0; }
+  table { width: 100%; border-collapse: collapse; margin: 5pt 0 10pt; font-size: 8.9pt; page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  th { background: var(--soft); text-align: left; font-weight: 600; border: 0.6pt solid var(--line); padding: 3.5pt 5pt; vertical-align: top; }
+  td { border: 0.6pt solid var(--line); padding: 3.5pt 5pt; vertical-align: top; }
+  code, .mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.6pt; background: var(--soft); padding: 0 2pt; border-radius: 2pt; }
+  pre { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 8.4pt; background: var(--soft); border: 0.6pt solid var(--line); padding: 6pt 8pt; border-radius: 3pt; white-space: pre-wrap; page-break-inside: avoid; margin: 4pt 0 8pt; }
+  .callout { border-left: 3pt solid var(--brand); background: var(--brand-soft); padding: 6pt 9pt; margin: 6pt 0 9pt; page-break-inside: avoid; }
+  .risk { border-left: 3pt solid var(--red); background: var(--red-soft); padding: 6pt 9pt; margin: 6pt 0 9pt; page-break-inside: avoid; }
+  .warn { border-left: 3pt solid #dc9b00; background: var(--amber-soft); padding: 6pt 9pt; margin: 6pt 0 9pt; page-break-inside: avoid; }
+  .ok { border-left: 3pt solid #12b76a; background: var(--green-soft); padding: 6pt 9pt; margin: 6pt 0 9pt; page-break-inside: avoid; }
+  .tag { display: inline-block; font-size: 7.6pt; font-weight: 700; padding: 0.5pt 4pt; border-radius: 6pt; letter-spacing: 0.2pt; }
+  .p0 { background: var(--red); color: #fff; } .p1 { background: #dc6803; color: #fff; } .p2 { background: #667085; color: #fff; }
+  .crit { color: var(--red); font-weight: 600; } .muted { color: var(--muted); }
+  .cover { height: 245mm; display: flex; flex-direction: column; justify-content: space-between; }
+  .cover .band { background: var(--brand); color: #fff; padding: 22pt 22pt 18pt; border-radius: 6pt; }
+  .cover h1 { border: 0; color: #fff; font-size: 30pt; margin: 0; page-break-before: avoid; }
+  .cover .sub { font-size: 13pt; opacity: .95; margin-top: 6pt; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt; }
+  .kpi { border: 0.6pt solid var(--line); border-radius: 4pt; padding: 6pt 8pt; }
+  .kpi b { display: block; font-size: 15pt; }
+  .toc ol { columns: 2; column-gap: 18pt; font-size: 9.6pt; }
+  .small { font-size: 8.6pt; }
+  .flow { font-family: "SF Mono", Menlo, monospace; font-size: 8.6pt; background: #fbfcfd; border: 0.6pt dashed var(--line); padding: 6pt 8pt; white-space: pre; page-break-inside: avoid; margin: 4pt 0 8pt; overflow: hidden; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="band">
+    <h1 class="first">Hatly Platform Handbook</h1>
+    <div class="sub">How the system works, as built: business position, operations, calculations, automation, configuration, security, and roadmap</div>
+  </div>
+  <div>
+    <table>
+      <tr><th style="width:32%">Source of truth</th><td>The code at commit <code>7c12d37</code> (branch <code>feature/register-release-1</code>, equal to <code>master</code> on GitHub), plus a read-only snapshot of the live production database and configuration taken on 14 Nov 2026.</td></tr>
+      <tr><th>Live release</th><td><code>20261114T043549Z-06e85f770a16</code> on <code>api.hatly.dev</code> / <code>admin.hatly.dev</code>. Driver App 1.0.0+8 built; Customer App 1.0.0+6 in the tree.</td></tr>
+      <tr><th>Scope</th><td>Backend (NestJS, 37 modules, 86 controllers, 62 tables, 82 migrations), Admin + Vendor dashboard (Next.js), Customer App and Driver App (Flutter).</td></tr>
+      <tr><th>Method</th><td>Every rule below was read from the code (state tables, services, formulas, guards, migrations) and, where it matters, checked against production values. Where the code and the comments disagree, the code wins and the gap is reported.</td></tr>
+      <tr><th>Changes made during this review</th><td>None. The only pending, uncommitted change is the approved mobile-layout fix for the Executive overview page (verified, not released).</td></tr>
+    </table>
+    <p class="muted small">Money is stored everywhere as integer minor units (piastres): 1 EGP = 100. Times are stored as instants and shown in Africa/Cairo. "R" numbers (R2, R16 …) and "PD" numbers refer to the owner's decision register entries quoted in the code.</p>
+  </div>
+</section>
+
+<h1>Contents</h1>
+<div class="toc">
+<ol>
+  <li>Executive summary and current business position</li>
+  <li>What Hatly is: the business model</li>
+  <li>Platform architecture and environments</li>
+  <li>Actors, user roles, permissions</li>
+  <li>Customer journey</li>
+  <li>Store (vendor) journey</li>
+  <li>Driver journey</li>
+  <li>Operations team: daily workflow</li>
+  <li>State machines (order, store part, payment, delivery)</li>
+  <li>Calculations: fees, offers, totals, loyalty</li>
+  <li>Commission, settlement and closing math</li>
+  <li>Refunds, wallet and cash handling</li>
+  <li>Dispatch logic</li>
+  <li>Automated system actions and timers</li>
+  <li>Alerts: every trigger, priority and lifecycle</li>
+  <li>Configuration and dependency tree</li>
+  <li>Open loops, broken cycles and dead settings</li>
+  <li>KPIs, reports, exports and monitoring</li>
+  <li>Security</li>
+  <li>UI/UX review and behaviour inconsistencies</li>
+  <li>Business and operations recommendations</li>
+  <li>Roadmap</li>
+  <li>Appendix: glossary and quick reference</li>
+</ol>
+</div>
+
+<!-- ============================================================ 1 -->
+<h1>1. Executive summary and current business position</h1>
+
+<p>Hatly is a multi-vendor local-commerce and delivery marketplace for Belbeis (Sharkia). Customers order from registered stores, or ask Hatly to buy or carry something from any place ("Hatly Service": <i>هاتلي من مكان</i> / <i>وصّلي لمكان</i>). Hatly runs the operation: it accepts orders on behalf of stores when needed, dispatches its own couriers, collects cash, settles with couriers and stores, and earns commission and service revenue.</p>
+
+<h2>1.1 Production snapshot (14 Nov 2026, read-only)</h2>
+<div class="grid2">
+  <div class="kpi"><span class="muted small">Stores / active branches</span><b>34 / 32</b><span class="small">all 32 marked open; 33 branches have a commission rate (0.05%–10%)</span></div>
+  <div class="kpi"><span class="muted small">Catalogue</span><b>226 products</b><span class="small">7 marketplace sectors · 1 active offer</span></div>
+  <div class="kpi"><span class="muted small">Customers</span><b>14</b><span class="small">phone OTP is OFF (no SMS provider)</span></div>
+  <div class="kpi"><span class="muted small">Couriers</span><b>2</b><span class="small">both without a commission rate</span></div>
+  <div class="kpi"><span class="muted small">Orders (all time, after the 7 Nov reset)</span><b>20</b><span class="small">19 cash (COD) + 1 InstaPay; all delivery</span></div>
+  <div class="kpi"><span class="muted small">Serviceable area</span><b>1 delivery zone</b><span class="small">"Abu Naceeb", fee 15.00 EGP; Google Maps disabled</span></div>
+  <div class="kpi"><span class="muted small">Staff accounts</span><b>1 super admin</b><span class="small">0 admins · 0 store staff accounts · MFA not enrolled</span></div>
+  <div class="kpi"><span class="muted small">Settlement</span><b>0 closings</b><span class="small">0 settlement payments; 13 store-commission and 4 courier-commission events recorded</span></div>
+</div>
+
+<h2>1.2 What is working well</h2>
+<ul>
+  <li><b>Strong integrity design.</b> Every status change goes through an explicit state table under a database row lock. Money is integer-only and frozen at the moment it is decided (fees, rates, discounts). Financial events are idempotent and append-only. Wallet and loyalty are ledgers, never edited.</li>
+  <li><b>Operations tooling is complete for the current scale.</b> This includes the Operations board, Stores now, Drivers today with one-step closing and cash recording, exceptions, failed deliveries, manual-transfer verification, alerts with push and sound, 25 reports with CSV/XLSX/PDF export, and an audit of every admin change.</li>
+  <li><b>Safe automation.</b> Automatic dispatch never re-assigns or releases on its own. Every timer is idempotent, locked against double-runs, and switchable off.</li>
+</ul>
+
+<h2>1.3 Top issues to act on (details in sections 17, 19, 21)</h2>
+<table>
+  <tr><th style="width:7%">Prio</th><th>Issue (verified in production)</th><th style="width:34%">Effect</th></tr>
+  <tr><td><span class="tag p0">P0</span></td><td>Customer-service WhatsApp number stored as <code>"201104949903+"</code> (plus sign at the end); <code>OPERATIONS_CONTACT_PHONE</code> unset, so it falls back to that value.</td><td>Support links in the apps and the courier's "Call Operations" may not dial.</td></tr>
+  <tr><td><span class="tag p0">P0</span></td><td>Manual-transfer destination label is <code>"E.g.instapay"</code> (placeholder text).</td><td>Customers paying by InstaPay see a placeholder as the payment label.</td></tr>
+  <tr><td><span class="tag p0">P0</span></td><td>The only super-admin has no second factor (MFA) and the MFA policy is off.</td><td>One stolen password gives full control of money, data and settings.</td></tr>
+  <tr><td><span class="tag p0">P0</span></td><td>Both couriers have no commission rate.</td><td>Courier commission is silently not recognised; closings show orders as "held back".</td></tr>
+  <tr><td><span class="tag p1">P1</span></td><td>No store staff accounts (0/33 branches), yet 32 branches are set to "store accepts".</td><td>Every new order depends on Hatly accepting on the store's behalf; "Stores now" has no number to call.</td></tr>
+  <tr><td><span class="tag p1">P1</span></td><td>Settlement frequency settings are empty strings.</td><td>Store closings would be stored with an empty frequency (no error, poor data).</td></tr>
+  <tr><td><span class="tag p1">P1</span></td><td>No SMS provider (OTP off), no mobile push (FCM), no off-site backup target, Google Maps off.</td><td>Unverified customer phones, no customer push, backups only on the same server plus the owner's Mac, and zone-only pricing.</td></tr>
+  <tr><td><span class="tag p1">P1</span></td><td>Only one delivery zone exists.</td><td>Any address outside "Abu Naceeb" cannot order (fails closed with <code>ADDRESS_ZONE_REQUIRED</code>).</td></tr>
+  <tr><td><span class="tag p2">P2</span></td><td>Three dead permissions, three dead or superseded settings, and a legacy store commission column.</td><td>Confusing to administer; see section 17.</td></tr>
+</table>
+
+<!-- ============================================================ 2 -->
+<h1>2. What Hatly is: the business model</h1>
+
+<h2>2.1 Order types the platform sells</h2>
+<table>
+  <tr><th style="width:22%">Type</th><th>What the customer gets</th><th style="width:30%">Who fulfils</th></tr>
+  <tr><td><b>Store order (CATALOG)</b><br>delivery or pickup</td><td>Products from one or several registered stores in one basket (multi-vendor is ON). Each store's share is a separate <i>store part</i> (segment) with its own status.</td><td>Each store prepares its part; one Hatly courier collects all parts (delivery) or the customer collects (pickup).</td></tr>
+  <tr><td><b>Hatly Service: BUY_FROM_PLACE</b> (<i>هاتلي من مكان</i>)</td><td>The customer lists items (free text) from any place; a courier buys them and brings them.</td><td>Courier buys with own money (or cash on delivery), records the purchase amount; price confirmed by Operations.</td></tr>
+  <tr><td><b>Hatly Service: DELIVER_TO_PLACE</b> (<i>وصّلي لمكان</i>)</td><td>A courier carries something from the customer to a place.</td><td>Courier only. There is no store and no acceptance: the part becomes ready automatically once payment allows.</td></tr>
+</table>
+
+<h2>2.2 Revenue and cost lines (as recognised by the ledger)</h2>
+<table>
+  <tr><th style="width:30%">Line</th><th>Rule in code</th><th style="width:22%">When recognised</th></tr>
+  <tr><td>Store commission (<code>VENDOR_COMMISSION_RECOGNIZED</code>)</td><td><code>round(segment subtotal × branch rate bps / 10 000)</code>; per store part, own branch rate, snapshot of the rate.</td><td>When the goods leave the store: PICKED_UP (delivery) or COLLECTED (pickup).</td></tr>
+  <tr><td>Courier commission (<code>DRIVER_COMMISSION_RECOGNIZED</code>)</td><td><code>round(courier compensation × courier rate bps / 10 000)</code>. Compensation = the whole delivery fee incl. additional-store charge (store orders); for Hatly Service only the base fee before the multiplier.</td><td>DELIVERED.</td></tr>
+  <tr><td>Hatly Service premium (<code>HATLY_SERVICE_CHARGE_RECOGNIZED</code>)</td><td><code>charge − base fee</code> (the multiplier part, default ×1.5); Hatly's own revenue, never subject to the courier %.</td><td>DELIVERED.</td></tr>
+  <tr><td>Hatly-funded discounts (cost)</td><td>Every offer discount is Hatly-funded: it never reduces the store's commission basis. Recorded and restored on cancellation.</td><td>Order placement / cancellation.</td></tr>
+  <tr><td>Courier reimbursement (liability)</td><td>For electronically paid orders the courier pays the store with own money; Hatly owes it back (<code>DRIVER_REIMBURSEMENT_OWED</code>).</td><td>PICKED_UP.</td></tr>
+  <tr><td>Manual-transfer refunds (liability)</td><td>Paid InstaPay money for cancelled/reduced orders; recorded, then marked sent by a person.</td><td>Cancellation / approval.</td></tr>
+</table>
+<p>"Hatly revenue" on the Executive overview = store commission + courier commission + service charge − net Hatly-funded discounts. Delivery fees themselves are courier compensation, not Hatly revenue.</p>
+
+<h2>2.3 Payment methods</h2>
+<table>
+  <tr><th style="width:22%">Method</th><th>Flow and gating</th></tr>
+  <tr><td>COD (cash on delivery)</td><td>Courier collects cash; fulfilment proceeds immediately. The courier pays the store for the goods at pickup from his own float and keeps the delivery-fee part as "cash held" against his compensation.</td></tr>
+  <tr><td>PAY_AT_DELIVERY</td><td>Electronic payment when the courier arrives; fulfilment proceeds immediately.</td></tr>
+  <tr><td>WALLET</td><td>Debited at checkout. It may cover the order fully, or partially, with the remainder on another method (PD-001).</td></tr>
+  <tr><td>MANUAL_TRANSFER (InstaPay, Vodafone Cash, Orange Cash, Etisalat Cash, WE Pay)</td><td>An electronic prepayment.
+    <ul>
+      <li>The customer transfers, then taps "I have transferred" (CLAIMED), which moves to UNDER_REVIEW automatically.</li>
+      <li>Operations verify PAID or REJECTED.</li>
+      <li><b>R2:</b> the store does not even see the order until it is PAID.</li>
+      <li>No preparing or dispatch before PAID.</li>
+      <li>The preparation clock restarts at approval.</li>
+      <li><b>R21:</b> optional auto-cancel if not verified within the configured window (OFF in production).</li>
+    </ul></td></tr>
+</table>
+
+<!-- ============================================================ 3 -->
+<h1>3. Platform architecture and environments</h1>
+<table>
+  <tr><th style="width:20%">Component</th><th>Technology and role</th></tr>
+  <tr><td>Backend API</td><td>NestJS + TypeORM on PostgreSQL 16, Redis 7 (sessions, refresh tokens, rate limits, locks). Node 22. Routes under <code>/api/v1</code>. Workers run in the same process as timers (switch <code>JOBS_WORKER_ENABLED</code>).</td></tr>
+  <tr><td>Dashboard</td><td>Next.js app with two areas: <b>Admin</b> (Hatly staff, 10 sections) and <b>Vendor</b> (store staff: overview, orders, order history, products, stock, stock history, finance, earnings, insights, team, branches, notifications). Bilingual EN/AR with RTL.</td></tr>
+  <tr><td>Customer App</td><td>Flutter (Android/iOS), 1.0.0+6. Screens: splash, phone entry, OTP, home, sectors and vendors, product details, search, favourites, cart, checkout, transfer instructions, order success, orders, order details, live tracking, addresses, wallet, loyalty, notifications, profile, Hatly Service.</td></tr>
+  <tr><td>Driver App</td><td>Flutter Android, 1.0.0+8 (signed with the upload key, not yet distributed). Screens: login, home (active orders, online switch), delivery detail, earnings (current shift, closed shifts), history, profile.</td></tr>
+  <tr><td>Hosting</td><td>One VPS (<code>/opt/hatly-prod</code>), Docker Compose (backend, dashboard, postgres, redis) behind Caddy + Cloudflare. Staging runs on the same host. Releases are immutable folders. <code>prod.sh</code> handles build, env-check, plan, backup, migrate and apps; rollback is a symlink switch.</td></tr>
+  <tr><td>External providers</td><td>Maps: <b>none</b> (disabled). SMS (Unifonic): <b>not configured</b>. Mobile push (FCM): <b>not configured</b>. Admin web push (VAPID): configured. Off-site backup: <b>not configured</b>.</td></tr>
+</table>
+
+<!-- ============================================================ 4 -->
+<h1>4. Actors, user roles and permissions</h1>
+
+<h2>4.1 Roles</h2>
+<table>
+  <tr><th style="width:18%">Role</th><th>Can do</th><th style="width:24%">Production count</th></tr>
+  <tr><td>CUSTOMER</td><td>Browse, cart, checkout, pay, track, cancel within the window, rate, wallet and loyalty, addresses, favourites.</td><td>14</td></tr>
+  <tr><td>DRIVER</td><td>Go online/offline, see own deliveries, acknowledge, pick up, on the way, delivered or failed, record weights and purchase amounts, cash and change, see earnings and closings. Cannot reject or release (R17).</td><td>2</td></tr>
+  <tr><td>VENDOR / VENDOR_MANAGER</td><td>Store staff of one or more branches. They act on their own store parts (accept, prepare, ready, reject, collected), manage stock and products (changes go through a request), branch closures, and see finance. A manager also manages the team.</td><td>0</td></tr>
+  <tr><td>ADMIN</td><td>Hatly staff. They can do only what their individual <b>permissions</b> allow (62 permissions).</td><td>0</td></tr>
+  <tr><td>SUPER_ADMIN</td><td>Bypasses every permission check and manages users and role templates.</td><td>1</td></tr>
+</table>
+
+<h2>4.2 Permission catalogue (62), grouped</h2>
+<table>
+  <tr><th style="width:22%">Area</th><th>Permissions</th></tr>
+  <tr><td>Orders & operations</td><td>VIEW_ORDERS, MANAGE_ORDER_FULFILMENT (act for stores), MANAGE_ORDER_ISSUES (exceptions, failed deliveries, collected fallback), ASSIGN_REASSIGN_ORDERS, OVERRIDE_DISPATCH (assign outside ranking, switch automation), OPEN_CLOSE_VENDOR_BRANCHES, VERIFY_MANUAL_PAYMENTS, ORDERS_EXPORT</td></tr>
+  <tr><td>Fleet</td><td>MANAGE_DRIVERS, FLEET_VIEW, MANAGE_VEHICLE_TYPES, MANAGE_DRIVER_COMMISSION, FLEET_EXPORT, <s>CHANGE_DRIVER_ONLINE_STATUS</s>*, <s>MANAGE_DRIVER_VENDOR_PREFERENCES</s>*</td></tr>
+  <tr><td>Stores & catalogue</td><td>VENDORS_VIEW, MANAGE_VENDORS, MANAGE_VENDOR_STAFF, MANAGE_VENDOR_COMMISSION, CATALOG_VIEW, MANAGE_CATALOG, CATALOG_EXPORT, MANAGE_MARKETPLACE_SECTORS, MANAGE_HOME_BANNERS, MEDIA_VIEW, MANAGE_MEDIA, MEDIA_DELETE</td></tr>
+  <tr><td>Money</td><td>VIEW_FINANCIALS, VIEW_VENDOR_FINANCIAL_REPORTS, VIEW_DRIVER_SETTLEMENTS, CLOSE_VENDOR_SETTLEMENTS, CLOSE_DRIVER_SETTLEMENTS, MANAGE_SETTLEMENT_PAYMENTS, APPROVE_SETTLEMENT_OVERPAYMENT, MANAGE_EMPLOYEE_LOANS, MANAGE_CUSTOMER_WALLET, WALLET_ADJUST_APPROVE, FINANCE_EXPORT</td></tr>
+  <tr><td>Customers</td><td>VIEW_CUSTOMERS, VIEW_CUSTOMER_PII (unmasked phone/name), MANAGE_CUSTOMERS, MODERATE_REVIEWS, CUSTOMERS_EXPORT</td></tr>
+  <tr><td>Marketing</td><td>MANAGE_OFFERS, MARKETING_VIEW, MANAGE_CAMPAIGNS, CAMPAIGN_APPROVE, MANAGE_BROADCASTS, BROADCAST_APPROVE, MARKETING_EXPORT, <s>MANAGE_LOYALTY_CONFIG</s>*</td></tr>
+  <tr><td>Configuration & system</td><td>MANAGE_BUSINESS_CONFIG, CONFIG_VIEW, MANAGE_SERVICE_AREAS, MANAGE_DELIVERY_FEE_MULTIPLIER, MANAGE_HATLY_SERVICE_PRICING, VIEW_SYSTEM_HEALTH, MANAGE_SYSTEM_JOBS, VIEW_REPORTS, REPORTS_EXPORT, VIEW_AUDIT_LOG, AUDIT_EXPORT</td></tr>
+</table>
+<p class="small">* Defined but enforced by no endpoint (dead), see section 17. <b>Maker-checker pairs</b>: campaigns (MANAGE_CAMPAIGNS / CAMPAIGN_APPROVE), broadcasts (MANAGE_BROADCASTS / BROADCAST_APPROVE), wallet adjustments (MANAGE_CUSTOMER_WALLET / WALLET_ADJUST_APPROVE), settlement overpayment (MANAGE_SETTLEMENT_PAYMENTS / APPROVE_SETTLEMENT_OVERPAYMENT).</p>
+
+<h2>4.3 Built-in role templates</h2>
+<p>A template only pre-fills permissions when creating an admin. Afterwards each grant is edited individually and nothing links back. Approver and dangerous permissions are deliberately in <b>no</b> template: CAMPAIGN/BROADCAST/WALLET_ADJUST approvals, overpayment approval, MEDIA_DELETE, AUDIT_EXPORT, VIEW_AUDIT_LOG, MANAGE_BUSINESS_CONFIG, MANAGE_VENDORS, both commission permissions, and MANAGE_HATLY_SERVICE_PRICING.</p>
+<table>
+  <tr><th style="width:16%">Template</th><th>Grants</th></tr>
+  <tr><td>Finance</td><td>Orders and customers view, reports, financials, store and courier settlement view and close, settlement payments, verify manual payments, finance export …</td></tr>
+  <tr><td>Operations</td><td>View orders, act for stores, order issues, assign and override dispatch, manage drivers, open/close branches, vendors and fleet view, customers view …</td></tr>
+  <tr><td>Support</td><td>View orders, order issues, customers (incl. PII), manage customers, moderate reviews, customer wallet.</td></tr>
+  <tr><td>Catalog</td><td>Catalogue, sectors, banners, media, vendors view, catalogue export.</td></tr>
+  <tr><td>Marketing</td><td>Offers, banners, campaigns, broadcasts, loyalty (dead permission), marketing view and export, media, reports, customers view.</td></tr>
+  <tr><td>Read-only</td><td>View pages only: no money, no personal data, no exports, no changes.</td></tr>
+</table>
+
+<!-- ============================================================ 5 -->
+<h1>5. Customer journey</h1>
+<h2>5.1 Account</h2>
+<ul>
+  <li>Registration and sign-in by phone + password. Phone OTP verification is controlled by <code>CUSTOMER_OTP_ENABLED</code>, which is <b>false</b> in production (no SMS provider), so phones are not verified.</li>
+  <li>Account deletion is a request, handled by Admin (Customers → Deletion requests).</li>
+</ul>
+<h2>5.2 Discover and build the basket</h2>
+<ul>
+  <li>Home: banners, sectors, curated home sections (best-selling cache), stores, offers.</li>
+  <li>A store is visible and orderable only when its branch is active, open (manual switch) and not inside a scheduled closure, and the customer's address is serviceable.</li>
+  <li>The cart can hold several stores (<code>MULTI_VENDOR_ORDERS_ENABLED=true</code>).</li>
+  <li>Products can be priced per piece or by weight. A weighed item is finalised when the store or courier records the actual weight; it must be recorded before pickup/collection.</li>
+  <li>Stock modes: tracked inventory is decremented on order and restored on cancellation; "open" inventory is not tracked.</li>
+</ul>
+<h2>5.3 Address and serviceability</h2>
+<ul>
+  <li>Two address methods: <b>GPS pin</b> (priced by road distance; needs Maps) or <b>MANUAL</b> (pick a delivery zone; fixed zone fee).</li>
+  <li>In production, Maps is off, so <b>only zone addresses can be priced</b>. Today there is one zone (Abu Naceeb, 15 EGP).</li>
+  <li>Error codes the customer can meet:
+    <ul>
+      <li><code>ADDRESS_ZONE_REQUIRED</code>: the address has no zone.</li>
+      <li><code>DELIVERY_ZONE_UNAVAILABLE</code>: the selected zone is inactive.</li>
+      <li><code>DISTANCE_PRICING_UNAVAILABLE</code>: a GPS address while Maps is off.</li>
+    </ul></li>
+</ul>
+<h2>5.4 Checkout</h2>
+<ol>
+  <li><b>Quote</b>: the server prices everything (items, offers, delivery fee, service charge, wallet use, ETA range) and returns a signed <b>quote token</b>, valid for <code>CHECKOUT_QUOTE_TTL_SECONDS</code> (code default if unset).</li>
+  <li><b>Place order</b> with that token. The server re-validates stock, hours, product validity and payment method, then freezes every amount and the fee breakdown on the order. Order numbers look like <code>HT-100050</code>.</li>
+  <li>For a manual transfer, the app shows the transfer instructions (destination from <code>MANUAL_TRANSFER_DESTINATION</code>). After transferring, the customer taps "I have transferred".</li>
+</ol>
+<h2>5.5 After the order</h2>
+<ul>
+  <li>Live status, timeline and ETA. The ETA is derived only: store readiness + frozen travel time ± <code>ETA_RANGE_BUFFER_MINUTES</code> (15). If any input is unknown, it says "unavailable" and never fakes a number.</li>
+  <li>In-app notifications for: placed, confirmed, preparing, ready, assigned, on the way, delivered or collected, failed delivery, cancelled, part cancelled, item unavailable. Push is not configured in production.</li>
+  <li><b>Cancellation by the customer (R3/R40)</b>:
+    <ul>
+      <li>A store order can be cancelled until the goods leave the store: PENDING, CONFIRMED, PREPARING, READY_FOR_PICKUP, or ASSIGNED_TO_DRIVER (not yet picked up). Hatly bears any preparation cost.</li>
+      <li>A Hatly Service part can be cancelled until the courier records the purchase.</li>
+      <li>The customer can never cancel one store's part only.</li>
+    </ul></li>
+  <li><b>Unavailable item (PD-016)</b>: the store marks the item and the customer chooses to <i>continue without it</i> or <i>cancel the whole order</i>. Silence is never consent: the case waits for Operations, who call the customer and record the decision. There is no substitution.</li>
+  <li>Ratings after completion. Wallet and loyalty screens. Support via WhatsApp (<code>CUSTOMER_SERVICE_WHATSAPP_NUMBER</code>).</li>
+</ul>
+
+<!-- ============================================================ 6 -->
+<h1>6. Store (vendor) journey</h1>
+<h2>6.1 Who accepts a branch's orders (R12)</h2>
+<table>
+  <tr><th style="width:15%">Mode</th><th>Behaviour</th><th style="width:22%">Production</th></tr>
+  <tr><td>AUTO</td><td>Accepted at placement, after every checkout check (hours, stock, product validity).</td><td>1 branch</td></tr>
+  <tr><td>VENDOR (default)</td><td>Store staff accept or reject. Hatly can act on their behalf (MANAGE_ORDER_FULFILMENT).</td><td>32 branches, with <b>no store accounts</b></td></tr>
+  <tr><td>HATLY</td><td>Only Hatly accepts or rejects. The store prepares once Hatly accepted.</td><td>0</td></tr>
+</table>
+<h2>6.2 Store part lifecycle</h2>
+<div class="flow">PENDING ──accept──▶ CONFIRMED ──start preparing (optional expected-ready time)──▶ PREPARING ──ready──▶ READY_FOR_PICKUP ──courier picks up──▶ PICKED_UP
+   │                 │                                                  │                         │
+   └──────── reject (reason REQUIRED, shown to the customer) ───────────┴─────────────────────────┘──▶ CANCELLED</div>
+<ul>
+  <li>Locked when the order has left the store or ended (PICKED_UP, ON_THE_WAY, DELIVERED, COLLECTED, CANCELLED, FAILED_DELIVERY).</li>
+  <li>The order becomes READY_FOR_PICKUP only when <b>all</b> remaining parts are ready; a cancelled part does not block. Automatic dispatch is tried at that moment.</li>
+  <li>Rejecting one part of a multi-store order recalculates the order on the server: subtotal, discount, delivery fee (additional-store charge drops) and total. A prepaid surplus is refunded (wallet back to wallet; a manual transfer is reconciled).</li>
+  <li>Pickup orders: store staff confirm COLLECTED when the customer picks up (Admin with MANAGE_ORDER_ISSUES as fallback).</li>
+</ul>
+<h2>6.3 Other store tools</h2>
+<ul>
+  <li><b>Branch open/closed switch</b> and <b>scheduled closures</b> with a reason and an explicit end. The branch reopens by itself at the end; there are no open-ended closures.</li>
+  <li><b>Preparation time</b> per branch (the source of <code>expectedReadyAt</code>; null means no estimate). 3 of 33 production branches have none.</li>
+  <li><b>Products</b>: a store's change is a <i>product change request</i> that Admin approves or rejects. Admin's own edits apply directly.</li>
+  <li><b>Stock and stock history</b>, <b>finance</b> (orders, commission owed, closings), <b>earnings</b>, <b>insights</b>, <b>team</b> (manager), and a <b>notifications</b> centre with a new-order alarm.</li>
+  <li><b>R2</b>: InstaPay orders are invisible to the store until verified.</li>
+</ul>
+
+<!-- ============================================================ 7 -->
+<h1>7. Driver (courier) journey</h1>
+<ol>
+  <li><b>Sign in</b> (phone + password; accounts are created and approved by Admin; vehicle type sets capacity).</li>
+  <li><b>Go online.</b> Only online + available + APPROVED drivers are dispatch candidates. The app reports its presence on every API call. If the setting is on, "app silent for N minutes" raises a DRIVER_OFFLINE alert while the driver holds an order.</li>
+  <li><b>Receive an assignment</b> (automatic or manual). The driver must <b>acknowledge</b> within the window (default 5 min). If not, Operations get one alert; nothing is auto-released (R16).</li>
+  <li><b>Pick up</b> at each store ("From — go here first"):
+    <ul>
+      <li>Weighed items need their weight recorded.</li>
+      <li>Hatly Service: record the purchase amount.</li>
+      <li>For COD the courier pays the stores from the cash he will collect. For electronic orders he pays from his own money and Hatly reimburses.</li>
+    </ul></li>
+  <li><b>On the way</b> → <b>Delivered</b>:
+    <ul>
+      <li>Enter the cash received; it can't be less than the amount due.</li>
+      <li>Change the customer leaves becomes a <i>cash remainder</i> claim, credited to the customer's wallet only after Admin approval.</li>
+      <li>The proof photo is optional.</li>
+    </ul></li>
+  <li><b>Failed delivery</b> (from PICKED_UP or ON_THE_WAY) with a reason:
+    <ul>
+      <li>Reasons: customer unreachable, refused, address not found, unsafe location, vehicle issue, other.</li>
+      <li>Status is terminal; Operations decide the outcome: <i>resolved, no refund</i> or <i>refund customer</i>.</li>
+    </ul></li>
+  <li><b>No reject / release button.</b> Problems → "Call Operations" (they reassign).</li>
+  <li><b>Earnings</b>:
+    <ul>
+      <li>The current (open) shift shows per order: delivery fee, Hatly commission, cash held, goods paid to the store, change.</li>
+      <li>Closed shifts show their reference. All numbers come from the server (one formula).</li>
+    </ul></li>
+</ol>
+
+<!-- ============================================================ 8 -->
+<h1>8. Operations team: daily workflow</h1>
+<table>
+  <tr><th style="width:22%">Screen</th><th>Use</th></tr>
+  <tr><td><b>Home → Operations board</b> (start page for staff with orders + fulfilment or assignment)</td><td>Every live order, most urgent first, with the next step as a button on the row:
+    <ul>
+      <li>Store actions: accept & start preparing, accept only, reject with a ready-made reason, start preparing, ready.</li>
+      <li>Driver actions: assign to the suggested driver, another driver (ranked picker), or select several orders and assign them together.</li>
+      <li>Driver offline or not acknowledged: call the driver or reassign.</li>
+    </ul>
+    An "Also waiting" strip covers order issues, escalations, assignment errors, refunds to send and system alerts. It refreshes every 10 s.</td></tr>
+  <tr><td><b>Stores now</b></td><td>Stores with parts to act on; late acceptance (&gt;5 min) and late preparation first; call store staff; act on each part.</td></tr>
+  <tr><td><b>Orders</b> (workspace)</td><td>Full search and views (new, needs driver, preparing …), order drawer with every action, history, refunds and attempts.</td></tr>
+  <tr><td><b>Exceptions</b></td><td>Order issues: unavailable items, cancellation requests, isolated cases needing a person, escalations to a supervisor; assignment to a person.</td></tr>
+  <tr><td><b>Failed deliveries</b></td><td>Decide each failed delivery: refund or no refund.</td></tr>
+  <tr><td><b>Manual transfer / Refunds / Payments</b></td><td>Verify transfers (PAID/REJECTED); mark recorded refunds as sent; payment overview.</td></tr>
+  <tr><td><b>Delivery → Drivers today</b></td><td>Per courier: online, delivered today, load/capacity, to close now (owed by/to the courier), held back, unpaid earlier closings.
+    <ul><li>"Close shift" combines the preview, acknowledgement of held-back orders, the cash received at the desk, and confirm, in about 3 taps.</li></ul></td></tr>
+  <tr><td><b>Delivery → Closing / Statements / Settlement history</b></td><td>Courier and store closings by period with references (CS-…, VS-…); statements; payments against closings.</td></tr>
+  <tr><td>More: Control Tower, Alerts, Notifications</td><td>Delivery-stage view; system alerts (stock, integrations, exports, refunds); inbox and push setup.</td></tr>
+</table>
+<div class="callout"><b>Typical day at current scale.</b>
+<ol>
+  <li>Open Home (the board).</li>
+  <li>Accept new orders for the store (no store accounts exist).</li>
+  <li>Mark ready when the store confirms by phone.</li>
+  <li>Assign the suggested courier.</li>
+  <li>Watch the alarms.</li>
+  <li>At shift end: Drivers today → Close shift + record the cash.</li>
+  <li>Weekly: store closings.</li>
+</ol></div>
+
+<!-- ============================================================ 9 -->
+<h1>9. State machines</h1>
+<h2>9.1 Order</h2>
+<table>
+  <tr><th style="width:25%">From → To</th><th style="width:25%">Who</th><th>Guards and side effects</th></tr>
+  <tr><td>PENDING → CONFIRMED → PREPARING → READY_FOR_PICKUP</td><td>System only (readiness aggregation)</td><td>Driven by store parts. A manual transfer must be PAID before PREPARING.</td></tr>
+  <tr><td>READY_FOR_PICKUP → ASSIGNED_TO_DRIVER</td><td>System, Admin</td><td>Delivery orders only; payment gate; courier capacity (R18); acknowledgement deadline set.</td></tr>
+  <tr><td>READY_FOR_PICKUP → COLLECTED</td><td>Store staff, Admin</td><td>Pickup orders only; weights recorded; loyalty earned; store commission recognised.</td></tr>
+  <tr><td>ASSIGNED_TO_DRIVER → READY_FOR_PICKUP</td><td>Admin only (R17)</td><td>Release; courier capacity recomputed; acknowledgement alert closed.</td></tr>
+  <tr><td>ASSIGNED_TO_DRIVER → PICKED_UP</td><td>Assigned courier</td><td>Ownership re-checked under lock; weights recorded; store commission and courier reimbursement recognised; acknowledged automatically.</td></tr>
+  <tr><td>PICKED_UP → ON_THE_WAY → DELIVERED</td><td>Assigned courier</td><td>Loyalty earning (same transaction); courier commission and service charge; capacity freed; dispatch alerts closed.</td></tr>
+  <tr><td>PICKED_UP / ON_THE_WAY → FAILED_DELIVERY</td><td>Courier, Admin</td><td>Metadata only (reason, time). <b>No</b> automatic refund, stock or financial action; Operations resolve it.</td></tr>
+  <tr><td>Any pre-pickup state → CANCELLED</td><td>Store staff (PENDING…READY), Admin (also ASSIGNED), Customer (via the cancellation rule)</td><td>Stock restored; flash sale and discount reversed; wallet refunded; PAID transfer refunded (paid − already refunded); unverified transfer becomes a pending refund entitlement; fee and totals zeroed; dispatch alerts closed; courier freed (R45: tell the courier; any compensation is decided manually).</td></tr>
+</table>
+<p>Terminal: DELIVERED, COLLECTED, CANCELLED, FAILED_DELIVERY. Each change writes a timeline row and the customer notification in the same transaction.</p>
+
+<h2>9.2 Payment (manual transfer)</h2>
+<div class="flow">PENDING ──customer "I transferred"──▶ CUSTOMER_CLAIMED_TRANSFER ──(automatic)──▶ UNDER_REVIEW ──Admin──▶ PAID | REJECTED   (both terminal)
+Pending refund entitlement:  NONE → PENDING (order cancelled before verification) → CONVERTED (approved → refund recorded) | VOIDED (rejected)</div>
+
+<h2>9.3 Delivery and acknowledgement</h2>
+<p>A delivery row holds the courier, <code>assigned_at</code>, <code>accept_deadline_at</code> (= assignment + window) and <code>acknowledged_at</code>. Opening the delivery or picking up acknowledges it. A missed deadline produces exactly one ACKNOWLEDGEMENT_OVERDUE alert per assignment.</p>
+
+<!-- ============================================================ 10 -->
+<h1>10. Calculations: fees, offers, totals, loyalty</h1>
+<h2>10.1 Store-order delivery fee</h2>
+<pre>Distance method (GPS address, Maps on):
+  route  = road distance through the stores (farthest-from-customer first) to the customer, TOTAL route
+  rounded = round DOWN to 100 m if the remainder ≤ 20 m, else UP to the next 100 m
+  distanceFee = (rounded / 100) × REGISTERED_VENDOR_PRICE_PER_100M_MINOR        (prod: 1.00 EGP per 100 m)
+  baseFee     = max(REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR, distanceFee)   (prod minimum: 15.00 EGP)
+Zone method (MANUAL address — the only one usable in production):
+  baseFee = selected zone's fixed fee                                            (prod: Abu Naceeb 15.00 EGP)
+Both:
+  deliveryFee = baseFee + REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR × (stores − 1)   (prod: +5.00 EGP per extra store)</pre>
+<p>Every input is frozen in <code>deliveryFeeBreakdownSnapshot</code>, so later setting changes never alter a past order. When a store part is rejected, the fee is re-derived: <code>frozen base + additional × (remaining stores − 1)</code>. Example: two stores in the zone = 15 + 5 = 20 EGP; one store rejects, so the fee becomes 15 EGP.</p>
+
+<h2>10.2 Hatly Service fee</h2>
+<pre>base fee = zone fee (MANUAL address)  or  road-distance price of ORIGIN → DESTINATION (GPS; no fallback)
+charge   = round(base fee × HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER)            (prod 1.5 → 15 EGP zone ⇒ 22.50 EGP)
+courier compensation = base fee;  Hatly service revenue = charge − base fee</pre>
+<p>Route ends come from the customer's choice or the configured defaults (<code>HATLY_SERVICE_DEFAULT_PICKUP_LOCATION</code>, <code>HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION</code>, <code>WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION</code>). All three are unset in production. The goods' price for BUY_FROM_PLACE is recorded later (courier purchase amount, confirmed by Operations with MANAGE_HATLY_SERVICE_PRICING). Until then the order shows a pending price.</p>
+
+<h2>10.3 Offers</h2>
+<ul>
+  <li><b>FLASH_SALE</b>: replaces the product's base price (paid options are added on top). It can be limited to N units per order (the rest at normal price) and has a global allocation, reversed on cancellation.</li>
+  <li><b>SUBTOTAL_DISCOUNT</b> (incl. coupons): percentage or fixed, on the eligible subtotal of a store part. It can have a minimum eligible subtotal and a maximum discount, and applies once per part.</li>
+  <li>A product can never be in an active flash sale and an active subtotal discount at the same time.</li>
+  <li>Offers are Admin-only and Hatly-funded (they never reduce the store's commission basis). Changing an offer never rewrites existing orders.</li>
+</ul>
+
+<h2>10.4 Order totals</h2>
+<pre>subtotal = Σ active store parts' subtotals            (item unit price incl. options × qty, or weighed amount)
+discount = Σ parts' offer discounts (segment + per-item flash sale)
+total    = subtotal + deliveryFee − discount
+amountDue (collected at the door) = total − wallet part (if the wallet paid part)</pre>
+
+<h2>10.5 Loyalty</h2>
+<pre>Earning (at DELIVERED / COLLECTED, once per order):
+  eligible = Σ items (unit × qty − item flash-sale discount) − part subtotal discounts     (fees never count)
+  points   = floor( floor(eligible / 100 EGP) × LOYALTY_POINTS_PER_EGP )               (prod 1 point per EGP)
+Conversion to wallet (customer request, idempotent):
+  minimum = 5 × LOYALTY_WALLET_CONVERSION_POINTS_PER_EGP points, exact multiple only     (prod 30 pts = 1 EGP ⇒ min 150 pts = 5 EGP)</pre>
+<p class="small">Production effect: 1 point per EGP spent, and 30 points buy 1 EGP. The loyalty value is therefore about 3.3% cash back. The code default (100 pts/EGP) would be 1%. This is a business choice; confirm it is intended.</p>
+
+<!-- ============================================================ 11 -->
+<h1>11. Commission, settlement and closing math</h1>
+<h2>11.1 Commission</h2>
+<ul>
+  <li><b>Store</b>: <code>round(part subtotal × branch.commission_rate_basis_points / 10 000)</code>, recognised when the goods leave the store. It is skipped (never assumed) if the branch has no rate. Production: 33/33 branches have a rate.</li>
+  <li><b>Courier</b>: <code>round(compensation × driver.commission_rate_basis_points / 10 000)</code>, recognised at DELIVERED. It is skipped if the courier has no rate. <span class="crit">Production: 0/2 couriers have a rate.</span></li>
+  <li>Rate changes never touch recorded events (each event snapshots its rate). Setting rates needs MANAGE_VENDOR_COMMISSION / MANAGE_DRIVER_COMMISSION.</li>
+</ul>
+<h2>11.2 Courier closing: one formula, used everywhere</h2>
+<pre>COD order:     goods pass-through = min(goods paid to stores, cash collected)       → excluded from the net
+               goods reimbursement = goods the cash did not cover (wallet-paid part)
+               cash held = cash collected − pass-through                              (normally the delivery fee)
+Electronic:    goods reimbursement = goods paid to stores; no cash
+Both:          compensation = delivery fee (compensation basis) − Hatly commission
+               NET = compensation + goods reimbursement − cash held − change kept
+               NET > 0 → Hatly pays the courier;  NET < 0 → the courier pays Hatly</pre>
+<table>
+  <tr><th>Example</th><th>Goods</th><th>Fee</th><th>Commission</th><th>Cash</th><th>Result</th></tr>
+  <tr><td>COD</td><td>300</td><td>40</td><td>10</td><td>340</td><td>pass-through 300, cash held 40, compensation 30 → <b>courier owes 10</b></td></tr>
+  <tr><td>InstaPay</td><td>300</td><td>40</td><td>10</td><td>0</td><td>reimbursement 300, compensation 30 → <b>Hatly owes 330</b></td></tr>
+</table>
+<p>Orders whose courier had no rate at delivery are <b>held back</b> ("rate undefined", R43). They are listed, never priced, and must be acknowledged before closing. The closing uses a <b>preview token</b>, so the confirmed figures are exactly what was shown. A closing gets a reference <code>CS-YYYYMMDD-XXXXXX</code> (store: <code>VS-…</code>) and is immutable. Payments against a closing are separate records (method, reference, date, idempotency key). An overpayment needs a second approver.</p>
+<h2>11.3 Store closing</h2>
+<p>Per branch and period: gross sales, commission owed (store owes Hatly, since the courier pays the store the full goods price at pickup), parts count, rate-undefined count. Frequency comes from per-vendor terms, else <code>VENDOR_SETTLEMENT_FREQUENCY</code> (empty in production).</p>
+
+<!-- ============================================================ 12 -->
+<h1>12. Refunds, wallet and cash handling</h1>
+<table>
+  <tr><th style="width:26%">Situation</th><th>What the system does automatically</th><th style="width:22%">What a person does</th></tr>
+  <tr><td>Wallet-paid order cancelled or reduced</td><td>One idempotent ORDER_REFUND credit back to the wallet.</td><td>Nothing.</td></tr>
+  <tr><td>PAID manual transfer, order cancelled</td><td>Refund recorded: paid − already refunded (never the order total).</td><td>Send the money; mark it sent (Refunds).</td></tr>
+  <tr><td>Unverified transfer, order cancelled</td><td>Whole amount becomes a pending refund entitlement.</td><td>Approve the transfer, which records the refund, or reject it (no refund).</td></tr>
+  <tr><td>Store part rejected / item removed</td><td>Totals recomputed; wallet excess refunded; transfer reconciled; cash orders simply collect less.</td><td>Nothing (unless isolated).</td></tr>
+  <tr><td>Change left by the customer</td><td>Courier claim (cash received − amount due).</td><td>Approve, which credits the wallet (MANAGE_CUSTOMER_WALLET).</td></tr>
+  <tr><td>Failed delivery</td><td>Nothing.</td><td>Decide refund or no refund.</td></tr>
+  <tr><td>Wallet adjustment</td><td>Request recorded.</td><td>Maker-checker approval.</td></tr>
+  <tr><td>Employee loan</td><td>Ledger entries for issue/repayment.</td><td>Record issue and repayments.</td></tr>
+</table>
+<p>The executive alert REFUND_NOT_SENT_24H flags refunds recorded but not sent after 24 h.</p>
+
+<!-- ============================================================ 13 -->
+<h1>13. Dispatch logic</h1>
+<ol>
+  <li><b>Trigger</b>: an order becomes READY_FOR_PICKUP (all parts ready) and is a delivery order. If <code>AUTOMATIC_DISPATCH_ENABLED</code> is false, an AUTO_ASSIGN_DISABLED alert is raised and the order waits for manual assignment.</li>
+  <li><b>First pickup point</b>:
+    <ul>
+      <li>The first store in the frozen route (farthest from the customer).</li>
+      <li>Hatly Service BUY: the purchase place.</li>
+      <li>DELIVER: the customer's address. A zone-only address has no point, so it goes to manual dispatch.</li>
+    </ul></li>
+  <li><b>Eligibility</b>:
+    <ul>
+      <li>Online, available (active orders &lt; capacity), APPROVED, inside an active service area of the first pickup point.</li>
+      <li>Bicycles are excluded beyond <code>MAX_BICYCLE_PICKUP_DISTANCE_METERS</code> (500 m). Without Maps they are always excluded from auto-ranking.</li>
+    </ul></li>
+  <li><b>Ranking (R14)</b>:
+    <ul>
+      <li>Nearest first. Straight-line distance while Maps is off; an ordering heuristic only, never a price.</li>
+      <li>Drivers without a known location come after, in round-robin (least recently assigned first).</li>
+    </ul></li>
+  <li><b>Capacity (R18)</b>: admin override, else the vehicle type's max active deliveries, else 1. Availability is recomputed at every assign, release, delivery and cancellation.</li>
+  <li><b>Assignment</b> sets the acknowledgement deadline (window 1–60 min, default 5). <b>No automatic release or re-assignment ever</b> (R13/R16/R17). Switching dispatch mode never touches existing assignments.</li>
+  <li><b>No eligible driver</b>: the order stays READY_FOR_PICKUP with a NO_ELIGIBLE_DRIVER alert. A background retry runs at most once per alert per interval. DRIVER_NOT_RESPONDING is never retried automatically.</li>
+  <li><b>Manual</b>: Admin with ASSIGN_REASSIGN_ORDERS picks from the ranked list (the same ranking). Assigning outside the ranking needs OVERRIDE_DISPATCH. The backend refuses with a reason: AT_CAPACITY, OFFLINE, payment gate, pickup order.</li>
+</ol>
+
+<!-- ============================================================ 14 -->
+<h1>14. Automated system actions and timers</h1>
+<table>
+  <tr><th style="width:27%">Job</th><th style="width:12%">Interval</th><th>What it does</th></tr>
+  <tr><td>Readiness aggregation</td><td>on event</td><td>When the last store part is ready: order → READY_FOR_PICKUP, then automatic dispatch.</td></tr>
+  <tr><td>Hatly Service auto-ready</td><td>on placement + periodic</td><td>Service parts (no store) become ready once the payment gate passes (manual transfer: after approval).</td></tr>
+  <tr><td>Dispatch sweep</td><td>periodic (env)</td><td>Raises one ACKNOWLEDGEMENT_OVERDUE per missed deadline; retries NO_DRIVER / AUTO_ASSIGN_DISABLED alerts. Redis lock with ownership token; batch-limited.</td></tr>
+  <tr><td>Ops alerts scan</td><td>30 s</td><td>Raises and resolves operations alerts (section 15). It repeats push notifications for unacknowledged CRITICAL alerts every 3 min, up to 5 rounds.</td></tr>
+  <tr><td>Manual-transfer expiry (R21)</td><td>1 min</td><td>Cancels unverified transfers older than the window. <b>Off in production</b> (window unset).</td></tr>
+  <tr><td>Notification outbox</td><td>5 s</td><td>Delivers queued customer push / messages (provider not configured in production).</td></tr>
+  <tr><td>Admin web push</td><td>3 s</td><td>Sends browser push to staff devices.</td></tr>
+  <tr><td>Marketing worker</td><td>30 s</td><td>Runs approved campaigns and broadcasts.</td></tr>
+  <tr><td>Report exports</td><td>15 s</td><td>Builds queued CSV/XLSX/PDF exports with heartbeat; failures raise an EXPORT_FAILED alert.</td></tr>
+  <tr><td>System metrics flush</td><td>60 s</td><td>Request and client metrics for System health.</td></tr>
+  <tr><td>Change-feed prune</td><td>hourly</td><td>Trims the live-update feed used by dashboards.</td></tr>
+  <tr><td>Branch closure end</td><td>on read</td><td>A scheduled closure ends by itself at its end time.</td></tr>
+  <tr><td>On transitions</td><td>in the transaction</td><td>Stock decrement and restore, offer reversal, loyalty earning, refunds, financial events, notifications, timeline.</td></tr>
+</table>
+
+<!-- ============================================================ 15 -->
+<h1>15. Alerts: every trigger, priority and lifecycle</h1>
+<h2>15.1 Operations alerts (push + sound + inbox)</h2>
+<p>Lifecycle: <b>raised</b> (idempotent key) → pushed to Operations devices → for CRITICAL alerts, <b>repeated</b> every 3 min (max 5 rounds) until someone <b>acknowledges</b> (stops the alarm for everyone) → <b>resolved automatically</b> when the condition ends. Acknowledging never resolves anything and never changes an order.</p>
+<table>
+  <tr><th style="width:21%">Category</th><th style="width:9%">Priority</th><th>Trigger</th><th style="width:25%">Auto-resolves when</th></tr>
+  <tr><td>NEW_ORDER</td><td class="crit">CRITICAL</td><td>A new order that is visible to the store (manual transfers only once PAID).</td><td>It is accepted / moves on.</td></tr>
+  <tr><td>ACCEPTANCE_OVERDUE</td><td class="crit">CRITICAL</td><td>A store part still PENDING more than 5 min (hard-coded, same as the Control Tower).</td><td>Accepted or rejected.</td></tr>
+  <tr><td>PREPARATION_LATE</td><td>HIGH</td><td>A CONFIRMED/PREPARING part past its <code>expected_ready_at</code>.</td><td>Ready / cancelled.</td></tr>
+  <tr><td>DRIVER_ACK_OVERDUE</td><td class="crit">CRITICAL</td><td>Assignment not acknowledged by the deadline.</td><td>Acknowledged / picked up / released.</td></tr>
+  <tr><td>NO_DRIVER</td><td class="crit">CRITICAL</td><td>No eligible driver, or automatic dispatch is off.</td><td>Assigned / order ends.</td></tr>
+  <tr><td>DRIVER_NOT_RESPONDING</td><td class="crit">CRITICAL</td><td>Dispatch alert for an unresponsive driver.</td><td>Closed by Operations.</td></tr>
+  <tr><td>ASSIGNMENT_ERROR</td><td class="crit">CRITICAL</td><td>The automatic dispatch attempt threw an error.</td><td>Assigned.</td></tr>
+  <tr><td>FAILED_DELIVERY</td><td class="crit">CRITICAL</td><td>FAILED_DELIVERY with no resolution yet.</td><td>Resolved.</td></tr>
+  <tr><td>DRIVER_OFFLINE</td><td class="crit">CRITICAL</td><td>The courier holding an active order went offline, or (if <code>DRIVER_PRESENCE_STALE_MINUTES</code> is set; unset in production) the app has been silent that long.</td><td>Back online / reassigned / order ends.</td></tr>
+</table>
+<h2>15.2 Other alert surfaces</h2>
+<ul>
+  <li><b>Shell banner and nav badge</b> (from the Control Tower summary, every 20 s): unassigned by reason, acceptance overdue, preparation overdue, refunds to send, transfers to verify. It is hidden where the Operations board is shown (the board lists the same).</li>
+  <li><b>System alerts page</b>:
+    <ul>
+      <li>Dispatch alerts: ASSIGNMENT_ERROR is critical, the rest are warnings.</li>
+      <li>Pending acceptance overdue.</li>
+      <li>OUT_OF_STOCK (warning) and LOW_STOCK (info).</li>
+      <li>REFUND_NOT_SENT_24H.</li>
+      <li>INTEGRATION_DOWN (critical) and INTEGRATION_DEGRADED.</li>
+      <li>EXPORT_FAILED.</li>
+    </ul>
+    These can be acknowledged and exist only while the condition holds.</li>
+  <li><b>Vendor new-order alarm</b> in the store dashboard.</li>
+</ul>
+
+<!-- ============================================================ 16 -->
+<h1>16. Configuration and dependency tree</h1>
+<h2>16.1 Business configuration (edited in Settings, audited, validated)</h2>
+<table class="small">
+  <tr><th style="width:31%">Key</th><th style="width:16%">Production value</th><th>Used by / effect</th></tr>
+  <tr><td>AUTOMATIC_DISPATCH_ENABLED</td><td>true</td><td>Dispatch on readiness; off → manual + AUTO_ASSIGN_DISABLED alerts.</td></tr>
+  <tr><td>MULTI_VENDOR_ORDERS_ENABLED</td><td>true</td><td>Cart, quote, order creation accept several stores.</td></tr>
+  <tr><td>DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES</td><td>unset → 5</td><td>Acknowledge-by deadline (1–60).</td></tr>
+  <tr><td>DRIVER_PRESENCE_STALE_MINUTES</td><td>unset → off</td><td>"App silent" DRIVER_OFFLINE alert (2–240).</td></tr>
+  <tr><td>REGISTERED_VENDOR_PRICE_PER_100M_MINOR</td><td>100 (1 EGP)</td><td>Distance fee (GPS addresses; also Hatly Service GPS).</td></tr>
+  <tr><td>REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR</td><td>1500</td><td>Minimum distance fee; required (fails closed).</td></tr>
+  <tr><td>REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR</td><td>500</td><td>Per extra store.</td></tr>
+  <tr><td>HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER</td><td>1.5</td><td>Hatly Service charge (0–10]. Needs MANAGE_DELIVERY_FEE_MULTIPLIER.</td></tr>
+  <tr><td>HATLY_SERVICE_DEFAULT_PICKUP / DESTINATION, WASALLY_DEFAULT_DESTINATION</td><td>unset</td><td>Default route ends when the customer does not choose.</td></tr>
+  <tr><td>MAX_BICYCLE_PICKUP_DISTANCE_METERS</td><td>500</td><td>Bicycle eligibility (needs Maps).</td></tr>
+  <tr><td>MANUAL_TRANSFER_DESTINATION</td><td class="crit">label "E.g.instapay"</td><td>Shown to customers paying by transfer.</td></tr>
+  <tr><td>MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES</td><td>unset → off</td><td>R21 auto-cancel (15–10080).</td></tr>
+  <tr><td>CHECKOUT_ENABLED_ELECTRONIC_METHODS</td><td>unset → code default</td><td>Which transfer wallets checkout offers.</td></tr>
+  <tr><td>CHECKOUT_QUOTE_TTL_SECONDS</td><td>unset → code default</td><td>Quote token validity.</td></tr>
+  <tr><td>ETA_RANGE_BUFFER_MINUTES</td><td>15</td><td>ETA range shown.</td></tr>
+  <tr><td>CUSTOMER_SERVICE_WHATSAPP_NUMBER</td><td class="crit">"201104949903+"</td><td>Customer support; fallback for operations phone.</td></tr>
+  <tr><td>OPERATIONS_CONTACT_PHONE</td><td>unset</td><td>Courier "Call Operations" (falls back to WhatsApp).</td></tr>
+  <tr><td>CUSTOMER_OTP_ENABLED</td><td>false</td><td>Customer phone verification.</td></tr>
+  <tr><td>LOYALTY_POINTS_PER_EGP / LOYALTY_WALLET_CONVERSION_POINTS_PER_EGP</td><td>1 / 30</td><td>Earning / conversion (about 3.3% value).</td></tr>
+  <tr><td>VENDOR_SETTLEMENT_FREQUENCY / DRIVER_SETTLEMENT_FREQUENCY</td><td class="crit">"" / ""</td><td>Store closing label (vendor key only; driver key unused).</td></tr>
+  <tr><td>DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES</td><td>5</td><td><b>Read by nothing</b>.</td></tr>
+  <tr><td>HATLY_SERVICE_DISTANCE_MULTIPLIER</td><td>—</td><td><b>Read by nothing</b>.</td></tr>
+  <tr><td>VENDOR_SEGMENT_AUTO_ACCEPT_ENABLED</td><td>true</td><td><b>Superseded</b> by per-branch acceptance mode (R12).</td></tr>
+</table>
+<h2>16.2 Hard-coded thresholds and environment settings</h2>
+<ul>
+  <li>Store acceptance alert: <b>5 minutes</b> (code constant, kept equal in 3 places by a test). Not configurable.</li>
+  <li>Operations alert repeat 3 min / max 5 rounds / scan 30 s; dispatch sweep interval and lock TTL; worker intervals: environment variables.</li>
+  <li>Maps provider, SMS, FCM, VAPID, MFA policy, CORS origins, Redis password: environment, checked at boot (<code>env-check</code>).</li>
+</ul>
+<h2>16.3 Dependency tree (what must exist for each capability)</h2>
+<pre>Customer can order
+ ├─ store visible: branch active + open + no active closure + products + (zone or GPS) serviceable
+ ├─ address priced: MANUAL zone active  ──or──  GPS pin + Maps provider + PRICE_PER_100M + MINIMUM_FEE
+ ├─ quote: CHECKOUT_QUOTE_TTL (default) · ETA_RANGE_BUFFER · MULTI_VENDOR flag
+ └─ payment: COD | WALLET balance | MANUAL_TRANSFER → MANUAL_TRANSFER_DESTINATION + ENABLED_METHODS
+Order reaches the store
+ └─ R2: transfer PAID (Operations with VERIFY_MANUAL_PAYMENTS)
+Order is accepted
+ └─ acceptance mode: AUTO | VENDOR (needs store staff account ⟶ 0 in prod) | HATLY (Operations)
+Order is prepared and ready
+ └─ store (or Hatly on behalf) · branch preparation time (ETA, late alert)
+Order is dispatched
+ ├─ AUTOMATIC_DISPATCH_ENABLED
+ ├─ driver: APPROVED + online + capacity (vehicle type / override) + service area of first pickup
+ ├─ first pickup point (zone-only DELIVER_TO_PLACE ⇒ manual)
+ └─ bicycles: MAX_BICYCLE distance + Maps
+Delivered and settled
+ ├─ store commission ⇐ branch rate (33/33 set)
+ ├─ courier commission ⇐ driver rate (0/2 set ⟶ held back)
+ ├─ closing ⇐ CLOSE_DRIVER_SETTLEMENTS · cash at the desk ⇐ MANAGE_SETTLEMENT_PAYMENTS
+ └─ store closing frequency ⇐ vendor terms or VENDOR_SETTLEMENT_FREQUENCY ("" in prod)
+Alerts reach a person
+ └─ staff browser push subscription (VAPID) · alarm sound enabled in the browser · DRIVER_PRESENCE_STALE (optional)
+Customer is told
+ └─ in-app (always) · push needs FCM (not configured) · OTP needs SMS (not configured)</pre>
+
+<!-- ============================================================ 17 -->
+<h1>17. Open loops, broken cycles and dead settings</h1>
+<table>
+  <tr><th style="width:5%">#</th><th style="width:34%">Finding</th><th>Why it matters / suggested fix</th></tr>
+  <tr><td>1</td><td><b>Store acceptance path has no actor</b>: 32 branches are on "store accepts" but no store account exists.</td><td>Every order relies on Hatly accepting. Either onboard store accounts or set those branches to HATLY so ownership is explicit.</td></tr>
+  <tr><td>2</td><td><b>Courier commission never recognised</b> (no rates).</td><td>Recorded courier income is understated and every courier closing will hold orders back. Set the rates, then decide the 8 old orders (R43).</td></tr>
+  <tr><td>3</td><td><b>Driver presence alert off</b> (setting unset).</td><td>A courier whose phone dies while holding an order is invisible until the customer complains. Set it to 10.</td></tr>
+  <tr><td>4</td><td><b>R21 auto-cancel off</b>.</td><td>Unverified InstaPay orders wait forever (stock reserved). Set a window (e.g. 60–120 min) or verify promptly.</td></tr>
+  <tr><td>5</td><td><b>Failed delivery has no automatic follow-up</b> beyond the alert.</td><td>By design. Make sure someone owns the Failed deliveries queue daily.</td></tr>
+  <tr><td>6</td><td><b>Zone-only addresses cannot auto-dispatch Wasally (DELIVER_TO_PLACE)</b>.</td><td>All such orders need manual assignment while Maps is off.</td></tr>
+  <tr><td>7</td><td><b>Dead settings</b>: DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES, HATLY_SERVICE_DISTANCE_MULTIPLIER, DRIVER_SETTLEMENT_FREQUENCY (getter unused), VENDOR_SEGMENT_AUTO_ACCEPT_ENABLED (superseded).</td><td>They appear editable but change nothing. Hide or remove them.</td></tr>
+  <tr><td>8</td><td><b>Dead permissions</b>: CHANGE_DRIVER_ONLINE_STATUS (in the Operations template), MANAGE_LOYALTY_CONFIG (in the Marketing template), MANAGE_DRIVER_VENDOR_PREFERENCES.</td><td>Grants that do nothing; loyalty values are really edited with MANAGE_BUSINESS_CONFIG. Remove them or wire them.</td></tr>
+  <tr><td>9</td><td><b>Legacy column</b> <code>vendors.commission_percent</code> (never used; commission is per branch in bps).</td><td>Two places that look like "the commission". Hide the old one.</td></tr>
+  <tr><td>10</td><td><b>Empty settlement frequency</b> strings.</td><td>Store closings would record frequency "". Set WEEKLY (or per-vendor terms).</td></tr>
+  <tr><td>11</td><td><b>Hard-coded 5-minute acceptance threshold</b>.</td><td>Not tunable per store or time of day. Fine for now; consider making it a setting.</td></tr>
+  <tr><td>12</td><td><b>Customer push not configured</b>: notifications are in-app only.</td><td>Customers do not learn about "on the way" or "item unavailable" unless the app is open; the unavailable-item decision then waits for a phone call.</td></tr>
+  <tr><td>13</td><td>Stale code comment: cash remainder says "− order.totalMinor"; the code correctly uses amount due.</td><td>Documentation only.</td></tr>
+</table>
+<div class="ok">No broken state cycles were found. Every non-terminal status has an exit owned by a role or by the system; terminal states have no exits; every automatic action is idempotent and guarded by locks.</div>
+
+<!-- ============================================================ 18 -->
+<h1>18. KPIs, reports, exports and monitoring</h1>
+<h2>18.1 Executive KPIs (Reports → Executive overview; current vs previous period)</h2>
+<table class="small">
+  <tr><th>KPI</th><th>Definition (from code)</th></tr>
+  <tr><td>Orders placed / delivered</td><td>Created in the period (any status) / of those, delivered or collected.</td></tr>
+  <tr><td>Cancellation rate</td><td>Cancelled ÷ placed (same cohort).</td></tr>
+  <tr><td>GMV (goods value)</td><td>Σ item subtotals of non-cancelled store parts. Not revenue.</td></tr>
+  <tr><td>Average order value</td><td>GMV ÷ non-cancelled orders.</td></tr>
+  <tr><td>Delivery fees (delivered)</td><td>Fees of delivered orders.</td></tr>
+  <tr><td>Hatly revenue</td><td>Store + courier commission + service charge − net Hatly-funded discounts.</td></tr>
+  <tr><td>Hatly-funded discount (net)</td><td>Recorded minus restored.</td></tr>
+  <tr><td>Active vendors / drivers</td><td>Branches with at least one part / drivers with at least one delivery.</td></tr>
+  <tr><td>Median delivery time</td><td>Assignment → delivery (minutes).</td></tr>
+  <tr><td>Open dispatch alerts; refunds recorded, not sent</td><td>Right now.</td></tr>
+</table>
+<p>Money KPIs need VIEW_FINANCIALS. A service-level card shows deliveries, assign→pickup and pickup→delivered P50/P90, and average reassignments.</p>
+<h2>18.2 Report catalogue (preview = export; bounded date range; Cairo dates)</h2>
+<table class="small">
+  <tr><th>ID</th><th>Report</th><th>ID</th><th>Report</th></tr>
+  <tr><td>S01</td><td>Executive summary</td><td>S13</td><td>Liabilities and receivables</td></tr>
+  <tr><td>S02</td><td>Orders</td><td>S15</td><td>Vendor settlements (receivable)</td></tr>
+  <tr><td>S03</td><td>Order lines and product sales</td><td>S16</td><td>Payments and refunds</td></tr>
+  <tr><td>S04</td><td>Sales by period</td><td>S17</td><td>Offers and coupons</td></tr>
+  <tr><td>S05</td><td>Vendor and branch performance</td><td>S20</td><td>Cancellations</td></tr>
+  <tr><td>S06</td><td>Customers</td><td>S21</td><td>Audit log</td></tr>
+  <tr><td>S07</td><td>Products and inventory</td><td>S23</td><td>Wallet transactions</td></tr>
+  <tr><td>S08</td><td>Driver performance</td><td>S24</td><td>Ratings</td></tr>
+  <tr><td>S09</td><td>Ledger (financial events)</td><td>S25</td><td>Permission matrix</td></tr>
+  <tr><td>S10</td><td>Revenue and commissions</td><td>S26</td><td>Courier closings — orders</td></tr>
+  <tr><td>S11</td><td>Driver settlements</td><td>S27</td><td>Vendor closings — parts</td></tr>
+  <tr><td>S12</td><td>Hatly-funded discounts</td><td></td><td></td></tr>
+</table>
+<p>Each report has its own view permission, money permission (money columns hidden without it) and export permission. Formats are CSV, XLSX and PDF, queued in the background; a failure raises an alert.</p>
+<h2>18.3 Operational and technical monitoring</h2>
+<ul>
+  <li><b>Control Tower</b>: delivery stages (awaiting assignment, assigned, in transit), dispatch alerts, operations facts.</li>
+  <li><b>System health</b> (VIEW_SYSTEM_HEALTH): integrations status and history, request metrics, database/cache metrics, client metrics, background jobs (retry with MANAGE_SYSTEM_JOBS), configuration overview and history, dispatch automation switch.</li>
+  <li><b>Audit log</b>: every admin/super-admin mutation is audited by a global interceptor (who, what, when, before/after), exportable with AUDIT_EXPORT.</li>
+  <li><b>Gaps</b>: no external uptime monitor or error tracker; no off-site backup.</li>
+</ul>
+
+<!-- ============================================================ 19 -->
+<h1>19. Security</h1>
+<h2>19.1 What is in place</h2>
+<ul>
+  <li><b>Dashboard sessions</b>:
+    <ul>
+      <li>HttpOnly, SameSite=Strict, Secure cookies; the access and refresh tokens are never readable by page scripts.</li>
+      <li>CSRF token is an HMAC of the session id; Origin is checked.</li>
+      <li>Refresh and logout require a custom header.</li>
+    </ul></li>
+  <li><b>Mobile apps</b>: bearer JWT (access 15 min) + refresh tokens stored server-side in Redis.</li>
+  <li><b>Brute force</b>:
+    <ul>
+      <li>Per-IP route throttles, from 3 to 300 requests per minute by route.</li>
+      <li>Per-account failed-login limiter; it counts unknown phones too, so it reveals nothing.</li>
+      <li>Wrong MFA codes count against the account.</li>
+    </ul></li>
+  <li><b>MFA</b> for staff:
+    <ul>
+      <li>TOTP, secret encrypted with AES-256-GCM, replay-protected, single-use recovery codes, all audited.</li>
+      <li>Break-glass reset by a super admin.</li>
+      <li>Enforcement policy <code>DASHBOARD_ADMIN_MFA_REQUIRED</code>.</li>
+    </ul></li>
+  <li><b>Authorization</b>: role + permission guard on every admin route. A public-route allowlist and a hostile-id sweep are enforced by tests. Ownership checks for store staff, couriers and customers are re-checked under row locks.</li>
+  <li><b>Data protection</b>: customer PII is masked without VIEW_CUSTOMER_PII; R2 hides unpaid transfers from stores; exports are permission-gated; the audit log is append-only.</li>
+  <li><b>Money integrity</b>: integer minor units, frozen snapshots, idempotency keys, append-only ledgers, maker-checker approvals.</li>
+  <li><b>Operations</b>: env-check at boot (refuses unsafe production config), release bundles scanned for secrets, backups + restore drill before every migration.</li>
+</ul>
+<h2>19.2 Findings (production)</h2>
+<div class="risk">
+<ul>
+  <li><b>MFA not enrolled for the only super admin, and the policy is off.</b> Enrol now, then set <code>DASHBOARD_ADMIN_MFA_REQUIRED=true</code>. The encryption key must be set first; env-check enforces it.</li>
+  <li><b>Single privileged account</b>: create named ADMIN accounts per person from templates; keep the super admin for emergencies.</li>
+  <li><b>Customer phones unverified</b> (OTP off): fake numbers can place COD orders. Mitigate with first-order confirmation calls until SMS is live.</li>
+  <li><b>Backups are not off-site</b> (only on the same host and the owner's Mac).</li>
+  <li>Known residuals from the security milestone: private media are capability URLs (signed per-read access planned); driver history keeps past customers' phones (redaction planned).</li>
+</ul></div>
+
+<!-- ============================================================ 20 -->
+<h1>20. UI/UX review and behaviour inconsistencies</h1>
+<h2>20.1 Admin dashboard</h2>
+<table>
+  <tr><th style="width:5%">#</th><th style="width:40%">Observation</th><th>Suggestion</th></tr>
+  <tr><td>1</td><td>Executive overview scrolled sideways on phones (the chart labels forced their width).</td><td><b>Fixed and verified (40/40 mobile tests), not released yet.</b></td></tr>
+  <tr><td>2</td><td>Section tabs carry the waiting count inside the link name ("Stores now 2070"); screen readers announce it and the test needed a regex.</td><td>Give the count its own accessible label ("2070 waiting").</td></tr>
+  <tr><td>3</td><td>Mixed wording: "Driver" vs "Courier", "Vendor" vs "Store", "Closing" vs "Settlement" across pages and reports.</td><td>One glossary (Store, Courier, Closing) applied to the UI and reports.</td></tr>
+  <tr><td>4</td><td>The Executive page and some old pages use 11px text and <code>text-[11px]</code> captions; newer pages enforce ≥ 12px.</td><td>Sweep the remaining 11px text.</td></tr>
+  <tr><td>5</td><td>Settings show dead or superseded keys (section 17) next to live ones.</td><td>Hide them; label each setting with what reads it.</td></tr>
+  <tr><td>6</td><td>Reject reasons are always stored in Arabic. A customer using the English app sees an Arabic reason.</td><td>Store a reason code + render in the customer's language.</td></tr>
+  <tr><td>7</td><td>Control Tower and the Operations board overlap. The Control Tower is now under "More".</td><td>After a few weeks of use, retire whichever is unused.</td></tr>
+  <tr><td>8</td><td>The 5-minute acceptance threshold is fixed; the board, banner and alarms all depend on it.</td><td>Expose it as a setting if stores need longer at peak times.</td></tr>
+  <tr><td>9</td><td>The Settlement frequency and Hatly Service default locations accept empty values silently.</td><td>Validate (reject "") and show a "not set" warning in Settings.</td></tr>
+</table>
+<h2>20.2 Customer App</h2>
+<ul>
+  <li>Support number is malformed in config, so the WhatsApp deep link may fail. Fix the data, and validate the phone format in Settings.</li>
+  <li>Transfer instructions show the placeholder label. Fix the data, and validate a non-placeholder label.</li>
+  <li>Without push, the "item unavailable" decision relies on the customer opening the app. Show a persistent in-app banner on next open (exists) and add SMS/WhatsApp once a provider exists.</li>
+  <li>The zone-only reality (one zone) is not explained when an address falls outside it. Show "We currently deliver in Abu Naceeb" with the zone list instead of a generic error.</li>
+</ul>
+<h2>20.3 Driver App</h2>
+<ul>
+  <li>Build 8 (presence, earnings by shift, optional photo, scoped active/history lists) is built but not distributed; build 7 lacks the shift view.</li>
+  <li>No in-app "I can't take this" is by design (R17). Make "Call Operations" prominent, and make sure the number is valid (see above).</li>
+</ul>
+<h2>20.4 Behaviour inconsistencies found in code</h2>
+<ul>
+  <li><b>Two commission fields</b> (store-level percent unused vs branch bps used).</li>
+  <li><b>Acceptance</b>: the global auto-accept key still exists after per-branch modes replaced it.</li>
+  <li><b>Customer cancellation</b>: the customer can cancel at ASSIGNED_TO_DRIVER (R3), but a store can no longer cancel at that point (Admin only). This is intentional; document it for store staff.</li>
+  <li><b>Failed delivery</b> never restores stock or refunds automatically, unlike cancellation. This is intentional; keep the Operations decision visible.</li>
+</ul>
+
+<!-- ============================================================ 21 -->
+<h1>21. Business and operations recommendations</h1>
+<h2>21.1 Fix this week (no code needed)</h2>
+<ol>
+  <li>Correct <code>CUSTOMER_SERVICE_WHATSAPP_NUMBER</code> (e.g. <code>+201104949903</code>) and set <code>OPERATIONS_CONTACT_PHONE</code>.</li>
+  <li>Replace the transfer label with the real wallet name (e.g. "InstaPay — Hatly").</li>
+  <li>Enrol MFA on the super admin; create named staff accounts from templates; then turn on the MFA policy.</li>
+  <li>Set both couriers' commission rates; decide the 8 pre-rate orders; set <code>DRIVER_PRESENCE_STALE_MINUTES=10</code>.</li>
+  <li>Set <code>VENDOR_SETTLEMENT_FREQUENCY</code> (e.g. WEEKLY) and decide the courier closing rhythm (daily at shift end).</li>
+  <li>Decide acceptance ownership: set the 32 branches to <b>HATLY</b> (truthful today) or onboard store staff.</li>
+  <li>Distribute Driver App build 8.</li>
+  <li>Set an InstaPay verification window (R21), e.g. 120 minutes.</li>
+</ol>
+<h2>21.2 Operating model</h2>
+<ul>
+  <li><b>Coverage</b>: one zone limits growth. Add zones for each Belbeis neighbourhood you serve, each with its own fee, before marketing. The data model already supports it.</li>
+  <li><b>Store onboarding</b>: give the top 5 stores by volume a store account and the vendor dashboard on a tablet. Acceptance and preparation then become measurable (median acceptance time per branch already exists in branch performance).</li>
+  <li><b>Cash control</b>: close every courier daily in "Drivers today", record cash at the desk, and review "unpaid earlier closings" weekly. COD is 95% of orders.</li>
+  <li><b>Fraud and first-order risk</b>: while OTP is off, call new customers on their first COD order above a threshold.</li>
+  <li><b>Store SLA</b>: track acceptance time and rejection rate per branch (S05). Agree a target (e.g. accept &lt; 5 min, reject &lt; 3%) and review weekly.</li>
+  <li><b>Pricing</b>: 15 EGP zone fee and ×1.5 Hatly Service (22.50 EGP). Validate courier economics: with no courier commission set, Hatly currently earns only store commission (0.05%–10%).</li>
+  <li><b>Loyalty</b>: current settings give about 3.3% back. Confirm the intent; 1–2% is more common for low-margin delivery.</li>
+</ul>
+<h2>21.3 Technology and providers</h2>
+<ul>
+  <li>Enable Maps (server key) to unlock GPS pricing, true road-distance ranking, bicycle couriers and auto-dispatch for Wasally.</li>
+  <li>SMS provider then OTP on; FCM then customer push.</li>
+  <li>Off-site backup target plus an uptime monitor and error tracker.</li>
+</ul>
+
+<!-- ============================================================ 22 -->
+<h1>22. Roadmap</h1>
+<table>
+  <tr><th style="width:16%">Horizon</th><th>Items</th></tr>
+  <tr><td><b>Now (0–2 weeks)</b></td><td>
+    <ul>
+      <li>Configuration fixes from 21.1.</li>
+      <li>MFA and named accounts.</li>
+      <li>Courier rates and the old-orders decision.</li>
+      <li>Driver App 8.</li>
+      <li>Release the Executive-page fix.</li>
+      <li>Hide dead settings and permissions.</li>
+      <li>Validate phone and label settings.</li>
+      <li>Store reject reasons as codes with localized text.</li>
+    </ul></td></tr>
+  <tr><td><b>Next (2–6 weeks)</b></td><td>
+    <ul>
+      <li>More delivery zones.</li>
+      <li>Store accounts for top stores.</li>
+      <li>SMS/OTP.</li>
+      <li>Customer push.</li>
+      <li>Off-site backups and monitoring.</li>
+      <li>Google Play closed testing for the Customer App.</li>
+      <li>A configurable acceptance threshold.</li>
+      <li>Accessible tab counts.</li>
+      <li>Retire whichever of Control Tower / board is unused.</li>
+    </ul></td></tr>
+  <tr><td><b>Later (6–12 weeks)</b></td><td>
+    <ul>
+      <li>Maps on: GPS pricing, road-distance ranking, bicycles.</li>
+      <li>An online payment gateway (replacing manual transfer verification).</li>
+      <li>Store payouts with statements by e-mail/WhatsApp.</li>
+      <li>Courier route batching for multi-order trips (capacity already exists).</li>
+      <li>A demand heat-map from S04/S05.</li>
+      <li>Signed media URLs and driver-history phone redaction.</li>
+    </ul></td></tr>
+</table>
+
+<!-- ============================================================ 23 -->
+<h1>23. Appendix: glossary and quick reference</h1>
+<table class="small">
+  <tr><th style="width:26%">Term</th><th>Meaning</th></tr>
+  <tr><td>Store part (segment)</td><td>One store's share of an order, with its own status, subtotal, discount and history.</td></tr>
+  <tr><td>Acceptance mode</td><td>AUTO / VENDOR / HATLY: who accepts a branch's orders.</td></tr>
+  <tr><td>Acknowledge</td><td>The courier confirming he saw an assignment (before the deadline).</td></tr>
+  <tr><td>Capacity</td><td>How many active orders a courier may carry.</td></tr>
+  <tr><td>Held back (rate undefined)</td><td>Delivered orders whose courier had no commission rate; excluded from closings until resolved.</td></tr>
+  <tr><td>Closing</td><td>An immutable settlement of a courier's or store's orders for a period, with a reference.</td></tr>
+  <tr><td>Pass-through</td><td>COD goods money the courier collected and paid to the store; not in his net.</td></tr>
+  <tr><td>R2</td><td>InstaPay orders are hidden from the store until verified.</td></tr>
+  <tr><td>R16 / R17</td><td>Acknowledgement alert only; only Operations release or reassign.</td></tr>
+  <tr><td>R18</td><td>Courier capacity.</td></tr>
+  <tr><td>R21</td><td>Auto-cancel of unverified transfers.</td></tr>
+  <tr><td>R43</td><td>Never assume a missing commission rate.</td></tr>
+  <tr><td>PD-016</td><td>Unavailable item: continue without it or cancel; silence is never consent.</td></tr>
+</table>
+<h3>Where to look in the code</h3>
+<table class="small">
+  <tr><th style="width:38%">Topic</th><th>File</th></tr>
+  <tr><td>Order states</td><td>apps/backend/src/modules/orders/order-state-machine.service.ts</td></tr>
+  <tr><td>Store part states</td><td>…/orders/order-vendor-segment-state-machine.service.ts</td></tr>
+  <tr><td>Delivery fee</td><td>…/delivery-fee/delivery-fee-calculation.service.ts, pricing-distance-rounding.ts</td></tr>
+  <tr><td>Hatly Service fee</td><td>…/finance/hatly-service-pricing.service.ts</td></tr>
+  <tr><td>Commission events</td><td>…/finance/order-financial-events.service.ts, driver-compensation-split.ts</td></tr>
+  <tr><td>Courier closing</td><td>…/finance/courier-settlement-math.ts, settlement-closing.service.ts</td></tr>
+  <tr><td>Dispatch</td><td>…/delivery/automatic-dispatch.service.ts, driver-ranking.service.ts, driver-capacity.ts</td></tr>
+  <tr><td>Alerts</td><td>…/notifications/ops-alerts.service.ts, admin-platform/executive/executive.service.ts</td></tr>
+  <tr><td>Configuration</td><td>…/business-config/business-config-key.enum.ts, business-config.service.ts</td></tr>
+  <tr><td>Permissions and templates</td><td>…/permissions/permission.enum.ts, admin-platform/permission-templates/</td></tr>
+  <tr><td>Reports</td><td>…/admin-platform/reports/report-registry.ts</td></tr>
+</table>
+<p class="muted small">Prepared from the code and a read-only production snapshot on 14 Nov 2026. No code or data was changed for this handbook.</p>
+
+</body>
+</html>
