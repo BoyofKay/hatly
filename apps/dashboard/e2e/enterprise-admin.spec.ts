@@ -116,7 +116,7 @@ test.describe('Enterprise Admin — Automatic Dispatch switch', () => {
       // The state is read back from the server, so a reload proves it was persisted.
       await page.reload();
       await expect(page.getByText('OFF', { exact: true })).toBeVisible();
-      await page.getByRole('button', { name: 'Turn ON' }).click();
+      await page.getByRole('button', { name: 'Turn ON', exact: true }).click(); // exact: the sound-alarm button also says "turn on"
       await page.getByRole('dialog').getByRole('button', { name: 'Turn ON' }).click();
       await expect(page.getByText('ON', { exact: true })).toBeVisible();
     });
@@ -130,6 +130,9 @@ test.describe('Enterprise Admin — landing and resilient navigation', () => {
     await page.getByLabel('Password').fill(SUPER_ADMIN_PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL(/\/home$/);
+    // since the Operations board (stage 1) an operations admin lands on the board; the overview is one tap away
+    await expect(page.getByTestId('operations-board')).toBeVisible();
+    await page.getByTestId('home-mode-overview').click();
     await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText('Welcome to your dashboard');
   });
 

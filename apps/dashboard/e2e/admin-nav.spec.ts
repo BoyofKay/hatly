@@ -12,12 +12,12 @@ test.describe('Admin navigation', () => {
   test.use({ storageState: SUPER_ADMIN_STORAGE_STATE });
 
   // The reference's flat menu: each page is reached by its sidebar section, then (when the section has several pages) its tab.
-  const expectedLinks: Array<{ name: string; href: string; section: string }> = [
+  const expectedLinks: Array<{ name: string; href: string; section: string; more?: boolean }> = [
     { name: 'Sectors', href: '/sectors', section: 'Categories' },
     { name: 'Users', href: '/users', section: 'Settings' },
     { name: 'Stores now', href: '/stores-now', section: 'Orders' },
-    { name: 'Control Tower', href: '/control-tower', section: 'Orders' },
-    { name: 'Alerts', href: '/alerts', section: 'Orders' },
+    { name: 'Control Tower', href: '/control-tower', section: 'Orders', more: true },
+    { name: 'Alerts', href: '/alerts', section: 'Orders', more: true },
     { name: 'Drivers today', href: '/drivers-today', section: 'Delivery' },
     { name: 'Drivers', href: '/drivers', section: 'Delivery' },
     { name: 'Closing', href: '/settlement', section: 'Delivery' },
@@ -37,8 +37,9 @@ test.describe('Admin navigation', () => {
       await expect(section).toHaveAttribute('aria-current', 'page'); // the section's first page has opened before its tabs are read
       const tabs = page.getByRole('navigation', { name: 'Section pages' });
       if (await tabs.count()) {
-        const tab = tabs.getByRole('link', { name: link.name, exact: true });
-        if (!(await tab.count())) await tabs.getByTestId('section-tabs-more').click(); // stage 5: less-used pages sit under "More"
+        // a tab with work waiting carries its count in its name ("Stores now 3")
+        const tab = tabs.getByRole('link', { name: new RegExp(`^${link.name}( \\d+)?$`) });
+        if (link.more) await tabs.getByTestId('section-tabs-more').click(); // stage 5: less-used pages sit under "More"
         await tab.click();
       }
       await expect(page).toHaveURL(new RegExp(`${link.href}$`));
