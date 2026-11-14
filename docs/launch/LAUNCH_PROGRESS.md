@@ -521,6 +521,25 @@ Production release `20261107T053628Z-079cf82fb4dc` (commit `177d278`, bundle ide
   COD orders without a commission event (R43 — shown as held back, no rate assumed); then distribute Driver APK 1.0.0+8
   (`~/Downloads/Hatly-Driver-Release/hatly-driver-1.0.0-build8-20261113/`, sha256 fc877725…, upload key 6e9dcf06).
 
+## 3at. Stores now, ready-made reject reasons, navigation cleanup (2026-11-14) — DEPLOYED and verified (no signed-in check)
+
+- Release `20261114T043549Z-06e85f770a16` (commits 7b8f1ec, 4ee24eb). **No migrations** (plan: 82 applied, 0 pending). Rollback = app switch to
+  `20261113T211742Z-96b47a8d0cb3` (same schema).
+- Content: `GET /admin/operations/stores-now` (VIEW_ORDERS, read-only) + `/stores-now`; ready-made reject reasons (fill the existing required
+  reason; Arabic text shown to the customer, approved as written); Orders opens on the Operations board, less-used views under "More"; closing
+  moved to Delivery; shell banner steps aside where the board is shown ("Also waiting" strip); start page by permissions.
+- Plan: `docs/launch/RELEASE_PLAN_2026-11-14_STORES_NAV.md`. Gates on 7b8f1ec: backend unit 2487/2488 (the one failure = image-validation timing
+  test, 2.6 s vs 2 s under load, 22/22 alone), integration 318/318, e2e 1195/1195, dashboard tsc + unit 57/57 + production build. Playwright (alone):
+  all affected specs pass after test fixes in 4ee24eb; known pre-existing issue: `/executive` scrolls sideways at phone width (a card is 518 px —
+  same with the previous shell), not part of this release.
+- Backup `hatly-prod-20261114T044045Z.dump` (sha256 f4c0f4efc007…), uploads 85 files, restore drill OK (106 tables, 82 migrations, 17 users),
+  off-host copy OK.
+- Live checks: backend ready ~5 s; health ok; `/stores-now`, `/operations`, `/home`, `/settlement`, `/drivers-today` 200; new route 401 without a
+  session; 0 errors in the backend log; settlement periods/payments still 0; the Stores-now query runs on live data (6 open store parts).
+- Found during the check: **no vendor staff accounts exist** (0 on 33 branches; 32 set to vendor acceptance) — the call button shows "no store
+  account" until accounts are added or branches move to Hatly acceptance (owner decision).
+- Still open from 3as: drivers' commission rates, DRIVER_PRESENCE_STALE_MINUTES, the 8 old COD orders (R43), Driver APK 1.0.0+8 distribution.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
