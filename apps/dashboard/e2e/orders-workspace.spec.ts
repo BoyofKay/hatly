@@ -147,9 +147,12 @@ test.describe('Admin — Orders workspace', () => {
     await expect(page.locator('[data-testid^="nav-section-"]')).toHaveCount(10);
     const orders = page.getByTestId('nav-section-orders');
     await expect(orders).toHaveAttribute('aria-current', 'page');
-    await expect(orders).toHaveAttribute('href', '/order-management');
+    await expect(orders).toHaveAttribute('href', '/operations'); // stage 5: the section opens on the Operations board
     const tabs = page.getByRole('navigation', { name: 'Section pages' });
     await expect(tabs.getByRole('link', { name: 'Orders', exact: true })).toHaveAttribute('aria-current', 'page');
+    // stage 5: the Control Tower is one click away under "More"
+    await expect(tabs.getByRole('link', { name: 'Control Tower', exact: true })).toHaveCount(0);
+    await tabs.getByTestId('section-tabs-more').click();
     await expect(tabs.getByRole('link', { name: 'Control Tower', exact: true })).toHaveAttribute('href', '/control-tower');
     await expect(page.getByRole('link', { name: 'Order Search', exact: true })).toHaveCount(0);
     // another section opens its first page, and the tab bar follows it

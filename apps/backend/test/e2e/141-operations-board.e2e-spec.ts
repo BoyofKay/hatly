@@ -129,6 +129,41 @@ describe('E2E — Operations board', () => {
     expect(ranking.ranked.find((r: any) => r.id === d.driverId)?.active ?? 2).toBe(2);
   });
 
+  it('stage 4: "Stores now" groups the parts to act on by branch — late acceptance, late preparation, who to call; a preset reject reason is stored verbatim', async () => {
+    const stores = async (a: Actor = admin) => expectData<any>(await world.api('get', '/admin/operations/stores-now', { token: a.accessToken }));
+    const waiting = await place();
+    await world.ds.query(`UPDATE order_vendor_segments SET created_at = now() - interval '12 minutes' WHERE order_id = $1`, [waiting.id]);
+    const cooking = await place();
+    const cookSeg = await segmentOf(cooking.id);
+    expectData(await onBehalf(cookSeg, 'CONFIRMED'));
+    expectData(await onBehalf(cookSeg, 'PREPARING'));
+    await world.ds.query(`UPDATE order_vendor_segments SET expected_ready_at = now() - interval '3 minutes' WHERE id = $1`, [cookSeg]);
+
+    const res = await stores();
+    expect(res.acceptAlertMinutes).toBe(5);
+    const st = res.stores.find((x: any) => x.branchId === v1.branchId);
+    expect(st).toMatchObject({ vendorName: 'Board Store', contacts: [expect.objectContaining({ name: 'Board Store Manager', role: 'VENDOR_MANAGER', phone: expect.any(String) })] });
+    expect(st.counts.lateAccept).toBeGreaterThanOrEqual(1);
+    expect(st.counts.latePreparation).toBeGreaterThanOrEqual(1);
+    const waitingSeg = await segmentOf(waiting.id);
+    expect(st.parts.find((p: any) => p.segmentId === waitingSeg)).toMatchObject({ status: 'PENDING', orderNumber: waiting.orderNumber, lateAccept: true, unverifiedTransfer: false });
+    expect(st.parts.find((p: any) => p.segmentId === cookSeg)).toMatchObject({ status: 'PREPARING', latePreparation: true, lateAccept: false });
+
+    // the page's preset reason is just the existing required reason — the same on-behalf transition, stored as written, shown to the customer
+    const preset = 'بعض المنتجات غير متوفرة حاليًا';
+    expectData(await world.api('patch', `/admin/orders/segments/${waitingSeg}/status`, { token: admin.accessToken, body: { status: 'CANCELLED', reason: preset } }));
+    const detail = expectData<any>(await world.api('get', `/admin/orders/${waiting.id}`, { token: admin.accessToken }));
+    expect(detail.segments.find((g: any) => g.id === waitingSeg).rejectionReason).toBe(preset);
+    const after = (await stores()).stores.find((x: any) => x.branchId === v1.branchId);
+    expect(after?.parts.some((p: any) => p.segmentId === waitingSeg) ?? false).toBe(false);
+
+    const viewer = await s.admin([Permission.VIEW_ORDERS], 'Stores viewer');
+    expect((await world.api('get', '/admin/operations/stores-now', { token: viewer.accessToken })).status).toBe(200);
+    const nobody = await s.admin([Permission.VIEW_CUSTOMERS], 'No stores');
+    expect((await world.api('get', '/admin/operations/stores-now', { token: nobody.accessToken })).status).toBe(403);
+    expect((await world.api('get', '/admin/operations/stores-now', { token: v1.manager.accessToken })).status).toBe(403);
+  });
+
   it('finished orders are not on the board; the board is read-only and needs VIEW_ORDERS; customers and stores are refused', async () => {
     const order = await place();
     const seg = await segmentOf(order.id);

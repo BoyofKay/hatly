@@ -16,6 +16,7 @@ import { adminHref } from '../../lib/notifications/wording';
 import { fetchAdminChanges } from '../../lib/api/changes';
 import { OpsAlarmBar, OpsAlarmProvider } from '../alerts/OpsAlarm';
 import { forgetThisDevice } from '../../lib/alerts/push-client';
+import { OpsShellContext } from './ops-shell-context';
 
 const ICONS: Record<string, ReactNode> = {
   home: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -118,6 +119,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const operations = useOperationsFacts();
+  const [boardShown, setBoardShown] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  useEffect(() => setMoreOpen(false), [pathname]);
+  const shellCtx = useMemo(() => ({ facts: operations, setBoardShown }), [operations]);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(false);
   const user = typeof window !== 'undefined' ? getCurrentUser() : null;
@@ -172,27 +177,54 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   // Work waiting behind a tab, shown on the tab itself so nobody has to open each page to find it (counts are the backend's own).
   const tabCounts: Record<string, number | undefined> = {
+    '/operations': operations?.actionRequired,
+    '/stores-now': operations?.pendingAcceptanceOverdue,
     '/manual-transfer': operations?.transfersToVerify,
     '/refunds': operations?.refundsToSend,
   };
 
   // The pages of the current section, as tabs above the page — only when the section has more than one page this admin may open.
+  // Stage 5: pages marked `more` sit in a "More" menu at the end (the page you are on is always shown as a tab, wherever it lives).
+  const tabLink = (i: NavItem) => {
+    const current = here.item?.href === i.href;
+    return (
+      <li key={i.href}>
+        <Link href={i.href} aria-current={current ? 'page' : undefined}
+          className={`-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium ${current ? 'border-hatly-orange text-hatly-orangeDark' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-800'}`}>
+          {t(i.en, i.ar)}
+          <TabCount n={tabCounts[i.href]} />
+        </Link>
+      </li>
+    );
+  };
+  const mainTabs = here.group ? here.group.items.filter((i) => !i.more || here.item?.href === i.href) : [];
+  const moreTabs = here.group ? here.group.items.filter((i) => i.more && here.item?.href !== i.href) : [];
   const tabs = here.group && here.group.items.length > 1 ? (
-    <nav aria-label={t('Section pages', 'صفحات القسم')} data-testid="section-tabs" className="-mx-4 mb-5 overflow-x-auto px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <ul className="flex min-w-max gap-1 border-b border-gray-200">
-        {here.group.items.map((i) => {
-          const current = here.item?.href === i.href;
-          return (
-            <li key={i.href}>
-              <Link href={i.href} aria-current={current ? 'page' : undefined}
-                className={`-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium ${current ? 'border-hatly-orange text-hatly-orangeDark' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-800'}`}>
-                {t(i.en, i.ar)}
-                <TabCount n={tabCounts[i.href]} />
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+    <nav aria-label={t('Section pages', 'صفحات القسم')} data-testid="section-tabs" className="-mx-4 mb-5 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div className="flex items-end border-b border-gray-200">
+        <ul className="flex min-w-0 flex-1 gap-1 overflow-x-auto">{mainTabs.map(tabLink)}</ul>
+        {moreTabs.length > 0 && (
+          <div className="relative shrink-0">
+            <button type="button" aria-expanded={moreOpen} aria-haspopup="true" onClick={() => setMoreOpen((v) => !v)} data-testid="section-tabs-more"
+              className="-mb-px flex items-center gap-1 whitespace-nowrap border-b-2 border-transparent px-3 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-800">
+              {t('More', 'المزيد')}
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><path d="M6 9l6 6 6-6" /></svg>
+            </button>
+            {moreOpen && (
+              <ul className="absolute end-0 z-30 mt-1 w-56 rounded-xl border border-gray-200 bg-white p-1 shadow-lg" data-testid="section-tabs-more-menu">
+                {moreTabs.map((i) => (
+                  <li key={i.href}>
+                    <Link href={i.href} onClick={() => setMoreOpen(false)} className="flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 text-sm text-gray-700 hover:bg-gray-50">
+                      {t(i.en, i.ar)}
+                      <TabCount n={tabCounts[i.href]} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
     </nav>
   ) : null;
 
@@ -231,8 +263,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </header>
         <OpsAlarmBar />
         {/* The Control Tower and the Orders workspace show these same facts as their own queues, so the shell banner stays out of their way. */}
-        {!['/control-tower', '/order-management'].some((p) => pathname === p) && <OperationsBanner facts={operations} />}
-        <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{tabs}{children}</main>
+        {/* Stage 5: the Operations board shows these facts itself (its "Other work" strip), so the banner steps aside wherever the board is on screen. */}
+        {!boardShown && !['/control-tower', '/order-management'].some((p) => pathname === p) && <OperationsBanner facts={operations} />}
+        <OpsShellContext.Provider value={shellCtx}>
+          <main className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">{tabs}{children}</main>
+        </OpsShellContext.Provider>
       </div>
       <CommandPalette open={search} onClose={() => setSearch(false)} />
     </div>

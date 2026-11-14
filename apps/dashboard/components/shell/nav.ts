@@ -12,6 +12,8 @@ export interface NavItem {
   perms?: string[];
   /** SUPER_ADMIN only. */
   superOnly?: boolean;
+  /** Stage 5: a page kept one click away under the section's "More" menu instead of a tab of its own (less-used / overlapping views). */
+  more?: boolean;
 }
 export interface NavGroup {
   id: string;
@@ -39,18 +41,20 @@ export const NAV: NavGroup[] = [
   },
   {
     id: 'orders', en: 'Orders', ar: 'الطلبات', icon: 'clipboard', match: ['/order-search', '/dispatch'],
+    // Stage 5: the section opens on the Operations board (the daily work); views it already covers sit under "More".
     items: [
-      { href: '/order-management', en: 'Orders', ar: 'الطلبات', perms: P.orders },
       { href: '/operations', en: 'Operations board', ar: 'لوحة التشغيل', perms: P.orders },
-      { href: '/control-tower', en: 'Control Tower', ar: 'برج المراقبة', perms: P.orders },
+      { href: '/stores-now', en: 'Stores now', ar: 'المتاجر الآن', perms: P.orders },
+      { href: '/order-management', en: 'Orders', ar: 'الطلبات', perms: P.orders },
       { href: '/exceptions', en: 'Exceptions', ar: 'الاستثناءات', perms: P.orders },
       { href: '/failed-deliveries', en: 'Failed Deliveries', ar: 'التوصيلات الفاشلة', perms: ['MANAGE_ORDER_ISSUES'] },
-      { href: '/alerts', en: 'Alerts', ar: 'التنبيهات', perms: P.orders },
-      { href: '/inbox', en: 'Notifications', ar: 'الإشعارات', perms: P.orders },
-      { href: '/notification-setup', en: 'Notification setup', ar: 'إعداد الإشعارات', perms: P.orders },
-      { href: '/payments', en: 'Payments', ar: 'المدفوعات', perms: ['VERIFY_MANUAL_PAYMENTS', 'VIEW_FINANCIALS'] },
       { href: '/manual-transfer', en: 'Manual Transfer', ar: 'التحويل اليدوي', perms: ['VERIFY_MANUAL_PAYMENTS'] },
       { href: '/refunds', en: 'Refunds', ar: 'المستردات', perms: ['VERIFY_MANUAL_PAYMENTS', 'VIEW_FINANCIALS'] },
+      { href: '/payments', en: 'Payments', ar: 'المدفوعات', perms: ['VERIFY_MANUAL_PAYMENTS', 'VIEW_FINANCIALS'] },
+      { href: '/control-tower', en: 'Control Tower', ar: 'برج المراقبة', perms: P.orders, more: true },
+      { href: '/alerts', en: 'Alerts', ar: 'التنبيهات', perms: P.orders, more: true },
+      { href: '/inbox', en: 'Notifications', ar: 'الإشعارات', perms: P.orders, more: true },
+      { href: '/notification-setup', en: 'Notification setup', ar: 'إعداد الإشعارات', perms: P.orders, more: true },
     ],
   },
   {
@@ -99,6 +103,10 @@ export const NAV: NavGroup[] = [
     id: 'delivery', en: 'Delivery', ar: 'التوصيل', icon: 'truck',
     items: [
       { href: '/drivers-today', en: 'Drivers today', ar: 'المندوبون اليوم', perms: ['CLOSE_DRIVER_SETTLEMENTS'] },
+      // Stage 5: closing is daily operations work, next to "Drivers today" (it was under Reports)
+      { href: '/settlement', en: 'Closing', ar: 'التقفيل', perms: ['CLOSE_VENDOR_SETTLEMENTS', 'CLOSE_DRIVER_SETTLEMENTS'] },
+      { href: '/settlement-statements', en: 'Statements by period', ar: 'الكشوف حسب الفترة', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
+      { href: '/settlements', en: 'Settlement history', ar: 'سجل التسويات', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
       { href: '/fleet', en: 'Live fleet', ar: 'الأسطول المباشر', perms: P.fleet },
       { href: '/drivers', en: 'Drivers', ar: 'السائقون', perms: ['MANAGE_DRIVERS'] },
       { href: '/delivery-zones', en: 'Delivery Zones', ar: 'مناطق التوصيل', perms: ['MANAGE_SERVICE_AREAS'] },
@@ -119,9 +127,6 @@ export const NAV: NavGroup[] = [
       { href: '/finance/receivables', en: 'Vendor receivables', ar: 'مستحقات المتاجر', perms: P.fin },
       { href: '/finance/liabilities', en: 'Liabilities', ar: 'الالتزامات', perms: P.fin },
       { href: '/finance/reconciliation', en: 'Reconciliation', ar: 'المطابقة', perms: P.fin },
-      { href: '/settlement', en: 'Closing', ar: 'التقفيل', perms: ['CLOSE_VENDOR_SETTLEMENTS', 'CLOSE_DRIVER_SETTLEMENTS'] },
-      { href: '/settlement-statements', en: 'Statements by period', ar: 'الكشوف حسب الفترة', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
-      { href: '/settlements', en: 'Settlement history', ar: 'سجل التسويات', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
     ],
   },
   {

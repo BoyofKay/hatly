@@ -12,13 +12,16 @@ import { updateSegmentOnBehalf } from '../../lib/api/admin-operations';
 import { assignDriver } from '../../lib/api/admin-dispatch';
 import { DispatchDriver } from '../../lib/api/admin-control-tower';
 import { DispatchAction } from './DispatchAction';
+import { RejectPart } from './RejectReason';
 import { useToast } from '../ui';
+import { useBoardShown, useShellFacts } from '../shell/ops-shell-context';
 
 /**
  * Operations board (stage 1 of the Admin simplification, 2026-11-13): every live order in ONE list, most urgent first, with the next step
  * as a button on the row — accept for the store (or accept and start preparing, approved shortcut), start preparing, ready, assign to the
  * suggested driver (same ranking as automatic dispatch) or another one. Every button is an existing endpoint with its own permission; the
- * board re-reads the backend after each action and every 10 s. Rejecting a store part, refunds and anything irreversible stay in the order.
+ * board re-reads the backend after each action and every 10 s. Stage 4: a pending store part can be rejected from the row with a ready-made
+ * reason (two taps in place). Refunds and other irreversible steps stay in the order.
  */
 type Reason = 'FAILED_DELIVERY' | 'STORE_NOT_ACCEPTED' | 'DRIVER_OFFLINE' | 'NEEDS_DRIVER' | 'VERIFY_TRANSFER' | 'NEW' | 'DRIVER_NOT_ACKNOWLEDGED' | 'PREPARATION_LATE' | 'READY_FOR_CUSTOMER' | 'PREPARING' | 'WITH_DRIVER';
 
@@ -66,7 +69,41 @@ export function OperationsBoard() {
   );
 }
 
+/**
+ * Stage 5 (2026-11-14): work that is NOT a row on the board, in one strip above it — so the board is the one place to look. Each chip opens the
+ * page that resolves it. The orders the board already lists (new, not accepted, needs a driver, late, driver offline…) are not repeated here;
+ * the shell banner, which listed them too, steps aside while the board is on screen. Counts are the backend's own (VIEW_ORDERS reads).
+ */
+function OtherWork() {
+  const { t } = useLang();
+  const facts = useShellFacts();
+  const exceptions = useApi<any>('/admin/order-exceptions/summary', undefined, { refreshInterval: 30_000 });
+  const alerts = useApi<any[]>('/admin/alerts', undefined, { refreshInterval: 60_000 });
+  const ex = exceptions.data;
+  const openAlerts = (alerts.data ?? []).filter((a) => !a.acknowledged).length;
+  const chips: Array<{ id: string; n: number; en: string; ar: string; href: string; strong?: boolean }> = [
+    { id: 'exceptions', n: ex?.awaitingOperations ?? 0, en: 'order issues waiting for Operations', ar: 'مشكلة طلب بانتظار العمليات', href: '/exceptions', strong: true },
+    { id: 'escalated', n: ex?.escalated ?? 0, en: 'escalated to a supervisor', ar: 'مُصعَّدة لمشرف', href: '/exceptions', strong: true },
+    { id: 'assign-errors', n: facts?.openDispatchAlerts?.ASSIGNMENT_ERROR ?? 0, en: 'automatic assignment errors', ar: 'خطأ في الإسناد التلقائي', href: '/control-tower', strong: true },
+    { id: 'refunds', n: facts?.refundsToSend ?? 0, en: 'refunds to send', ar: 'استرداد بانتظار الإرسال', href: '/refunds' },
+    { id: 'alerts', n: openAlerts, en: 'alerts (stock, integrations…)', ar: 'تنبيه (المخزون، التكاملات…)', href: '/alerts' },
+  ].filter((c) => c.n > 0);
+  if (chips.length === 0) return null;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-2" data-testid="board-other-work">
+      <span className="px-1 text-xs font-semibold text-gray-600">{t('Also waiting:', 'أيضًا بانتظارك:')}</span>
+      {chips.map((c) => (
+        <Link key={c.id} href={c.href} data-testid={`board-other-${c.id}`}
+          className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full border px-3 text-xs font-medium ${c.strong ? 'border-red-200 bg-red-50 text-red-800 hover:bg-red-100' : 'border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100'}`}>
+          <span className="font-bold">{c.n}</span> {t(c.en, c.ar)}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function Board() {
+  useBoardShown();
   const { t, money, locale } = useLang();
   const ar = locale === 'ar';
   const { can } = usePermissions();
@@ -162,6 +199,7 @@ function Board() {
 
   return (
     <div data-testid="operations-board">
+      <OtherWork />
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => {
           const n = f.id === 'urgent' ? urgentCount : f.id === 'all' ? items.length : f.id === 'PREPARING' ? (counts.PREPARING ?? 0) + (counts.PREPARATION_LATE ?? 0) : f.id === 'WITH_DRIVER' ? (counts.WITH_DRIVER ?? 0) + (counts.DRIVER_OFFLINE ?? 0) + (counts.DRIVER_NOT_ACKNOWLEDGED ?? 0) : counts[f.id] ?? 0;
@@ -238,6 +276,7 @@ function Board() {
                               className="min-h-[40px] rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50">
                               {t('Accept only', 'قبول فقط')}
                             </button>
+                            <RejectPart segmentId={g.id} orderNumber={o.orderNumber} storeName={storeName(g)} disabled={busy !== null} run={act} />
                           </>
                         )}
                         {canStore && g.status === 'CONFIRMED' && (

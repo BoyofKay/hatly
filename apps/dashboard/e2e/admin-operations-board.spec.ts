@@ -161,4 +161,29 @@ test.describe('Operations board', () => {
       await cancelTestOrder(order);
     }
   });
+  test('stage 5: on the board page the shell banner steps aside; work that is not a board row shows in "Also waiting" with a link; the banner is back elsewhere', async ({ page }) => {
+    const facts = { pendingAcceptanceAlertMinutes: 5, pendingAcceptance: 3, pendingAcceptanceOverdue: 2, preparationOverdue: 0, partiallyRejectedActiveOrders: 0, refundsToSend: 3, transfersToVerify: 0,
+      openDispatchAlerts: { NO_ELIGIBLE_DRIVER: 0, AUTO_ASSIGN_DISABLED: 0, ASSIGNMENT_ERROR: 1, DRIVER_NOT_RESPONDING: 0, ACKNOWLEDGEMENT_OVERDUE: 0 }, actionRequired: 6 };
+    await page.route('**/admin/control-tower/summary', async (route) => {
+      const real = await route.fetch();
+      const body = await real.json();
+      body.data.operations = facts;
+      await route.fulfill({ response: real, json: body });
+    });
+    await page.goto('/operations');
+    await expect(page.getByTestId('operations-board')).toBeVisible();
+    const other = page.getByTestId('board-other-work');
+    await expect(other.getByTestId('board-other-refunds')).toContainText('3');
+    await expect(other.getByTestId('board-other-refunds')).toHaveAttribute('href', '/refunds');
+    await expect(other.getByTestId('board-other-assign-errors')).toHaveAttribute('href', '/control-tower');
+    await expect(page.getByTestId('operations-banner')).toHaveCount(0); // not twice on one screen
+    // the Orders tab bar: the board first, with its count; the overlapping views under "More"
+    const tabs = page.getByRole('navigation', { name: 'Section pages' });
+    await expect(tabs.getByRole('link').first()).toHaveAttribute('href', '/operations');
+    await expect(tabs.getByRole('link', { name: /Operations board/ }).getByTestId('tab-count')).toHaveText('6');
+    await tabs.getByTestId('section-tabs-more').click();
+    await expect(page.getByTestId('section-tabs-more-menu').getByRole('link', { name: 'Alerts', exact: true })).toBeVisible();
+    await page.goto('/vendors');
+    await expect(page.getByTestId('operations-banner')).toBeVisible();
+  });
 });

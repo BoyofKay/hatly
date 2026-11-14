@@ -108,4 +108,83 @@ export class OperationsBoardService {
     for (const i of items) counts[i.reason] = (counts[i.reason] ?? 0) + 1;
     return { items, counts, totalLive: total, truncated: total > items.length, generatedAt: new Date(now).toISOString() };
   }
+
+  /**
+   * Stage 4 (2026-11-14): "Stores now" — every branch that has a store part to act on right now (not accepted yet, accepted, preparing,
+   * ready and waiting for the driver), with how late it is and who to call (the branch's active staff accounts — a branch has no phone of
+   * its own). Read-only; the same timing figures as the board (STORE_ACCEPT_ALERT_MINUTES, expected-ready time). Ad-hoc Hatly Service
+   * parts have no branch and stay on the board only. The actions the page offers are the existing on-behalf segment transitions.
+   */
+  async storesNow() {
+    const rows: any[] = await this.ds.query(
+      `SELECT b.id AS branch_id, b.name AS branch_name, b.is_open, b.acceptance_mode, v.name AS vendor_name, v.name_ar AS vendor_name_ar,
+              s.id AS segment_id, s.status AS segment_status, s.created_at AS segment_created_at, s.expected_ready_at, s.subtotal_minor,
+              o.id AS order_id, o.order_number, o.status AS order_status, o.fulfillment_type, o.payment_method,
+              (SELECT p.status FROM payments p WHERE p.order_id = o.id ORDER BY p.created_at DESC LIMIT 1) AS payment_status
+         FROM order_vendor_segments s
+         JOIN orders o ON o.id = s.order_id AND o.deleted_at IS NULL
+         JOIN vendor_branches b ON b.id = s.vendor_branch_id
+         JOIN vendors v ON v.id = b.vendor_id
+        WHERE s.deleted_at IS NULL
+          AND s.status IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP')
+          AND o.status IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP','ASSIGNED_TO_DRIVER')
+        ORDER BY s.created_at DESC
+        LIMIT ${BOARD_LIMIT}`,
+    );
+    // the newest parts when there are more than the limit (as the board); then oldest first inside each store
+    rows.reverse();
+    const [{ total }] = await this.ds.query(
+      `SELECT count(*)::int AS total FROM order_vendor_segments s JOIN orders o ON o.id = s.order_id AND o.deleted_at IS NULL
+        WHERE s.deleted_at IS NULL AND s.vendor_branch_id IS NOT NULL AND s.status IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP')
+          AND o.status IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP','ASSIGNED_TO_DRIVER')`,
+    );
+    const branchIds = [...new Set(rows.map((r) => r.branch_id))];
+    const staff: any[] = branchIds.length
+      ? await this.ds.query(
+          `SELECT st.vendor_branch_id AS branch_id, u.full_name AS name, u.phone, u.role
+             FROM vendor_staff st JOIN users u ON u.id = st.user_id
+            WHERE st.vendor_branch_id = ANY($1) AND st.deleted_at IS NULL AND u.deleted_at IS NULL AND u.is_active
+            ORDER BY (u.role = 'VENDOR_MANAGER') DESC, u.full_name`,
+          [branchIds],
+        )
+      : [];
+    const now = Date.now();
+    const stores = new Map<string, any>();
+    for (const r of rows) {
+      let st = stores.get(r.branch_id);
+      if (!st) {
+        st = {
+          branchId: r.branch_id, branchName: r.branch_name, vendorName: r.vendor_name, vendorNameAr: r.vendor_name_ar ?? null,
+          isOpen: Boolean(r.is_open), acceptanceMode: r.acceptance_mode,
+          contacts: staff.filter((c) => c.branch_id === r.branch_id).slice(0, 3).map((c) => ({ name: c.name, phone: c.phone, role: c.role })),
+          counts: { notAccepted: 0, lateAccept: 0, preparing: 0, latePreparation: 0, ready: 0 },
+          oldestWaitingAt: null as string | null,
+          parts: [] as any[],
+        };
+        stores.set(r.branch_id, st);
+      }
+      const created = new Date(r.segment_created_at).toISOString();
+      const lateAccept = r.segment_status === 'PENDING' && now - Date.parse(created) > STORE_ACCEPT_ALERT_MINUTES * 60_000;
+      const latePreparation = ['CONFIRMED', 'PREPARING'].includes(r.segment_status) && r.expected_ready_at != null && Date.parse(r.expected_ready_at) < now;
+      if (r.segment_status === 'PENDING') {
+        st.counts.notAccepted++;
+        if (!st.oldestWaitingAt) st.oldestWaitingAt = created;
+      }
+      if (lateAccept) st.counts.lateAccept++;
+      if (['CONFIRMED', 'PREPARING'].includes(r.segment_status)) st.counts.preparing++;
+      if (latePreparation) st.counts.latePreparation++;
+      if (r.segment_status === 'READY_FOR_PICKUP') st.counts.ready++;
+      st.parts.push({
+        segmentId: r.segment_id, status: r.segment_status, createdAt: created, expectedReadyAt: iso(r.expected_ready_at), subtotalMinor: num(r.subtotal_minor),
+        orderId: r.order_id, orderNumber: r.order_number, orderStatus: r.order_status, fulfillmentType: r.fulfillment_type,
+        // R2: no store action before a manual transfer is verified — the page shows "verify the transfer" instead
+        unverifiedTransfer: r.payment_method === 'MANUAL_TRANSFER' && r.payment_status !== 'PAID',
+        lateAccept, latePreparation,
+      });
+    }
+    const list = [...stores.values()].sort((a, b) =>
+      b.counts.lateAccept - a.counts.lateAccept || b.counts.latePreparation - a.counts.latePreparation || b.counts.notAccepted - a.counts.notAccepted
+      || (a.oldestWaitingAt ?? '~').localeCompare(b.oldestWaitingAt ?? '~') || a.vendorName.localeCompare(b.vendorName));
+    return { stores: list, acceptAlertMinutes: STORE_ACCEPT_ALERT_MINUTES, totalParts: total, truncated: total > rows.length, generatedAt: new Date(now).toISOString() };
+  }
 }

@@ -15,11 +15,14 @@ test.describe('Admin navigation', () => {
   const expectedLinks: Array<{ name: string; href: string; section: string }> = [
     { name: 'Sectors', href: '/sectors', section: 'Categories' },
     { name: 'Users', href: '/users', section: 'Settings' },
+    { name: 'Stores now', href: '/stores-now', section: 'Orders' },
+    { name: 'Control Tower', href: '/control-tower', section: 'Orders' },
+    { name: 'Alerts', href: '/alerts', section: 'Orders' },
     { name: 'Drivers today', href: '/drivers-today', section: 'Delivery' },
     { name: 'Drivers', href: '/drivers', section: 'Delivery' },
-    { name: 'Closing', href: '/settlement', section: 'Reports' },
-    { name: 'Statements by period', href: '/settlement-statements', section: 'Reports' },
-    { name: 'Settlement history', href: '/settlements', section: 'Reports' },
+    { name: 'Closing', href: '/settlement', section: 'Delivery' },
+    { name: 'Statements by period', href: '/settlement-statements', section: 'Delivery' },
+    { name: 'Settlement history', href: '/settlements', section: 'Delivery' },
     { name: 'Cash Remainders', href: '/cash-remainders', section: 'Delivery' },
     { name: 'Employee Loans', href: '/employee-loans', section: 'Delivery' },
     { name: 'Vehicle Types', href: '/vehicle-types', section: 'Delivery' },
@@ -33,7 +36,11 @@ test.describe('Admin navigation', () => {
       await section.click();
       await expect(section).toHaveAttribute('aria-current', 'page'); // the section's first page has opened before its tabs are read
       const tabs = page.getByRole('navigation', { name: 'Section pages' });
-      if (await tabs.count()) await tabs.getByRole('link', { name: link.name, exact: true }).click();
+      if (await tabs.count()) {
+        const tab = tabs.getByRole('link', { name: link.name, exact: true });
+        if (!(await tab.count())) await tabs.getByTestId('section-tabs-more').click(); // stage 5: less-used pages sit under "More"
+        await tab.click();
+      }
       await expect(page).toHaveURL(new RegExp(`${link.href}$`));
       await expect(page).not.toHaveURL(/\/login$/);
     });

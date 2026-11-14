@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { startPageFor } from '../../../lib/ui/start-page';
+import { NAV } from '../../../components/shell/nav';
 import { AdminOverview } from '../../../components/dashboard/AdminOverview';
 import { OperationsBoard } from '../../../components/operations/OperationsBoard';
 import { PushSetupPrompt } from '../../../components/alerts/PushSetupPrompt';
@@ -17,14 +20,18 @@ const MODE_KEY = 'hatly_home_mode';
  */
 export default function AdminHomePage() {
   const { t } = useLang();
-  const { can, loaded } = usePermissions();
-  const ops = loaded && can('VIEW_ORDERS') && can('MANAGE_ORDER_FULFILMENT', 'ASSIGN_REASSIGN_ORDERS');
+  const { can, loaded, role } = usePermissions();
+  const router = useRouter();
+  const start = loaded ? startPageFor({ role, can }, NAV) : null;
+  const ops = start === 'ops';
+  const elsewhere = start !== null && start.startsWith('/');
+  useEffect(() => { if (elsewhere) router.replace(start!); }, [elsewhere, start, router]);
   const [mode, setMode] = useState<'ops' | 'overview' | null>(null);
   useEffect(() => {
     try { const m = localStorage.getItem(MODE_KEY); if (m === 'ops' || m === 'overview') setMode(m); } catch { /* per-browser convenience only */ }
   }, []);
   const choose = (m: 'ops' | 'overview') => { setMode(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* ignore */ } };
-  if (!loaded) return <div data-testid="home-page" />;
+  if (!loaded || elsewhere) return <div data-testid="home-page" />;
   const effective = ops ? mode ?? 'ops' : 'overview';
 
   return (

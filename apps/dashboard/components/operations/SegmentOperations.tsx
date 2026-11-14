@@ -1,5 +1,6 @@
 'use client';
 
+import { RejectReasonPicker } from './RejectReason';
 import { useRef, useState } from 'react';
 import { AdminOrderDetail, AdminSegmentHistoryEntry } from '../../lib/api/admin-failed-deliveries';
 import { MANAGE_ORDER_FULFILMENT, SEGMENT_NEXT_ACTIONS, SegmentTarget, updateSegmentOnBehalf } from '../../lib/api/admin-operations';
@@ -127,17 +128,7 @@ export function SegmentOperations({ segment, onChanged, orderStatus }: { segment
             {rejecting && (
               <div className="rounded-xl border border-red-200 bg-white p-2" data-testid="segment-reject-form">
                 <p className="text-xs font-medium">{t('opSegRejectTitle')}</p>
-                <label className="mt-1 block text-xs text-gray-600">
-                  {t('opSegRejectReason')}
-                  <textarea
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    maxLength={500}
-                    rows={2}
-                    data-testid="segment-reject-reason"
-                    className="mt-1 w-full rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
-                  />
-                </label>
+                <div className="mt-1"><RejectReasonPicker value={reason} onChange={setReason} testIdPrefix="segment-reject" /></div>
                 <div className="mt-1 flex gap-2">
                   <button
                     type="button"

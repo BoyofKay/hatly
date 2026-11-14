@@ -23,6 +23,13 @@ export class AdminOperationsBoardController {
     return { data: await this.board.board() };
   }
 
+  /** Stage 4: "Stores now" — branches with a store part to act on, how late, and who to call. Read-only; same permission as the board. */
+  @Get('stores-now')
+  @RequiresPermission(Permission.VIEW_ORDERS)
+  async storesNow() {
+    return { data: await this.board.storesNow() };
+  }
+
   /**
    * Stage 2 (smart assignment): the drivers automatic dispatch would pick for this order, in its order, with load / capacity — for the
    * board's driver picker. Read-only (the ranking query itself); assigning stays the existing assign/reassign endpoints and their checks.
