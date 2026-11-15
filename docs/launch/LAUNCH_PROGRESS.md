@@ -540,6 +540,22 @@ Production release `20261107T053628Z-079cf82fb4dc` (commit `177d278`, bundle ide
   account" until accounts are added or branches move to Hatly acceptance (owner decision).
 - Still open from 3as: drivers' commission rates, DRIVER_PRESENCE_STALE_MINUTES, the 8 old COD orders (R43), Driver APK 1.0.0+8 distribution.
 
+## 3au. Modal typing focus, courier online status, Executive page on phones (2026-11-15) — DEPLOYED and verified (no signed-in check)
+
+- Release `20261115T032058Z-26e146606679` (commit bc91184). **No migrations** (82 applied, 0 pending). Rollback = app switch to
+  `20261114T043549Z-06e85f770a16`.
+- Content: shared Modal no longer re-runs its focus effect on every keystroke (owner report: typing stopped after one character, 30/39
+  dialogs); `GET /driver/online-status` (driver only, read-only) for Driver App 1.0.0+9, which reads its switch on launch/resume (owner
+  report: shown offline after reopening); Executive overview no sideways scroll at phone width.
+- Gates on bc91184: backend unit 2487/2488 (the one = upload size test hitting jest's 5 s limit under load, 12/12 alone), integration 318/318,
+  e2e 1196/1196, dashboard tsc + unit 57/57 + build; Playwright 83/83 incl. the new modal-typing test (fails on the old code); Driver App
+  flutter test 96/96.
+- Backup `hatly-prod-20261115T032916Z.dump` (sha256 38fe564c8c2c…), uploads 89 files, restore drill OK (106 tables, 82 migrations, 17 users),
+  off-host copy OK. 1 order on the road during the ~5 s switch (no migration); unaffected.
+- Live checks: health ok; `/home`, `/executive`, `/vehicle-types`, `/drivers-today` 200; new route 401 without a session; 0 errors in the log.
+- Driver App 1.0.0+9: `~/Downloads/Hatly-Driver-Release/hatly-driver-1.0.0-build9-20261115/` (sha256 ce52f862…, upload key 6e9dcf06), installed
+  over build 8 on the emulator, login screen, no crash. Not distributed — distribute 9 instead of 8.
+
 ## 4. Open release blockers (status 2026-10-17) — details in `CRITICAL_PATH.md`
 
 | Blocker | Kind | Where it stands |
