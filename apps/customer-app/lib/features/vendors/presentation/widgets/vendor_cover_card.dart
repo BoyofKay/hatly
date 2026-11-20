@@ -151,8 +151,13 @@ class VendorCoverCard extends StatelessWidget {
                                 Icon(Icons.schedule_rounded,
                                     size: 16, color: p.textMuted),
                                 const SizedBox(width: 4),
-                                Text(l10n.vendorEtaMinutes(etaRange),
-                                    style: context.type.small),
+                                // Flexible, like the review count above: shrinks in a narrow card at large text sizes.
+                                Flexible(
+                                  child: Text(l10n.vendorEtaMinutes(etaRange),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: context.type.small),
+                                ),
                               ],
                             ),
                           HatlyBadge(

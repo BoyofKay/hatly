@@ -232,7 +232,8 @@ class OrderSummaryCard extends StatelessWidget {
               ),
               if (order.totalMinor != null)
                 LtrText(formatMinorUnits(order.totalMinor!, context),
-                    style: context.type.title),
+                    style: context.type.title
+                        .copyWith(color: p.link, fontWeight: FontWeight.w800)),
             ],
           ),
         ],

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hatly_customer/features/favorites/data/favorites_api.dart';
 import 'package:hatly_customer/features/favorites/domain/favorite_vendor.dart';
 
 /// Favorites Chunk 2. Pure-function/model tests only — CONFIRMED
@@ -61,6 +62,30 @@ void main() {
 
       expect(favorite.nameAr, isNull);
       expect(favorite.logoUrl, isNull);
+    });
+  });
+
+  group('parseFavoritesPayload', () {
+    const row = {
+      'vendorId': 'vendor-1',
+      'name': 'Test Vendor',
+      'nameAr': null,
+      'logoUrl': null,
+      'isActive': true,
+      'favoritedAt': '2026-02-01T14:30:00.000Z',
+    };
+
+    test('accepts the bare list GET /favorites actually returns', () {
+      final favorites = parseFavoritesPayload([row]);
+      expect(favorites.single.vendorId, 'vendor-1');
+      expect(parseFavoritesPayload(<dynamic>[]), isEmpty);
+    });
+
+    test('still accepts the {data: [...]} envelope', () {
+      final favorites = parseFavoritesPayload({
+        'data': [row]
+      });
+      expect(favorites.single.vendorId, 'vendor-1');
     });
   });
 }

@@ -148,7 +148,7 @@ void main() {
 
   group('HatlyFloatingNavBar', () {
     testWidgets(
-        'renders 5 destinations, floats inset from the sides, and marks only the selected one',
+        'renders 5 destinations on a flat full-width bar with a top border (reference board), and marks only the selected one',
         (tester) async {
       await tester.pumpWidget(hatlyTestApp(HatlyFloatingNavBar(
           items: _navItems, selectedIndex: 0, onTap: (_) {})));
@@ -156,21 +156,26 @@ void main() {
       for (final label in ['Home', 'Explore', 'Cart', 'Orders', 'Profile']) {
         expect(find.text(label), findsOneWidget);
       }
-      // floating: the card is narrower than the screen (side margin) and has a soft shadow
-      final card = tester.getRect(find.byType(DecoratedBox).first);
-      expect(card.left, greaterThan(8));
-      final deco = tester
-          .widget<DecoratedBox>(find.byType(DecoratedBox).first)
-          .decoration as BoxDecoration;
+      // flat: the bar spans the full width, with a hairline top border and a soft upward shadow, and no rounded corners
+      final bar = find.descendant(
+          of: find.byType(HatlyFloatingNavBar),
+          matching: find.byType(DecoratedBox));
+      final card = tester.getRect(bar.first);
+      expect(card.left, 0);
+      expect(card.width,
+          tester.view.physicalSize.width / tester.view.devicePixelRatio);
+      final deco =
+          tester.widget<DecoratedBox>(bar.first).decoration as BoxDecoration;
       expect(deco.boxShadow, isNotEmpty);
-      expect(deco.borderRadius, isNotNull);
+      expect(deco.border, isNotNull);
+      expect(deco.borderRadius, isNull);
       // active item uses the filled icon, the others the outlined one
       expect(find.byIcon(Icons.home_rounded), findsOneWidget);
       expect(find.byIcon(Icons.explore_outlined), findsOneWidget);
     });
 
     testWidgets(
-        'active item has a subtle pill background AND a heavier label; inactive has neither',
+        'active item has an orange indicator AND a heavier label; inactive has neither',
         (tester) async {
       await tester.pumpWidget(hatlyTestApp(HatlyFloatingNavBar(
           items: _navItems, selectedIndex: 1, onTap: (_) {})));
@@ -181,16 +186,16 @@ void main() {
       expect(labelStyle('Explore').fontWeight, FontWeight.w800);
       expect(labelStyle('Home').fontWeight, FontWeight.w500);
 
-      BoxDecoration pill(String t) {
-        final c = tester.widget<AnimatedContainer>(find
-            .ancestor(
-                of: find.text(t), matching: find.byType(AnimatedContainer))
-            .first);
-        return c.decoration! as BoxDecoration;
-      }
+      double indicatorWidth(String key) => tester
+          .getSize(find
+              .descendant(
+                  of: find.byKey(Key(key)),
+                  matching: find.byType(AnimatedContainer))
+              .first)
+          .width;
 
-      expect(pill('Explore').color, isNot(Colors.transparent));
-      expect(pill('Home').color, Colors.transparent);
+      expect(indicatorWidth('n1'), greaterThan(0));
+      expect(indicatorWidth('n0'), 0);
     });
 
     testWidgets(

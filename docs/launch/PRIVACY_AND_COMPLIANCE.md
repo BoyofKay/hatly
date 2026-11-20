@@ -60,7 +60,7 @@ The same SDKs, plus `flutter_secure_storage`, `shared_preferences`, `geolocator`
 
 ## 4. Apple — draft App Privacy answers (App Store Connect) — **CONFIRM + LEGAL**
 
-*Customer app* — Data **linked to the user**: Contact Info (Name, Phone Number) · Location (Precise Location) · User Content (Photos or Videos; Other User Content = notes, custom-request text, ratings/comments) · Purchases (Purchase History = orders) · Identifiers (User ID; Device ID — Firebase/Google Maps) · Diagnostics/Usage (Crash Data, Performance Data, Product Interaction — Google Maps SDK). Purposes: App Functionality (all), Analytics (SDK items only). **Used to track you: none** (no ad SDK, no ATT, manifests say no tracking).
+*Customer app* — Data **linked to the user**: Contact Info (Name, Phone Number, **Physical Address** — saved delivery addresses; added 2026-11-13) · Location (Precise Location) · User Content (Photos or Videos; Other User Content = notes, custom-request text, ratings/comments) · Purchases (Purchase History = orders) · Identifiers (User ID; Device ID — Firebase/Google Maps) · Diagnostics/Usage (Crash Data, Performance Data, Product Interaction — Google Maps SDK). Purposes: App Functionality (all), Analytics (SDK items only). **Used to track you: none** (no ad SDK, no ATT, manifests say no tracking).
 *Driver app* — same, minus Purchases, plus the driver's location while online and delivery photos; Contact Info (Name, Phone Number) only as the account Hatly created.
 **Open point:** Apple lets you omit data collected only on-device and not transmitted; everything above is transmitted to Hatly's server or to Google's SDK endpoints, so it is declared.
 
@@ -77,7 +77,7 @@ The same SDKs, plus `flutter_secure_storage`, `shared_preferences`, `geolocator`
 ## 6. iOS privacy manifests (`PrivacyInfo.xcprivacy`)
 
 * **Plugins and SDKs already ship their own** (24 manifests inside the customer build, 22 in the driver build) — so the "missing SDK privacy manifest" rejection class does not apply. One framework in the customer build (`objective_c`) carries none; it is a Dart FFI helper, not a listed "required SDK" — **watch the App Store Connect upload warnings** after the first upload.
-* **An app-level manifest is not present.** What it would contain: `NSPrivacyTracking = false`, no tracking domains, the collected-data types from section 4, and required-reason entries only for APIs the **app's own code** calls (Dart code does not call UserDefaults/file-timestamp APIs directly; plugins do, and they declare them). Because the collected-data declaration is a legal statement, the file is **proposed, not added**: once the owner confirms section 4, it can be added in one step to each `ios/Runner/` (Xcode target membership included). Apple still requires the answers in App Store Connect either way.
+* **App-level manifest added 2026-11-13** (`apps/customer-app/ios/Runner/PrivacyInfo.xcprivacy`): no tracking, no tracking domains, no required-reason APIs in the app's own code, and the data the app itself sends to Hatly — Name, Phone Number, Physical Address, Precise Location, Photos, Other User Content, Purchase History, User ID, Device ID (push token), all linked to the user, purpose App Functionality. SDK-collected diagnostics stay in the SDKs' own manifests. **Keep it identical in meaning to the App Store Connect answers above.**
 
 ## 7. Privacy policy — public page `/privacy` (2026-10-23) and its outline — **LEGAL**
 

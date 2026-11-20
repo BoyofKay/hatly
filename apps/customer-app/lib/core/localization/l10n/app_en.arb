@@ -305,7 +305,7 @@
   "addressLocationCaptured": "Location captured",
   "addressMissingLocationError": "Please enter the address and use current location",
   "addressSaveButton": "Save address",
-  "navExplore": "Explore",
+  "navExplore": "Stores",
   "homeSearchHint": "What are you looking for?",
   "homeSectionCategories": "Shop by category",
   "homeSectionPopularNearYou": "Popular near you",
@@ -1232,5 +1232,21 @@
   "addressOpenLocationSettings": "Open location settings",
   "weightInlineLabel": "Or type the weight in kilograms",
   "weightEstimateNote": "Estimated: {price} — the final price is set by the actual weight when your order is prepared.",
-  "@weightEstimateNote": {"placeholders": {"price": {"type": "String"}}}
+  "@weightEstimateNote": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "homeDeliverTo": "Deliver to",
+  "profileSettings": "Settings",
+  "settingsLanguage": "Language",
+  "languageArabic": "العربية",
+  "languageEnglish": "English",
+  "settingsPasswordSection": "Password & security",
+  "settingsAccountSection": "Account",
+  "settingsAppSection": "App",
+  "searchFilterVendors": "Stores only",
+  "searchFilterProducts": "Products only"
 }

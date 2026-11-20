@@ -181,6 +181,7 @@ class _OrderDetailsContent extends ConsumerWidget {
           const SizedBox(height: HatlySpacing.lg),
           HatlySection(
             title: l10n.orderTimelineTitle,
+            icon: Icons.timeline_rounded,
             child: _OrderSurface(
                 child: OrderTimelineView(entries: order.timeline)),
           ),
@@ -195,6 +196,7 @@ class _OrderDetailsContent extends ConsumerWidget {
         const SizedBox(height: HatlySpacing.lg),
         HatlySection(
           title: l10n.orderVendorsLabel,
+          icon: Icons.storefront_outlined,
           child: Column(
             children: [
               for (final segment in order.segments)
@@ -208,7 +210,9 @@ class _OrderDetailsContent extends ConsumerWidget {
             ],
           ),
         ),
-        RemovedItemsSection(items: [for (final segment in order.segments) ...segment.removedItems]),
+        RemovedItemsSection(items: [
+          for (final segment in order.segments) ...segment.removedItems
+        ]),
         // 4. Pricing (+ 6. discount / coupon)
         const SizedBox(height: HatlySpacing.sm),
         _PricingCard(order: order),
@@ -217,6 +221,7 @@ class _OrderDetailsContent extends ConsumerWidget {
           const SizedBox(height: HatlySpacing.md),
           HatlySection(
             title: AppLocalizations.of(context).routeOrderSectionTitle,
+            icon: Icons.route_rounded,
             child: HatlySurface(
               child: RouteSummary(
                 key: const Key('order-route'),
@@ -795,6 +800,7 @@ class _PricingCard extends StatelessWidget {
     final discount = order.discountMinor ?? 0;
     return HatlySection(
       title: l10n.orderPricingTitle,
+      icon: Icons.receipt_long_outlined,
       child: _OrderSurface(
         child: Column(
           children: [
@@ -866,6 +872,7 @@ class _DeliveryBreakdownCard extends StatelessWidget {
     final b = order.deliveryBreakdown!;
     return HatlySection(
       title: l10n.orderDeliveryBreakdownTitle,
+      icon: Icons.delivery_dining_outlined,
       child: _OrderSurface(
         child: Column(
           key: const Key('order-delivery-breakdown'),
@@ -929,6 +936,7 @@ class _PaymentCard extends StatelessWidget {
     final due = payment?.amountDueMinor ?? order.amountDueMinor;
     return HatlySection(
       title: l10n.orderPaymentTitle,
+      icon: Icons.payments_outlined,
       child: _OrderSurface(
         child: Column(
           key: const Key('order-payment'),
@@ -974,6 +982,7 @@ class _AddressCard extends StatelessWidget {
     final p = context.palette;
     return HatlySection(
       title: l10n.orderDeliveryAddressTitle,
+      icon: Icons.location_on_outlined,
       child: _OrderSurface(
         child: Row(
           key: const Key('order-address'),

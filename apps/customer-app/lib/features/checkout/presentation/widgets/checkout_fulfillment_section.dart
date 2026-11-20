@@ -37,6 +37,7 @@ class CheckoutFulfillmentSection extends StatelessWidget {
         !fulfillment.pickupAvailable && !fulfillment.isPickup;
     return HatlySection(
       title: l10n.checkoutFulfillmentTitle,
+      icon: Icons.local_shipping_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../shared_widgets/hatly_soft_image.dart';
 import '../../../core/localization/l10n/app_localizations.dart';
 import '../../../core/theme/hatly_theme.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/hatly_loading_view.dart';
 import '../../../shared_widgets/hatly_card.dart';
-import '../../../shared_widgets/hatly_image.dart';
 import '../../../shared_widgets/availability_badge.dart';
 import '../data/favorites_providers.dart';
 import '../domain/favorite_vendor.dart';
@@ -106,11 +106,13 @@ class _FavoriteVendorCard extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            HatlyImage(
+            // Reference board ("المفضلة"): the same rounded store photo as the store list rows.
+            HatlySoftImage(
                 url: favorite.logoUrl,
-                width: 64,
-                height: 64,
-                shape: HatlyImageShape.circular),
+                width: 76,
+                height: 76,
+                radius: 14,
+                placeholderIcon: Icons.storefront_outlined),
             const SizedBox(width: HatlySpacing.ms),
             Expanded(
               child: Column(
@@ -118,9 +120,10 @@ class _FavoriteVendorCard extends StatelessWidget {
                 children: [
                   Text(
                     displayName,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: context.type.title
+                        .copyWith(fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: HatlySpacing.xs),
                   // Real, live status from the backend (Chunk 1) —

@@ -63,7 +63,8 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
   RouteEndpoint? _destinationChoice;
 
   RouteEndpoint? _effectiveOrigin(RouteDefaults d) =>
-      _originChoice ?? (_serviceType == HatlyServiceType.buyFromPlace ? d.hatlyOrigin : null);
+      _originChoice ??
+      (_serviceType == HatlyServiceType.buyFromPlace ? d.hatlyOrigin : null);
 
   RouteEndpoint? _effectiveDestination(RouteDefaults d) =>
       _destinationChoice ??
@@ -161,24 +162,30 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
         imageUrls.add(url);
       }
 
-      final error =
-          await ref.read(cartControllerProvider.notifier).addAdHocItem(
-                cartVendorGroupId: existingGroupId,
-                adHocPlaceName: existingGroupId == null
-                    ? _placeNameController.text.trim()
-                    : null,
-                adHocServiceType: existingGroupId == null ? _serviceType : null,
-                // Only what the customer chose is sent; an end left on "default" stays null and the server resolves it.
-                pickupLatitude: existingGroupId == null ? _originChoice?.latitude : null,
-                pickupLongitude: existingGroupId == null ? _originChoice?.longitude : null,
-                pickupLabel: existingGroupId == null ? _originChoice?.label : null,
-                destinationLatitude: existingGroupId == null ? _destinationChoice?.latitude : null,
-                destinationLongitude: existingGroupId == null ? _destinationChoice?.longitude : null,
-                destinationLabel: existingGroupId == null ? _destinationChoice?.label : null,
-                freeTextDescription: _descriptionController.text.trim(),
-                quantity: 1,
-                imageUrls: imageUrls.isEmpty ? null : imageUrls,
-              );
+      final error = await ref
+          .read(cartControllerProvider.notifier)
+          .addAdHocItem(
+            cartVendorGroupId: existingGroupId,
+            adHocPlaceName: existingGroupId == null
+                ? _placeNameController.text.trim()
+                : null,
+            adHocServiceType: existingGroupId == null ? _serviceType : null,
+            // Only what the customer chose is sent; an end left on "default" stays null and the server resolves it.
+            pickupLatitude:
+                existingGroupId == null ? _originChoice?.latitude : null,
+            pickupLongitude:
+                existingGroupId == null ? _originChoice?.longitude : null,
+            pickupLabel: existingGroupId == null ? _originChoice?.label : null,
+            destinationLatitude:
+                existingGroupId == null ? _destinationChoice?.latitude : null,
+            destinationLongitude:
+                existingGroupId == null ? _destinationChoice?.longitude : null,
+            destinationLabel:
+                existingGroupId == null ? _destinationChoice?.label : null,
+            freeTextDescription: _descriptionController.text.trim(),
+            quantity: 1,
+            imageUrls: imageUrls.isEmpty ? null : imageUrls,
+          );
 
       if (!mounted) return;
       if (error != null) {
@@ -200,20 +207,38 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
 
   /// The ends in effect for the request being edited: an existing cart group's own (its customer-chosen ends, else the service default)
   /// or the new request's choices. Never the customer's address.
-  ({RouteEndpoint? origin, RouteEndpoint? destination}) _routeFor(CartGroup? existing, RouteDefaults d) {
-    if (existing == null) return (origin: _effectiveOrigin(d), destination: _effectiveDestination(d));
+  ({RouteEndpoint? origin, RouteEndpoint? destination}) _routeFor(
+      CartGroup? existing, RouteDefaults d) {
+    if (existing == null)
+      return (
+        origin: _effectiveOrigin(d),
+        destination: _effectiveDestination(d)
+      );
     final isBuy = existing.adHocServiceType == HatlyServiceType.buyFromPlace;
-    RouteEndpoint? chosen(double? lat, double? lng, String? label) => lat == null || lng == null
-        ? null
-        : RouteEndpoint(latitude: lat, longitude: lng, label: label ?? '', source: RouteEndpointSource.customer);
+    RouteEndpoint? chosen(double? lat, double? lng, String? label) =>
+        lat == null || lng == null
+            ? null
+            : RouteEndpoint(
+                latitude: lat,
+                longitude: lng,
+                label: label ?? '',
+                source: RouteEndpointSource.customer);
     return (
-      origin: chosen(existing.adHocPickupLatitude, existing.adHocPickupLongitude, existing.adHocPickupLabel) ?? (isBuy ? d.hatlyOrigin : null),
-      destination: chosen(existing.adHocDestinationLatitude, existing.adHocDestinationLongitude, existing.adHocDestinationLabel) ??
+      origin: chosen(existing.adHocPickupLatitude,
+              existing.adHocPickupLongitude, existing.adHocPickupLabel) ??
+          (isBuy ? d.hatlyOrigin : null),
+      destination: chosen(
+              existing.adHocDestinationLatitude,
+              existing.adHocDestinationLongitude,
+              existing.adHocDestinationLabel) ??
           (isBuy ? d.hatlyDestination : d.wasallyDestination),
     );
   }
 
-  Future<void> _editEndpoint({required bool isOrigin, required CartGroup? existing, required RouteDefaults defaults}) async {
+  Future<void> _editEndpoint(
+      {required bool isOrigin,
+      required CartGroup? existing,
+      required RouteDefaults defaults}) async {
     final type = existing?.adHocServiceType ?? _serviceType;
     final isBuy = type == HatlyServiceType.buyFromPlace;
     final route = _routeFor(existing, defaults);
@@ -221,19 +246,23 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
       context,
       isOrigin: isOrigin,
       current: isOrigin ? route.origin : route.destination,
-      defaultEndpoint: isOrigin ? (isBuy ? defaults.hatlyOrigin : null) : (isBuy ? defaults.hatlyDestination : defaults.wasallyDestination),
+      defaultEndpoint: isOrigin
+          ? (isBuy ? defaults.hatlyOrigin : null)
+          : (isBuy ? defaults.hatlyDestination : defaults.wasallyDestination),
     );
     if (choice == null || !mounted) return;
     if (existing != null) {
       // The request is already in the cart: store the new end there (each end independently; "default" clears the customer's choice).
-      final error = await ref.read(cartControllerProvider.notifier).updateAdHocRoute(
-            origin: isOrigin ? choice.endpoint : null,
-            clearOrigin: isOrigin && choice.useDefault,
-            destination: isOrigin ? null : choice.endpoint,
-            clearDestination: !isOrigin && choice.useDefault,
-          );
+      final error =
+          await ref.read(cartControllerProvider.notifier).updateAdHocRoute(
+                origin: isOrigin ? choice.endpoint : null,
+                clearOrigin: isOrigin && choice.useDefault,
+                destination: isOrigin ? null : choice.endpoint,
+                clearDestination: !isOrigin && choice.useDefault,
+              );
       if (!mounted) return;
-      setState(() => _errorMessage = error == null ? null : localizedCartErrorMessage(context, error));
+      setState(() => _errorMessage =
+          error == null ? null : localizedCartErrorMessage(context, error));
       return;
     }
     setState(() {
@@ -251,9 +280,11 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
     final existingGroup = _existingGroup(ref);
     _existingGroupIdCache = existingGroup?.id;
     // While the defaults load (or if they cannot be read) nothing is configured: the customer simply chooses the ends themselves.
-    final defaults = ref.watch(routeDefaultsProvider).valueOrNull ?? RouteDefaults.none;
+    final defaults =
+        ref.watch(routeDefaultsProvider).valueOrNull ?? RouteDefaults.none;
     final route = _routeFor(existingGroup, defaults);
-    final isBuy = (existingGroup?.adHocServiceType ?? _serviceType) == HatlyServiceType.buyFromPlace;
+    final isBuy = (existingGroup?.adHocServiceType ?? _serviceType) ==
+        HatlyServiceType.buyFromPlace;
 
     return Scaffold(
       appBar: AppBar(title: Text(l10n.hatlyServiceScreenTitle)),
@@ -278,10 +309,18 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
                 onRemoveImage: _removeImage,
                 origin: route.origin,
                 destination: route.destination,
-                originHint: isBuy ? l10n.routeDefaultMissingHint : l10n.routeOriginRequiredHint,
+                originHint: isBuy
+                    ? l10n.routeDefaultMissingHint
+                    : l10n.routeOriginRequiredHint,
                 destinationHint: l10n.routeDefaultMissingHint,
-                onEditOrigin: () => _editEndpoint(isOrigin: true, existing: existingGroup, defaults: defaults),
-                onEditDestination: () => _editEndpoint(isOrigin: false, existing: existingGroup, defaults: defaults),
+                onEditOrigin: () => _editEndpoint(
+                    isOrigin: true,
+                    existing: existingGroup,
+                    defaults: defaults),
+                onEditDestination: () => _editEndpoint(
+                    isOrigin: false,
+                    existing: existingGroup,
+                    defaults: defaults),
                 errorMessage: _errorMessage,
                 onChanged: () => setState(() {}),
                 isValid: _isValid(defaults),
@@ -368,6 +407,7 @@ class _FormPhase extends StatelessWidget {
         ] else ...[
           HatlySection(
             title: l10n.hatlyServiceTypeSectionTitle,
+            icon: Icons.category_outlined,
             child: Column(
               children: [
                 _ServiceTypeTile(
@@ -395,6 +435,7 @@ class _FormPhase extends StatelessWidget {
           const SizedBox(height: HatlySpacing.lg),
           HatlySection(
             title: l10n.hatlyServicePlaceNameLabel,
+            icon: Icons.storefront_outlined,
             child: TextField(
               key: const Key('hatly-service-place-name'),
               controller: placeNameController,
@@ -411,6 +452,7 @@ class _FormPhase extends StatelessWidget {
         ],
         HatlySection(
           title: l10n.hatlyServiceDescriptionLabel,
+          icon: Icons.edit_note_rounded,
           child: TextField(
             key: const Key('hatly-service-description'),
             controller: descriptionController,
@@ -429,6 +471,7 @@ class _FormPhase extends StatelessWidget {
         const SizedBox(height: HatlySpacing.lg),
         HatlySection(
           title: l10n.hatlyServiceImagesLabel,
+          icon: Icons.photo_camera_outlined,
           child: Row(
             children: [
               ...images.asMap().entries.map(
@@ -496,6 +539,7 @@ class _FormPhase extends StatelessWidget {
           // changeable on its own. Shown for a request already in the cart too — its ends are edited in place.
           HatlySection(
             title: l10n.routeSectionTitle,
+            icon: Icons.route_rounded,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -512,7 +556,9 @@ class _FormPhase extends StatelessWidget {
                 ),
                 if (errorMessage != null) ...[
                   const SizedBox(height: HatlySpacing.sm),
-                  HatlyErrorBanner(key: const Key('hatly-service-route-error'), message: errorMessage!),
+                  HatlyErrorBanner(
+                      key: const Key('hatly-service-route-error'),
+                      message: errorMessage!),
                 ],
               ],
             ),
@@ -640,6 +686,7 @@ class _ReviewPhase extends StatelessWidget {
       children: [
         HatlySection(
           title: l10n.hatlyServiceReviewTitle,
+          icon: Icons.fact_check_outlined,
           trailing: TextButton(
             key: const Key('hatly-service-edit'),
             onPressed: isSubmitting ? null : onEdit,

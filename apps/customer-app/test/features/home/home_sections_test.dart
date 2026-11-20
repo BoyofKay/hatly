@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hatly_customer/features/home/data/home_banners_providers.dart';
 import 'package:hatly_customer/features/home/data/home_providers.dart';
+import 'package:hatly_customer/features/home/domain/home_banner.dart';
 import 'package:hatly_customer/features/home/domain/home_content.dart';
 import 'package:hatly_customer/features/home/presentation/home_section_products_screen.dart';
 import 'package:hatly_customer/features/home/presentation/widgets/home_promo_actions.dart';
@@ -251,7 +253,8 @@ void main() {
     test(
         'about 1.6:1 on a normal phone (was a ~2:1 strip of 176), clamped for small and large screens',
         () {
-      expect(promoBannerHeight(390), inInclusiveRange(215, 235));
+      // Full content width since 2026-11-13 (was 92 % of the screen): 233.9 → 238.7 pt on a 390 pt phone, i.e. about the same height.
+      expect(promoBannerHeight(390), inInclusiveRange(225, 245));
       expect(promoBannerHeight(390), greaterThan(176 * 1.2));
       expect(promoBannerHeight(320), kPromoBannerMinHeight);
       expect(promoBannerHeight(1200), kPromoBannerMaxHeight);
@@ -280,7 +283,7 @@ void main() {
       () {
     Future<List<String>> pump(WidgetTester tester, HomeSectionKind kind,
         AsyncValue<List<HomeProductEntry>> Function() value,
-        {List<String>? visited}) async {
+        {List<String>? visited, List<HomeBanner> banners = const []}) async {
       tester.view.physicalSize = const Size(390, 2400);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -288,6 +291,7 @@ void main() {
       await tester.pumpWidget(hatlyRouterApp(
         initialLocation: homeSectionRoute(kind),
         overrides: [
+          homeBannersProvider.overrideWith((ref) async => banners),
           homeSectionProductsProvider(kind).overrideWith((ref) async {
             final v = value();
             if (v.hasError) throw v.error!;
@@ -343,6 +347,32 @@ void main() {
           () => const AsyncData(<HomeProductEntry>[]));
       expect(find.byKey(const Key('home-section-empty')), findsOneWidget);
       expect(find.byKey(const Key('home-section-product-rice')), findsNothing);
+    });
+
+    testWidgets(
+        'Offers leads with the admin promotion banners (reference board) — even when no product has an offer right now',
+        (tester) async {
+      const banners = [
+        HomeBanner(
+            id: 'b1',
+            title: 'Weekend',
+            titleAr: 'عروض الويكند',
+            imageUrl: '/uploads/files/a.png'),
+        HomeBanner(
+            id: 'b2', title: 'Free delivery', imageUrl: '/uploads/files/b.png'),
+      ];
+      await pump(tester, HomeSectionKind.offers,
+          () => const AsyncData(<HomeProductEntry>[]),
+          banners: banners);
+      expect(find.byKey(const Key('offers-banner-b1')), findsOneWidget);
+      expect(find.byKey(const Key('offers-banner-b2')), findsOneWidget);
+      expect(find.byKey(const Key('home-section-empty')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      // Other sections never show banners.
+      await pump(tester, HomeSectionKind.newest,
+          () => const AsyncData(<HomeProductEntry>[]),
+          banners: banners);
+      expect(find.byKey(const Key('offers-banner-b1')), findsNothing);
     });
 
     testWidgets('a failed load shows the retry state, not a blank page',

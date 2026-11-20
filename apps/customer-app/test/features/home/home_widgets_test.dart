@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hatly_customer/shared_widgets/looping_pager.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hatly_customer/core/theme/hatly_theme.dart';
 import 'package:hatly_customer/features/home/data/home_providers.dart';
@@ -101,25 +102,13 @@ void main() {
     });
 
     testWidgets(
-        'page indicators: one per promo, the active one is a longer pill; swiping moves it',
+        'no page dots (owner, 2026-11-11); swiping still moves to another promo',
         (tester) async {
       await tester.pumpWidget(hatlyTestApp(PromoCarousel(
           promos: _promos,
           onAction: (_) {},
           autoRotateInterval: const Duration(days: 1))));
-      expect(find.byType(PromoPageIndicator), findsOneWidget);
-      double activeWidth() {
-        final widths = tester
-            .widgetList<AnimatedContainer>(find.descendant(
-                of: find.byType(PromoPageIndicator),
-                matching: find.byType(AnimatedContainer)))
-            .map((c) => c.constraints!.maxWidth)
-            .toList();
-        expect(widths, hasLength(5));
-        return widths.reduce((a, b) => a > b ? a : b);
-      }
-
-      expect(activeWidth(), 20);
+      expect(find.byType(PromoPageIndicator), findsNothing);
       final firstActive = _activeIndex(tester);
       await tester.fling(find.byType(PageView), const Offset(400, 0), 1000);
       await tester.pumpAndSettle();
@@ -148,6 +137,22 @@ void main() {
           autoRotateInterval: const Duration(seconds: 1))));
       await tester.pump(const Duration(seconds: 3));
       expect(find.byType(PromoPageIndicator), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('an automatic slide is a gentle glide (900 ms, ease-in-out), not a jump',
+        (tester) async {
+      expect(kLoopingPagerGlide, const Duration(milliseconds: 900));
+      await tester.pumpWidget(hatlyTestApp(PromoCarousel(
+          promos: _promos,
+          onAction: (_) {},
+          autoRotateInterval: const Duration(seconds: 5))));
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump(const Duration(milliseconds: 450)); // half-way: still moving, between two pages
+      final page = tester.widget<PageView>(find.byType(PageView)).controller!.page!;
+      expect(page - page.floor(), inExclusiveRange(0.05, 0.95));
+      await tester.pumpAndSettle();
+      expect(_activeIndex(tester), 1);
     });
 
     testWidgets('does not auto-rotate when the OS asks for reduced motion',
@@ -164,7 +169,7 @@ void main() {
       expect(_activeIndex(tester), 0);
     });
 
-    testWidgets('the card is a radius-20 inset card', (tester) async {
+    testWidgets('the card is a subtly rounded (8 px) inset card', (tester) async {
       await tester.pumpWidget(hatlyTestApp(PromoCarousel(
           promos: _promos,
           onAction: (_) {},
@@ -173,7 +178,8 @@ void main() {
           .widgetList<Container>(find.byType(Container))
           .map((c) => c.decoration)
           .whereType<BoxDecoration>()
-          .firstWhere((d) => d.borderRadius == BorderRadius.circular(20));
+          .firstWhere((d) => d.borderRadius == BorderRadius.circular(HatlyRadius.heroBanner));
+      expect(HatlyRadius.heroBanner, 8);
       expect(card.boxShadow, isNull, reason: 'calm: no shadow on the promo');
       final screen = tester.getSize(find.byType(PromoCarousel)).width;
       expect(tester.getSize(find.byType(PromoCtaButton).first).height,
@@ -701,11 +707,7 @@ void main() {
 }
 
 int _activeIndex(WidgetTester tester) {
-  final widths = tester
-      .widgetList<AnimatedContainer>(find.descendant(
-          of: find.byType(PromoPageIndicator),
-          matching: find.byType(AnimatedContainer)))
-      .map((c) => c.constraints!.maxWidth)
-      .toList();
-  return widths.indexOf(widths.reduce((a, b) => a > b ? a : b));
+  // No dots any more: the settled page of the (endless) pager, modulo the number of promos.
+  final page = tester.widget<PageView>(find.byType(PageView)).controller!.page!.round();
+  return page % _promos.length;
 }

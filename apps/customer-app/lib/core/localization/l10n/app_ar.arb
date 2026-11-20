@@ -305,7 +305,7 @@
   "addressLocationCaptured": "تم تحديد الموقع",
   "addressMissingLocationError": "يرجى إدخال العنوان واستخدام الموقع الحالي",
   "addressSaveButton": "حفظ العنوان",
-  "navExplore": "استكشف",
+  "navExplore": "المتاجر",
   "homeSearchHint": "بتدور على إيه؟",
   "homeSectionCategories": "تسوّق حسب الفئة",
   "homeSectionPopularNearYou": "الأشهر بالقرب منك",
@@ -1246,5 +1246,21 @@
   "addressOpenLocationSettings": "فتح إعدادات الموقع",
   "weightInlineLabel": "أو اكتب الوزن بالكيلوغرام",
   "weightEstimateNote": "التقدير: {price} — يُحدَّد السعر النهائي حسب الوزن الفعلي عند التجهيز.",
-  "@weightEstimateNote": {"placeholders": {"price": {"type": "String"}}}
+  "@weightEstimateNote": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "homeDeliverTo": "التوصيل إلى",
+  "profileSettings": "الإعدادات",
+  "settingsLanguage": "اللغة",
+  "languageArabic": "العربية",
+  "languageEnglish": "English",
+  "settingsPasswordSection": "كلمة المرور والأمان",
+  "settingsAccountSection": "الحساب",
+  "settingsAppSection": "التطبيق",
+  "searchFilterVendors": "متاجر",
+  "searchFilterProducts": "منتجات"
 }

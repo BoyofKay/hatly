@@ -21,6 +21,7 @@ class CheckoutItemsSummary extends StatelessWidget {
     if (cart.groups.isEmpty) return const SizedBox.shrink();
     return HatlySection(
       title: l10n.checkoutOrderSummary,
+      icon: Icons.receipt_long_outlined,
       child: Column(
         children: [
           for (final group in cart.groups)

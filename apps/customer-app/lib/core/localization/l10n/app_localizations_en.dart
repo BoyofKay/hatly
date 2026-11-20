@@ -736,7 +736,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addressSaveButton => 'Save address';
 
   @override
-  String get navExplore => 'Explore';
+  String get navExplore => 'Stores';
 
   @override
   String get homeSearchHint => 'What are you looking for?';
@@ -2534,4 +2534,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String weightEstimateNote(String price) {
     return 'Estimated: $price — the final price is set by the actual weight when your order is prepared.';
   }
+
+  @override
+  String get homeDeliverTo => 'Deliver to';
+
+  @override
+  String get profileSettings => 'Settings';
+
+  @override
+  String get settingsLanguage => 'Language';
+
+  @override
+  String get languageArabic => 'العربية';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
+  String get settingsPasswordSection => 'Password & security';
+
+  @override
+  String get settingsAccountSection => 'Account';
+
+  @override
+  String get settingsAppSection => 'App';
+
+  @override
+  String get searchFilterVendors => 'Stores only';
+
+  @override
+  String get searchFilterProducts => 'Products only';
 }

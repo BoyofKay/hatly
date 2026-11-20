@@ -67,6 +67,7 @@ class _CheckoutWalletSectionState extends State<CheckoutWalletSection> {
 
     return HatlySection(
       title: l10n.checkoutWalletTitle,
+      icon: Icons.account_balance_wallet_outlined,
       child: HatlySurface(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

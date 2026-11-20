@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../products/presentation/widgets/product_grid_card.dart';
 import '../../../core/localization/l10n/app_localizations.dart';
 import '../../../core/theme/hatly_theme.dart';
 import '../../../shared_widgets/filter_action_button.dart';
@@ -16,7 +17,6 @@ import '../../products/data/product_providers.dart';
 import '../../products/domain/product_category.dart';
 import '../../products/domain/product_filters.dart';
 import '../../products/presentation/widgets/product_filter_sheet.dart';
-import '../../products/presentation/widgets/product_list_tile.dart';
 import '../../products/presentation/widgets/product_list_tile_skeleton.dart';
 import '../data/vendor_providers.dart';
 import '../domain/vendor_branch_summary.dart';
@@ -230,22 +230,32 @@ class _VendorDetailsContent extends ConsumerWidget {
                 ),
               );
             }
+            // Reference board ("منتجات القسم"): the products as a two-column photo grid, two per row.
+            final rows = (products.length + 1) ~/ 2;
             return SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final product = products[index];
-                    return ProductListTile(
-                      product: product,
-                      onTap: () => context.push('/products/${product.id}'),
-                      // Same one-tap add as Home (one unit via the cart controller; hands off to the product
-                      // page when the backend needs an option/weight choice or the cart is another branch's).
-                      onQuickAdd: () =>
-                          handleQuickAdd(context, ref, product.id),
+                  (context, row) {
+                    final pair = products.skip(row * 2).take(2).toList();
+                    return Padding(
+                      padding: EdgeInsets.only(
+                          bottom: row == rows - 1 ? 0 : HatlySpacing.ms),
+                      child: TwoColumnRows(children: [
+                        for (final product in pair)
+                          ProductGridCard(
+                            product: product,
+                            onTap: () =>
+                                context.push('/products/${product.id}'),
+                            // Same one-tap add as Home (one unit via the cart controller; hands off to the product
+                            // page when the backend needs an option/weight choice or the cart is another branch's).
+                            onQuickAdd: () =>
+                                handleQuickAdd(context, ref, product.id),
+                          ),
+                      ]),
                     );
                   },
-                  childCount: products.length,
+                  childCount: rows,
                 ),
               ),
             );
@@ -278,78 +288,103 @@ class _VendorHeader extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final p = context.palette;
 
-    const logoSize = 72.0;
-    // Image-first header: a wide cover, the logo overlapping its lower edge, then the name, the rating and the offer badge.
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          HatlySpacing.md, HatlySpacing.sm, HatlySpacing.md, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
+    const logoSize = 84.0;
+    const coverHeight = 190.0;
+    // Reference board ("تفاصيل المتجر"): an edge-to-edge store photo, the round logo centred on its lower edge, then the name,
+    // offer badge and rating centred beneath it.
+    return Column(
+      children: [
+        SizedBox(
+          height: coverHeight + logoSize / 2,
+          child: Stack(
             clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
             children: [
-              HatlySoftImage(
-                url: details.vendor.logoUrl,
-                width: double.infinity,
-                height: 140,
-                radius: HatlyRadius.card,
-                placeholderIcon: Icons.storefront_outlined,
-                placeholderIconSize: 44,
+              // The vendor API has no cover photo, and stretching the logo across the width blurs it: a warm brand panel
+              // carries the header instead, with the real logo on its edge.
+              Container(
+                key: const Key('vendor-details-cover'),
+                height: coverHeight,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: AlignmentDirectional.topStart,
+                    end: AlignmentDirectional.bottomEnd,
+                    colors: [
+                      p.accent,
+                      Color.lerp(p.accent, const Color(0xFFFFC08A), 0.7)!,
+                    ],
+                  ),
+                ),
+                alignment: AlignmentDirectional.topEnd,
+                padding: const EdgeInsets.all(HatlySpacing.md),
+                child: Icon(Icons.storefront_rounded,
+                    size: 96, color: p.accentOn.withValues(alpha: 0.08)),
               ),
-              PositionedDirectional(
-                bottom: -(logoSize / 2),
-                start: HatlySpacing.md,
+              Positioned(
+                top: coverHeight - logoSize / 2,
                 child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration:
-                      BoxDecoration(color: p.surface, shape: BoxShape.circle),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                      color: p.surface,
+                      shape: BoxShape.circle,
+                      boxShadow: HatlyShadows.floating(p)),
                   child: HatlySoftImage(
                     url: details.vendor.logoUrl,
-                    width: logoSize,
-                    height: logoSize,
+                    width: logoSize - 8,
+                    height: logoSize - 8,
                     circular: true,
                     placeholderIcon: Icons.store_outlined,
-                    placeholderIconSize: 30,
+                    placeholderIconSize: 32,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: logoSize / 2 + HatlySpacing.sm),
-          Wrap(
-            spacing: HatlySpacing.sm,
-            runSpacing: HatlySpacing.xs,
-            crossAxisAlignment: WrapCrossAlignment.center,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+              HatlySpacing.md, HatlySpacing.sm, HatlySpacing.md, 0),
+          child: Column(
             children: [
-              Text(vendorName, style: Theme.of(context).textTheme.titleLarge),
-              if (details.hasPromotion)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: HatlySpacing.sm, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: HatlyColors.primaryOrange,
-                    borderRadius: BorderRadius.circular(HatlyRadius.chip),
-                  ),
-                  child: Text(
-                    l10n.promotionBadge,
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelLarge
-                        ?.copyWith(color: p.accentOn),
-                  ),
+              Text(vendorName,
+                  textAlign: TextAlign.center,
+                  style: context.type.h2.copyWith(fontWeight: FontWeight.w800)),
+              if (details.ratingCount > 0 || details.hasPromotion) ...[
+                const SizedBox(height: HatlySpacing.xs),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: HatlySpacing.sm,
+                  runSpacing: HatlySpacing.xs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (details.ratingCount > 0)
+                      HatlyRatingInline(
+                          key: const Key('vendor-details-rating'),
+                          average: details.ratingAverage,
+                          count: details.ratingCount),
+                    if (details.hasPromotion)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: HatlySpacing.sm, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: HatlyColors.primaryOrange,
+                          borderRadius: BorderRadius.circular(HatlyRadius.chip),
+                        ),
+                        child: Text(
+                          l10n.promotionBadge,
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelLarge
+                              ?.copyWith(color: p.accentOn),
+                        ),
+                      ),
+                  ],
                 ),
+              ],
             ],
           ),
-          if (details.ratingCount > 0) ...[
-            const SizedBox(height: HatlySpacing.xs),
-            HatlyRatingInline(
-                key: const Key('vendor-details-rating'),
-                average: details.ratingAverage,
-                count: details.ratingCount),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -370,15 +405,15 @@ class _BranchInfoSection extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(
-          HatlySpacing.md, HatlySpacing.md, HatlySpacing.md, 0),
-      padding: const EdgeInsets.all(HatlySpacing.ms),
+          HatlySpacing.md, HatlySpacing.ms, HatlySpacing.md, 0),
+      padding: const EdgeInsets.symmetric(
+          horizontal: HatlySpacing.md, vertical: HatlySpacing.ms),
       // Polish pass: was `HatlyColors.background`/`HatlyColors.textMuted`
       // (fixed light-mode constants) — this container stayed a bright
       // off-white box on a dark screen in Dark Mode. `p.surfaceSoft`/
       // `p.textMuted` are the theme-aware equivalents.
       decoration: BoxDecoration(
-          color: p.surface,
-          border: Border.all(color: p.border),
+          color: p.surfaceSoft.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(HatlyRadius.card)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

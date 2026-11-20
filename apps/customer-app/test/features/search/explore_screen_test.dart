@@ -297,7 +297,7 @@ void main() {
     });
 
     testWidgets(
-        'Shop by Category: a 3-column grid; tap → existing listing route',
+        'Shop by Category: a 2-column grid of large cards (reference board); tap → existing listing route',
         (tester) async {
       _phone(tester);
       final visited = <String>[];
@@ -305,20 +305,20 @@ void main() {
 
       final grid =
           tester.widgetList<CategoryCard>(find.byType(CategoryCard)).toList();
-      expect(grid, hasLength(6), reason: 'collapsed: two rows of three');
+      expect(grid, hasLength(6), reason: 'collapsed: three rows of two');
+      expect(grid.every((c) => c.large), isTrue);
       final rects = [
         for (var i = 0; i < 6; i++)
           tester.getRect(find.byType(CategoryCard).at(i))
       ];
-      expect({for (final r in rects) r.left.round()}.length, 3);
-      expect({for (final r in rects) r.top.round()}.length, 2);
+      expect({for (final r in rects) r.left.round()}.length, 2);
+      expect({for (final r in rects) r.top.round()}.length, 3);
       // Arabic: the first category is on the right
       expect(rects[0].left, greaterThan(rects[1].left));
 
       await tester.tap(find.byType(CategoryCard).at(1));
       await tester.pumpAndSettle();
-      expect(visited.single,
-          startsWith('/vendors?sectorId=sec1&sectorName='));
+      expect(visited.single, startsWith('/vendors?sectorId=sec1&sectorName='));
       expect(Uri.parse(visited.single).queryParameters['sectorName'], 'فئة 1');
     });
 
@@ -376,8 +376,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('فئة 9'));
       await tester.pumpAndSettle();
-      expect(visited.single,
-          startsWith('/vendors?sectorId=sec9&sectorName='));
+      expect(visited.single, startsWith('/vendors?sectorId=sec9&sectorName='));
     });
 
     testWidgets(
@@ -527,6 +526,33 @@ void main() {
   });
 
   group('Explore search', () {
+    testWidgets(
+        'result filter chips (الكل · متاجر · منتجات) narrow the loaded results without a new request',
+        (tester) async {
+      _phone(tester);
+      final api = _FakeSearchApi();
+      await _open(tester, _app(overrides: _overrides(api: api), visited: <String>[]));
+      await _type(tester, 'برجر');
+      expect(find.byType(VendorCoverCard), findsOneWidget);
+      expect(find.text('برجر جبنة'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('search-filter-products')));
+      await tester.pumpAndSettle();
+      expect(find.byType(VendorCoverCard), findsNothing);
+      expect(find.text('برجر جبنة'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('search-filter-vendors')));
+      await tester.pumpAndSettle();
+      expect(find.byType(VendorCoverCard), findsOneWidget);
+      expect(find.text('برجر جبنة'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('search-filter-all')));
+      await tester.pumpAndSettle();
+      expect(find.byType(VendorCoverCard), findsOneWidget);
+      expect(find.text('برجر جبنة'), findsOneWidget);
+      expect(api.queries, ['برجر'], reason: 'filtering is local');
+    });
+
     testWidgets('vendors + products from the real search; navigation unchanged',
         (tester) async {
       _phone(tester);
@@ -662,8 +688,7 @@ void main() {
 
       await tester.tap(find.byType(CategoryCard));
       await tester.pumpAndSettle();
-      expect(visited.single,
-          startsWith('/vendors?sectorId=r&sectorName='));
+      expect(visited.single, startsWith('/vendors?sectorId=r&sectorName='));
     });
 
     testWidgets(

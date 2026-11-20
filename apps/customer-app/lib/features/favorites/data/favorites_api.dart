@@ -13,9 +13,7 @@ class FavoritesApi {
   Future<List<FavoriteVendor>> getFavorites() {
     return _client.request(
       (dio) => dio.get('/favorites'),
-      (data) => (data['data'] as List)
-          .map((e) => FavoriteVendor.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      parseFavoritesPayload,
     );
   }
 
@@ -38,4 +36,15 @@ class FavoritesApi {
       (data) {},
     );
   }
+}
+
+/// `GET /favorites` answers with the bare list (favorites.controller.ts returns the service's array unwrapped), unlike
+/// most endpoints' `{data: [...]}` envelope. Both shapes are accepted, so the screen works with either backend shape
+/// instead of failing on a type error.
+List<FavoriteVendor> parseFavoritesPayload(dynamic data) {
+  final list =
+      data is List ? data : (data as Map<String, dynamic>)['data'] as List;
+  return list
+      .map((e) => FavoriteVendor.fromJson(e as Map<String, dynamic>))
+      .toList();
 }

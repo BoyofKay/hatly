@@ -33,6 +33,7 @@ class CheckoutDeliverySection extends StatelessWidget {
       title: isPickup
           ? l10n.checkoutPickupEstimate
           : l10n.checkoutDeliveryEstimate,
+      icon: Icons.schedule_rounded,
       child: HatlySurface(
         padding: EdgeInsets.zero,
         child: Theme(

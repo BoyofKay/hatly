@@ -19,7 +19,11 @@ import 'explore_message.dart';
 /// vendor and product results. Navigation is exactly what it was: vendor →
 /// `/vendors/:id`, product → `/products/:id`, category →
 /// `/vendors?sectorId=…&sectorName=…`.
-class ExploreSearchResults extends StatelessWidget {
+/// Which kinds of result are shown (reference board, "نتائج البحث": الكل · متاجر · منتجات). A view filter over the results
+/// already loaded — it never triggers another request.
+enum _ResultFilter { all, vendors, products }
+
+class ExploreSearchResults extends StatefulWidget {
   const ExploreSearchResults({
     super.key,
     required this.state,
@@ -32,21 +36,38 @@ class ExploreSearchResults extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
+  State<ExploreSearchResults> createState() => _ExploreSearchResultsState();
+}
+
+class _ExploreSearchResultsState extends State<ExploreSearchResults> {
+  _ResultFilter _filter = _ResultFilter.all;
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
+    final matchedCategories = widget.matchedCategories;
+    final onRetry = widget.onRetry;
     final l10n = AppLocalizations.of(context);
     final p = context.palette;
     final results = state.results;
     final loading = state.status == SearchStatus.loading;
     final failed = state.status == SearchStatus.error;
-    final vendors = results?.vendors.data ?? const <SearchVendorResult>[];
-    final products = results?.products.data ?? const <SearchProductResult>[];
-    final hasCategories = matchedCategories.isNotEmpty;
+    final allVendors = results?.vendors.data ?? const <SearchVendorResult>[];
+    final allProducts = results?.products.data ?? const <SearchProductResult>[];
+    final vendors = _filter == _ResultFilter.products
+        ? const <SearchVendorResult>[]
+        : allVendors;
+    final products = _filter == _ResultFilter.vendors
+        ? const <SearchProductResult>[]
+        : allProducts;
+    final hasCategories =
+        _filter == _ResultFilter.all && matchedCategories.isNotEmpty;
 
     // One clear overall message — never stacked empty states.
     if (state.status == SearchStatus.loaded &&
-        !hasCategories &&
-        vendors.isEmpty &&
-        products.isEmpty) {
+        matchedCategories.isEmpty &&
+        allVendors.isEmpty &&
+        allProducts.isEmpty) {
       return ExploreMessage(
           icon: Icons.search_off_rounded,
           title: l10n.searchNoResultsForQuery(state.query));
@@ -67,6 +88,18 @@ class ExploreSearchResults extends StatelessWidget {
       padding:
           const EdgeInsets.only(top: HatlySpacing.md, bottom: HatlySpacing.lg),
       children: [
+        if (allVendors.isNotEmpty && allProducts.isNotEmpty) ...[
+          _FilterChips(
+            selected: _filter,
+            labels: {
+              _ResultFilter.all: l10n.allProducts,
+              _ResultFilter.vendors: l10n.searchFilterVendors,
+              _ResultFilter.products: l10n.searchFilterProducts,
+            },
+            onSelected: (f) => setState(() => _filter = f),
+          ),
+          const SizedBox(height: HatlySpacing.md),
+        ],
         if (hasCategories) ...[
           HatlySectionHeader(title: l10n.exploreSearchCategories),
           const SizedBox(height: HatlySpacing.sm),
@@ -143,6 +176,48 @@ class ExploreSearchResults extends StatelessWidget {
 /// stay at the same "not provided" placeholders the vendor listing mapping
 /// uses — and [VendorCoverCard] hides them. Rating and review count are real
 /// (`ratingAverage` / `ratingCount` from the search response).
+class _FilterChips extends StatelessWidget {
+  const _FilterChips(
+      {required this.selected, required this.labels, required this.onSelected});
+
+  final _ResultFilter selected;
+  final Map<_ResultFilter, String> labels;
+  final ValueChanged<_ResultFilter> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding:
+          const EdgeInsets.symmetric(horizontal: HatlySpacing.screenPadding),
+      child: Row(
+        children: [
+          for (final entry in labels.entries) ...[
+            if (entry.key != _ResultFilter.all)
+              const SizedBox(width: HatlySpacing.sm),
+            ChoiceChip(
+              key: Key('search-filter-${entry.key.name}'),
+              label: Text(entry.value),
+              selected: selected == entry.key,
+              showCheckmark: false,
+              onSelected: (_) => onSelected(entry.key),
+              selectedColor: p.accent,
+              backgroundColor: p.surface,
+              side: BorderSide(
+                  color: selected == entry.key ? p.accent : p.border),
+              shape: const StadiumBorder(),
+              labelStyle: context.type.small.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: selected == entry.key ? p.accentOn : p.textPrimary),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 extension SearchVendorResultAsVendor on SearchVendorResult {
   Vendor toVendor() => Vendor(
         id: id,

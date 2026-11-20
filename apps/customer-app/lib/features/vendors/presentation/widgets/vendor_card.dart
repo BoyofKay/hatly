@@ -44,9 +44,8 @@ class VendorCard extends StatelessWidget {
         isArabic && vendor.nameAr != null ? vendor.nameAr! : vendor.name;
 
     final p = context.palette;
-    const logoSize = 52.0;
-    // Image-first: the cover leads, the logo overlaps its lower edge, the heart and the offer badge sit ON the cover. Closed vendors stay
-    // visible but muted (the cover only — the name and status must stay readable).
+    // Reference board ("قائمة المتاجر"): a compact white row — the store photo at the start, name, rating and status beside
+    // it, the heart at the end. Closed vendors stay visible but their photo is muted (name and status stay readable).
     final card = DecoratedBox(
       decoration: BoxDecoration(
         color: p.surface,
@@ -58,99 +57,86 @@ class VendorCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(HatlyRadius.card),
           onTap: onTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Opacity(
-                    opacity: vendor.isOpen ? 1.0 : 0.55,
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(HatlyRadius.card)),
-                      child: HatlySoftImage(
+          child: Padding(
+            padding: const EdgeInsets.all(HatlySpacing.ms),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Opacity(
+                  opacity: vendor.isOpen ? 1.0 : 0.55,
+                  child: Stack(
+                    children: [
+                      HatlySoftImage(
                         url: vendor.coverImageUrl ?? vendor.logoUrl,
-                        width: double.infinity,
-                        height: 108,
-                        radius: 0,
+                        width: 92,
+                        height: 92,
+                        radius: 14,
                         placeholderIcon: Icons.storefront_outlined,
-                        placeholderIconSize: 40,
+                        placeholderIconSize: 34,
                       ),
-                    ),
-                  ),
-                  if (vendor.hasPromotion)
-                    PositionedDirectional(
-                      top: HatlySpacing.sm,
-                      start: HatlySpacing.sm,
-                      child: HatlyBadge(
-                          kind: HatlyBadgeKind.offer, label: l10n.badgeOffer),
-                    ),
-                  PositionedDirectional(
-                    top: 2,
-                    end: 2,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                          color: p.surface.withValues(alpha: 0.92),
-                          shape: BoxShape.circle),
-                      child: _FavoriteHeartButton(vendorId: vendor.id),
-                    ),
-                  ),
-                  PositionedDirectional(
-                    bottom: -(logoSize / 2),
-                    start: HatlySpacing.md,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                          color: p.surface, shape: BoxShape.circle),
-                      child: HatlySoftImage(
-                        url: vendor.logoUrl,
-                        width: logoSize,
-                        height: logoSize,
-                        circular: true,
-                        placeholderIcon: Icons.store_outlined,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                    HatlySpacing.md,
-                    logoSize / 2 + HatlySpacing.sm,
-                    HatlySpacing.md,
-                    HatlySpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.type.title,
-                    ),
-                    const SizedBox(height: HatlySpacing.xs),
-                    Wrap(
-                      spacing: HatlySpacing.ms,
-                      runSpacing: HatlySpacing.xs,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (vendor.ratingCount > 0)
-                          HatlyRatingInline(
-                              key: Key('vendor-card-rating-${vendor.id}'),
-                              average: vendor.ratingAverage,
-                              count: vendor.ratingCount),
-                        AvailabilityBadge(
-                          isOpen: vendor.isOpen,
-                          openLabel: l10n.vendorOpenNow,
-                          closedLabel: l10n.vendorClosed,
+                      if (vendor.coverImageUrl != null &&
+                          vendor.logoUrl != null)
+                        PositionedDirectional(
+                          bottom: 4,
+                          start: 4,
+                          child: Container(
+                            padding: const EdgeInsets.all(1.5),
+                            decoration: BoxDecoration(
+                                color: p.surface, shape: BoxShape.circle),
+                            child: HatlySoftImage(
+                              url: vendor.logoUrl,
+                              width: 28,
+                              height: 28,
+                              circular: true,
+                              placeholderIcon: Icons.store_outlined,
+                            ),
+                          ),
                         ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: HatlySpacing.ms),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.type.title
+                            .copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: HatlySpacing.xs),
+                      if (vendor.ratingCount > 0) ...[
+                        HatlyRatingInline(
+                            key: Key('vendor-card-rating-${vendor.id}'),
+                            average: vendor.ratingAverage,
+                            count: vendor.ratingCount),
+                        const SizedBox(height: HatlySpacing.xs),
+                      ],
+                      Wrap(
+                        spacing: HatlySpacing.sm,
+                        runSpacing: HatlySpacing.xs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          AvailabilityBadge(
+                            isOpen: vendor.isOpen,
+                            openLabel: l10n.vendorOpenNow,
+                            closedLabel: l10n.vendorClosed,
+                          ),
+                          if (vendor.hasPromotion)
+                            HatlyBadge(
+                                kind: HatlyBadgeKind.offer,
+                                label: l10n.badgeOffer),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                _FavoriteHeartButton(vendorId: vendor.id),
+              ],
+            ),
           ),
         ),
       ),

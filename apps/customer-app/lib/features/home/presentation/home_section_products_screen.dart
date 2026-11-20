@@ -5,9 +5,12 @@ import '../../../core/localization/l10n/app_localizations.dart';
 import '../../../core/theme/hatly_theme.dart';
 import '../../../shared_widgets/hatly_badge.dart';
 import '../../../shared_widgets/hatly_loading_view.dart';
+import '../../../shared_widgets/hatly_soft_image.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../products/presentation/widgets/product_card.dart';
+import '../data/home_banners_providers.dart';
 import '../data/home_providers.dart';
+import '../domain/home_banner.dart';
 import '../domain/home_content.dart';
 import 'widgets/home_promo_actions.dart';
 
@@ -46,11 +49,27 @@ class HomeSectionProductsScreen extends ConsumerWidget {
             onRetry: () => ref.invalidate(homeSectionProductsProvider(kind)),
           ),
           data: (entries) {
+            final banners = kind == HomeSectionKind.offers
+                ? ref.watch(homeBannersProvider).valueOrNull ??
+                    const <HomeBanner>[]
+                : const <HomeBanner>[];
             if (entries.isEmpty) {
-              return HatlyStateView(
+              final empty = HatlyStateView(
                   key: const Key('home-section-empty'),
                   icon: Icons.inbox_outlined,
                   title: l10n.homeSeeAllEmpty);
+              if (banners.isEmpty) return empty;
+              // No offer products right now, but the admin's promotions still lead the page.
+              return ListView(
+                padding: const EdgeInsets.all(HatlySpacing.screenPadding),
+                children: [
+                  for (final banner in banners) ...[
+                    _OfferBannerCard(banner: banner),
+                    const SizedBox(height: HatlySpacing.md),
+                  ],
+                  SizedBox(height: 220, child: empty),
+                ],
+              );
             }
             return LayoutBuilder(builder: (context, constraints) {
               const gap = HatlySpacing.md;
@@ -69,28 +88,100 @@ class HomeSectionProductsScreen extends ConsumerWidget {
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(HatlySpacing.screenPadding),
-                  child: Wrap(
-                    spacing: gap,
-                    runSpacing: gap,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (final entry in entries)
-                        ProductCard(
-                          key: Key('home-section-product-${entry.product.id}'),
-                          product: entry.product,
-                          width: width,
-                          extraBadge: entry.tag == HomeProductTag.newItem
-                              ? HatlyBadgeKind.newItem
-                              : null,
-                          elevated: false,
-                          onTap: () =>
-                              context.push(productRoute(entry.product.id)),
-                        ),
+                      // Reference board ("العروض والكوبونات"): the admin's promotion banners lead the offers page, stacked as large
+                      // cards; nothing is shown when there are none (never a placeholder banner).
+                      for (final banner in banners) ...[
+                        _OfferBannerCard(banner: banner),
+                        const SizedBox(height: HatlySpacing.md),
+                      ],
+                      Wrap(
+                        spacing: gap,
+                        runSpacing: gap,
+                        children: [
+                          for (final entry in entries)
+                            ProductCard(
+                              key: Key(
+                                  'home-section-product-${entry.product.id}'),
+                              product: entry.product,
+                              width: width,
+                              extraBadge: entry.tag == HomeProductTag.newItem
+                                  ? HatlyBadgeKind.newItem
+                                  : null,
+                              elevated: false,
+                              onTap: () =>
+                                  context.push(productRoute(entry.product.id)),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               );
             });
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _OfferBannerCard extends StatelessWidget {
+  const _OfferBannerCard({required this.banner});
+
+  final HomeBanner banner;
+
+  @override
+  Widget build(BuildContext context) {
+    final arabic = Localizations.localeOf(context).languageCode == 'ar';
+    final title =
+        arabic && banner.titleAr != null ? banner.titleAr! : banner.title;
+    final route = bannerRoute(banner, arabic: arabic);
+    return Semantics(
+      button: route != null,
+      label: title,
+      excludeSemantics: true,
+      child: InkWell(
+        key: Key('offers-banner-${banner.id}'),
+        borderRadius: BorderRadius.circular(HatlyRadius.promoBanner),
+        onTap: route == null ? null : () => context.push(route),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(HatlyRadius.promoBanner),
+          child: AspectRatio(
+            aspectRatio: 2.4,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                HatlySoftImage(
+                    url: banner.imageUrl,
+                    width: double.infinity,
+                    height: double.infinity,
+                    radius: 0,
+                    placeholderIcon: Icons.local_offer_outlined),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Color(0x99000000)],
+                    ),
+                  ),
+                ),
+                PositionedDirectional(
+                  start: HatlySpacing.md,
+                  end: HatlySpacing.md,
+                  bottom: HatlySpacing.ms,
+                  child: Text(title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.type.title.copyWith(
+                          color: Colors.white, fontWeight: FontWeight.w800)),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

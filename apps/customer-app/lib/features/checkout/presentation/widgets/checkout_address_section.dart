@@ -42,6 +42,7 @@ class CheckoutAddressSection extends StatelessWidget {
       final branch = fulfillment.pickupBranch;
       return HatlySection(
         title: l10n.checkoutPickupFrom,
+        icon: Icons.storefront_outlined,
         child: HatlySurface(
           child: Row(
             children: [
@@ -69,12 +70,12 @@ class CheckoutAddressSection extends StatelessWidget {
     final eligibility = quote.eligibility;
     final notServiceable =
         snapshot != null && eligibility != null && !eligibility.serviceable;
-    final chevron = Directionality.of(context) == TextDirection.rtl
-        ? Icons.chevron_left
-        : Icons.chevron_right;
+    // chevron_right is a directional icon: Flutter mirrors it in RTL, so it always points "forward".
+    const chevron = Icons.chevron_right;
 
     return HatlySection(
       title: l10n.checkoutAddressLabel,
+      icon: Icons.location_on_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -125,7 +126,8 @@ class CheckoutAddressSection extends StatelessWidget {
                               ],
                             ),
                             for (final line in snapshot.detailLinesFor(
-                                Localizations.localeOf(context).languageCode == 'ar'))
+                                Localizations.localeOf(context).languageCode ==
+                                    'ar'))
                               Text(line, style: context.type.small),
                             if (snapshot.instructions?.isNotEmpty == true)
                               Text(snapshot.instructions!,

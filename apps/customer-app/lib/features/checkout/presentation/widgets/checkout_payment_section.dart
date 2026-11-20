@@ -36,6 +36,7 @@ class CheckoutPaymentSection extends StatelessWidget {
     if (payment.method == 'WALLET') {
       return HatlySection(
         title: l10n.checkoutPaymentMethodLabel,
+        icon: Icons.payments_outlined,
         child: HatlySurface(
           key: const Key('checkout-paid-by-wallet'),
           child: Row(
@@ -67,6 +68,7 @@ class CheckoutPaymentSection extends StatelessWidget {
 
     return HatlySection(
       title: l10n.checkoutPaymentMethodLabel,
+      icon: Icons.payments_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

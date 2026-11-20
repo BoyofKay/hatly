@@ -62,11 +62,15 @@ class HatlySection extends StatelessWidget {
     required this.title,
     required this.child,
     this.trailing,
+    this.icon,
   });
 
   final String title;
   final Widget child;
   final Widget? trailing;
+
+  /// Reference board (checkout / order screens): a soft orange icon box leads the heading instead of the accent bar.
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -75,15 +79,26 @@ class HatlySection extends StatelessWidget {
       children: [
         Row(
           children: [
-            // The same orange accent bar as the Home section headers, so every screen's headings read as one family.
-            Container(
-              width: 4,
-              height: 18,
-              margin: const EdgeInsetsDirectional.only(end: HatlySpacing.sm),
-              decoration: BoxDecoration(
-                  color: context.palette.accent,
-                  borderRadius: BorderRadius.circular(HatlyRadius.circular)),
-            ),
+            if (icon != null)
+              Container(
+                width: 32,
+                height: 32,
+                margin: const EdgeInsetsDirectional.only(end: HatlySpacing.sm),
+                decoration: BoxDecoration(
+                    color: context.palette.accentSoft,
+                    borderRadius: BorderRadius.circular(HatlyRadius.chip + 2)),
+                child: Icon(icon, size: 18, color: context.palette.accent),
+              )
+            else
+              // The same orange accent bar as the Home section headers, so every screen's headings read as one family.
+              Container(
+                width: 4,
+                height: 18,
+                margin: const EdgeInsetsDirectional.only(end: HatlySpacing.sm),
+                decoration: BoxDecoration(
+                    color: context.palette.accent,
+                    borderRadius: BorderRadius.circular(HatlyRadius.circular)),
+              ),
             Expanded(
               child: Semantics(
                 header: true,

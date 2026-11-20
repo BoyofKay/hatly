@@ -42,46 +42,42 @@ class HatlySectionHeader extends StatelessWidget {
               ),
             ),
             if (showAction)
-              Flexible(
+              // Sized to its own label (capped), so it sits at the row's far end instead of floating mid-row.
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                    maxWidth: MediaQuery.sizeOf(context).width * 0.4),
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(HatlyRadius.button),
+                  borderRadius: BorderRadius.circular(HatlyRadius.circular),
                   onTap: onSeeAll,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(
                         minHeight: HatlyTouch.minTarget,
                         minWidth: HatlyTouch.minTarget),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: HatlySpacing.xs,
-                          vertical: HatlySpacing.xs),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                            color: p.accentSoft,
-                            borderRadius:
-                                BorderRadius.circular(HatlyRadius.circular)),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: HatlySpacing.ms,
-                              vertical: HatlySpacing.xs),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  seeAllLabel!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: context.type.small.copyWith(
-                                      color: p.link,
-                                      fontWeight: FontWeight.w700),
-                                ),
-                              ),
-                              const SizedBox(width: HatlySpacing.xs),
-                              Icon(Icons.arrow_forward_rounded,
-                                  size: 16, color: p.link),
-                            ],
+                      padding: const EdgeInsetsDirectional.only(
+                          start: HatlySpacing.sm),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              seeAllLabel!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.type.small.copyWith(
+                                  color: p.link, fontWeight: FontWeight.w700),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: HatlySpacing.xs),
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                                color: p.accentSoft, shape: BoxShape.circle),
+                            child: Icon(Icons.arrow_forward_rounded,
+                                size: 14, color: p.link),
+                          ),
+                        ],
                       ),
                     ),
                   ),

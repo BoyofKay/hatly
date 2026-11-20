@@ -17,8 +17,8 @@ import 'promo_carousel.dart';
 const double kBannerAspect = 1.7;
 
 double bannerHeight(double availableWidth) {
-  final cardWidth =
-      availableWidth * kPromoViewportFraction - 2 * HatlySpacing.xs;
+  // The card spans the content width (page margin on both sides); the height follows the card, as before (~210 pt on a 390 pt phone).
+  final cardWidth = heroBannerCardWidth(availableWidth);
   return (cardWidth / kBannerAspect).clamp(190.0, 330.0);
 }
 
@@ -83,13 +83,13 @@ class HomeBannerSkeleton extends StatelessWidget {
             key: const Key('home-banner-skeleton'),
             width: double.infinity,
             height: bannerHeight(c.maxWidth),
-            borderRadius: HatlyRadius.promoBanner),
+            borderRadius: HatlyRadius.heroBanner),
       ),
     );
   }
 }
 
-/// Swipeable banner images with page dots. Auto-rotates every few seconds (paused while dragging, off when the OS asks for reduced
+/// Swipeable banner images (no page dots — owner, 2026-11-11). Glides to the next banner every few seconds (paused while dragging, off when the OS asks for reduced
 /// motion, never for a single banner). A tappable banner is announced as a button with its title; an informative one as an image.
 class HomeBannerCarousel extends StatefulWidget {
   const HomeBannerCarousel({
@@ -108,8 +108,6 @@ class HomeBannerCarousel extends StatefulWidget {
 }
 
 class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
-  int _page = 0;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -128,15 +126,14 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
               // Endless in both directions; auto-play always glides forward (see LoopingPager).
               child: LoopingPager(
                 count: banners.length,
-                viewportFraction: kPromoViewportFraction,
                 autoPlayInterval: widget.autoRotateInterval,
-                onIndexChanged: (i) => setState(() => _page = i),
                 itemBuilder: (context, index) {
                   final banner = banners[index];
                   final title = banner.displayTitle(arabic);
                   return Padding(
+                    // Full-width page; the card is inset by exactly the page margin, so it lines up with the content below.
                     padding: const EdgeInsets.symmetric(
-                        horizontal: HatlySpacing.xs, vertical: 6),
+                        horizontal: kHeroBannerSideMargin, vertical: 6),
                     child: Semantics(
                       button: banner.isTappable,
                       label: title,
@@ -144,18 +141,19 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           borderRadius:
-                              BorderRadius.circular(HatlyRadius.promoBanner),
+                              BorderRadius.circular(HatlyRadius.heroBanner),
+                          // A whisper of elevation — soft and restrained, not a floating card.
                           boxShadow: [
                             BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.10),
-                                blurRadius: 18,
-                                offset: const Offset(0, 8)),
+                                color: Colors.black.withValues(alpha: 0.06),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3)),
                           ],
                         ),
                         child: Material(
                           color: Colors.transparent,
                           borderRadius:
-                              BorderRadius.circular(HatlyRadius.promoBanner),
+                              BorderRadius.circular(HatlyRadius.heroBanner),
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
                             key: Key('home-banner-${banner.id}'),
@@ -170,7 +168,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                                   url: banner.imageUrl,
                                   width: double.infinity,
                                   height: double.infinity,
-                                  radius: HatlyRadius.promoBanner,
+                                  radius: HatlyRadius.heroBanner,
                                   placeholderIcon: Icons.local_offer_outlined,
                                 ),
                                 if (title.isNotEmpty) ...[
@@ -213,10 +211,6 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
               ),
             ),
           ),
-          if (banners.length > 1) ...[
-            const SizedBox(height: HatlySpacing.xs),
-            PromoPageIndicator(count: banners.length, index: _page),
-          ],
         ],
       ),
     );

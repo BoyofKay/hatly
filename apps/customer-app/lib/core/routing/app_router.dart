@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/profile/presentation/settings_screen.dart';
 import '../../shared_widgets/hatly_state_view.dart';
 import '../localization/l10n/app_localizations.dart';
 import '../../features/auth/presentation/auth_gate.dart';
@@ -201,6 +202,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile/loyalty',
         builder: (context, state) => const LoyaltyScreen(),
+      ),
+      GoRoute(
+        path: '/profile/settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: '/addresses/add',

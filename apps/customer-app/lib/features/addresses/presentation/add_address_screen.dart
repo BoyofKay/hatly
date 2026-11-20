@@ -61,6 +61,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
 
   double? _latitude;
   double? _longitude;
+
   /// The address the map provider resolved for the GPS pin (assistive; null when Maps are off or nothing was found — never asked of the customer).
   String? _resolvedAddress;
   int _resolveSeq = 0;
@@ -87,7 +88,8 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
         _longitude = e.longitude;
         _resolvedAddress = e.formattedAddress;
       } else {
-        _line1.text = e.line1; // a MANUAL or legacy address always has written text (a GPS address never reaches this branch)
+        _line1.text = e
+            .line1; // a MANUAL or legacy address always has written text (a GPS address never reaches this branch)
         _building.text = e.buildingNumber ?? '';
         _floor.text = e.floor ?? '';
         _apartment.text = e.apartment ?? '';
@@ -98,7 +100,15 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
 
   @override
   void dispose() {
-    for (final c in [_label, _line1, _building, _floor, _apartment, _landmark, _instructions]) {
+    for (final c in [
+      _label,
+      _line1,
+      _building,
+      _floor,
+      _apartment,
+      _landmark,
+      _instructions
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -129,19 +139,25 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
 
   /// Data-driven, never hardcoded: when the backend offers exactly ONE governorate / city / active zone for the current
   /// selection, it is selected for the customer (shown as selected, still changeable). With several, the customer chooses.
-  void _applySingleChoices(List<DeliveryZone> zones, {bool includeZone = true}) {
+  void _applySingleChoices(List<DeliveryZone> zones,
+      {bool includeZone = true}) {
     final governorates = zones.map((z) => z.governorateAr).toSet();
-    if (_governorate == null && governorates.length == 1) _governorate = governorates.first;
-    final cities = zones.where((z) => z.governorateAr == _governorate).map((z) => z.cityAr).toSet();
+    if (_governorate == null && governorates.length == 1)
+      _governorate = governorates.first;
+    final cities = zones
+        .where((z) => z.governorateAr == _governorate)
+        .map((z) => z.cityAr)
+        .toSet();
     if (_city == null && cities.length == 1) _city = cities.first;
     if (!includeZone || _zoneId != null || _city == null) return;
-    final cityZones = zones.where((z) => z.governorateAr == _governorate && z.cityAr == _city).toList();
+    final cityZones = zones
+        .where((z) => z.governorateAr == _governorate && z.cityAr == _city)
+        .toList();
     if (cityZones.length == 1) {
       _zoneId = cityZones.single.id;
       _zoneAutoSelected = true;
     }
   }
-
 
   /// The GPS method got a point: the coordinates are the whole address. Nothing else is asked.
   void _onGpsPoint(double latitude, double longitude) {
@@ -157,11 +173,17 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
 
   /// Assistive reverse geocoding: shows what the map provider says is at the pin so the customer never has to type an address that is
   /// already known. Silent when unavailable (Maps off, no result, offline) — the coordinates remain the address and saving is never blocked.
-  Future<void> _resolveAddress(int seq, double latitude, double longitude) async {
+  Future<void> _resolveAddress(
+      int seq, double latitude, double longitude) async {
     try {
-      final text = (await ref.read(addressesApiProvider).reverseGeocode(latitude, longitude))?.trim();
-      if (!mounted || seq != _resolveSeq || text == null || text.isEmpty) return;
-      setState(() => _resolvedAddress = text.length > 500 ? text.substring(0, 500) : text);
+      final text = (await ref
+              .read(addressesApiProvider)
+              .reverseGeocode(latitude, longitude))
+          ?.trim();
+      if (!mounted || seq != _resolveSeq || text == null || text.isEmpty)
+        return;
+      setState(() =>
+          _resolvedAddress = text.length > 500 ? text.substring(0, 500) : text);
     } catch (_) {
       // Assistive only.
     }
@@ -170,16 +192,25 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
   /// "Change address method": says what will be discarded, then clears exactly the fields the other method does not use.
   Future<void> _changeMethod() async {
     final l10n = AppLocalizations.of(context);
-    final discards = _mode == AddressMode.gps ? l10n.addressChangeMethodDiscardsGps : l10n.addressChangeMethodDiscardsManual;
+    final discards = _mode == AddressMode.gps
+        ? l10n.addressChangeMethodDiscardsGps
+        : l10n.addressChangeMethodDiscardsManual;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         key: const Key('address-change-method-dialog'),
         title: Text(l10n.addressChangeMethodTitle),
-        content: Text(discards, key: const Key('address-change-method-discards')),
+        content:
+            Text(discards, key: const Key('address-change-method-discards')),
         actions: [
-          TextButton(key: const Key('address-change-method-cancel'), onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.cancel)),
-          TextButton(key: const Key('address-change-method-confirm'), onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.addressChangeMethodConfirm)),
+          TextButton(
+              key: const Key('address-change-method-cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(l10n.cancel)),
+          TextButton(
+              key: const Key('address-change-method-confirm'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(l10n.addressChangeMethodConfirm)),
         ],
       ),
     );
@@ -231,7 +262,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
   Future<void> _save() async {
     final l10n = AppLocalizations.of(context);
     setState(() => _showErrors = true);
-    final includeMode = ref.read(addressCapabilitiesProvider).maybeWhen(data: (c) => c.supportsModes, orElse: () => true);
+    final includeMode = ref
+        .read(addressCapabilitiesProvider)
+        .maybeWhen(data: (c) => c.supportsModes, orElse: () => true);
     final AddressInput input;
     if (_mode == AddressMode.gps) {
       if (_latitude == null || _longitude == null) return;
@@ -264,7 +297,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     });
     try {
       final api = ref.read(addressesApiProvider);
-      final saved = _isEditing ? await api.updateAddress(widget.existing!.id, input) : await api.createAddress(input);
+      final saved = _isEditing
+          ? await api.updateAddress(widget.existing!.id, input)
+          : await api.createAddress(input);
       ref.invalidate(savedAddressesProvider);
       if (mounted) context.pop(saved);
     } catch (error) {
@@ -275,15 +310,25 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
   }
 
   Widget _field(TextEditingController controller, String label,
-      {Key? key, int maxLines = 1, int? maxLength, String? errorText, String? hint, TextInputType? keyboardType}) {
+      {Key? key,
+      int maxLines = 1,
+      int? maxLength,
+      String? errorText,
+      String? hint,
+      TextInputType? keyboardType}) {
     return TextField(
       key: key,
       controller: controller,
       maxLines: maxLines,
       maxLength: maxLength,
       keyboardType: keyboardType,
-      textInputAction: maxLines > 1 ? TextInputAction.newline : TextInputAction.next,
-      decoration: InputDecoration(labelText: label, hintText: hint, errorText: errorText, counterText: ''),
+      textInputAction:
+          maxLines > 1 ? TextInputAction.newline : TextInputAction.next,
+      decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          errorText: errorText,
+          counterText: ''),
     );
   }
 
@@ -314,10 +359,13 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
 
     return HatlySection(
       title: l10n.addressZoneSection,
+      icon: Icons.map_outlined,
       child: zonesAsync.when(
         loading: () => const Padding(
           padding: EdgeInsets.all(HatlySpacing.md),
-          child: Center(child: CircularProgressIndicator(key: Key('address-zones-loading'))),
+          child: Center(
+              child:
+                  CircularProgressIndicator(key: Key('address-zones-loading'))),
         ),
         error: (_, __) => HatlySurface(
           key: const Key('address-zones-error'),
@@ -325,7 +373,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
             children: [
               Icon(Icons.error_outline, color: p.urgent),
               const SizedBox(width: HatlySpacing.ms),
-              Expanded(child: Text(l10n.addressZonesLoadError, style: context.type.small)),
+              Expanded(
+                  child: Text(l10n.addressZonesLoadError,
+                      style: context.type.small)),
               TextButton(
                 key: const Key('address-zones-retry'),
                 onPressed: () => ref.invalidate(deliveryZonesProvider),
@@ -337,14 +387,22 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
         data: (zones) {
           _initZoneSelection(zones);
           if (zones.isEmpty) {
-            return Text(l10n.addressZonesEmpty, key: const Key('address-zones-empty'), style: context.type.small);
+            return Text(l10n.addressZonesEmpty,
+                key: const Key('address-zones-empty'),
+                style: context.type.small);
           }
           // One option per governorate / city (by their Arabic name, the canonical key), labelled in the app's language.
-          final governorates = <String, DeliveryZone>{for (final z in zones) z.governorateAr: z};
-          final cities = <String, DeliveryZone>{
-            for (final z in zones.where((z) => z.governorateAr == _governorate)) z.cityAr: z,
+          final governorates = <String, DeliveryZone>{
+            for (final z in zones) z.governorateAr: z
           };
-          final areaZones = zones.where((z) => z.governorateAr == _governorate && z.cityAr == _city).toList();
+          final cities = <String, DeliveryZone>{
+            for (final z in zones.where((z) => z.governorateAr == _governorate))
+              z.cityAr: z,
+          };
+          final areaZones = zones
+              .where(
+                  (z) => z.governorateAr == _governorate && z.cityAr == _city)
+              .toList();
           DeliveryZone? selected;
           for (final z in areaZones) {
             if (z.id == _zoneId) selected = z;
@@ -354,7 +412,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (existing != null && existing.needsZoneSelection && _zoneId == null) ...[
+              if (existing != null &&
+                  existing.needsZoneSelection &&
+                  _zoneId == null) ...[
                 HatlySurface(
                   key: const Key('address-zone-banner'),
                   borderColor: p.urgent,
@@ -375,7 +435,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 ),
                 const SizedBox(height: HatlySpacing.ms),
               ],
-              Text(l10n.addressZoneHelp, key: const Key('address-zone-help'), style: context.type.small.copyWith(color: p.textMuted)),
+              Text(l10n.addressZoneHelp,
+                  key: const Key('address-zone-help'),
+                  style: context.type.small.copyWith(color: p.textMuted)),
               const SizedBox(height: HatlySpacing.ms),
               _dropdown<String>(
                 key: const Key('address-governorate'),
@@ -383,7 +445,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 value: _governorate,
                 items: [
                   for (final e in governorates.entries)
-                    DropdownMenuItem(value: e.key, child: Text(e.value.displayGovernorate(arabic))),
+                    DropdownMenuItem(
+                        value: e.key,
+                        child: Text(e.value.displayGovernorate(arabic))),
                 ],
                 onChanged: (v) => setState(() {
                   _governorate = v;
@@ -399,7 +463,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 label: l10n.addressCityLabel,
                 value: _city,
                 items: [
-                  for (final e in cities.entries) DropdownMenuItem(value: e.key, child: Text(e.value.displayCity(arabic))),
+                  for (final e in cities.entries)
+                    DropdownMenuItem(
+                        value: e.key, child: Text(e.value.displayCity(arabic))),
                 ],
                 onChanged: (v) => setState(() {
                   _city = v;
@@ -416,7 +482,10 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 errorText: zoneMissing ? l10n.addressZoneRequired : null,
                 items: [
                   for (final z in areaZones)
-                    DropdownMenuItem(value: z.id, key: Key('address-zone-option-${z.id}'), child: Text(z.displayName(arabic))),
+                    DropdownMenuItem(
+                        value: z.id,
+                        key: Key('address-zone-option-${z.id}'),
+                        child: Text(z.displayName(arabic))),
                 ],
                 onChanged: (v) => setState(() {
                   _zoneId = v;
@@ -426,7 +495,8 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
               if (_city != null && areaZones.isEmpty) ...[
                 const SizedBox(height: HatlySpacing.sm),
                 Text(l10n.addressCityNoZones,
-                    key: const Key('address-city-no-zones'), style: context.type.small.copyWith(color: p.urgent)),
+                    key: const Key('address-city-no-zones'),
+                    style: context.type.small.copyWith(color: p.urgent)),
               ],
               if (_zoneAutoSelected && selected != null) ...[
                 const SizedBox(height: HatlySpacing.sm),
@@ -435,14 +505,17 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                   children: [
                     Icon(Icons.check_circle_outline, size: 16, color: p.link),
                     const SizedBox(width: HatlySpacing.xs),
-                    Expanded(child: Text(l10n.addressZoneAutoSelected, style: context.type.small)),
+                    Expanded(
+                        child: Text(l10n.addressZoneAutoSelected,
+                            style: context.type.small)),
                   ],
                 ),
               ],
               if (selected?.deliveryFeeMinor != null) ...[
                 const SizedBox(height: HatlySpacing.sm),
                 Text(
-                  l10n.addressZoneFeeHint(formatMinorUnits(selected!.deliveryFeeMinor!, context)),
+                  l10n.addressZoneFeeHint(
+                      formatMinorUnits(selected!.deliveryFeeMinor!, context)),
                   key: const Key('address-zone-fee'),
                   style: context.type.small,
                 ),
@@ -453,7 +526,6 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
       ),
     );
   }
-
 
   // ------------------------------------------------------------------------------------------------ first screen: the two methods
 
@@ -486,10 +558,13 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                   children: [
                     Text(title, style: context.type.title),
                     const SizedBox(height: HatlySpacing.xs),
-                    Text(hint, style: context.type.small.copyWith(color: p.textMuted)),
+                    Text(hint,
+                        style: context.type.small.copyWith(color: p.textMuted)),
                     if (disabledNote != null) ...[
                       const SizedBox(height: HatlySpacing.xs),
-                      Text(disabledNote, key: Key(disabledNoteKey), style: context.type.small.copyWith(color: p.urgent)),
+                      Text(disabledNote,
+                          key: Key(disabledNoteKey),
+                          style: context.type.small.copyWith(color: p.urgent)),
                     ],
                   ],
                 ),
@@ -501,7 +576,8 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     );
   }
 
-  Widget _methodChooser(AppLocalizations l10n, AsyncValue<AddressCapabilities> capabilities) {
+  Widget _methodChooser(
+      AppLocalizations l10n, AsyncValue<AddressCapabilities> capabilities) {
     final caps = capabilities.maybeWhen(data: (c) => c, orElse: () => null);
     final loading = capabilities.isLoading;
     final gpsEnabled = caps?.gpsAvailable == true;
@@ -511,7 +587,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
       children: [
         Text(l10n.addressMethodTitle, style: context.type.title),
         const SizedBox(height: HatlySpacing.xs),
-        Text(l10n.addressMethodSubtitle, style: context.type.small.copyWith(color: context.palette.textMuted)),
+        Text(l10n.addressMethodSubtitle,
+            style:
+                context.type.small.copyWith(color: context.palette.textMuted)),
         const SizedBox(height: HatlySpacing.md),
         _methodCard(
           key: const Key('address-method-gps'),
@@ -519,7 +597,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           title: l10n.addressMethodGpsTitle,
           hint: l10n.addressMethodGpsHint,
           enabled: gpsEnabled,
-          disabledNote: loading ? l10n.addressMethodsLoading : (gpsEnabled ? null : l10n.addressMethodGpsUnavailable),
+          disabledNote: loading
+              ? l10n.addressMethodsLoading
+              : (gpsEnabled ? null : l10n.addressMethodGpsUnavailable),
           disabledNoteKey: 'address-method-gps-unavailable',
           onTap: () => setState(() {
             _mode = AddressMode.gps;
@@ -550,17 +630,27 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     return Row(
       key: const Key('address-method-header'),
       children: [
-        Icon(gps ? Icons.my_location : Icons.edit_location_alt_outlined, size: 18, color: p.link),
+        Icon(gps ? Icons.my_location : Icons.edit_location_alt_outlined,
+            size: 18, color: p.link),
         const SizedBox(width: HatlySpacing.xs),
-        Expanded(child: Text(gps ? l10n.addressGpsJourneyBadge : l10n.addressManualJourneyBadge, style: context.type.caption)),
+        Expanded(
+            child: Text(
+                gps
+                    ? l10n.addressGpsJourneyBadge
+                    : l10n.addressManualJourneyBadge,
+                style: context.type.caption)),
         if (canChange)
           Flexible(
             // The app theme makes buttons full-width; inside a row the label must size to its text (and may wrap on a narrow screen).
             child: TextButton(
               key: const Key('address-change-method'),
-              style: TextButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: HatlySpacing.sm)),
+              style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: HatlySpacing.sm)),
               onPressed: _changeMethod,
-              child: Text(l10n.addressChangeMethod, textAlign: TextAlign.center),
+              child:
+                  Text(l10n.addressChangeMethod, textAlign: TextAlign.center),
             ),
           ),
       ],
@@ -572,17 +662,26 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     return Column(
       children: [
         if (withNotes) ...[
-          _field(_instructions, l10n.checkoutAddressInstructionsHint, key: const Key('address-instructions'), maxLines: 2, maxLength: 500),
+          _field(_instructions, l10n.checkoutAddressInstructionsHint,
+              key: const Key('address-instructions'),
+              maxLines: 2,
+              maxLength: 500),
           gap,
         ],
-        _field(_label, l10n.addressLabelHint, key: const Key('address-label'), maxLength: 100),
+        _field(_label, l10n.addressLabelHint,
+            key: const Key('address-label'), maxLength: 100),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: Wrap(
             spacing: HatlySpacing.sm,
             children: [
-              for (final preset in [l10n.addressLabelHome, l10n.addressLabelWork])
-                ActionChip(label: Text(preset), onPressed: () => setState(() => _label.text = preset)),
+              for (final preset in [
+                l10n.addressLabelHome,
+                l10n.addressLabelWork
+              ])
+                ActionChip(
+                    label: Text(preset),
+                    onPressed: () => setState(() => _label.text = preset)),
             ],
           ),
         ),
@@ -605,7 +704,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
         ),
         if (_error != null) ...[
           const SizedBox(height: HatlySpacing.sm),
-          Text(_error!, key: const Key('address-error'), style: context.type.small.copyWith(color: p.urgent)),
+          Text(_error!,
+              key: const Key('address-error'),
+              style: context.type.small.copyWith(color: p.urgent)),
         ],
         const SizedBox(height: HatlySpacing.lg),
         SizedBox(
@@ -615,7 +716,11 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
             style: hatlyAccentButtonStyle(context),
             onPressed: (_isSaving || !enabled) ? null : _save,
             child: _isSaving
-                ? SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: p.accentOn))
+                ? SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: p.accentOn))
                 : Text(l10n.addressSaveButton),
           ),
         ),
@@ -633,10 +738,12 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
       const SizedBox(height: HatlySpacing.sm),
       HatlySection(
         title: l10n.addressGpsJourneyTitle,
+        icon: Icons.my_location_rounded,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(l10n.addressGpsHelp, style: context.type.small.copyWith(color: p.textMuted)),
+            Text(l10n.addressGpsHelp,
+                style: context.type.small.copyWith(color: p.textMuted)),
             const SizedBox(height: HatlySpacing.sm),
             // Location permission is requested only from here (after the customer chose GPS), by the button inside the picker.
             AddressPinPicker(
@@ -658,11 +765,20 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(l10n.addressGpsDetected, style: context.type.title),
-                          if (_resolvedAddress != null) Text(_resolvedAddress!, key: const Key('address-gps-resolved'), style: context.type.body),
-                          Text(gpsAddressText(_latitude!, _longitude!), key: const Key('address-gps-coordinates'), style: context.type.small),
+                          Text(l10n.addressGpsDetected,
+                              style: context.type.title),
+                          if (_resolvedAddress != null)
+                            Text(_resolvedAddress!,
+                                key: const Key('address-gps-resolved'),
+                                style: context.type.body),
+                          Text(gpsAddressText(_latitude!, _longitude!),
+                              key: const Key('address-gps-coordinates'),
+                              style: context.type.small),
                           const SizedBox(height: HatlySpacing.xs),
-                          Text(l10n.addressGpsFeeNote, key: const Key('address-gps-fee-note'), style: context.type.small.copyWith(color: p.textMuted)),
+                          Text(l10n.addressGpsFeeNote,
+                              key: const Key('address-gps-fee-note'),
+                              style: context.type.small
+                                  .copyWith(color: p.textMuted)),
                         ],
                       ),
                     ),
@@ -672,24 +788,32 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
             ] else if (_showErrors)
               Padding(
                 padding: const EdgeInsets.only(top: HatlySpacing.sm),
-                child: Text(l10n.addressGpsNeedLocation, key: const Key('address-gps-required'), style: context.type.small.copyWith(color: p.urgent)),
+                child: Text(l10n.addressGpsNeedLocation,
+                    key: const Key('address-gps-required'),
+                    style: context.type.small.copyWith(color: p.urgent)),
               ),
           ],
         ),
       ),
       const SizedBox(height: HatlySpacing.lg),
-      HatlySection(title: l10n.addressDetailsSection, child: _optionalFields(l10n, withNotes: true)),
+      HatlySection(
+          title: l10n.addressDetailsSection,
+          icon: Icons.home_outlined,
+          child: _optionalFields(l10n, withNotes: true)),
       _saveRow(l10n, enabled: located),
     ];
   }
 
   // ------------------------------------------------------------------------------------------------ manual journey
 
-  List<Widget> _manualJourney(AppLocalizations l10n, {required bool canChangeMethod}) {
+  List<Widget> _manualJourney(AppLocalizations l10n,
+      {required bool canChangeMethod}) {
     const gap = SizedBox(height: HatlySpacing.ms);
     // Saving needs a delivery area from the backend. While the list is loading, failed or EMPTY there is nothing the customer can
     // choose, so the button stays off (the zone section explains why) instead of offering a save that can only fail.
-    final zonesReady = ref.watch(deliveryZonesProvider).maybeWhen(data: (z) => z.isNotEmpty, orElse: () => false);
+    final zonesReady = ref
+        .watch(deliveryZonesProvider)
+        .maybeWhen(data: (z) => z.isNotEmpty, orElse: () => false);
     return [
       if (canChangeMethod) ...[
         _methodHeader(l10n, canChange: true),
@@ -699,6 +823,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
       const SizedBox(height: HatlySpacing.lg),
       HatlySection(
         title: l10n.addressDetailsSection,
+        icon: Icons.home_outlined,
         child: Column(
           children: [
             _field(_line1, l10n.addressDetailedLabel,
@@ -706,20 +831,29 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 hint: l10n.addressDetailedHint,
                 maxLines: 2,
                 maxLength: 255,
-                errorText: _showErrors && _line1.text.trim().isEmpty ? l10n.addressLine1Required : null),
+                errorText: _showErrors && _line1.text.trim().isEmpty
+                    ? l10n.addressLine1Required
+                    : null),
             gap,
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: _field(_building, l10n.addressBuildingLabel, key: const Key('address-building'), maxLength: 40)),
+                Expanded(
+                    child: _field(_building, l10n.addressBuildingLabel,
+                        key: const Key('address-building'), maxLength: 40)),
                 const SizedBox(width: HatlySpacing.ms),
-                Expanded(child: _field(_floor, l10n.addressFloorLabel, key: const Key('address-floor'), maxLength: 20)),
+                Expanded(
+                    child: _field(_floor, l10n.addressFloorLabel,
+                        key: const Key('address-floor'), maxLength: 20)),
                 const SizedBox(width: HatlySpacing.ms),
-                Expanded(child: _field(_apartment, l10n.addressApartmentLabel, key: const Key('address-apartment'), maxLength: 20)),
+                Expanded(
+                    child: _field(_apartment, l10n.addressApartmentLabel,
+                        key: const Key('address-apartment'), maxLength: 20)),
               ],
             ),
             gap,
-            _field(_landmark, l10n.addressLandmarkLabel, key: const Key('address-landmark'), maxLength: 200),
+            _field(_landmark, l10n.addressLandmarkLabel,
+                key: const Key('address-landmark'), maxLength: 200),
             gap,
             _optionalFields(l10n, withNotes: true),
           ],
@@ -734,11 +868,14 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     final l10n = AppLocalizations.of(context);
     final capabilities = ref.watch(addressCapabilitiesProvider);
     // A backend that predates the two methods has only the (legacy) form: area + written address, no mode sent, no choice offered.
-    final legacyBackend = capabilities.maybeWhen(data: (c) => !c.supportsModes, orElse: () => false);
+    final legacyBackend = capabilities.maybeWhen(
+        data: (c) => !c.supportsModes, orElse: () => false);
     final mode = legacyBackend ? AddressMode.manual : _mode;
 
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? l10n.editAddressTitle : l10n.addAddressTitle)),
+      appBar: AppBar(
+          title:
+              Text(_isEditing ? l10n.editAddressTitle : l10n.addAddressTitle)),
       body: ListView(
         padding: const EdgeInsets.all(HatlySpacing.md),
         children: mode == null

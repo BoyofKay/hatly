@@ -731,7 +731,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addressSaveButton => 'حفظ العنوان';
 
   @override
-  String get navExplore => 'استكشف';
+  String get navExplore => 'المتاجر';
 
   @override
   String get homeSearchHint => 'بتدور على إيه؟';
@@ -2506,4 +2506,34 @@ class AppLocalizationsAr extends AppLocalizations {
   String weightEstimateNote(String price) {
     return 'التقدير: $price — يُحدَّد السعر النهائي حسب الوزن الفعلي عند التجهيز.';
   }
+
+  @override
+  String get homeDeliverTo => 'التوصيل إلى';
+
+  @override
+  String get profileSettings => 'الإعدادات';
+
+  @override
+  String get settingsLanguage => 'اللغة';
+
+  @override
+  String get languageArabic => 'العربية';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
+  String get settingsPasswordSection => 'كلمة المرور والأمان';
+
+  @override
+  String get settingsAccountSection => 'الحساب';
+
+  @override
+  String get settingsAppSection => 'التطبيق';
+
+  @override
+  String get searchFilterVendors => 'متاجر';
+
+  @override
+  String get searchFilterProducts => 'منتجات';
 }

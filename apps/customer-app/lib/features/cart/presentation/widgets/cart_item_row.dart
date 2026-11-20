@@ -76,8 +76,9 @@ class CartItemRow extends StatelessWidget {
                 ExcludeSemantics(
                   child: HatlySoftImage(
                     url: item.productImageUrl,
-                    width: 72,
-                    height: 72,
+                    width: 76,
+                    height: 76,
+                    radius: 14,
                     placeholderIcon: Icons.shopping_basket_outlined,
                   ),
                 ),
@@ -147,6 +148,23 @@ class CartItemRow extends StatelessWidget {
                     ],
                   ),
                 ),
+                // Reference board ("السلة"): the remove action sits at the end of the item's first line.
+                Semantics(
+                  button: true,
+                  enabled: !busy,
+                  label: l10n.cartRemoveItem,
+                  excludeSemantics: true,
+                  onTap: busy ? null : onRemove,
+                  child: IconButton(
+                    onPressed: busy ? null : onRemove,
+                    tooltip: l10n.cartRemoveItem,
+                    constraints: const BoxConstraints(
+                        minWidth: HatlyTouch.minTarget,
+                        minHeight: HatlyTouch.minTarget),
+                    icon: Icon(Icons.delete_outline_rounded,
+                        color: busy ? p.textMuted : p.textPrimary, size: 22),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: HatlySpacing.sm),
@@ -160,9 +178,16 @@ class CartItemRow extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Flexible(child: _quantity(context, l10n, p)),
-                    if (busy) ...[
-                      const SizedBox(width: HatlySpacing.sm),
+                    // Compact stepper (not a full-width bar), so the edit/remove actions share its line.
+                    Flexible(
+                        child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 148),
+                            child: _quantity(context, l10n, p))),
+                    // The spinner's slot is always reserved: a line going busy never reflows the cart under a finger.
+                    const SizedBox(width: HatlySpacing.sm),
+                    if (!busy)
+                      const SizedBox(width: 18, height: 18)
+                    else ...[
                       Semantics(
                         label: l10n.cartItemUpdating,
                         liveRegion: true,
@@ -190,23 +215,6 @@ class CartItemRow extends StatelessWidget {
                             style: context.type.small.copyWith(
                                 color: p.link, fontWeight: FontWeight.w700)),
                       ),
-                    Semantics(
-                      button: true,
-                      enabled: !busy,
-                      label: l10n.cartRemoveItem,
-                      excludeSemantics: true,
-                      onTap: busy ? null : onRemove,
-                      child: IconButton(
-                        onPressed: busy ? null : onRemove,
-                        tooltip: l10n.cartRemoveItem,
-                        constraints: const BoxConstraints(
-                            minWidth: HatlyTouch.minTarget,
-                            minHeight: HatlyTouch.minTarget),
-                        icon: Icon(Icons.delete_outline_rounded,
-                            color: busy ? p.textMuted : p.textPrimary,
-                            size: 22),
-                      ),
-                    ),
                   ],
                 ),
               ],
@@ -307,6 +315,6 @@ class _Price extends StatelessWidget {
     }
     return LtrText(formatMinorUnits(line, context),
         style: context.type.body
-            .copyWith(color: p.textPrimary, fontWeight: FontWeight.w800));
+            .copyWith(color: p.link, fontWeight: FontWeight.w800));
   }
 }

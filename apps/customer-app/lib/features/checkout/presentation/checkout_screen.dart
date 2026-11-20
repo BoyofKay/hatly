@@ -188,6 +188,7 @@ class _Content extends ConsumerWidget {
         if (quote.delivery?.route != null) ...[
           HatlySection(
             title: l10n.routeSectionTitle,
+            icon: Icons.route_rounded,
             child: HatlySurface(
               child: RouteSummary(
                 key: const Key('checkout-route'),

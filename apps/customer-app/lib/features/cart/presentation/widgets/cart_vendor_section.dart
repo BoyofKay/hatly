@@ -64,8 +64,16 @@ class CartVendorSection extends StatelessWidget {
                       horizontal: HatlySpacing.md, vertical: HatlySpacing.ms),
                   child: Row(
                     children: [
-                      Icon(Icons.storefront_outlined,
-                          color: p.textMuted, size: 22),
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                            color: p.accentSoft,
+                            borderRadius:
+                                BorderRadius.circular(HatlyRadius.button)),
+                        child: Icon(Icons.storefront_outlined,
+                            color: p.accent, size: 22),
+                      ),
                       const SizedBox(width: HatlySpacing.ms),
                       Expanded(
                         child: Column(

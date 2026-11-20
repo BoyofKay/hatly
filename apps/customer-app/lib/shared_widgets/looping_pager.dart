@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+/// How long an automatic slide takes: slow enough to read as a gentle glide, never a jump (owner, 2026-11-11).
+const Duration kLoopingPagerGlide = Duration(milliseconds: 900);
+
 /// A pager that never ends: swiping past the last item shows the first again, and swiping back from the first shows the last, in either
 /// direction, with no jump, rewind or blank frame. It works by paging over a very large virtual range that starts in the middle (a multiple
 /// of [count], so item 0 is on screen at first) and showing `index % count`; the auto-play always glides FORWARD (it never animates back
@@ -76,7 +79,7 @@ class _LoopingPagerState extends State<LoopingPager> {
     if (_reduceMotion || !_loops) return;
     _timer = Timer.periodic(widget.autoPlayInterval, (_) {
       if (!mounted || !_controller.hasClients) return;
-      _controller.nextPage(duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+      _controller.nextPage(duration: kLoopingPagerGlide, curve: Curves.easeInOutCubic);
     });
   }
 

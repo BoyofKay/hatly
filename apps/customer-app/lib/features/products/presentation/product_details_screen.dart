@@ -103,115 +103,136 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
       body: SafeArea(
         top: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(HatlySpacing.screenPadding,
-              HatlySpacing.sm, HatlySpacing.screenPadding, HatlySpacing.xl),
+          padding: const EdgeInsets.only(bottom: HatlySpacing.xl),
           children: [
-            AspectRatio(
-              aspectRatio: 1.85,
-              child: HatlySoftImage(
-                url: product.imageUrl,
-                width: double.infinity,
-                height: double.infinity,
-                placeholderIcon: Icons.shopping_basket_outlined,
-                placeholderIconSize: 56,
-                semanticLabel: name,
-              ),
-            ),
-            const SizedBox(height: HatlySpacing.lg),
-            Semantics(
-              header: true,
-              child: Text(name,
-                  style: context.type.h1.copyWith(
-                      color: p.textPrimary, fontWeight: FontWeight.w800)),
-            ),
-            const SizedBox(height: HatlySpacing.sm),
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: HatlySpacing.sm,
-              runSpacing: HatlySpacing.xs,
-              children: [
-                LtrText(
-                    '${formatMinorUnits(flashPrice ?? product.priceMinor, context)}$unit',
-                    style: context.type.h2.copyWith(
-                        color: flashPrice != null ? p.urgent : p.textPrimary,
-                        fontWeight: FontWeight.w800)),
-                if (flashPrice != null)
-                  LtrText(
-                      '${formatMinorUnits(product.priceMinor, context)}$unit',
-                      style: context.type.small
-                          .copyWith(decoration: TextDecoration.lineThrough)),
-                if (offer != null)
-                  HatlyBadge(
-                    kind: offer.isFlashSale
-                        ? HatlyBadgeKind.flashSale
-                        : HatlyBadgeKind.offer,
-                    label: offer.isFlashSale
-                        ? l10n.badgeFlashSale
-                        : l10n.subtotalDiscountAvailable,
+            // Reference board ("تفاصيل المنتج"): the photo fills the width on a soft panel with rounded lower corners, then the
+            // name and price are centred under it.
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(HatlyRadius.promoBanner + 8)),
+              child: ColoredBox(
+                color: p.surfaceSoft,
+                child: AspectRatio(
+                  aspectRatio: 1.5,
+                  child: HatlySoftImage(
+                    url: product.imageUrl,
+                    width: double.infinity,
+                    height: double.infinity,
+                    radius: 0,
+                    placeholderIcon: Icons.shopping_basket_outlined,
+                    placeholderIconSize: 64,
+                    semanticLabel: name,
                   ),
-                if (!product.isAvailable)
-                  HatlyBadge(
-                      kind: HatlyBadgeKind.unavailable,
-                      label: l10n.productUnavailable),
-              ],
-            ),
-            if (product.vendor != null) ...[
-              const SizedBox(height: HatlySpacing.md),
-              _VendorSummary(
-                vendor: product.vendor!,
-                onChangeStore: product.catalogProductId == null
-                    ? null
-                    : () => _changeStore(product.catalogProductId!),
-              ),
-            ],
-            if (description != null && description.trim().isNotEmpty) ...[
-              const SizedBox(height: HatlySpacing.md),
-              ExpandableText(description,
-                  moreLabel: l10n.descriptionReadMore,
-                  lessLabel: l10n.descriptionReadLess),
-            ],
-            if (product.options.isNotEmpty) ...[
-              const SizedBox(height: HatlySpacing.lg),
-              Text(l10n.productOptionsTitle,
-                  style: context.type.title.copyWith(
-                      color: p.textPrimary, fontWeight: FontWeight.w800)),
-              const SizedBox(height: HatlySpacing.sm),
-              for (final option in product.options) ...[
-                ProductOptionGroup(
-                  option: option,
-                  selected: config.selectedFor(option),
-                  showError: _showOptionErrors,
-                  onToggle: (valueId) =>
-                      setState(() => _config = config.toggle(option, valueId)),
                 ),
-                const SizedBox(height: HatlySpacing.md),
-              ],
-            ],
-            if (product.isAvailable) ...[
-              const SizedBox(height: HatlySpacing.md),
-              _QuantityRow(
-                  product: product,
-                  config: config,
-                  onChanged: (c) => setState(() => _config = c)),
-              const SizedBox(height: HatlySpacing.lg),
-              Row(
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(HatlySpacing.screenPadding,
+                  HatlySpacing.lg, HatlySpacing.screenPadding, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Text(l10n.productTotalLabel,
-                        style: context.type.body.copyWith(color: p.textMuted)),
+                  Semantics(
+                    header: true,
+                    child: Text(name,
+                        textAlign: TextAlign.center,
+                        style: context.type.h1.copyWith(
+                            color: p.textPrimary, fontWeight: FontWeight.w800)),
                   ),
-                  LtrText(formatMinorUnits(total, context),
-                      style: context.type.h2.copyWith(
-                          color: p.textPrimary, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: HatlySpacing.sm),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: HatlySpacing.sm,
+                    runSpacing: HatlySpacing.xs,
+                    children: [
+                      LtrText(
+                          '${formatMinorUnits(flashPrice ?? product.priceMinor, context)}$unit',
+                          style: context.type.h1.copyWith(
+                              color: flashPrice != null ? p.urgent : p.link,
+                              fontWeight: FontWeight.w800)),
+                      if (flashPrice != null)
+                        LtrText(
+                            '${formatMinorUnits(product.priceMinor, context)}$unit',
+                            style: context.type.small.copyWith(
+                                decoration: TextDecoration.lineThrough)),
+                      if (offer != null)
+                        HatlyBadge(
+                          kind: offer.isFlashSale
+                              ? HatlyBadgeKind.flashSale
+                              : HatlyBadgeKind.offer,
+                          label: offer.isFlashSale
+                              ? l10n.badgeFlashSale
+                              : l10n.subtotalDiscountAvailable,
+                        ),
+                      if (!product.isAvailable)
+                        HatlyBadge(
+                            kind: HatlyBadgeKind.unavailable,
+                            label: l10n.productUnavailable),
+                    ],
+                  ),
+                  if (product.vendor != null) ...[
+                    const SizedBox(height: HatlySpacing.md),
+                    _VendorSummary(
+                      vendor: product.vendor!,
+                      onChangeStore: product.catalogProductId == null
+                          ? null
+                          : () => _changeStore(product.catalogProductId!),
+                    ),
+                  ],
+                  if (description != null && description.trim().isNotEmpty) ...[
+                    const SizedBox(height: HatlySpacing.md),
+                    ExpandableText(description,
+                        moreLabel: l10n.descriptionReadMore,
+                        lessLabel: l10n.descriptionReadLess),
+                  ],
+                  if (product.options.isNotEmpty) ...[
+                    const SizedBox(height: HatlySpacing.lg),
+                    Text(l10n.productOptionsTitle,
+                        style: context.type.title.copyWith(
+                            color: p.textPrimary, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: HatlySpacing.sm),
+                    for (final option in product.options) ...[
+                      ProductOptionGroup(
+                        option: option,
+                        selected: config.selectedFor(option),
+                        showError: _showOptionErrors,
+                        onToggle: (valueId) => setState(
+                            () => _config = config.toggle(option, valueId)),
+                      ),
+                      const SizedBox(height: HatlySpacing.md),
+                    ],
+                  ],
+                  if (product.isAvailable) ...[
+                    const SizedBox(height: HatlySpacing.md),
+                    _QuantityRow(
+                        product: product,
+                        config: config,
+                        onChanged: (c) => setState(() => _config = c)),
+                    const SizedBox(height: HatlySpacing.lg),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(l10n.productTotalLabel,
+                              style: context.type.body
+                                  .copyWith(color: p.textMuted)),
+                        ),
+                        LtrText(formatMinorUnits(total, context),
+                            style: context.type.h2.copyWith(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                    const SizedBox(height: HatlySpacing.md),
+                    HatlyCtaButton(
+                      label: l10n.productAddToCart,
+                      isLoading: _isAdding,
+                      onPressed: () => _addToCart(product),
+                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: HatlySpacing.md),
-              HatlyCtaButton(
-                label: l10n.productAddToCart,
-                isLoading: _isAdding,
-                onPressed: () => _addToCart(product),
-              ),
-            ],
+            ),
           ],
         ),
       ),
