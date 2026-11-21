@@ -1,4 +1,5 @@
 'use client';
+import { minorToEgpInput, parseEgpToMinorAllowZero } from '../../../lib/money';
 
 import { useEffect, useRef, useState } from 'react';
 import { clearBusinessConfigValue, getBusinessConfigValue, setBusinessConfigValue } from '../../../lib/api/admin-business-config';
@@ -30,7 +31,8 @@ const CUSTOMER_OTP_ENABLED_KEY = 'CUSTOMER_OTP_ENABLED';
  * `CUSTOMER_OTP_ENABLED` is already its own dedicated control above,
  * not duplicated here.
  */
-type ConfigFieldType = 'boolean' | 'integer' | 'decimal' | 'enum' | 'string';
+/** `money`: stored as integer piastres, shown and typed as EGP with up to 2 decimals (10.50). */
+type ConfigFieldType = 'boolean' | 'integer' | 'decimal' | 'enum' | 'string' | 'money';
 
 interface ConfigFieldDef {
   key: string;
@@ -48,9 +50,9 @@ const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'MULTI_VENDOR_ORDERS_ENABLED', label: 'Multi-Vendor Orders', type: 'boolean', help: 'OFF: checkout rejects a cart with more than one vendor group.' },
   { key: 'VENDOR_SETTLEMENT_FREQUENCY', label: 'Vendor Settlement Frequency', type: 'enum', options: ['WEEKLY', 'MONTHLY'] },
   { key: 'DRIVER_SETTLEMENT_FREQUENCY', label: 'Driver Settlement Frequency', type: 'enum', options: ['WEEKLY', 'MONTHLY'] },
-  { key: 'REGISTERED_VENDOR_PRICE_PER_100M_MINOR', label: 'Registered-Vendor Price per 100m', type: 'integer', unit: 'minor units' },
-  { key: 'REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR', label: 'Registered-Vendor Minimum Delivery Fee', type: 'integer', unit: 'minor units' },
-  { key: 'REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR', label: 'Registered-Vendor Additional-Vendor Fee', type: 'integer', unit: 'minor units' },
+  { key: 'REGISTERED_VENDOR_PRICE_PER_100M_MINOR', label: 'Registered-Vendor Price per 100m', type: 'money', unit: 'EGP' },
+  { key: 'REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR', label: 'Registered-Vendor Minimum Delivery Fee', type: 'money', unit: 'EGP' },
+  { key: 'REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR', label: 'Registered-Vendor Additional-Vendor Fee', type: 'money', unit: 'EGP' },
   // Hatly AND Wasally: base fee by the customer's address method, then this multiplier once. Replaces the retired HATLY_SERVICE_DISTANCE_MULTIPLIER (never read).
   {
     key: 'HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER',
@@ -107,7 +109,7 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
     setError(null);
     try {
       const raw = await getBusinessConfigValue<unknown>(field.key);
-      if (!edited.current) setValue(raw === null || raw === undefined ? '' : String(raw));
+      if (!edited.current) setValue(raw === null || raw === undefined ? '' : field.type === 'money' ? minorToEgpInput(Number(raw)) : String(raw));
     } catch (err: any) {
       setError(apiErrorMessage(err, 'Failed to load.'));
     } finally {
@@ -132,6 +134,13 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
         return;
       }
       parsed = n;
+    } else if (field.type === 'money') {
+      const p = parseEgpToMinorAllowZero(value);
+      if (!p.ok) {
+        setError('Enter an amount in EGP, e.g. 10 or 10.50.');
+        return;
+      }
+      parsed = p.minor;
     } else if (field.type === 'decimal') {
       const n = Number(value);
       if (!/^\d+(\.\d{1,4})?$/.test(value.trim()) || !(n > 0) || n > 10) {
@@ -204,7 +213,7 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
         ) : (
           <input
             type={field.type === 'integer' ? 'number' : 'text'}
-            inputMode={field.type === 'decimal' ? 'decimal' : undefined}
+            inputMode={field.type === 'decimal' || field.type === 'money' ? 'decimal' : undefined}
             data-testid={`config-input-${field.key}`}
             value={value}
             onChange={(e) => { edited.current = true; setValue(e.target.value); setSaved(false); }}

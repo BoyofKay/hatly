@@ -1,4 +1,5 @@
 'use client';
+import { minorToEgpInput, parseEgpToMinor } from '../../lib/money';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -18,7 +19,7 @@ export function OfferTools({ offer, onChanged }: { offer: { id: string; name: st
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState(offer.name);
   const [endAt, setEndAt] = useState(offer.endAt.slice(0, 16));
-  const [budget, setBudget] = useState(offer.budgetCapMinor === null ? '' : String(offer.budgetCapMinor));
+  const [budget, setBudget] = useState(minorToEgpInput(offer.budgetCapMinor));
   const [alloc, setAlloc] = useState(offer.totalAllocationLimit === null ? '' : String(offer.totalAllocationLimit));
   const [cloneName, setCloneName] = useState(`${offer.name} (copy)`);
   const [cloneCode, setCloneCode] = useState('');
@@ -30,7 +31,11 @@ export function OfferTools({ offer, onChanged }: { offer: { id: string; name: st
       const body: Record<string, unknown> = {};
       if (name !== offer.name) body.name = name;
       if (endAt && endAt !== offer.endAt.slice(0, 16)) body.endAt = new Date(endAt).toISOString();
-      if (budget !== (offer.budgetCapMinor === null ? '' : String(offer.budgetCapMinor)) && budget !== '') body.budgetCapMinor = Number(budget);
+      if (budget !== minorToEgpInput(offer.budgetCapMinor) && budget !== '') {
+        const b = parseEgpToMinor(budget);
+        if (!b.ok) { setError(t('Enter the budget in EGP, e.g. 500 or 750.50.', 'أدخل الميزانية بالجنيه، مثل 500 أو 750.50.')); return; }
+        body.budgetCapMinor = b.minor;
+      }
       if (alloc !== (offer.totalAllocationLimit === null ? '' : String(offer.totalAllocationLimit)) && alloc !== '') body.totalAllocationLimit = Number(alloc);
       if (Object.keys(body).length === 0) { setError(t('Nothing to change.', 'لا شيء لتغييره.')); return; }
       await send('patch', `/admin/offers/${offer.id}`, body);
@@ -57,7 +62,7 @@ export function OfferTools({ offer, onChanged }: { offer: { id: string; name: st
         <div className="space-y-3">
           <LabeledInput label={t('Name', 'الاسم')} value={name} onChange={(e) => setName(e.target.value)} />
           <LabeledInput label={t('Ends at', 'ينتهي في')} type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} />
-          <LabeledInput label={t('Budget cap (minor units, can only be raised after use)', 'سقف الميزانية (بالوحدة الصغرى، يمكن رفعه فقط بعد الاستخدام)')} inputMode="numeric" value={budget} onChange={(e) => setBudget(e.target.value.replace(/\D/g, ''))} />
+          <LabeledInput label={t('Budget cap (EGP, can only be raised after use)', 'سقف الميزانية (بالجنيه، يمكن رفعه فقط بعد الاستخدام)')} inputMode="decimal" dir="ltr" value={budget} onChange={(e) => setBudget(e.target.value)} />
           <LabeledInput label={t('Total uses (can only be raised after use)', 'إجمالي الاستخدامات (يمكن رفعه فقط بعد الاستخدام)')} inputMode="numeric" value={alloc} onChange={(e) => setAlloc(e.target.value.replace(/\D/g, ''))} />
           <p className="text-xs text-gray-500">{t('Discount type, value, coupon code and branch cannot change. To change those, clone the offer and edit the copy.', 'لا يمكن تغيير نوع الخصم وقيمته ورمز القسيمة والفرع. لتغييرها انسخ العرض وعدّل النسخة.')}</p>
           {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

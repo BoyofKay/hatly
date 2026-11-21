@@ -44,7 +44,7 @@ const MENU_COLS: Col[] = [
   { key: 'price', en: 'price EGP', ar: 'السعر بالجنيه', width: 12 },
   { key: 'unit', en: 'PIECE or WEIGHT', ar: 'قطعة أو وزن', width: 12 },
   { key: 'stock', en: 'OPEN or TRACKED', ar: 'مفتوح أو محدود', width: 12 },
-  { key: 'quantity', en: 'pieces / grams', ar: 'الكمية', width: 10 },
+  { key: 'quantity', en: 'pieces, or kg for WEIGHT', ar: 'الكمية (قطع أو كجم)', width: 12 },
   { key: 'available', en: 'TRUE / FALSE', ar: 'متاح', width: 10 },
   { key: 'image', en: 'photo file name', ar: 'اسم ملف الصورة', width: 22 },
 ];
@@ -88,6 +88,8 @@ interface MenuRow {
   unit: PricingUnit | null;
   stock: InventoryMode | null;
   quantity: number | null;
+  /** The stock cell as typed (pieces, or kg for WEIGHT) — converted once the unit is known. */
+  quantityRaw: any;
   available: boolean | null;
   image: string | null;
   report: MenuImportRowReport;
@@ -132,7 +134,7 @@ export class MenuImportService {
     );
     const menu: any[][] = [MENU_COLS.map((c) => `${c.key} | ${c.ar}`), MENU_COLS.map((c) => c.en)];
     for (const p of rows) {
-      menu.push([p.id, p.category, p.category_ar ?? '', p.name, p.name_ar ?? '', p.description ?? '', p.description_ar ?? '', Number(p.price_minor) / 100, p.pricing_unit, p.inventory_mode, p.quantity ?? '', p.is_available ? 'TRUE' : 'FALSE', '']);
+      menu.push([p.id, p.category, p.category_ar ?? '', p.name, p.name_ar ?? '', p.description ?? '', p.description_ar ?? '', Number(p.price_minor) / 100, p.pricing_unit, p.inventory_mode, p.quantity === null ? '' : p.pricing_unit === 'WEIGHT' ? Number(p.quantity) / 1000 : p.quantity, p.is_available ? 'TRUE' : 'FALSE', '']);
     }
     if (rows.length === 0) {
       // A new store: two example rows the admin overwrites (they are real rows — delete them if not wanted).
@@ -188,6 +190,17 @@ export class MenuImportService {
       [branchId],
     );
     const byId = new Map(existing.map((p) => [p.id, p]));
+    // Stock: whole pieces, or KILOGRAMS (up to 3 decimals) for products sold by weight — stored as grams.
+    for (const r of menuRows) {
+      if (r.quantityRaw === null || r.quantityRaw === undefined) continue;
+      const unit = r.unit ?? (r.productId ? byId.get(r.productId)?.pricing_unit : null) ?? PricingUnit.PIECE;
+      const n = Number(String(r.quantityRaw).replace(',', '.'));
+      if (unit === PricingUnit.WEIGHT) {
+        if (!Number.isFinite(n) || n < 0 || Math.abs(Math.round(n * 1000) - n * 1000) > 1e-6) r.report.errors.push('quantity for a WEIGHT product is in kg, e.g. 12.5 (up to 3 decimals).');
+        else r.quantity = Math.round(n * 1000);
+      } else if (!Number.isInteger(n) || n < 0) r.report.errors.push('quantity must be a whole number of pieces, 0 or more.');
+      else r.quantity = n;
+    }
     const byName = new Map(existing.map((p) => [lc(p.name), p]));
     const newNames = new Map<string, number>();
     for (const r of menuRows) {
@@ -234,6 +247,19 @@ export class MenuImportService {
       for (const name of used) {
         const ph = photos.get(name);
         if (ph && ph.content.length > MAX_PHOTO_BYTES) extra.push({ sheet: 'Photos', rowNumber: null, label: ph.name, action: 'SKIP', errors: ['Photo is larger than 5 MB.'] });
+      }
+    }
+
+    // a NEW category needs its Arabic name on at least one of its rows
+    const existingCats: Array<{ name: string }> = await this.ds.query(`SELECT name FROM product_categories WHERE vendor_branch_id = $1 AND deleted_at IS NULL`, [branchId]);
+    const knownCats = new Set(existingCats.map((c) => lc(c.name)));
+    const catAr = new Map<string, string>();
+    for (const r of menuRows) if (r.category && r.categoryAr) catAr.set(lc(r.category), r.categoryAr);
+    for (const r of menuRows) {
+      if (r.category && !knownCats.has(lc(r.category)) && !catAr.has(lc(r.category))) {
+        r.report.errors.push(`The new category "${r.category}" needs its Arabic name in categoryAr.`);
+      } else if (r.category && !r.categoryAr && catAr.has(lc(r.category))) {
+        r.categoryAr = catAr.get(lc(r.category))!;
       }
     }
 
@@ -477,22 +503,20 @@ export class MenuImportService {
         unit: this.choice(v.unit, { PIECE: PricingUnit.PIECE, WEIGHT: PricingUnit.WEIGHT, KG: PricingUnit.WEIGHT, 'قطعة': PricingUnit.PIECE, 'وزن': PricingUnit.WEIGHT, 'كيلو': PricingUnit.WEIGHT }, 'unit', errors),
         stock: this.choice(v.stock, { OPEN: InventoryMode.OPEN, TRACKED: InventoryMode.TRACKED, 'مفتوح': InventoryMode.OPEN, 'محدود': InventoryMode.TRACKED }, 'stock', errors),
         quantity: null,
+        quantityRaw: v.quantity,
         available: this.bool(v.available, 'available', errors),
         image: str('image', 200),
         report: { sheet: 'Menu', rowNumber, label: name ?? productId, action: productId ? 'UPDATE' : 'CREATE', errors },
       };
-      if (v.quantity !== null) {
-        const q = Number(v.quantity);
-        if (!Number.isInteger(q) || q < 0) errors.push('quantity must be a whole number, 0 or more (pieces, or grams for WEIGHT).');
-        else r.quantity = q;
-      }
+
       if (!productId) {
-        if (!name) errors.push('name is required for a new product.');
+        if (!name) errors.push('name (English) is required for a new product.');
+        if (!r.nameAr) errors.push('nameAr (Arabic name) is required for a new product — the app is Arabic and English.');
         if (!category) errors.push('category is required for a new product.');
         if (r.priceMinor === null && v.price === null) errors.push('price is required for a new product.');
       }
       if (r.priceMinor !== null && r.priceMinor < 1) errors.push('price must be more than 0.');
-      if (r.stock === InventoryMode.TRACKED && r.quantity === null && !productId) errors.push('stock TRACKED needs a quantity.');
+      if (r.stock === InventoryMode.TRACKED && v.quantity === null && !productId) errors.push('stock TRACKED needs a quantity.');
       if (r.image && /[\\/]/.test(r.image)) r.image = r.image.split(/[\\/]/).pop()!;
       return r;
     });
@@ -514,10 +538,14 @@ export class MenuImportService {
       }
       const key = `${lc(product)}\u0000${lc(group)}`;
       let g = byKey.get(key);
+      if (v.choiceAr === null) errors.push(`Row ${rowNumber}: choiceAr (Arabic) is required.`);
       if (!g) {
         g = { productRef: product, rowNumber, name: group, nameAr: v.groupAr === null ? null : String(v.groupAr).trim(), isRequired: false, allowsMultiple: false, values: [], report: { sheet: 'Options', rowNumber, label: `${product} › ${group}`, action: 'OPTIONS', errors } };
         byKey.set(key, g);
         groups.push(g);
+      } else {
+        if (errors.length > 0) g.report.errors.push(...errors);
+        if (!g.nameAr && v.groupAr !== null) g.nameAr = String(v.groupAr).trim();
       }
       const req = this.bool(v.required, 'required', g.report.errors);
       if (req !== null) g.isRequired = req;
@@ -530,6 +558,7 @@ export class MenuImportService {
       g.values.push({ name: choice, nameAr: v.choiceAr === null ? null : String(v.choiceAr).trim(), priceDeltaMinor: delta });
       if (g.values.length > MAX_VALUES_PER_OPTION_GROUP) g.report.errors.push(`A group can have at most ${MAX_VALUES_PER_OPTION_GROUP} choices.`);
     }
+    for (const g of groups) if (g.report.action === 'OPTIONS' && !g.nameAr) g.report.errors.push(`Group "${g.name}": groupAr (Arabic group name) is required.`);
     return groups;
   }
 
@@ -578,11 +607,11 @@ const INSTRUCTIONS = [
   'HATLY — MENU TEMPLATE / قالب المنيو',
   '',
   'HOW TO USE (English)',
-  '1) Sheet "Menu": one row per product. Leave productId EMPTY to add a new product. Rows that already have a productId update that product.',
+  '1) Sheet "Menu": one row per product, with BOTH the English (name) and Arabic (nameAr) names. Leave productId EMPTY to add a new product. Rows that already have a productId update that product.',
   '2) category: the menu section (e.g. Burgers). A new category name is created automatically. categoryAr is its Arabic name.',
-  '3) price: in EGP, e.g. 95 or 12.50. For unit WEIGHT the price is per kilogram.',
+  '3) price: in EGP, e.g. 95 or 12.50 (not piastres). For unit WEIGHT the price is per kilogram.',
   '4) unit: PIECE (sold by piece) or WEIGHT (sold by kg). Empty = PIECE. It cannot be changed later for an existing product.',
-  '5) stock: OPEN (always available, not counted) or TRACKED (counted). TRACKED needs quantity (pieces, or grams for WEIGHT). Empty = OPEN.',
+  '5) stock: OPEN (always available, not counted) or TRACKED (counted). TRACKED needs quantity: pieces, or KILOGRAMS for WEIGHT (e.g. 12.5). Empty = OPEN.',
   '6) available: TRUE or FALSE. Empty = TRUE for new products, unchanged for existing ones.',
   '7) Photos: put this .xlsx and the photos (JPG / PNG / WebP, up to 5 MB each) in ONE .zip, write each photo file name in the "image" column, and upload the .zip.',
   '8) Sheet "Options" (optional): sizes, add-ons… One row per choice. Repeat the product name and group name on each row.',
@@ -596,7 +625,7 @@ const INSTRUCTIONS = [
   '٢) category: قسم المنيو (مثل برجر). القسم الجديد يُنشأ تلقائيًا. categoryAr هو اسمه بالعربي.',
   '٣) price: بالجنيه مثل 95 أو 12.50. للمنتجات بالوزن السعر لكل كيلو.',
   '٤) unit: PIECE (بالقطعة) أو WEIGHT (بالكيلو). الفارغ = PIECE. لا يمكن تغييرها لاحقًا لمنتج موجود.',
-  '٥) stock: OPEN (متاح دائمًا) أو TRACKED (بكمية محسوبة) ويحتاج quantity (قطع، أو جرامات للوزن).',
+  '٥) stock: OPEN (متاح دائمًا) أو TRACKED (بكمية محسوبة) ويحتاج quantity: عدد القطع، أو الكيلوجرامات للوزن (مثل 12.5).',
   '٦) available: TRUE أو FALSE.',
   '٧) الصور: ضع ملف الإكسل والصور (JPG / PNG / WebP حتى 5 ميجا) في ملف ‎.zip واحد، واكتب اسم ملف الصورة في عمود image، ثم ارفع ملف ‎.zip.',
   '٨) ورقة "Options" (اختيارية): الأحجام والإضافات. صف لكل اختيار مع تكرار اسم المنتج والمجموعة في كل صف.',

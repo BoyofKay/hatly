@@ -110,6 +110,7 @@ export class AdminVendorsService {
       this.branchesRepository.create({
         vendorId: dto.vendorId,
         name: dto.name,
+        nameAr: dto.nameAr?.trim() || null,
         address: dto.address,
         latitude: dto.latitude,
         longitude: dto.longitude,
@@ -142,6 +143,7 @@ export class AdminVendorsService {
   async updateVendorBranch(id: string, dto: UpdateVendorBranchDto): Promise<VendorBranch> {
     const branch = await this.getVendorBranch(id);
     if (dto.name !== undefined) branch.name = dto.name;
+    if (dto.nameAr !== undefined) branch.nameAr = dto.nameAr?.trim() || null;
     if (dto.address !== undefined) branch.address = dto.address;
     if (dto.latitude !== undefined) branch.latitude = dto.latitude;
     if (dto.longitude !== undefined) branch.longitude = dto.longitude;

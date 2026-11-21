@@ -72,6 +72,10 @@ export class Offer extends BaseEntity {
   @Column({ type: 'varchar', length: 150 })
   name: string;
 
+  /** Arabic name (bilingual app). */
+  @Column({ name: 'name_ar', type: 'varchar', length: 150, nullable: true })
+  nameAr?: string | null;
+
   @Index()
   @Column({ type: 'varchar', length: 20 })
   mechanism: OfferMechanism;

@@ -1,4 +1,12 @@
 'use client';
+import { gramsToKg, parseKgToGrams } from '../../../lib/money';
+
+/** Stock typed by the store: kg with decimals for weighed products (stored as grams), whole pieces otherwise. null = invalid. */
+function quantityFromInput(raw: string, unit: string): number | null {
+  if (unit === 'WEIGHT') return parseKgToGrams(raw.trim());
+  const n = Number(raw);
+  return raw.trim() !== '' && Number.isInteger(n) && n >= 0 ? n : null;
+}
 
 import { useEffect, useState } from 'react';
 import { VendorOwnedBranch, listOwnedBranches } from '../../../lib/api/vendor-branches';
@@ -177,9 +185,9 @@ export default function VendorProductsPage() {
       isAvailable: createFields.isAvailable,
     };
     if (createFields.inventoryMode === 'TRACKED') {
-      const qty = Number(createFields.quantity);
-      if (!Number.isInteger(qty) || qty < 0) {
-        setCreateError(t('Enter a valid, non-negative whole-number quantity.', 'أدخل كمية صحيحة غير سالبة (عدد صحيح).'));
+      const qty = quantityFromInput(createFields.quantity, createFields.pricingUnit);
+      if (qty === null) {
+        setCreateError(createFields.pricingUnit === 'WEIGHT' ? t('Enter the quantity in kg, e.g. 12.5.', 'أدخل الكمية بالكيلو، مثل 12.5.') : t('Enter a valid, non-negative whole-number quantity.', 'أدخل كمية صحيحة غير سالبة (عدد صحيح).'));
         return;
       }
       input.quantity = qty;
@@ -224,7 +232,7 @@ export default function VendorProductsPage() {
       categoryId: product.categoryId,
       price: (product.priceMinor / 100).toFixed(2),
       inventoryMode: product.inventoryMode,
-      quantity: product.quantity != null ? String(product.quantity) : '',
+      quantity: product.quantity != null ? (product.pricingUnit === 'WEIGHT' ? gramsToKg(product.quantity) : String(product.quantity)) : '',
     });
   }
 
@@ -248,9 +256,9 @@ export default function VendorProductsPage() {
       inventoryMode: editFields.inventoryMode,
     };
     if (editFields.inventoryMode === 'TRACKED') {
-      const qty = Number(editFields.quantity);
-      if (!Number.isInteger(qty) || qty < 0) {
-        setEditError(t('Enter a valid, non-negative whole-number quantity.', 'أدخل كمية صحيحة غير سالبة (عدد صحيح).'));
+      const qty = quantityFromInput(editFields.quantity, editingPricingUnit);
+      if (qty === null) {
+        setEditError(editingPricingUnit === 'WEIGHT' ? t('Enter the quantity in kg, e.g. 12.5.', 'أدخل الكمية بالكيلو، مثل 12.5.') : t('Enter a valid, non-negative whole-number quantity.', 'أدخل كمية صحيحة غير سالبة (عدد صحيح).'));
         return;
       }
       input.quantity = qty;
@@ -650,7 +658,7 @@ export default function VendorProductsPage() {
             {createFields.inventoryMode === 'TRACKED' && (
               <div>
                 <label className="block text-sm font-medium">
-                  {createFields.pricingUnit === 'WEIGHT' ? t('Quantity (grams)', 'الكمية (بالجرام)') : t('Quantity (pieces)', 'الكمية (بالقطع)')}
+                  {createFields.pricingUnit === 'WEIGHT' ? t('Quantity (kg)', 'الكمية (بالكيلو)') : t('Quantity (pieces)', 'الكمية (بالقطع)')}
                 </label>
                 <input
                   required
@@ -778,7 +786,7 @@ export default function VendorProductsPage() {
                       {editFields.inventoryMode === 'TRACKED' && (
                         <div>
                           <label className="block text-sm font-medium">
-                            {editingPricingUnit === 'WEIGHT' ? t('Quantity (grams)', 'الكمية (بالجرام)') : t('Quantity (pieces)', 'الكمية (بالقطع)')}
+                            {editingPricingUnit === 'WEIGHT' ? t('Quantity (kg)', 'الكمية (بالكيلو)') : t('Quantity (pieces)', 'الكمية (بالقطع)')}
                           </label>
                           <input
                             required
@@ -830,7 +838,7 @@ export default function VendorProductsPage() {
                         <p className="text-xs text-gray-500">
                           {p.inventoryMode === 'OPEN'
                             ? t('Open stock', 'مخزون مفتوح')
-                            : `Tracked: ${p.quantity ?? 0} ${p.pricingUnit === 'WEIGHT' ? 'g' : 'pcs'}`}
+                            : `Tracked: ${p.pricingUnit === 'WEIGHT' ? `${gramsToKg(p.quantity ?? 0)} kg` : `${p.quantity ?? 0} pcs`}`}
                         </p>
                         <label className="mt-1 inline-block text-xs text-hatly-orange">
                           {uploadingImageId === p.id ? t('Uploading...', 'جارٍ الرفع...') : p.imageUrl ? t('Change Image', 'تغيير الصورة') : t('Upload Image', 'رفع صورة')}

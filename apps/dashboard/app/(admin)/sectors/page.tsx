@@ -133,7 +133,7 @@ export default function SectorsPage() {
         <form onSubmit={submitNew} data-testid="sector-form" className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <LabeledInput data-testid="sector-name" label="Name (EN)" value={form.name} placeholder="Restaurants" onChange={(e) => { const name = e.target.value; setForm((f) => ({ ...f, name, slug: slugTouched ? f.slug : suggestSlug(name) })); }} />
-            <LabeledInput data-testid="sector-name-ar" label="Name (AR)" dir="rtl" value={form.nameAr} placeholder="مطاعم" onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))} />
+            <LabeledInput data-testid="sector-name-ar" label="Name (AR)" required dir="rtl" value={form.nameAr} placeholder="مطاعم" onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))} />
             <LabeledInput data-testid="sector-slug" label="Slug (lowercase, hyphens)" dir="ltr" value={form.slug} placeholder="restaurants" onChange={(e) => { setSlugTouched(true); setForm((f) => ({ ...f, slug: e.target.value })); }} />
             <LabeledInput data-testid="sector-order" label="Display order (lowest first)" inputMode="numeric" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))} />
           </div>

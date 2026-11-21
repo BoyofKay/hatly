@@ -312,6 +312,7 @@ export class MarketingService implements OnApplicationBootstrap, OnModuleDestroy
     const set: string[] = []; const v: unknown[] = [id];
     const add = (col: string, val: unknown) => { v.push(val); set.push(`${col} = $${v.length}`); };
     if (input.name !== undefined) { if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 150) throw bad('name must be 1–150 characters.'); add('name', input.name.trim()); }
+    if (input.nameAr !== undefined) { if (input.nameAr !== null && (typeof input.nameAr !== 'string' || input.nameAr.length > 150)) throw bad('nameAr must be at most 150 characters.'); add('name_ar', input.nameAr ? String(input.nameAr).trim() : null); }
     if (input.endAt !== undefined) { if (Number.isNaN(Date.parse(input.endAt)) || new Date(input.endAt) <= new Date(o.start_at)) throw bad('endAt must be after the start.'); add('end_at', input.endAt); }
     if (input.startAt !== undefined) { if (n > 0) throw new ConflictException({ message: 'The start cannot move once the offer has been used.', details: { code: 'OFFER_FIELD_LOCKED', fields: ['startAt'] } }); if (Number.isNaN(Date.parse(input.startAt))) throw bad('startAt is invalid.'); add('start_at', input.startAt); }
     for (const [key, col, raiseOnly] of [['totalAllocationLimit', 'total_allocation_limit', true], ['budgetCapMinor', 'budget_cap_minor', true], ['perCustomerLifetimeLimit', 'per_customer_lifetime_limit', true], ['perOrderLimit', 'per_order_limit', false]] as const) {
@@ -339,9 +340,9 @@ export class MarketingService implements OnApplicationBootstrap, OnModuleDestroy
     if (code && !/^[A-Za-z0-9]{4,20}$/.test(code)) throw bad('couponCode must be 4–20 letters/digits.');
     try {
       const [c] = await this.ds.query(
-        `INSERT INTO offers (vendor_branch_id, name, mechanism, discount_type, discount_value, minimum_eligible_subtotal_minor, maximum_discount_minor, special_price_minor, start_at, end_at, is_active, coupon_code,
+        `INSERT INTO offers (vendor_branch_id, name, name_ar, mechanism, discount_type, discount_value, minimum_eligible_subtotal_minor, maximum_discount_minor, special_price_minor, start_at, end_at, is_active, coupon_code,
            per_order_limit, per_customer_lifetime_limit, total_allocation_limit, budget_cap_minor, consumed_units_count, consumed_discount_minor, created_by_user_id)
-         SELECT vendor_branch_id, $2, mechanism, discount_type, discount_value, minimum_eligible_subtotal_minor, maximum_discount_minor, special_price_minor, start_at, end_at, false, $3,
+         SELECT vendor_branch_id, $2, name_ar, mechanism, discount_type, discount_value, minimum_eligible_subtotal_minor, maximum_discount_minor, special_price_minor, start_at, end_at, false, $3,
            per_order_limit, per_customer_lifetime_limit, total_allocation_limit, budget_cap_minor, 0, 0, $4 FROM offers WHERE id = $1 RETURNING id`,
         [id, (input.name ?? `${o.name} (copy)`).slice(0, 150), code, actorId],
       );

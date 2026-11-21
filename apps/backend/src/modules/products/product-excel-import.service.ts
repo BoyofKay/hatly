@@ -90,7 +90,7 @@ export class ProductExcelImportService {
         p.nameAr ?? '',
         (p.priceMinor / 100).toFixed(2),
         p.inventoryMode,
-        p.quantity ?? '',
+        p.quantity === null || p.quantity === undefined ? '' : p.pricingUnit === 'WEIGHT' ? p.quantity / 1000 : p.quantity,
         p.isAvailable ? 'TRUE' : 'FALSE',
       ]);
     }
@@ -100,7 +100,7 @@ export class ProductExcelImportService {
       ['productId identifies the Product and never changes it.'],
       ['Leave a cell blank to keep its current value unchanged.'],
       ['price is a normal currency value, e.g. 12.50 (not minor units).'],
-      ['For WEIGHT products, quantity is in GRAMS. For PIECE products, quantity is a count of pieces.'],
+      ['For WEIGHT products, quantity is in KILOGRAMS (e.g. 12.5, up to 3 decimals). For PIECE products, quantity is a count of pieces.'],
       ['inventoryMode can be OPEN or TRACKED.'],
       ['TRACKED requires a quantity in the same row.'],
       ['isAvailable accepts TRUE/FALSE (or 1/0).'],
@@ -217,11 +217,16 @@ export class ProductExcelImportService {
         const quantityCell = raw[5];
         let parsedQuantity: number | undefined;
         if (quantityCell !== undefined && quantityCell !== null && String(quantityCell).trim() !== '') {
-          const asNumber = Number(quantityCell);
-          if (!Number.isInteger(asNumber)) {
-            errors.push('Quantity must be an integer.');
-          } else if (asNumber < 0) {
+          const typed = Number(String(quantityCell).replace(',', '.'));
+          // WEIGHT products: the sheet holds kilograms (12.5), stored as grams; PIECE products: whole pieces.
+          const isWeight = product.pricingUnit === 'WEIGHT';
+          const asNumber = isWeight ? Math.round(typed * 1000) : typed;
+          if (!Number.isFinite(typed)) {
+            errors.push(isWeight ? 'Quantity must be a number of kg, e.g. 12.5.' : 'Quantity must be an integer.');
+          } else if (typed < 0) {
             errors.push('Quantity cannot be negative.');
+          } else if (isWeight ? Math.abs(typed * 1000 - asNumber) > 1e-6 : !Number.isInteger(typed)) {
+            errors.push(isWeight ? 'Quantity in kg can have at most 3 decimals.' : 'Quantity must be an integer.');
           } else {
             parsedQuantity = asNumber;
             intent.quantity = asNumber;

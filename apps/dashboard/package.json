@@ -10,7 +10,7 @@
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
-    "test:unit": "node --experimental-strip-types --test lib/legal/public-site.test.mts lib/banners/banner-form.test.mts lib/sectors/sector-form.test.mts lib/service-routes/route-defaults.test.mts lib/vendor/new-orders.test.mts lib/changes/change-feed.test.mts lib/ui/closures.test.mts lib/alerts/alarm-logic.test.mts lib/alerts/sw.test.mts lib/ui/start-page.test.mts lib/admin/lat-lng.test.mts"
+    "test:unit": "node --experimental-strip-types --test lib/legal/public-site.test.mts lib/banners/banner-form.test.mts lib/sectors/sector-form.test.mts lib/service-routes/route-defaults.test.mts lib/vendor/new-orders.test.mts lib/changes/change-feed.test.mts lib/ui/closures.test.mts lib/alerts/alarm-logic.test.mts lib/alerts/sw.test.mts lib/ui/start-page.test.mts lib/admin/lat-lng.test.mts lib/units.test.mts"
   },
   "dependencies": {
     "axios": "^1.7.4",

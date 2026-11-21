@@ -1,4 +1,5 @@
 'use client';
+import { parseKgToGrams } from '../../lib/money';
 
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -124,9 +125,9 @@ export function VendorOrderDetailView({ id, embedded = false, onChanged }: { id:
     if (recordingWeightRef.current === itemId) return; // already mid-flight for this item — ignore the duplicate tap
     setActionError(null);
     const raw = weightInputs[itemId];
-    const grams = Number(raw);
-    if (!raw || Number.isNaN(grams) || grams <= 0) {
-      setActionError(t('Enter a valid weight in grams.', 'أدخل وزنًا صحيحًا بالجرام.'));
+    const grams = raw ? parseKgToGrams(raw.trim()) : null;
+    if (grams === null || grams <= 0) {
+      setActionError(t('Enter the actual weight in kg, e.g. 1.25.', 'أدخل الوزن الفعلي بالكيلو، مثل 1.25.'));
       return;
     }
     recordingWeightRef.current = itemId;
@@ -339,8 +340,9 @@ export function VendorOrderDetailView({ id, embedded = false, onChanged }: { id:
                       ) : (
                         <div className="mt-1 flex gap-2">
                           <input
-                            type="number"
-                            placeholder={t('Actual weight (grams)', 'الوزن الفعلي (بالجرام)')}
+                            inputMode="decimal"
+                            dir="ltr"
+                            placeholder={t('Actual weight (kg), e.g. 1.25', 'الوزن الفعلي (كجم)، مثل 1.25')}
                             value={weightInputs[item.id] ?? ''}
                             onChange={(e) => setWeightInputs((prev) => ({ ...prev, [item.id]: e.target.value }))}
                             className="w-40 rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"

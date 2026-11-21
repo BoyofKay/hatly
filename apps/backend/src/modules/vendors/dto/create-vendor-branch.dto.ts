@@ -35,6 +35,12 @@ export class CreateVendorBranchDto {
   @MaxLength(150)
   name: string;
 
+  /** Arabic name (bilingual app). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  nameAr?: string;
+
   @IsString()
   @MaxLength(255)
   address: string;

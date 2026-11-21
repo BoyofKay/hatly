@@ -12,6 +12,7 @@ export interface VendorBranch {
   id: string;
   vendorId: string;
   name: string;
+  nameAr?: string | null;
   address: string;
   latitude: number;
   longitude: number;
@@ -40,6 +41,7 @@ export interface CreateVendorInput {
 export interface CreateVendorBranchInput {
   vendorId: string;
   name: string;
+  nameAr?: string;
   address: string;
   latitude: number;
   longitude: number;

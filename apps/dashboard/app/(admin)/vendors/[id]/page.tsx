@@ -59,6 +59,7 @@ export default function VendorDetailPage() {
   const [branchLng, setBranchLng] = useState('');
   const [branchCommission, setBranchCommission] = useState('');
   const [branchAreaId, setBranchAreaId] = useState('');
+  const [branchNameAr, setBranchNameAr] = useState('');
   const [mapsLink, setMapsLink] = useState('');
   const [areas, setAreas] = useState<ServiceArea[]>([]);
   useEffect(() => { listServiceAreas().then((a) => { setAreas(a.filter((x: any) => x.isActive !== false)); if (a.length === 1) setBranchAreaId(a[0].id); }).catch(() => undefined); }, []);
@@ -144,12 +145,13 @@ export default function VendorDetailPage() {
     if (!branchLat.trim() || !branchLng.trim() || Number.isNaN(latitude) || Number.isNaN(longitude)) return setBranchError(t('Latitude and longitude must be valid numbers.', 'خط العرض وخط الطول يجب أن يكونا أرقامًا صحيحة.'));
     const percent = Number(branchCommission);
     if (!branchCommission.trim() || !(percent >= 0 && percent <= 100)) return setBranchError(t('Enter Hatly’s commission as a percentage (0–100). Without it, orders record no commission.', 'أدخل عمولة هاتلي كنسبة مئوية (0–100). بدونها لا تُسجَّل عمولة على الطلبات.'));
+    if (!branchNameAr.trim()) return setBranchError(t('Enter the branch name in Arabic too.', 'أدخل اسم الفرع بالعربي أيضًا.'));
     if (!branchAreaId) return setBranchError(t('Choose the service area (customers only see stores in their area).', 'اختر منطقة الخدمة (العملاء يرون متاجر منطقتهم فقط).'));
     setIsCreatingBranch(true);
     setBranchError(null);
     try {
-      const created = await createVendorBranch({ vendorId: id, name: branchName, address: branchAddress, latitude, longitude, serviceAreaId: branchAreaId, commissionRateBasisPoints: Math.round(percent * 100) });
-      setBranchName(''); setBranchAddress(''); setBranchLat(''); setBranchLng(''); setBranchCommission(''); setMapsLink('');
+      const created = await createVendorBranch({ vendorId: id, name: branchName, nameAr: branchNameAr.trim(), address: branchAddress, latitude, longitude, serviceAreaId: branchAreaId, commissionRateBasisPoints: Math.round(percent * 100) });
+      setBranchName(''); setBranchNameAr(''); setBranchAddress(''); setBranchLat(''); setBranchLng(''); setBranchCommission(''); setMapsLink('');
       setBranchOpen(false);
       toast.push('success', t('Branch created. Finish its go-live checklist.', 'تم إنشاء الفرع. أكمل قائمة الجاهزية.'));
       router.push(`/branches/${created.id}`);
@@ -245,7 +247,8 @@ export default function VendorDetailPage() {
         footer={<><Button onClick={() => setBranchOpen(false)} disabled={isCreatingBranch}>{t('Cancel', 'إلغاء')}</Button><Button variant="primary" type="submit" form="vd-branch" loading={isCreatingBranch}>{isCreatingBranch ? t('Creating...', 'جارٍ الإنشاء...') : t('Create branch', 'إنشاء الفرع')}</Button></>}
       >
         <form id="vd-branch" onSubmit={handleCreateBranch} className="space-y-3">
-          <LabeledInput label={t('Branch name', 'اسم الفرع')} required value={branchName} onChange={(e) => setBranchName(e.target.value)} />
+          <LabeledInput label={t('Branch name (English)', 'اسم الفرع (إنجليزي)')} required value={branchName} onChange={(e) => setBranchName(e.target.value)} />
+          <LabeledInput label={t('Branch name (Arabic)', 'اسم الفرع (عربي)')} required dir="rtl" value={branchNameAr} onChange={(e) => setBranchNameAr(e.target.value)} />
           <LabeledInput label={t('Address', 'العنوان')} required value={branchAddress} onChange={(e) => setBranchAddress(e.target.value)} />
           <LabeledInput
             label={t('Location: paste a Google Maps link or "lat, lng"', 'الموقع: الصق رابط خرائط جوجل أو "خط العرض، خط الطول"')}

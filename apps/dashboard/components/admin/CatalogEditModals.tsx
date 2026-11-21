@@ -5,6 +5,7 @@ import { Product, ProductCategory, updateCategory, updateProduct } from '../../l
 import { apiErrorMessage } from '../../lib/api/errors';
 import { useLang } from '../../lib/ui/lang';
 import { Button, LabeledInput, LabeledSelect, LabeledTextarea, Modal, useToast } from '../ui';
+import { gramsToKg, minorToEgpInput, parseEgpToMinor, parseKgToGrams } from '../../lib/money';
 
 /** Full product edit for admins (replaces the old name-only prompt): names, descriptions, category, price and stock mode. */
 export function ProductEditModal({ product, categories, onClose, onSaved }: { product: Product; categories: ProductCategory[]; onClose: () => void; onSaved: () => void | Promise<void> }) {
@@ -15,15 +16,19 @@ export function ProductEditModal({ product, categories, onClose, onSaved }: { pr
   const [description, setDescription] = useState(product.description ?? '');
   const [descriptionAr, setDescriptionAr] = useState(product.descriptionAr ?? '');
   const [categoryId, setCategoryId] = useState(product.categoryId);
-  const [price, setPrice] = useState((product.priceMinor / 100).toFixed(2));
+  const [price, setPrice] = useState(minorToEgpInput(product.priceMinor));
   const [inventoryMode, setInventoryMode] = useState(product.inventoryMode);
-  const [quantity, setQuantity] = useState(product.quantity === null ? '' : String(product.quantity));
+  const isWeight = product.pricingUnit === 'WEIGHT';
+  // Weighed products are counted in kg on screen (1.5 kg) and stored in grams; pieces stay whole numbers.
+  const [quantity, setQuantity] = useState(product.quantity === null ? '' : isWeight ? gramsToKg(product.quantity) : String(product.quantity));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const priceMinor = Math.round(Number(price) * 100);
-  const priceOk = Number.isFinite(priceMinor) && priceMinor >= 1;
-  const qtyOk = inventoryMode === 'OPEN' || (/^\d+$/.test(quantity));
+  const parsedPrice = parseEgpToMinor(price);
+  const priceMinor = parsedPrice.ok ? parsedPrice.minor : 0;
+  const priceOk = parsedPrice.ok;
+  const quantityValue = isWeight ? parseKgToGrams(quantity) : /^\d+$/.test(quantity) ? Number(quantity) : null;
+  const qtyOk = inventoryMode === 'OPEN' || quantityValue !== null;
   const ok = name.trim().length > 0 && priceOk && qtyOk;
 
   async function save() {
@@ -38,7 +43,7 @@ export function ProductEditModal({ product, categories, onClose, onSaved }: { pr
         categoryId,
         priceMinor,
         inventoryMode,
-        ...(inventoryMode === 'TRACKED' ? { quantity: Number(quantity) } : {}),
+        ...(inventoryMode === 'TRACKED' && quantityValue !== null ? { quantity: quantityValue } : {}),
       } as any);
       toast.push('success', t('Product saved.', 'تم حفظ المنتج.'));
       await onSaved();
@@ -73,9 +78,10 @@ export function ProductEditModal({ product, categories, onClose, onSaved }: { pr
         </LabeledSelect>
         {inventoryMode === 'TRACKED' && (
           <LabeledInput
-            label={product.pricingUnit === 'WEIGHT' ? t('Quantity (grams)', 'الكمية (جرام)') : t('Quantity (pieces)', 'الكمية (قطعة)')}
-            inputMode="numeric" dir="ltr" value={quantity} onChange={(e) => setQuantity(e.target.value)}
-            error={qtyOk ? null : t('A whole number, 0 or more.', 'عدد صحيح 0 أو أكثر.')}
+            label={isWeight ? t('Quantity in stock (kg)', 'الكمية بالمخزون (كجم)') : t('Quantity in stock (pieces)', 'الكمية بالمخزون (قطعة)')}
+            inputMode={isWeight ? 'decimal' : 'numeric'} dir="ltr" value={quantity} onChange={(e) => setQuantity(e.target.value)}
+            placeholder={isWeight ? '12.5' : '20'}
+            error={qtyOk ? null : isWeight ? t('Kilograms, e.g. 12.5 (up to 3 decimals).', 'بالكيلو، مثل 12.5 (حتى 3 أرقام عشرية).') : t('A whole number, 0 or more.', 'عدد صحيح 0 أو أكثر.')}
           />
         )}
       </div>

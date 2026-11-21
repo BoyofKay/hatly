@@ -16,6 +16,10 @@ export class VendorBranch extends BaseEntity {
   @Column({ type: 'varchar', length: 150 })
   name: string;
 
+  /** Arabic name (bilingual app). Null until filled; clients fall back to `name`. */
+  @Column({ name: 'name_ar', type: 'varchar', length: 150, nullable: true })
+  nameAr?: string | null;
+
   @Column({ type: 'varchar', length: 255 })
   address: string;
 

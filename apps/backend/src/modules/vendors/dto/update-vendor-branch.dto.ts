@@ -28,6 +28,12 @@ export class UpdateVendorBranchDto {
   @MaxLength(150)
   name?: string;
 
+  /** Arabic name (bilingual app). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  nameAr?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(255)

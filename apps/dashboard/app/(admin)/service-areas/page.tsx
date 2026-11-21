@@ -28,6 +28,8 @@ export default function ServiceAreasPage() {
 
   const [renaming, setRenaming] = useState<ServiceArea | null>(null);
   const [newName, setNewName] = useState('');
+  const [newNameAr, setNewNameAr] = useState('');
+  const [nameAr, setNameAr] = useState('');
   const [deactivate, setDeactivate] = useState<ServiceArea | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -54,13 +56,14 @@ export default function ServiceAreasPage() {
     if (isSubmitting) return;
     const centerLatitude = Number(lat);
     const centerLongitude = Number(lng);
-    const radiusMeters = Number(radius);
+    const radiusMeters = Math.round(Number(radius) * 1000); // typed in km (7.5), stored in metres
+    if (!nameAr.trim()) return setCreateError(t('Enter the Arabic name too.', 'أدخل الاسم العربي أيضًا.'));
     if ([lat, lng, radius].some((v) => !v.trim()) || [centerLatitude, centerLongitude, radiusMeters].some((n) => Number.isNaN(n))) return setCreateError(t('Latitude, longitude and radius must all be valid numbers.', 'خط العرض وخط الطول ونصف القطر يجب أن تكون كلها أرقامًا صحيحة.'));
     setIsSubmitting(true);
     setCreateError(null);
     try {
-      await createServiceArea({ name, centerLatitude, centerLongitude, radiusMeters });
-      setName(''); setLat(''); setLng(''); setRadius('');
+      await createServiceArea({ name: name.trim(), nameAr: nameAr.trim(), centerLatitude, centerLongitude, radiusMeters });
+      setName(''); setNameAr(''); setLat(''); setLng(''); setRadius('');
       setCreating(false);
       toast.push('success', t('Service area created.', 'تم إنشاء منطقة الخدمة.'));
       await refresh();
@@ -96,7 +99,7 @@ export default function ServiceAreasPage() {
       key: 'actions', header: '', align: 'end',
       cell: (a) => (
         <span className="inline-flex gap-2">
-          <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setNewName(a.name); setRenaming(a); }}>{t('Rename', 'إعادة تسمية')}</Button>
+          <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setNewName(a.name); setNewNameAr(a.nameAr ?? ''); setRenaming(a); }}>{t('Rename', 'إعادة تسمية')}</Button>
           {a.isActive
             ? <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setDeactivate(a); }}>{t('Deactivate', 'إيقاف')}</Button>
             : <Button size="sm" variant="primary" className="min-h-[36px]" loading={busy} onClick={() => void run(() => activateServiceArea(a.id), t('Service area activated.', 'تم تفعيل منطقة الخدمة.'), t('Failed to update service area.', 'تعذّر تحديث منطقة الخدمة.'), () => undefined)}>{t('Activate', 'تفعيل')}</Button>}
@@ -124,11 +127,12 @@ export default function ServiceAreasPage() {
         footer={<><Button onClick={() => setCreating(false)} disabled={isSubmitting}>{t('Cancel', 'إلغاء')}</Button><Button variant="primary" type="submit" form="sa-create" loading={isSubmitting}>{isSubmitting ? t('Creating...', 'جارٍ الإنشاء...') : t('Create service area', 'إنشاء المنطقة')}</Button></>}
       >
         <form id="sa-create" onSubmit={handleCreate} className="space-y-3">
-          <LabeledInput label={t('Name', 'الاسم')} required value={name} onChange={(e) => setName(e.target.value)} />
+          <LabeledInput label={t('Name (English)', 'الاسم (إنجليزي)')} required value={name} onChange={(e) => setName(e.target.value)} />
+          <LabeledInput label={t('Name (Arabic)', 'الاسم (عربي)')} required dir="rtl" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
           <div className="grid gap-3 sm:grid-cols-3">
             <LabeledInput label={t('Centre latitude', 'خط عرض المركز')} required dir="ltr" inputMode="decimal" value={lat} onChange={(e) => setLat(e.target.value)} />
             <LabeledInput label={t('Centre longitude', 'خط طول المركز')} required dir="ltr" inputMode="decimal" value={lng} onChange={(e) => setLng(e.target.value)} />
-            <LabeledInput label={t('Radius (metres)', 'نصف القطر (متر)')} required dir="ltr" inputMode="numeric" value={radius} onChange={(e) => setRadius(e.target.value)} />
+            <LabeledInput label={t('Radius (km)', 'نصف القطر (كم)')} required dir="ltr" inputMode="decimal" placeholder="7.5" value={radius} onChange={(e) => setRadius(e.target.value)} />
           </div>
           {createError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{createError}</p>}
         </form>
@@ -138,10 +142,11 @@ export default function ServiceAreasPage() {
         open={!!renaming}
         title={t('Rename service area', 'إعادة تسمية منطقة الخدمة')}
         onClose={() => !busy && setRenaming(null)}
-        footer={<><Button onClick={() => setRenaming(null)} disabled={busy}>{t('Cancel', 'إلغاء')}</Button><Button variant="primary" type="submit" form="sa-rename" loading={busy} disabled={!newName.trim() || newName === renaming?.name}>{t('Save', 'حفظ')}</Button></>}
+        footer={<><Button onClick={() => setRenaming(null)} disabled={busy}>{t('Cancel', 'إلغاء')}</Button><Button variant="primary" type="submit" form="sa-rename" loading={busy} disabled={!newName.trim() || !newNameAr.trim() || (newName === renaming?.name && newNameAr === (renaming?.nameAr ?? ''))}>{t('Save', 'حفظ')}</Button></>}
       >
-        <form id="sa-rename" onSubmit={(e) => { e.preventDefault(); if (renaming) void run(() => updateServiceArea(renaming.id, { name: newName.trim() }), t('Service area renamed.', 'تمت إعادة تسمية المنطقة.'), t('Failed to rename service area.', 'تعذّرت إعادة التسمية.'), () => setRenaming(null)); }} className="space-y-3">
-          <LabeledInput label={t('Name', 'الاسم')} required value={newName} onChange={(e) => setNewName(e.target.value)} />
+        <form id="sa-rename" onSubmit={(e) => { e.preventDefault(); if (renaming) void run(() => updateServiceArea(renaming.id, { name: newName.trim(), nameAr: newNameAr.trim() }), t('Service area renamed.', 'تمت إعادة تسمية المنطقة.'), t('Failed to rename service area.', 'تعذّرت إعادة التسمية.'), () => setRenaming(null)); }} className="space-y-3">
+          <LabeledInput label={t('Name (English)', 'الاسم (إنجليزي)')} required value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <LabeledInput label={t('Name (Arabic)', 'الاسم (عربي)')} required dir="rtl" value={newNameAr} onChange={(e) => setNewNameAr(e.target.value)} />
           {actionError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>}
         </form>
       </Modal>

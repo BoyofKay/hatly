@@ -134,6 +134,7 @@ export class AdminOffersService {
           couponCode,
           vendorBranchId: dto.vendorBranchId,
           name: dto.name,
+          nameAr: dto.nameAr?.trim() || null,
           mechanism: dto.mechanism,
           discountType: dto.mechanism === OfferMechanism.SUBTOTAL_DISCOUNT ? dto.discountType : null,
           discountValue: dto.mechanism === OfferMechanism.SUBTOTAL_DISCOUNT ? dto.discountValue : null,

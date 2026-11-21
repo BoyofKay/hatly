@@ -12,6 +12,7 @@ export interface Offer {
   id: string;
   vendorBranchId: string;
   name: string;
+  nameAr?: string | null;
   mechanism: OfferMechanism;
   discountType: DiscountType | null;
   discountValue: number | null;
@@ -37,6 +38,7 @@ export interface Offer {
 export interface CreateOfferInput {
   vendorBranchId: string;
   name: string;
+  nameAr?: string;
   mechanism: OfferMechanism;
   // SUBTOTAL_DISCOUNT only:
   discountType?: DiscountType;

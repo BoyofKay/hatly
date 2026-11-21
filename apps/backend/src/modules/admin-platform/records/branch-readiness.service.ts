@@ -36,7 +36,7 @@ export class BranchReadinessService {
     const [b] = await this.ds.query(
       `SELECT b.id, b.is_active, b.is_open, ${effectiveOpenSql('b')} AS open_now, b.service_area_id, b.marketplace_sector_id, b.commission_rate_basis_points,
               b.acceptance_mode, b.opening_hours, b.delivery_enabled, b.pickup_enabled, b.preparation_time_minutes,
-              v.is_active AS vendor_active, v.logo_url, v.name_ar AS vendor_name_ar,
+              v.is_active AS vendor_active, v.logo_url, v.name_ar AS vendor_name_ar, b.name_ar AS branch_name_ar,
               sa.is_active AS area_active, ms.is_active AS sector_active
          FROM vendor_branches b
          JOIN vendors v ON v.id = b.vendor_id
@@ -78,7 +78,7 @@ export class BranchReadinessService {
       { key: 'HOURS', ok: hours > 0, level: 'WARNING', en: 'Opening hours are set (without them the branch is open whenever its switch is on).', ar: 'مواعيد العمل محددة (بدونها يكون الفرع مفتوحًا طالما المفتاح مفعّل).', fix: 'sec-hours' },
       { key: 'PREP_TIME', ok: b.preparation_time_minutes !== null, level: 'WARNING', en: 'A preparation time is set (used for customer estimates and dispatch).', ar: 'وقت التحضير محدد (يُستخدم في تقدير الوقت للعميل والإسناد).', fix: 'sec-hours' },
       { key: 'LOGO', ok: !!b.logo_url, level: 'WARNING', en: 'The store has a logo.', ar: 'للمتجر شعار.', fix: 'vendor' },
-      { key: 'ARABIC', ok: !!b.vendor_name_ar && n.products_without_arabic === 0, level: 'WARNING', en: `Arabic names are filled (store, and ${n.products_without_arabic} product(s) missing one).`, ar: `الأسماء العربية مكتملة (المتجر، و${n.products_without_arabic} منتج ينقصه الاسم العربي).`, fix: 'sec-products' },
+      { key: 'ARABIC', ok: !!b.vendor_name_ar && !!b.branch_name_ar && n.products_without_arabic === 0, level: 'WARNING', en: `Arabic names are filled (store${b.vendor_name_ar ? ' ✓' : ' ✗'}, branch${b.branch_name_ar ? ' ✓' : ' ✗'}, ${n.products_without_arabic} product(s) missing one).`, ar: `الأسماء العربية مكتملة (المتجر${b.vendor_name_ar ? ' ✓' : ' ✗'}، الفرع${b.branch_name_ar ? ' ✓' : ' ✗'}، ${n.products_without_arabic} منتج ينقصه الاسم العربي).`, fix: 'sec-products' },
       { key: 'PHOTOS', ok: n.products_without_photo === 0, level: 'WARNING', en: `Every available product has a photo (${n.products_without_photo} without).`, ar: `لكل منتج متاح صورة (${n.products_without_photo} بدون صورة).`, fix: 'sec-products' },
     ];
     const blockers = checks.filter((c) => !c.ok && c.level === 'BLOCKER').length;

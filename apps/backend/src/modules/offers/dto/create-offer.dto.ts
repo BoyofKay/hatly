@@ -26,6 +26,12 @@ export class CreateOfferDto {
   @MaxLength(150)
   name: string;
 
+  /** Arabic name (bilingual app). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  nameAr?: string;
+
   @IsEnum(OfferMechanism)
   mechanism: OfferMechanism;
 

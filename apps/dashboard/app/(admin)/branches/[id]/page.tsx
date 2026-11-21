@@ -35,6 +35,7 @@ import { BranchClosures } from '../../../../components/vendor/BranchClosures';
 import { BranchHoursEditor } from '../../../../components/vendor/BranchHoursEditor';
 import { DeleteRecordButton } from '../../../../components/admin/DeleteRecordButton';
 import { MenuImportPanel } from '../../../../components/admin/MenuImportPanel';
+import { basisPointsToPercent, parseEgpToMinor, parsePercentToBasisPoints } from '../../../../lib/money';
 import { BranchReadinessCard } from '../../../../components/admin/BranchReadinessCard';
 import { CategoryEditModal, ProductEditModal } from '../../../../components/admin/CatalogEditModals';
 import { useRouter } from 'next/navigation';
@@ -61,6 +62,9 @@ export default function BranchDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [name, setName] = useState('');
+  const [nameAr, setNameAr] = useState('');
+  const [categoryNameAr, setCategoryNameAr] = useState('');
+  const [productNameAr, setProductNameAr] = useState('');
   const [address, setAddress] = useState('');
   const [commission, setCommission] = useState('');
   const [deliveryEnabled, setDeliveryEnabled] = useState(true);
@@ -97,8 +101,9 @@ export default function BranchDetailPage() {
       ]);
       setBranch(b);
       setName(b.name);
+      setNameAr(b.nameAr ?? '');
       setAddress(b.address);
-      setCommission(b.commissionRateBasisPoints != null ? String(b.commissionRateBasisPoints) : '');
+      setCommission(basisPointsToPercent(b.commissionRateBasisPoints));
       setDeliveryEnabled(b.deliveryEnabled);
       setPickupEnabled(b.pickupEnabled);
       setSelectedSectorId(b.marketplaceSectorId ?? '');
@@ -124,12 +129,22 @@ export default function BranchDetailPage() {
     setIsSaving(true);
     setActionError(null);
     try {
+      const commissionBp = commission.trim() ? parsePercentToBasisPoints(commission) : undefined;
+      if (commissionBp === null) {
+        setActionError('Commission must be a percentage between 0 and 100, e.g. 15 or 12.5.');
+        return;
+      }
+      if (!nameAr.trim()) {
+        setActionError('Enter the Arabic name too — the app is Arabic and English.');
+        return;
+      }
       const updated = await updateVendorBranch(id, {
         name,
+        nameAr: nameAr.trim(),
         address,
         deliveryEnabled,
         pickupEnabled,
-        commissionRateBasisPoints: commission ? Number(commission) : undefined,
+        commissionRateBasisPoints: commissionBp,
       });
       setBranch(updated);
     } catch (err: any) {
@@ -201,8 +216,9 @@ export default function BranchDetailPage() {
   async function handleCreateCategory(e: React.FormEvent) {
     e.preventDefault();
     try {
-      await createCategory({ vendorBranchId: id, name: categoryName });
+      await createCategory({ vendorBranchId: id, name: categoryName.trim(), nameAr: categoryNameAr.trim() });
       setCategoryName('');
+      setCategoryNameAr('');
       setShowCategoryForm(false);
       await refresh();
     } catch (err: any) {
@@ -226,9 +242,14 @@ export default function BranchDetailPage() {
   async function handleCreateProduct(e: React.FormEvent) {
     e.preventDefault();
     setProductError(null);
-    const priceMinor = Number(productPrice);
-    if (Number.isNaN(priceMinor) || priceMinor <= 0) {
-      setProductError('Price must be a positive number, in minor units (piasters).');
+    const parsedPrice = parseEgpToMinor(productPrice);
+    if (!parsedPrice.ok) {
+      setProductError('Enter the price in EGP, e.g. 95 or 12.50.');
+      return;
+    }
+    const priceMinor = parsedPrice.minor;
+    if (!productNameAr.trim()) {
+      setProductError('Enter the Arabic name too — the app is Arabic and English.');
       return;
     }
     if (!productCategoryId) {
@@ -239,11 +260,13 @@ export default function BranchDetailPage() {
       await createProduct({
         vendorBranchId: id,
         categoryId: productCategoryId,
-        name: productName,
+        name: productName.trim(),
+        nameAr: productNameAr.trim(),
         priceMinor,
         pricingUnit: productPricingUnit,
       });
       setProductName('');
+      setProductNameAr('');
       setProductPrice('');
       setProductPricingUnit('PIECE');
       setShowProductForm(false);
@@ -344,16 +367,20 @@ export default function BranchDetailPage() {
 
         <form onSubmit={handleSaveBranch} className="mt-4 space-y-3">
           <div>
-            <label className="block text-sm font-medium">Name</label>
+            <label className="block text-sm font-medium">Name (English)</label>
             <input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Name (Arabic) — الاسم بالعربي</label>
+            <input dir="rtl" required value={nameAr} onChange={(e) => setNameAr(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           </div>
           <div>
             <label className="block text-sm font-medium">Address</label>
             <input value={address} onChange={(e) => setAddress(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium">Commission rate (basis points — 1000 = 10%)</label>
-            <input value={commission} onChange={(e) => setCommission(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
+            <label className="block text-sm font-medium">Hatly commission (%)</label>
+            <input inputMode="decimal" dir="ltr" placeholder="15" value={commission} onChange={(e) => setCommission(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           </div>
           <div className="flex gap-4 text-sm">
             <label className="flex items-center gap-2">
@@ -445,7 +472,15 @@ export default function BranchDetailPage() {
               required
               value={categoryName}
               onChange={(e) => setCategoryName(e.target.value)}
-              placeholder="Category name"
+              placeholder="Category name (English)"
+              className="flex-1 rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
+            />
+            <input
+              required
+              dir="rtl"
+              value={categoryNameAr}
+              onChange={(e) => setCategoryNameAr(e.target.value)}
+              placeholder="اسم القسم بالعربي"
               className="flex-1 rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
             />
             <button type="submit" className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
@@ -458,7 +493,7 @@ export default function BranchDetailPage() {
           {categories.map((c) => (
             <li key={c.id} className="flex items-center justify-between px-4 py-3">
               <button onClick={() => handleRenameCategory(c)} className="text-left hover:underline">
-                {c.name}
+                {c.name}{c.nameAr ? <span dir="rtl" className="text-gray-500"> — {c.nameAr}</span> : null}
               </button>
               <div className="flex items-center gap-2">
                 <span className={`rounded px-2 py-0.5 text-xs ${c.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
@@ -493,11 +528,21 @@ export default function BranchDetailPage() {
         {showProductForm && (
           <form onSubmit={handleCreateProduct} className="mt-3 space-y-3 rounded border p-3">
             <div>
-              <label className="block text-sm font-medium">Name</label>
+              <label className="block text-sm font-medium">Name (English)</label>
               <input
                 required
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
+                className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Name (Arabic) — الاسم بالعربي</label>
+              <input
+                required
+                dir="rtl"
+                value={productNameAr}
+                onChange={(e) => setProductNameAr(e.target.value)}
                 className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
               />
             </div>
@@ -519,12 +564,14 @@ export default function BranchDetailPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium">Price (minor units)</label>
+                <label className="block text-sm font-medium">{productPricingUnit === 'WEIGHT' ? 'Price per kg (EGP)' : 'Price (EGP)'}</label>
                 <input
                   required
+                  inputMode="decimal"
+                  dir="ltr"
                   value={productPrice}
                   onChange={(e) => setProductPrice(e.target.value)}
-                  placeholder="e.g. 10000 = 100.00"
+                  placeholder="e.g. 95 or 12.50"
                   className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
                 />
               </div>

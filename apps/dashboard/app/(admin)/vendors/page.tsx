@@ -85,7 +85,7 @@ export default function VendorsPage() {
       <Modal open={open} title={t('New Vendor', 'مورد جديد')} onClose={() => setOpen(false)}>
         <form onSubmit={submit} className="space-y-3">
           <LabeledInput label={t('Name', 'الاسم')} required value={name} onChange={(e) => setName(e.target.value)} />
-          <LabeledInput label={t('Name (Arabic)', 'الاسم (بالعربية)')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+          <LabeledInput label={t('Name (Arabic)', 'الاسم (بالعربية)')} required dir="rtl" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
           <LabeledInput label={t('Logo URL', 'رابط الشعار')} value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
           {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
           <p className="text-xs text-gray-500">{t('The new vendor starts inactive until you activate it.', 'يبدأ المورد الجديد غير مفعّل حتى تفعّله.')}</p>

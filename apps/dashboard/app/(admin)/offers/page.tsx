@@ -40,6 +40,7 @@ export default function AdminOffersPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [mechanism, setMechanism] = useState<OfferMechanism>('SUBTOTAL_DISCOUNT');
   const [name, setName] = useState('');
+  const [nameAr, setNameAr] = useState('');
   const [discountType, setDiscountType] = useState<DiscountType>('PERCENTAGE');
   const [discountValue, setDiscountValue] = useState('');
   const [minimumEligibleSubtotal, setMinimumEligibleSubtotal] = useState('');
@@ -86,6 +87,7 @@ export default function AdminOffersPage() {
 
   function resetForm() {
     setName('');
+    setNameAr('');
     setDiscountType('PERCENTAGE');
     setDiscountValue('');
     setMinimumEligibleSubtotal('');
@@ -111,6 +113,7 @@ export default function AdminOffersPage() {
       const input: CreateOfferInput = {
         vendorBranchId: selectedBranchId,
         name,
+        nameAr: nameAr.trim(),
         mechanism,
         startAt: new Date(startAt).toISOString(),
         endAt: new Date(endAt).toISOString(),
@@ -235,8 +238,12 @@ export default function AdminOffersPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium">Name</label>
+                <label className="block text-sm font-medium">Name (English)</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} required className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Name (Arabic) — الاسم بالعربي</label>
+                <input dir="rtl" value={nameAr} onChange={(e) => setNameAr(e.target.value)} required className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
               </div>
 
               <div>

@@ -47,3 +47,43 @@ export function parseEgpToMinorAllowZero(raw: string): ParsedEgp {
   if (!parsed.ok && parsed.reason === 'NOT_POSITIVE') return { ok: true, minor: 0 };
   return parsed;
 }
+
+/**
+ * Percent ↔ basis points for commission rates (the backend stores basis points: 1500 = 15%). Admins type a percentage with up to two
+ * decimals ("15", "12.5", "7.25"); string arithmetic only. Returns null for anything else (empty, negative, over 100).
+ */
+export function parsePercentToBasisPoints(raw: string): number | null {
+  const m = /^(\d{1,3})(?:\.(\d{1,2}))?$/.exec(normalizeDigits(raw));
+  if (!m) return null;
+  const bp = Number(m[1]) * 100 + Number((m[2] ?? '').padEnd(2, '0'));
+  return bp <= 10000 ? bp : null;
+}
+
+/** 1500 → "15", 1250 → "12.5", 725 → "7.25". */
+export function basisPointsToPercent(bp: number | null | undefined): string {
+  if (bp === null || bp === undefined) return '';
+  const whole = Math.trunc(bp / 100);
+  const frac = String(bp % 100).padStart(2, '0').replace(/0+$/, '');
+  return frac ? `${whole}.${frac}` : String(whole);
+}
+
+/** Kilograms ↔ grams for weighed products (the backend stores integer grams). "1.5" → 1500, "0.25" → 250, "2" → 2000; up to 3 decimals. */
+export function parseKgToGrams(raw: string): number | null {
+  const m = /^(\d{1,6})(?:\.(\d{1,3}))?$/.exec(normalizeDigits(raw));
+  if (!m) return null;
+  return Number(m[1]) * 1000 + Number((m[2] ?? '').padEnd(3, '0'));
+}
+
+/** 1500 → "1.5", 250 → "0.25", 2000 → "2". */
+export function gramsToKg(grams: number | null | undefined): string {
+  if (grams === null || grams === undefined) return '';
+  const whole = Math.trunc(grams / 1000);
+  const frac = String(grams % 1000).padStart(3, '0').replace(/0+$/, '');
+  return frac ? `${whole}.${frac}` : String(whole);
+}
+
+/** Minor units → an editable EGP string: 1050 → "10.50", 1000 → "10.00". */
+export function minorToEgpInput(minor: number | null | undefined): string {
+  if (minor === null || minor === undefined) return '';
+  return `${Math.trunc(minor / 100)}.${String(Math.abs(minor % 100)).padStart(2, '0')}`;
+}

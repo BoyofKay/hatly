@@ -141,10 +141,11 @@ describe('E2E — menu import', () => {
     const before = await productCount();
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
-      ['productId', 'category', 'name', 'price', 'unit'],
-      ['', 'Drinks', 'Cola', '', 'PIECE'],
-      ['', 'Drinks', 'Juice', 20, 'LITRE'],
-      ['', 'Drinks', 'Water', 10, 'PIECE'],
+      ['productId', 'category', 'categoryAr', 'name', 'nameAr', 'price', 'unit'],
+      ['', 'Drinks', 'مشروبات', 'Cola', 'كولا', '', 'PIECE'],
+      ['', 'Drinks', 'مشروبات', 'Juice', 'عصير', 20, 'LITRE'],
+      ['', 'Drinks', 'مشروبات', 'Water', 'مياه', 10, 'PIECE'],
+      ['', 'Drinks', 'مشروبات', 'Tea', '', 10, 'PIECE'],
     ]), 'Menu');
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['product', 'group', 'choice'], ['Ghost Product', 'Size', 'Big']]), 'Options');
     const res = await post('validate', toXlsx(wb), 'bad.xlsx');
@@ -153,6 +154,7 @@ describe('E2E — menu import', () => {
     expect(byRow[2].join(' ')).toContain('price is required');
     expect(byRow[3].join(' ')).toContain('unit must be one of');
     expect(byRow[4]).toEqual([]);
+    expect(byRow[5].join(' ')).toContain('nameAr (Arabic name) is required');
     expect(JSON.stringify(res.body.data.rows.filter((r: any) => r.sheet === 'Options'))).toContain('Ghost Product');
     expect((await post('apply', toXlsx(wb), 'bad.xlsx')).status).toBe(400);
     expect(await productCount()).toBe(before);
