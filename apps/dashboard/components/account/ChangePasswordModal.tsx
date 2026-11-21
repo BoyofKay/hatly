@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { changeMyPassword, staffPasswordProblem } from '../../lib/api/admin-staff';
 import { apiErrorMessage } from '../../lib/api/errors';
 import { useLang } from '../../lib/ui/lang';
@@ -39,8 +40,10 @@ export function ChangePasswordModal({ open, onClose }: { open: boolean; onClose:
     }
   }
 
-  return (
-    <Modal open={open} title={t('Change my password', 'تغيير كلمة المرور')} onClose={() => !busy && onClose()} footer={<>
+  // Rendered on <body>: the shells open this from inside their sticky, blurred header, which would otherwise clip a fixed dialog.
+  if (!open || typeof document === 'undefined') return null;
+  return createPortal(
+    <Modal open title={t('Change my password', 'تغيير كلمة المرور')} onClose={() => !busy && onClose()} footer={<>
       <Button onClick={onClose} disabled={busy}>{t('Cancel', 'إلغاء')}</Button>
       <Button variant="primary" loading={busy} disabled={!ok} onClick={() => void submit()}>{t('Change password', 'تغيير كلمة المرور')}</Button>
     </>}>
@@ -51,6 +54,7 @@ export function ChangePasswordModal({ open, onClose }: { open: boolean; onClose:
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         <button type="submit" hidden />
       </form>
-    </Modal>
+    </Modal>,
+    document.body,
   );
 }
