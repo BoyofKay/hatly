@@ -1,4 +1,5 @@
 'use client';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -467,6 +468,7 @@ export default function DeliveryZonesPage() {
                       <button data-testid="zone-toggle" disabled={canManage !== true} onClick={() => toggle(z)} className="text-xs text-gray-600 underline disabled:opacity-40">
                         {z.isActive ? 'Deactivate' : 'Activate'}
                       </button>
+                      {canManage === true && <DeleteRecordButton path={`/admin/delivery-zones/${z.id}`} name={z.name} what={['Delivery zone', 'منطقة التوصيل']} consequence={['Customers can no longer choose it. Saved addresses in it will ask the customer to pick another zone.', 'لن يستطيع العملاء اختيارها. العناوين المحفوظة فيها ستطلب من العميل اختيار منطقة أخرى.']} onDeleted={refresh} />}
                     </td>
                   </tr>
                 ),
@@ -497,6 +499,7 @@ export default function DeliveryZonesPage() {
                       <span className="flex gap-2">
                         <button disabled={canManage !== true} onClick={() => setEditingId(z.id)} className="min-h-[44px] px-2 text-sm font-medium text-hatly-orangeDark disabled:opacity-40">{tl('Edit', 'تعديل')}</button>
                         <button disabled={canManage !== true} onClick={() => toggle(z)} className="min-h-[44px] px-2 text-sm font-medium text-gray-700 disabled:opacity-40">{z.isActive ? tl('Deactivate', 'إيقاف') : tl('Activate', 'تفعيل')}</button>
+                        {canManage === true && <DeleteRecordButton path={`/admin/delivery-zones/${z.id}`} name={z.name} what={['Delivery zone', 'منطقة التوصيل']} onDeleted={refresh} />}
                       </span>
                     </div>
                   </>

@@ -12,6 +12,7 @@ import { Role } from '../../common/enums/role.enum';
 import { BusinessConfigService } from '../business-config/business-config.service';
 import { LoginAttemptLimiter } from './login-attempt-limiter';
 import { MFA_ROLES, StaffMfaService } from './mfa/staff-mfa.service';
+import { assertStrongStaffPassword } from '../admin-platform/staff/staff-password-policy';
 
 export interface TokenPair {
   accessToken: string;
@@ -302,6 +303,24 @@ export class AuthService {
    *  - an account with no password cannot exist under the product contract; if a leftover one is ever found it is refused
    *    (generic) rather than completed — a password is never attached by a session or by a one-time code.
    */
+  /** A staff member changes their own password (dashboard profile). Requires the current password; the new one follows the staff rule. */
+  async changeStaffPassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.usersService.findByIdWithPasswordHash(userId);
+    const staff = [Role.VENDOR, Role.VENDOR_MANAGER, Role.ADMIN, Role.SUPER_ADMIN];
+    if (!user || !staff.includes(user.role) || !user.isActive || !user.passwordHash) throw new UnauthorizedException('Unable to update password.');
+    assertStrongStaffPassword(newPassword);
+    await this.loginAttemptLimiter.assertAllowed(user.phone);
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      await this.loginAttemptLimiter.recordFailure(user.phone);
+      throw new ForbiddenException({ message: 'The current password is incorrect.', details: { code: 'CURRENT_PASSWORD_INVALID' } });
+    }
+    if (await bcrypt.compare(newPassword, user.passwordHash)) {
+      throw new BadRequestException({ message: 'The new password must be different from the current one.', details: { code: 'PASSWORD_UNCHANGED' } });
+    }
+    await this.loginAttemptLimiter.clear(user.phone);
+    await this.usersService.setPasswordHash(userId, await bcrypt.hash(newPassword, 10));
+  }
+
   async setCustomerPassword(userId: string, newPassword: string, currentPassword?: string): Promise<void> {
     const user = await this.usersService.findByIdWithPasswordHash(userId);
     if (!user || user.role !== Role.CUSTOMER || !user.isActive || !user.passwordHash) {

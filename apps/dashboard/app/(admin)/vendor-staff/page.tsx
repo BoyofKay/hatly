@@ -1,4 +1,6 @@
 'use client';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
+import { SimpleEditModal } from '../../../components/admin/SimpleEditModal';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { VendorStaffMember, activateVendorStaff, createVendorStaff, deactivateVendorStaff, listVendorStaff } from '../../../lib/api/admin-vendor-staff';
@@ -44,6 +46,7 @@ export default function VendorStaffPage() {
   const [toggleBusy, setToggleBusy] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
 
+  const [editingStaff, setEditingStaff] = useState<VendorStaffMember | null>(null);
   const refresh = useCallback(async () => {
     setError(null);
     setLoading(true);
@@ -125,7 +128,13 @@ export default function VendorStaffPage() {
     { key: 'role', header: t('Role', 'الدور'), cell: (s) => <Badge tone={s.role === 'VENDOR_MANAGER' ? 'blue' : 'gray'}>{ROLE[s.role] ? t(ROLE[s.role][0], ROLE[s.role][1]) : s.role}</Badge> },
     { key: 'status', header: t('Status', 'الحالة'), cell: (s) => <Badge tone={s.isActive ? 'green' : 'gray'}>{s.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge> },
     { key: 'created', header: t('Created', 'أُنشئ'), cell: (s) => <span className="whitespace-nowrap text-gray-600">{date(s.createdAt)}</span> },
-    { key: 'actions', header: '', align: 'end', cell: (s) => <Button size="sm" className="min-h-[36px]" onClick={() => { setToggleError(null); setToggle(s); }}>{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</Button> },
+    { key: 'actions', header: '', align: 'end', cell: (s) => (
+      <span className="inline-flex flex-wrap justify-end gap-2">
+        <Button size="sm" className="min-h-[36px]" onClick={() => setEditingStaff(s)}>{t('Edit', 'تعديل')}</Button>
+        <Button size="sm" className="min-h-[36px]" onClick={() => { setToggleError(null); setToggle(s); }}>{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</Button>
+        <DeleteRecordButton path={`/admin/vendor-staff/${s.id}`} name={s.fullName} what={['Staff member', 'الموظف']} consequence={['They are signed out and removed from every branch. The phone number can be used again.', 'سيتم تسجيل خروجه وإزالته من كل الفروع. يمكن استخدام رقم الهاتف مجددًا.']} onDeleted={refresh} />
+      </span>
+    ) },
   ];
 
   return (
@@ -211,6 +220,20 @@ export default function VendorStaffPage() {
         onConfirm={() => void confirmToggle()}
         onClose={() => setToggle(null)}
       />
+      {editingStaff && (
+        <SimpleEditModal
+          title={['Edit store staff member', 'تعديل موظف المتجر']}
+          path={`/admin/vendor-staff/${editingStaff.id}`}
+          initial={editingStaff as unknown as Record<string, unknown>}
+          fields={[
+            { key: 'fullName', label: ['Full name', 'الاسم الكامل'], required: true },
+            { key: 'phone', label: ['Phone (sign-in)', 'الهاتف (للدخول)'], kind: 'phone', required: true, hint: ['Changing it signs the person out.', 'تغييره يُخرج الشخص من الحساب.'] },
+            { key: 'role', label: ['Role', 'الدور'], options: [['VENDOR_MANAGER', 'Store manager', 'مدير المتجر'], ['VENDOR', 'Store operator', 'مشغل المتجر']] },
+          ]}
+          onClose={() => setEditingStaff(null)}
+          onSaved={async () => { setEditingStaff(null); await refresh(); }}
+        />
+      )}
     </div>
   );
 }

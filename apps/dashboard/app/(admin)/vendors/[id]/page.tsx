@@ -19,6 +19,10 @@ import { checkImageFile } from '../../../../lib/banners/banner-form';
 import { resolveMediaUrl } from '../../../../lib/media-url';
 import { useLang } from '../../../../lib/ui/lang';
 import { SettlementTermsCard } from '../../../../components/vendor/SettlementTermsCard';
+import { DeleteRecordButton } from '../../../../components/admin/DeleteRecordButton';
+import { ServiceArea, listServiceAreas } from '../../../../lib/api/admin-service-areas';
+import { LabeledSelect } from '../../../../components/ui';
+import { parseLatLng } from '../../../../lib/admin/lat-lng';
 import { Badge, Button, Card, Column, ConfirmDialog, DataTable, ErrorState, KpiCard, LabeledInput, Modal, Skeleton, useToast } from '../../../../components/ui';
 
 const LOGO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -54,6 +58,10 @@ export default function VendorDetailPage() {
   const [branchLat, setBranchLat] = useState('');
   const [branchLng, setBranchLng] = useState('');
   const [branchCommission, setBranchCommission] = useState('');
+  const [branchAreaId, setBranchAreaId] = useState('');
+  const [mapsLink, setMapsLink] = useState('');
+  const [areas, setAreas] = useState<ServiceArea[]>([]);
+  useEffect(() => { listServiceAreas().then((a) => { setAreas(a.filter((x: any) => x.isActive !== false)); if (a.length === 1) setBranchAreaId(a[0].id); }).catch(() => undefined); }, []);
   const [isCreatingBranch, setIsCreatingBranch] = useState(false);
   const [branchError, setBranchError] = useState<string | null>(null);
 
@@ -134,14 +142,17 @@ export default function VendorDetailPage() {
     const latitude = Number(branchLat);
     const longitude = Number(branchLng);
     if (!branchLat.trim() || !branchLng.trim() || Number.isNaN(latitude) || Number.isNaN(longitude)) return setBranchError(t('Latitude and longitude must be valid numbers.', 'خط العرض وخط الطول يجب أن يكونا أرقامًا صحيحة.'));
+    const percent = Number(branchCommission);
+    if (!branchCommission.trim() || !(percent >= 0 && percent <= 100)) return setBranchError(t('Enter Hatly’s commission as a percentage (0–100). Without it, orders record no commission.', 'أدخل عمولة هاتلي كنسبة مئوية (0–100). بدونها لا تُسجَّل عمولة على الطلبات.'));
+    if (!branchAreaId) return setBranchError(t('Choose the service area (customers only see stores in their area).', 'اختر منطقة الخدمة (العملاء يرون متاجر منطقتهم فقط).'));
     setIsCreatingBranch(true);
     setBranchError(null);
     try {
-      await createVendorBranch({ vendorId: id, name: branchName, address: branchAddress, latitude, longitude, commissionRateBasisPoints: branchCommission ? Number(branchCommission) : undefined });
-      setBranchName(''); setBranchAddress(''); setBranchLat(''); setBranchLng(''); setBranchCommission('');
+      const created = await createVendorBranch({ vendorId: id, name: branchName, address: branchAddress, latitude, longitude, serviceAreaId: branchAreaId, commissionRateBasisPoints: Math.round(percent * 100) });
+      setBranchName(''); setBranchAddress(''); setBranchLat(''); setBranchLng(''); setBranchCommission(''); setMapsLink('');
       setBranchOpen(false);
-      toast.push('success', t('Branch created (inactive until you activate it).', 'تم إنشاء الفرع (غير مفعّل حتى تفعّله).'));
-      await refresh();
+      toast.push('success', t('Branch created. Finish its go-live checklist.', 'تم إنشاء الفرع. أكمل قائمة الجاهزية.'));
+      router.push(`/branches/${created.id}`);
     } catch (err: any) {
       setBranchError(apiErrorMessage(err, t('Failed to create branch.', 'تعذّر إنشاء الفرع.')));
     } finally {
@@ -180,7 +191,18 @@ export default function VendorDetailPage() {
           </div>
           <Badge tone={vendor.isActive ? 'green' : 'gray'}>{vendor.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge>
         </div>
-        <Button variant={vendor.isActive ? 'secondary' : 'primary'} className="min-h-[44px]" onClick={() => setConfirmToggle(true)}>{vendor.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant={vendor.isActive ? 'secondary' : 'primary'} className="min-h-[44px]" onClick={() => setConfirmToggle(true)}>{vendor.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</Button>
+          <DeleteRecordButton
+            size="md"
+            path={`/admin/vendors/${vendor.id}`}
+            name={vendor.name}
+            what={['Store', 'المتجر']}
+            consequence={['All its branches, menus, offers and store staff are switched off with it. Refused while any branch has orders in progress.', 'يتم إيقاف كل فروعه والمنيو والعروض وموظفي المتجر. يُرفض الحذف إذا كان لأي فرع طلبات جارية.']}
+            strong
+            onDeleted={() => router.replace('/vendors')}
+          />
+        </div>
       </div>
       {actionError && <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>}
 
@@ -225,12 +247,22 @@ export default function VendorDetailPage() {
         <form id="vd-branch" onSubmit={handleCreateBranch} className="space-y-3">
           <LabeledInput label={t('Branch name', 'اسم الفرع')} required value={branchName} onChange={(e) => setBranchName(e.target.value)} />
           <LabeledInput label={t('Address', 'العنوان')} required value={branchAddress} onChange={(e) => setBranchAddress(e.target.value)} />
+          <LabeledInput
+            label={t('Location: paste a Google Maps link or "lat, lng"', 'الموقع: الصق رابط خرائط جوجل أو "خط العرض، خط الطول"')}
+            dir="ltr" value={mapsLink} placeholder="https://maps.google.com/?q=30.4170,31.5620"
+            onChange={(e) => { setMapsLink(e.target.value); const p = parseLatLng(e.target.value); if (p) { setBranchLat(String(p.lat)); setBranchLng(String(p.lng)); } }}
+            hint={t('In Google Maps: long-press the shop → copy the coordinates or Share → Copy link.', 'في خرائط جوجل: اضغط مطولًا على المحل ← انسخ الإحداثيات أو مشاركة ← نسخ الرابط.')}
+          />
           <div className="grid grid-cols-2 gap-3">
             <LabeledInput label={t('Latitude', 'خط العرض')} required dir="ltr" inputMode="decimal" value={branchLat} onChange={(e) => setBranchLat(e.target.value)} />
             <LabeledInput label={t('Longitude', 'خط الطول')} required dir="ltr" inputMode="decimal" value={branchLng} onChange={(e) => setBranchLng(e.target.value)} />
           </div>
-          <LabeledInput label={t('Commission rate (basis points)', 'نسبة العمولة (نقطة أساس)')} dir="ltr" inputMode="numeric" placeholder="1500 = 15%" value={branchCommission} onChange={(e) => setBranchCommission(e.target.value)} />
-          <p className="text-xs text-gray-500">{t('The new branch starts inactive. Delivery and pickup default to enabled; adjust them, and assign a marketplace sector, from the branch page.', 'يبدأ الفرع غير مفعّل. التوصيل والاستلام مفعّلان افتراضيًا؛ عدّلهما وحدّد القطاع من صفحة الفرع.')}</p>
+          <LabeledSelect label={t('Service area', 'منطقة الخدمة')} required value={branchAreaId} onChange={(e) => setBranchAreaId(e.target.value)}>
+            <option value="">{t('Choose…', 'اختر…')}</option>
+            {areas.map((a) => <option key={a.id} value={a.id}>{a.nameAr ? `${a.name} — ${a.nameAr}` : a.name}</option>)}
+          </LabeledSelect>
+          <LabeledInput label={t('Hatly commission (%)', 'عمولة هاتلي (%)')} required dir="ltr" inputMode="decimal" placeholder="15" value={branchCommission} onChange={(e) => setBranchCommission(e.target.value)} />
+          <p className="text-xs text-gray-500">{t('The new branch starts inactive and closed. Next, its page shows a go-live checklist: section, menu, staff, hours, then activate and open.', 'يبدأ الفرع غير مفعّل ومغلقًا. ستعرض صفحته قائمة الجاهزية: القسم والمنيو والموظفون والمواعيد ثم التفعيل والفتح.')}</p>
           {branchError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{branchError}</p>}
         </form>
       </Modal>

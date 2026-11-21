@@ -17,6 +17,7 @@ import { fetchAdminChanges } from '../../lib/api/changes';
 import { OpsAlarmBar, OpsAlarmProvider } from '../alerts/OpsAlarm';
 import { forgetThisDevice } from '../../lib/alerts/push-client';
 import { OpsShellContext } from './ops-shell-context';
+import { ChangePasswordModal } from '../account/ChangePasswordModal';
 
 const ICONS: Record<string, ReactNode> = {
   home: <><path d="M3 11l9-7 9 7" /><path d="M5 10v10h14V10" /><path d="M10 20v-6h4v6" /></>,
@@ -115,6 +116,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
 /** The permission-aware sidebar + top bar every Admin page lives in. Navigation visibility is a UX filter; the backend enforces access. */
 export function AdminShell({ children }: { children: ReactNode }) {
   const { t, locale, setLocale } = useLang();
+  const [pwOpen, setPwOpen] = useState(false);
   const perms = usePermissions();
   const router = useRouter();
   const pathname = usePathname();
@@ -253,10 +255,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <button onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')} className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" aria-label={t('Switch to Arabic', 'التبديل إلى الإنجليزية')}>
               {locale === 'ar' ? 'English' : 'العربية'}
             </button>
-            <span className="flex items-center gap-2" title={user?.phone}>
+            <button type="button" onClick={() => setPwOpen(true)} className="flex items-center gap-2 rounded-lg p-0.5 hover:bg-gray-50" title={t('Change my password', 'تغيير كلمة المرور')} aria-label={t('My account — change my password', 'حسابي — تغيير كلمة المرور')}>
               <span aria-hidden className="flex h-9 w-9 items-center justify-center rounded-full bg-hatly-orange text-white shadow-sm"><svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" /></svg></span>
               <span className="hidden min-w-0 leading-tight sm:block"><span className="block max-w-[9rem] truncate text-xs font-medium text-gray-800"><bdi>{user?.fullName ?? user?.phone ?? ''}</bdi></span><span className="block text-[10px] text-gray-400">{perms.role === 'SUPER_ADMIN' ? t('Super admin', 'مدير النظام') : t('Admin', 'مشرف')}</span></span>
-            </span>
+            </button>
+            <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
             {/* Signing out also unregisters this browser from push, so a shared device stops showing this admin's alerts. */}
             <Button variant="ghost" size="sm" onClick={() => forgetThisDevice().finally(() => logout().finally(() => router.replace('/login')))}>{t('Sign out', 'تسجيل الخروج')}</Button>
           </div>

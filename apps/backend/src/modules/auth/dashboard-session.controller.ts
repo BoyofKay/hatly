@@ -17,6 +17,12 @@ import { DASHBOARD_COOKIE, clearCookie, csrfTokenFor, newSessionId, parseCookies
 import { AdminAuditAction, AdminAuditService } from '../audit/admin-audit.service';
 import { StaffMfaService, MFA_ROLES } from './mfa/staff-mfa.service';
 import { UsersService } from '../users/users.service';
+import { IsString, MaxLength, MinLength } from 'class-validator';
+
+class ChangeStaffPasswordDto {
+  @IsString() @MinLength(1) @MaxLength(128) currentPassword: string;
+  @IsString() @MinLength(10) @MaxLength(128) newPassword: string;
+}
 
 const STAFF_ROLES = [Role.VENDOR, Role.VENDOR_MANAGER, Role.ADMIN, Role.SUPER_ADMIN];
 
@@ -111,6 +117,22 @@ export class DashboardSessionController {
     }
     this.clearCookies(req, res);
     return { message: 'Logged out.' };
+  }
+
+  /**
+   * Any signed-in dashboard user (super admin, admin, operations staff, vendor staff) changes their OWN password. The identity is the
+   * session's, never a body field; the current password is required (same per-account brute-force brake as sign-in). The current session
+   * stays signed in; a session elsewhere ends at its next refresh because the account holds one session at a time.
+   */
+  @UseGuards(RolesGuard)
+  @Roles(...STAFF_ROLES)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('password')
+  @HttpCode(HttpStatus.OK)
+  async changePassword(@CurrentUser() current: AuthenticatedUser, @Body() dto: ChangeStaffPasswordDto, @Req() req: Request) {
+    await this.auth.changeStaffPassword(current.id, dto.currentPassword, dto.newPassword);
+    await this.audit.record({ actorUserId: current.id, actorRole: current.role, action: AdminAuditAction.STAFF_PASSWORD_CHANGED, targetType: 'user', targetId: current.id, ipAddress: req.ip });
+    return { message: 'Password changed.' };
   }
 
   /** The signed-in staff member (and a fresh CSRF token) — how the page learns who it is after a reload, without ever seeing a token. */

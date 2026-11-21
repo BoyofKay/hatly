@@ -18,20 +18,13 @@ import {
   ProductCategory,
   activateCategory,
   activateProduct,
-  applyAdminImport,
   createCategory,
   createProduct,
   deactivateCategory,
   deactivateProduct,
-  downloadAdminImportTemplate,
-  ExcelImportApplyResult,
-  ExcelImportValidationSummary,
   listCategories,
   listProducts,
   setProductInventoryToZero,
-  updateCategory,
-  updateProduct,
-  validateAdminImport,
 } from '../../../../lib/api/admin-catalog';
 import { MarketplaceSector, listSectors } from '../../../../lib/api/sectors';
 import { ProductOptionsEditor } from '../../../../components/products/ProductOptionsEditor';
@@ -40,6 +33,11 @@ import { apiErrorMessage } from '../../../../lib/api/errors';
 import { BranchAcceptanceMode } from '../../../../components/operations/BranchAcceptanceMode';
 import { BranchClosures } from '../../../../components/vendor/BranchClosures';
 import { BranchHoursEditor } from '../../../../components/vendor/BranchHoursEditor';
+import { DeleteRecordButton } from '../../../../components/admin/DeleteRecordButton';
+import { MenuImportPanel } from '../../../../components/admin/MenuImportPanel';
+import { BranchReadinessCard } from '../../../../components/admin/BranchReadinessCard';
+import { CategoryEditModal, ProductEditModal } from '../../../../components/admin/CatalogEditModals';
+import { useRouter } from 'next/navigation';
 
 /**
  * Real Branch detail/edit/activate + Sector assignment (reuses the
@@ -55,6 +53,9 @@ export default function BranchDetailPage() {
   const [sectors, setSectors] = useState<MarketplaceSector[]>([]);
   const [serviceAreas, setServiceAreas] = useState<ServiceArea[]>([]);
   const [categories, setCategories] = useState<ProductCategory[] | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingCategory, setEditingCategory] = useState<ProductCategory | null>(null);
+  const router = useRouter();
   const [products, setProducts] = useState<Product[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -81,14 +82,8 @@ export default function BranchDetailPage() {
   const [productPricingUnit, setProductPricingUnit] = useState<'PIECE' | 'WEIGHT'>('PIECE');
   const [productError, setProductError] = useState<string | null>(null);
 
-  // Excel Inventory & Price Management.
+  // Menu import (MenuImportPanel).
   const [showImport, setShowImport] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importSummary, setImportSummary] = useState<ExcelImportValidationSummary | null>(null);
-  const [importResult, setImportResult] = useState<ExcelImportApplyResult | null>(null);
-  const [isValidatingImport, setIsValidatingImport] = useState(false);
-  const [isApplyingImport, setIsApplyingImport] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
 
   async function refresh() {
     setError(null);
@@ -224,15 +219,8 @@ export default function BranchDetailPage() {
     }
   }
 
-  async function handleRenameCategory(category: ProductCategory) {
-    const newName = window.prompt('Category name', category.name);
-    if (!newName || newName === category.name) return;
-    try {
-      await updateCategory(category.id, { name: newName });
-      await refresh();
-    } catch (err: any) {
-      setActionError(apiErrorMessage(err, 'Failed to rename category.'));
-    }
+  function handleRenameCategory(category: ProductCategory) {
+    setEditingCategory(category);
   }
 
   async function handleCreateProduct(e: React.FormEvent) {
@@ -286,77 +274,8 @@ export default function BranchDetailPage() {
     }
   }
 
-  // Excel Inventory & Price Management.
-  async function handleDownloadTemplate(prefilled: boolean) {
-    try {
-      const blob = await downloadAdminImportTemplate(id, prefilled);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'hatly-products-template.xlsx';
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err: any) {
-      setImportError(apiErrorMessage(err, 'Failed to download template.'));
-    }
-  }
-
-  function handleImportFileSelected(file: File | undefined) {
-    setImportFile(file ?? null);
-    setImportSummary(null);
-    setImportResult(null);
-    setImportError(null);
-  }
-
-  async function handleValidateImport() {
-    if (!importFile) return;
-    setIsValidatingImport(true);
-    setImportError(null);
-    setImportSummary(null);
-    try {
-      const summary = await validateAdminImport(importFile);
-      setImportSummary(summary);
-    } catch (err: any) {
-      setImportError(apiErrorMessage(err, 'Failed to validate file.'));
-    } finally {
-      setIsValidatingImport(false);
-    }
-  }
-
-  async function handleApplyImport() {
-    if (!importFile || importSummary?.status !== 'READY') return;
-    setIsApplyingImport(true);
-    setImportError(null);
-    try {
-      const result = await applyAdminImport(importFile);
-      setImportResult(result);
-      setImportSummary(null);
-      setImportFile(null);
-      await refresh();
-    } catch (err: any) {
-      setImportError(apiErrorMessage(err, 'Failed to apply import.'));
-    } finally {
-      setIsApplyingImport(false);
-    }
-  }
-
-  function handleCloseImport() {
-    setShowImport(false);
-    setImportFile(null);
-    setImportSummary(null);
-    setImportResult(null);
-    setImportError(null);
-  }
-
-  async function handleRenameProduct(product: Product) {
-    const newName = window.prompt('Product name', product.name);
-    if (!newName || newName === product.name) return;
-    try {
-      await updateProduct(product.id, { name: newName });
-      await refresh();
-    } catch (err: any) {
-      setActionError(apiErrorMessage(err, 'Failed to rename product.'));
-    }
+  function handleRenameProduct(product: Product) {
+    setEditingProduct(product);
   }
 
   if (error) {
@@ -383,7 +302,8 @@ export default function BranchDetailPage() {
           ))}
         </nav>
       </div>
-      <div className="rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
+      <BranchReadinessCard branchId={branch.id} vendorId={branch.vendorId} refreshKey={`${JSON.stringify(branch)}|${products?.length ?? 0}|${categories?.length ?? 0}`} />
+      <div id="sec-details" className="scroll-mt-16 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{branch.name}</h1>
           <div className="flex items-center gap-2">
@@ -411,6 +331,14 @@ export default function BranchDetailPage() {
             >
               {branch.isActive ? 'Deactivate' : 'Activate'}
             </button>
+            <DeleteRecordButton
+              path={`/admin/vendor-branches/${branch.id}`}
+              name={branch.name}
+              what={['Branch', 'الفرع']}
+              consequence={['Its menu, categories, offers and the staff who work only here are switched off with it. Refused while it has orders in progress.', 'يتم إيقاف المنيو والأقسام والعروض والموظفين الذين يعملون فيه فقط. يُرفض الحذف إذا كان لديه طلبات جارية.']}
+              strong
+              onDeleted={() => router.replace(branch.vendorId ? `/vendors/${branch.vendorId}` : '/branches')}
+            />
           </div>
         </div>
 
@@ -539,6 +467,8 @@ export default function BranchDetailPage() {
                 <button onClick={() => handleToggleCategory(c)} className="text-xs text-gray-500 underline">
                   {c.isActive ? 'Deactivate' : 'Activate'}
                 </button>
+                <button onClick={() => setEditingCategory(c)} className="text-xs text-gray-500 underline">Edit</button>
+                <DeleteRecordButton path={`/admin/product-categories/${c.id}`} name={c.name} what={['Category', 'القسم']} consequence={['Only an empty category can be deleted: move or delete its products first.', 'يمكن حذف القسم الفارغ فقط: انقل منتجاته أو احذفها أولًا.']} onDeleted={refresh} />
               </div>
             </li>
           ))}
@@ -550,7 +480,7 @@ export default function BranchDetailPage() {
           <h2 id="sec-products" className="scroll-mt-16 font-semibold">Products</h2>
           <div className="flex gap-2">
             <button onClick={() => setShowImport((v) => !v)} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-              {showImport ? 'Cancel' : 'Import Excel'}
+              {showImport ? 'Close import' : 'Import menu (Excel)'}
             </button>
             <button onClick={() => setShowProductForm((v) => !v)} className="rounded-lg bg-hatly-orange px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
               {showProductForm ? 'Cancel' : 'New Product'}
@@ -558,82 +488,7 @@ export default function BranchDetailPage() {
           </div>
         </div>
 
-        {showImport && (
-          <div className="mt-3 space-y-3 rounded border p-3">
-            <h3 className="text-sm font-semibold">Import Excel</h3>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => handleDownloadTemplate(true)} className="rounded-lg border px-3 py-1.5 text-xs border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-                Download Current Catalog Template
-              </button>
-              <button onClick={() => handleDownloadTemplate(false)} className="rounded-lg border px-3 py-1.5 text-xs border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-                Download Empty Template
-              </button>
-            </div>
-
-            <input type="file" accept=".xlsx" onChange={(e) => handleImportFileSelected(e.target.files?.[0])} className="text-sm" />
-
-            {importFile && (
-              <button
-                onClick={handleValidateImport}
-                disabled={isValidatingImport}
-                className="rounded-lg bg-hatly-orange px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
-              >
-                {isValidatingImport ? 'Validating…' : 'Validate'}
-              </button>
-            )}
-
-            {importError && <p className="text-xs text-red-600">{importError}</p>}
-
-            {importSummary && (
-              <div className="space-y-2">
-                <p className="text-xs">
-                  Status: <span className="font-semibold">{importSummary.status}</span> — {importSummary.totalRows} rows,{' '}
-                  {importSummary.changedRows} changed, {importSummary.unchangedRows} unchanged
-                </p>
-                <div className="max-h-64 overflow-y-auto rounded border">
-                  <table className="w-full text-xs">
-                    <thead className="bg-gray-50 tracking-wide">
-                      <tr>
-                        <th className="p-1.5 text-left font-medium">Row</th>
-                        <th className="p-1.5 text-left font-medium">Product</th>
-                        <th className="p-1.5 text-left font-medium">Changed Fields</th>
-                        <th className="p-1.5 text-left font-medium">Errors</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {importSummary.rows.map((r) => (
-                        <tr key={r.rowNumber} className={r.errors.length > 0 ? 'bg-red-50' : ''}>
-                          <td className="p-1.5">{r.rowNumber}</td>
-                          <td className="p-1.5">{r.productName ?? r.productId ?? '—'}</td>
-                          <td className="p-1.5">{r.changedFields.join(', ') || '—'}</td>
-                          <td className="p-1.5 text-red-600">{r.errors.join('; ')}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <button
-                  onClick={handleApplyImport}
-                  disabled={importSummary.status !== 'READY' || isApplyingImport}
-                  className="rounded-lg bg-hatly-orange px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
-                >
-                  {isApplyingImport ? 'Applying…' : 'Confirm Apply'}
-                </button>
-              </div>
-            )}
-
-            {importResult && (
-              <p className="rounded bg-green-50 p-2 text-xs text-green-800">
-                Applied: {importResult.totalRows} total rows, {importResult.updatedRows} updated, {importResult.unchangedRows}{' '}
-                unchanged.
-              </p>
-            )}
-
-            <button onClick={handleCloseImport} className="text-xs text-gray-500 underline">
-              Close
-            </button>
-          </div>
-        )}
+        {showImport && <MenuImportPanel branchId={branch.id} branchName={branch.name} onImported={refresh} />}
 
         {showProductForm && (
           <form onSubmit={handleCreateProduct} className="mt-3 space-y-3 rounded border p-3">
@@ -715,6 +570,8 @@ export default function BranchDetailPage() {
                 <button onClick={() => handleToggleProduct(p)} className="text-xs text-gray-500 underline">
                   {p.isAvailable ? 'Deactivate' : 'Activate'}
                 </button>
+                <button onClick={() => setEditingProduct(p)} className="text-xs text-gray-500 underline">Edit</button>
+                <DeleteRecordButton path={`/admin/products/${p.id}`} name={p.name} what={['Product', 'المنتج']} consequence={['It leaves the menu and every customer cart. Past orders keep it.', 'يُزال من المنيو ومن سلال العملاء. تحتفظ الطلبات السابقة به.']} onDeleted={refresh} />
                 {p.inventoryMode === 'TRACKED' && (
                   <button onClick={() => handleSetProductInventoryToZero(p)} className="text-xs text-gray-500 underline">
                     Set Inventory to 0
@@ -734,6 +591,8 @@ export default function BranchDetailPage() {
           ))}
         </ul>
       </div>
+      {editingProduct && <ProductEditModal product={editingProduct} categories={categories ?? []} onClose={() => setEditingProduct(null)} onSaved={async () => { setEditingProduct(null); await refresh(); }} />}
+      {editingCategory && <CategoryEditModal category={editingCategory} onClose={() => setEditingCategory(null)} onSaved={async () => { setEditingCategory(null); await refresh(); }} />}
     </div>
   );
 }

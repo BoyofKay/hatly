@@ -86,6 +86,8 @@ export const AdminAuditAction = {
   PRODUCT_CHANGE_DECIDED: 'product.change_decided',
   DISPATCH_AUTOMATION_CHANGED: 'dispatch.automation_changed',
   /** Generic record of any other privileged (ADMIN / SUPER_ADMIN) mutation — see AdminMutationAuditInterceptor. */
+  /** A staff member changed their own dashboard password (never the password itself). */
+  STAFF_PASSWORD_CHANGED: 'staff.password_changed',
   ADMIN_MUTATION: 'admin.mutation',
 } as const;
 export type AdminAuditActionName = (typeof AdminAuditAction)[keyof typeof AdminAuditAction];

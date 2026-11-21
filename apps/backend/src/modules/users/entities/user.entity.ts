@@ -33,6 +33,10 @@ export class User extends BaseEntity {
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
+  /** Hatly staff hierarchy for ADMIN-role accounts (ADMIN > OPS_SUPERVISOR > OPS_TEAM); null for every other role. See StaffLevels migration. */
+  @Column({ name: 'staff_level', type: 'varchar', length: 20, nullable: true })
+  staffLevel?: 'ADMIN' | 'OPS_SUPERVISOR' | 'OPS_TEAM' | null;
+
   @Column({ name: 'preferred_language', type: 'varchar', length: 5, default: 'ar' })
   preferredLanguage: 'ar' | 'en';
 }

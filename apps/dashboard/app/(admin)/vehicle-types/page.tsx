@@ -1,4 +1,5 @@
 'use client';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 
 import { useCallback, useEffect, useState } from 'react';
 import { VehicleType, createVehicleType, listVehicleTypes, updateVehicleType } from '../../../lib/api/admin-vehicle-types';
@@ -100,6 +101,7 @@ export default function VehicleTypesPage() {
         <span className="inline-flex gap-2">
           <Button size="sm" className="min-h-[36px]" onClick={() => open(v)}>{t('Edit', 'تعديل')}</Button>
           {v.isActive ? <Button size="sm" className="min-h-[36px]" onClick={() => { setRowError(null); setDeactivate(v); }}>{t('Deactivate', 'إيقاف')}</Button> : <Button size="sm" variant="primary" className="min-h-[36px]" loading={busy} onClick={() => void setActive(v, true)}>{t('Activate', 'تفعيل')}</Button>}
+          <DeleteRecordButton path={`/admin/vehicle-types/${v.id}`} name={v.name} what={['Vehicle type', 'نوع المركبة']} consequence={['Refused while any driver uses it.', 'يُرفض إذا كان أي سائق يستخدمه.']} onDeleted={refresh} />
         </span>
       ),
     },

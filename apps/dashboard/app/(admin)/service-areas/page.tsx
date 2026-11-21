@@ -1,4 +1,5 @@
 'use client';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 
 import { useCallback, useEffect, useState } from 'react';
 import { ServiceArea, activateServiceArea, createServiceArea, deactivateServiceArea, listServiceAreas, updateServiceArea } from '../../../lib/api/admin-service-areas';
@@ -99,6 +100,7 @@ export default function ServiceAreasPage() {
           {a.isActive
             ? <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setDeactivate(a); }}>{t('Deactivate', 'إيقاف')}</Button>
             : <Button size="sm" variant="primary" className="min-h-[36px]" loading={busy} onClick={() => void run(() => activateServiceArea(a.id), t('Service area activated.', 'تم تفعيل منطقة الخدمة.'), t('Failed to update service area.', 'تعذّر تحديث منطقة الخدمة.'), () => undefined)}>{t('Activate', 'تفعيل')}</Button>}
+          <DeleteRecordButton path={`/admin/service-areas/${a.id}`} name={a.name} what={['Service area', 'منطقة الخدمة']} consequence={['Only an area with no stores and no delivery zones can be deleted.', 'يمكن حذف المنطقة التي لا تحتوي متاجر ولا مناطق توصيل فقط.']} onDeleted={refresh} />
         </span>
       ),
     },

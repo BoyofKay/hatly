@@ -63,6 +63,43 @@ export const SYSTEM_TEMPLATES: TemplateDef[] = [
     descriptionAr: 'العروض والقسائم والحملات والبث والولاء واللافتات.',
     permissions: [P.MANAGE_OFFERS, P.MANAGE_HOME_BANNERS, P.MANAGE_CAMPAIGNS, P.MANAGE_BROADCASTS, P.MANAGE_LOYALTY_CONFIG, P.MARKETING_VIEW, P.MARKETING_EXPORT, P.MANAGE_MEDIA, P.MEDIA_VIEW, P.VIEW_REPORTS, P.VIEW_CUSTOMERS],
   },
+  // ---- Staff hierarchy presets (2026-11-21): the recommended starting set for each level. Still copied, still editable per person. ----
+  {
+    key: 'OPS_TEAM',
+    nameEn: 'Operations team',
+    nameAr: 'فريق التشغيل',
+    descriptionEn: 'Day-to-day order handling: follow orders, act for a store, assign drivers, open/close stores. No money, no personal data, no settings.',
+    descriptionAr: 'متابعة الطلبات يوميًا: تنفيذ الطلب نيابة عن المتجر وإسناد السائقين وفتح/إغلاق المتاجر. بدون أموال أو بيانات شخصية أو إعدادات.',
+    permissions: [P.VIEW_ORDERS, P.MANAGE_ORDER_FULFILMENT, P.ASSIGN_REASSIGN_ORDERS, P.OPEN_CLOSE_VENDOR_BRANCHES, P.VENDORS_VIEW, P.CATALOG_VIEW, P.FLEET_VIEW, P.VIEW_CUSTOMERS],
+  },
+  {
+    key: 'OPS_SUPERVISOR',
+    nameEn: 'Operations supervisor',
+    nameAr: 'مشرف التشغيل',
+    descriptionEn: 'Everything the operations team does, plus order issues, dispatch overrides, drivers, driver closing, transfer checks, customer contact details, reports, and managing the operations team.',
+    descriptionAr: 'كل ما يفعله فريق التشغيل، بالإضافة إلى مشكلات الطلبات وتجاوز الإسناد والسائقين وتقفيل السائقين ومراجعة التحويلات وبيانات تواصل العملاء والتقارير وإدارة فريق التشغيل.',
+    permissions: [
+      P.VIEW_ORDERS, P.MANAGE_ORDER_FULFILMENT, P.ASSIGN_REASSIGN_ORDERS, P.OPEN_CLOSE_VENDOR_BRANCHES, P.VENDORS_VIEW, P.CATALOG_VIEW, P.FLEET_VIEW, P.VIEW_CUSTOMERS,
+      P.MANAGE_ORDER_ISSUES, P.OVERRIDE_DISPATCH, P.MANAGE_DRIVERS, P.CHANGE_DRIVER_ONLINE_STATUS, P.VIEW_DRIVER_SETTLEMENTS, P.CLOSE_DRIVER_SETTLEMENTS,
+      P.VERIFY_MANUAL_PAYMENTS, P.VIEW_CUSTOMER_PII, P.VIEW_REPORTS, P.ORDERS_EXPORT, P.FLEET_EXPORT, P.MANAGE_STAFF_ACCOUNTS,
+    ],
+  },
+  {
+    key: 'ADMIN_GENERAL',
+    nameEn: 'Admin (general)',
+    nameAr: 'مدير (عام)',
+    descriptionEn: 'Runs the platform: stores, menus, zones, drivers, offers, customers, reports and the staff below them. Commissions, business settings, approvals and the audit trail stay with the super admin.',
+    descriptionAr: 'إدارة المنصة: المتاجر والمنيو والمناطق والسائقون والعروض والعملاء والتقارير والموظفون الأقل منه. العمولات وإعدادات العمل والاعتمادات وسجل التدقيق تبقى مع المدير العام.',
+    permissions: [
+      P.VIEW_ORDERS, P.MANAGE_ORDER_FULFILMENT, P.MANAGE_ORDER_ISSUES, P.ASSIGN_REASSIGN_ORDERS, P.OVERRIDE_DISPATCH, P.OPEN_CLOSE_VENDOR_BRANCHES,
+      P.MANAGE_DRIVERS, P.CHANGE_DRIVER_ONLINE_STATUS, P.MANAGE_DRIVER_VENDOR_PREFERENCES, P.VIEW_DRIVER_SETTLEMENTS, P.CLOSE_DRIVER_SETTLEMENTS,
+      P.MANAGE_VENDORS, P.VENDORS_VIEW, P.MANAGE_VENDOR_STAFF, P.MANAGE_CATALOG, P.CATALOG_VIEW, P.MANAGE_MARKETPLACE_SECTORS, P.MANAGE_SERVICE_AREAS,
+      P.MANAGE_VEHICLE_TYPES, P.MANAGE_OFFERS, P.MANAGE_HOME_BANNERS, P.MARKETING_VIEW, P.MANAGE_MEDIA, P.MEDIA_VIEW, P.FLEET_VIEW, P.CONFIG_VIEW,
+      P.VIEW_CUSTOMERS, P.VIEW_CUSTOMER_PII, P.MANAGE_CUSTOMERS, P.MODERATE_REVIEWS, P.VERIFY_MANUAL_PAYMENTS, P.VIEW_FINANCIALS,
+      P.VIEW_VENDOR_FINANCIAL_REPORTS, P.VIEW_REPORTS, P.VIEW_SYSTEM_HEALTH, P.ORDERS_EXPORT, P.CATALOG_EXPORT, P.FLEET_EXPORT, P.REPORTS_EXPORT,
+      P.MANAGE_STAFF_ACCOUNTS,
+    ],
+  },
   {
     key: 'READ_ONLY',
     nameEn: 'Read-only',

@@ -1,4 +1,6 @@
 'use client';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
+import { OfferEditModal } from '../../../components/admin/OfferEditModal';
 
 import { useEffect, useState } from 'react';
 import { VendorBranch, listVendorBranches } from '../../../lib/api/admin-vendors';
@@ -32,6 +34,7 @@ export default function AdminOffersPage() {
   const [branches, setBranches] = useState<VendorBranch[] | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [offers, setOffers] = useState<Offer[] | null>(null);
+  const [editingOffer, setEditingOffer] = useState<Offer | null>(null);
   const [products, setProducts] = useState<Product[] | null>(null);
   const [categories, setCategories] = useState<ProductCategory[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -444,6 +447,10 @@ export default function AdminOffersPage() {
                   <button onClick={() => handleToggleActive(offer)} className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-hatly-orangeDark hover:bg-gray-50">
                     {offer.isActive ? tl('Deactivate', 'إيقاف') : tl('Activate', 'تفعيل')}
                   </button>
+                  <span className="flex gap-2">
+                    <button onClick={() => setEditingOffer(offer)} className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{tl('Edit', 'تعديل')}</button>
+                    <DeleteRecordButton path={`/admin/offers/${offer.id}`} name={offer.name} what={['Offer', 'العرض']} consequence={['It stops applying at once. Orders that already used it keep their discount.', 'يتوقف تطبيقه فورًا. تحتفظ الطلبات التي استخدمته بخصمها.']} onDeleted={() => refresh(selectedBranchId)} />
+                  </span>
                 </div>
                 <p className="mt-1 text-sm">{mechanismSummary(offer)}</p>
                 <p className="text-xs text-gray-500">
@@ -459,6 +466,7 @@ export default function AdminOffersPage() {
           </div>
         </>
       )}
+      {editingOffer && <OfferEditModal offer={editingOffer} onClose={() => setEditingOffer(null)} onSaved={async () => { setEditingOffer(null); await refresh(selectedBranchId); }} />}
     </div>
   );
 }

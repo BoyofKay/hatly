@@ -10,6 +10,8 @@ import { ProductOptionValue } from './entities/product-option-value.entity';
 import { VendorBranch } from '../vendors/entities/vendor-branch.entity';
 import { VendorsModule } from '../vendors/vendors.module';
 import { UploadsModule } from '../uploads/uploads.module';
+import { MenuImportService } from './menu-import.service';
+import { AdminMenuImportController } from './admin-menu-import.controller';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
 import { AdminProductCategoriesController } from './admin-product-categories.controller';
@@ -29,7 +31,7 @@ import { AdminProductOptionsController, VendorProductOptionsController } from '.
     OffersModule,
     NotificationsModule,
   ],
-  controllers: [
+  controllers: [AdminMenuImportController, 
     ProductsController,
     AdminProductCategoriesController,
     AdminProductsController,
@@ -39,7 +41,7 @@ import { AdminProductOptionsController, VendorProductOptionsController } from '.
     VendorProductOptionsController,
     AdminProductChangeRequestsController,
   ],
-  providers: [ProductsService, VendorProductsService, ProductExcelImportService, ProductOptionsService, ProductChangeRequestsService],
+  providers: [MenuImportService, ProductsService, VendorProductsService, ProductExcelImportService, ProductOptionsService, ProductChangeRequestsService],
   exports: [ProductsService, TypeOrmModule],
 })
 export class ProductsModule {}

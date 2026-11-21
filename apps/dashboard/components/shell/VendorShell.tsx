@@ -9,6 +9,7 @@ import { useLang } from '../../lib/ui/lang';
 import { useVendorOrdersFeed } from '../../lib/vendor/orders-feed';
 import type { VendorOverview } from '../../lib/api/vendor-business';
 import { StaffAlertsBell } from './StaffAlertsBell';
+import { ChangePasswordModal } from '../account/ChangePasswordModal';
 import { vendorHref } from '../../lib/notifications/wording';
 import { fetchVendorChanges } from '../../lib/api/changes';
 
@@ -62,6 +63,7 @@ function Svg({ name, className = 'h-5 w-5' }: { name: string; className?: string
  */
 export function VendorShell({ children, onSignOut }: { children: ReactNode; onSignOut: () => void }) {
   const { t, locale, setLocale } = useLang();
+  const [pwOpen, setPwOpen] = useState(false);
   const pathname = usePathname();
   const { awaitingAcceptance } = useVendorOrdersFeed();
   const overview = useApi<VendorOverview>('/vendor/overview');
@@ -163,6 +165,8 @@ export function VendorShell({ children, onSignOut }: { children: ReactNode; onSi
             <button onClick={() => setLocale(locale === 'ar' ? 'en' : 'ar')} className="rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" aria-label={t('Switch to Arabic', 'التبديل إلى الإنجليزية')}>
               {locale === 'ar' ? 'English' : 'العربية'}
             </button>
+            <button onClick={() => setPwOpen(true)} className="rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-100">{t('Password', 'كلمة المرور')}</button>
+            <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
             <button onClick={onSignOut} className="rounded-lg px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-100">{t('Sign out', 'تسجيل الخروج')}</button>
           </div>
         </header>

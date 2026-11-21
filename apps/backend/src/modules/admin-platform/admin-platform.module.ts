@@ -1,5 +1,12 @@
 import { Module } from '@nestjs/common';
 import { PermissionsModule } from '../permissions/permissions.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from '../users/entities/user.entity';
+import { StaffAccountsController } from './staff/staff-accounts.controller';
+import { StaffAccountsService } from './staff/staff-accounts.service';
+import { AdminRecordsController } from './records/admin-records.controller';
+import { AdminRecordsService } from './records/admin-records.service';
+import { BranchReadinessService } from './records/branch-readiness.service';
 import { UsersModule } from '../users/users.module';
 import { OrdersModule } from '../orders/orders.module';
 import { WalletModule } from '../wallet/wallet.module';
@@ -36,8 +43,8 @@ import { ReportsService } from './reports/reports.service';
  * new tables' own writes (notes, settlement payments, templates, ...).
  */
 @Module({
-  imports: [PermissionsModule, UsersModule, OrdersModule, WalletModule, AuthModule, UploadsModule, HomeProductsModule, BusinessConfigModule],
-  controllers: [ExecutiveController, PermissionTemplatesController, AdminFinanceController, AdminOrderExtrasController, AdminOrderExceptionsController, AdminCustomersExtController, ReportsController, MediaController, MarketingController, CustomerInboxController, DirectoryController, SystemController, TelemetryController, ConfigOverviewController],
-  providers: [ExecutiveService, PermissionTemplatesService, AdminFinanceService, AdminOrderExtrasService, ManualTransferExpiryService, AdminCustomersExtService, ReportsService, MediaService, MarketingService, SystemService, MetricsRecorder, { provide: APP_INTERCEPTOR, useClass: RequestMetricsInterceptor }],
+  imports: [TypeOrmModule.forFeature([User]), PermissionsModule, UsersModule, OrdersModule, WalletModule, AuthModule, UploadsModule, HomeProductsModule, BusinessConfigModule],
+  controllers: [StaffAccountsController, AdminRecordsController, ExecutiveController, PermissionTemplatesController, AdminFinanceController, AdminOrderExtrasController, AdminOrderExceptionsController, AdminCustomersExtController, ReportsController, MediaController, MarketingController, CustomerInboxController, DirectoryController, SystemController, TelemetryController, ConfigOverviewController],
+  providers: [StaffAccountsService, AdminRecordsService, BranchReadinessService, ExecutiveService, PermissionTemplatesService, AdminFinanceService, AdminOrderExtrasService, ManualTransferExpiryService, AdminCustomersExtService, ReportsService, MediaService, MarketingService, SystemService, MetricsRecorder, { provide: APP_INTERCEPTOR, useClass: RequestMetricsInterceptor }],
 })
 export class AdminPlatformModule {}

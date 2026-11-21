@@ -134,7 +134,7 @@ export const NAV: NavGroup[] = [
     items: [
       { href: '/settings', en: 'Settings', ar: 'الإعدادات', perms: ['MANAGE_BUSINESS_CONFIG', 'CONFIG_VIEW'] },
       { href: '/config', en: 'Configuration overview', ar: 'نظرة عامة على الإعدادات', perms: ['MANAGE_BUSINESS_CONFIG', 'CONFIG_VIEW'] },
-      { href: '/users', en: 'Users', ar: 'المستخدمون', superOnly: true },
+      { href: '/users', en: 'Staff & permissions', ar: 'الموظفون والصلاحيات', perms: ['MANAGE_STAFF_ACCOUNTS'] },
       { href: '/access/templates', en: 'Role templates', ar: 'قوالب الأدوار', superOnly: true },
       { href: '/audit-log', en: 'Audit log', ar: 'سجل التدقيق', perms: ['VIEW_AUDIT_LOG'] },
       { href: '/security', en: 'Security', ar: 'الأمان', perms: [] },

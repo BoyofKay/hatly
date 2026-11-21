@@ -190,4 +190,9 @@ export enum Permission {
   MARKETING_EXPORT = 'MARKETING_EXPORT',
   AUDIT_EXPORT = 'AUDIT_EXPORT',
   REPORTS_EXPORT = 'REPORTS_EXPORT',
+  /**
+   * Staff hierarchy (2026-11-21). Create, edit, deactivate, delete and reset the password of staff accounts BELOW the holder's own level
+   * (ADMIN > OPS_SUPERVISOR > OPS_TEAM), and give them permissions the holder already has. SUPER_ADMIN always passes.
+   */
+  MANAGE_STAFF_ACCOUNTS = 'MANAGE_STAFF_ACCOUNTS',
 }

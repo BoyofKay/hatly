@@ -1,4 +1,6 @@
 'use client';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
+import { SimpleEditModal } from '../../../components/admin/SimpleEditModal';
 
 import { useEffect, useState } from 'react';
 import { AdminSector, MANAGE_MARKETPLACE_SECTORS, createSector, listAdminSectors, setSectorActive, setSectorCustomRequests } from '../../../lib/api/admin-sectors';
@@ -29,6 +31,8 @@ export default function SectorsPage() {
   const [slugTouched, setSlugTouched] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [editing, setEditing] = useState<AdminSector | null>(null);
 
   async function refresh() {
     setError(null);
@@ -173,7 +177,7 @@ export default function SectorsPage() {
                     <td className="px-3 py-2"><span className="font-medium text-gray-900">{s.name}</span>{s.nameAr ? <span dir="rtl" className="text-gray-500"> / {s.nameAr}</span> : null}</td>
                     <td className="px-3 py-2 text-gray-500" dir="ltr">{s.slug}</td>
                     <td className="px-3 py-2"><Badge tone={s.isActive ? 'green' : 'gray'}>{s.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge></td>
-                    <td className="px-3 py-2"><button data-testid={`sector-active-toggle-${s.id}`} disabled={!canManage || busyId === s.id} onClick={() => toggleActive(s)} className="min-h-[36px] text-xs font-medium text-hatly-orangeDark hover:underline disabled:opacity-40">{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</button></td>
+                    <td className="px-3 py-2"><button data-testid={`sector-active-toggle-${s.id}`} disabled={!canManage || busyId === s.id} onClick={() => toggleActive(s)} className="min-h-[36px] text-xs font-medium text-hatly-orangeDark hover:underline disabled:opacity-40">{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</button>{canManage && <span className="ms-3 inline-flex gap-2"><Button size="sm" onClick={() => setEditing(s)}>{t('Edit', 'تعديل')}</Button><DeleteRecordButton path={`/admin/sectors/${s.id}`} name={s.name} what={['Section', 'القسم']} consequence={['Only a section with no stores can be deleted: move its stores to another section first.', 'يمكن حذف القسم الذي لا يحتوي متاجر فقط: انقل متاجره أولًا.']} onDeleted={refresh} /></span>}</td>
                     <td className="px-3 py-2"><Switch s={s} testId={`sector-custom-requests-${s.id}`} /></td>
                   </tr>
                 ))}
@@ -191,10 +195,25 @@ export default function SectorsPage() {
                   <span className="text-xs text-gray-600">{t('Custom requests', 'الطلبات المخصصة')}</span>
                   <span className="flex items-center gap-2"><Switch s={s} /><button disabled={!canManage || busyId === s.id} onClick={() => toggleActive(s)} className="min-h-[36px] text-xs font-medium text-hatly-orangeDark disabled:opacity-40">{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</button></span>
                 </div>
+                {canManage && <div className="mt-2 flex gap-2"><Button size="sm" onClick={() => setEditing(s)}>{t('Edit', 'تعديل')}</Button><DeleteRecordButton path={`/admin/sectors/${s.id}`} name={s.name} what={['Section', 'القسم']} onDeleted={refresh} /></div>}
               </li>
             ))}
           </ul>
         </>
+      )}
+      {editing && (
+        <SimpleEditModal
+          title={['Edit section', 'تعديل القسم']}
+          path={`/admin/sectors/${editing.id}`}
+          initial={editing as unknown as Record<string, unknown>}
+          fields={[
+            { key: 'name', label: ['Name (English)', 'الاسم (إنجليزي)'], required: true },
+            { key: 'nameAr', label: ['Name (Arabic)', 'الاسم (عربي)'], dir: 'rtl' },
+            { key: 'sortOrder', label: ['Display order (lowest first)', 'ترتيب العرض (الأقل أولًا)'], kind: 'int' },
+          ]}
+          onClose={() => setEditing(null)}
+          onSaved={async () => { setEditing(null); await refresh(); }}
+        />
       )}
     </div>
   );

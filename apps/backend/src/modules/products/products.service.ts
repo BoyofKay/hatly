@@ -359,10 +359,11 @@ export class ProductsService {
     }
   }
 
-  async adminCreateCategory(dto: CreateProductCategoryDto): Promise<ProductCategory> {
+  async adminCreateCategory(dto: CreateProductCategoryDto, manager?: EntityManager): Promise<ProductCategory> {
     await this.assertBranchExists(dto.vendorBranchId);
-    return this.categoriesRepository.save(
-      this.categoriesRepository.create({
+    const repo = manager ? manager.getRepository(ProductCategory) : this.categoriesRepository;
+    return repo.save(
+      repo.create({
         vendorBranchId: dto.vendorBranchId,
         name: dto.name,
         nameAr: dto.nameAr ?? null,
@@ -413,8 +414,9 @@ export class ProductsService {
     return this.categoriesRepository.save(category);
   }
 
-  private async assertCategoryBelongsToBranch(categoryId: string, vendorBranchId: string): Promise<void> {
-    const category = await this.categoriesRepository.findOne({ where: { id: categoryId } });
+  private async assertCategoryBelongsToBranch(categoryId: string, vendorBranchId: string, manager?: EntityManager): Promise<void> {
+    // `manager`: read inside the caller's transaction, so a category created earlier in that same transaction (menu import) is visible.
+    const category = await (manager ? manager.getRepository(ProductCategory) : this.categoriesRepository).findOne({ where: { id: categoryId } });
     if (!category || category.vendorBranchId !== vendorBranchId) {
       throw new BadRequestException({
         message: 'This category does not belong to the requested vendor branch.',
@@ -425,7 +427,7 @@ export class ProductsService {
 
   async adminCreateProduct(dto: CreateProductDto, opts: { approvalStatus?: Product['approvalStatus']; manager?: EntityManager } = {}): Promise<Product> {
     await this.assertBranchExists(dto.vendorBranchId);
-    await this.assertCategoryBelongsToBranch(dto.categoryId, dto.vendorBranchId);
+    await this.assertCategoryBelongsToBranch(dto.categoryId, dto.vendorBranchId, opts.manager);
 
     const { inventoryMode, quantity } = this.resolveInventoryFieldsForCreate(dto.inventoryMode, dto.quantity);
 
@@ -487,7 +489,7 @@ export class ProductsService {
     const product = await this.adminGetProduct(id, manager);
 
     if (dto.categoryId !== undefined) {
-      await this.assertCategoryBelongsToBranch(dto.categoryId, product.vendorBranchId);
+      await this.assertCategoryBelongsToBranch(dto.categoryId, product.vendorBranchId, manager);
       product.categoryId = dto.categoryId;
     }
     if (dto.name !== undefined) product.name = dto.name;

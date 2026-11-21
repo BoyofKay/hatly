@@ -1,4 +1,6 @@
 'use client';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
+import { SimpleEditModal } from '../../../components/admin/SimpleEditModal';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -51,6 +53,7 @@ function AdminDriversScreen() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [fullName, setFullName] = useState('');
+  const [editingDriver, setEditingDriver] = useState<{ id: string; fullName: string; phone: string } | null>(null);
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -283,6 +286,8 @@ function AdminDriversScreen() {
                     <div className="flex flex-wrap gap-2">
                       {d.verificationStatus !== 'APPROVED' && <Button variant="primary" size="sm" className="min-h-[40px]" onClick={() => { setVerifyError(null); setVerifying({ driver: d, status: 'APPROVED' }); }}>{t('drvApprove')}</Button>}
                       {d.verificationStatus !== 'REJECTED' && <Button size="sm" className="min-h-[40px]" onClick={() => { setVerifyError(null); setVerifying({ driver: d, status: 'REJECTED' }); }}>{t('drvReject')}</Button>}
+                      <Button size="sm" className="min-h-[40px]" onClick={() => setEditingDriver({ id: d.id, fullName: d.fullName, phone: d.phone })}>{tl('Edit details', 'تعديل البيانات')}</Button>
+                      <DeleteRecordButton path={`/admin/drivers/${d.id}`} name={d.fullName} what={['Driver', 'السائق']} consequence={['They are signed out of the driver app and cannot sign in again. Refused while they have deliveries in progress. Their past deliveries and settlements stay.', 'سيتم تسجيل خروجه من تطبيق السائق ولن يستطيع الدخول. يُرفض إذا كان لديه توصيلات جارية. تبقى توصيلاته وتسوياته السابقة.']} onDeleted={refresh} />
                     </div>
                   )}
 
@@ -371,6 +376,19 @@ function AdminDriversScreen() {
         onConfirm={confirmVerification}
         onClose={() => setVerifying(null)}
       />
+      {editingDriver && (
+        <SimpleEditModal
+          title={['Edit driver', 'تعديل السائق']}
+          path={`/admin/drivers/${editingDriver.id}/profile`}
+          initial={editingDriver}
+          fields={[
+            { key: 'fullName', label: ['Full name', 'الاسم الكامل'], required: true },
+            { key: 'phone', label: ['Phone (sign-in)', 'الهاتف (للدخول)'], kind: 'phone', required: true, hint: ['Changing it signs the driver out.', 'تغييره يُخرج السائق من التطبيق.'] },
+          ]}
+          onClose={() => setEditingDriver(null)}
+          onSaved={async () => { setEditingDriver(null); await refresh(); }}
+        />
+      )}
     </div>
   );
 }
