@@ -59,6 +59,7 @@ test.describe('Vendor — product options', () => {
 
       // adding a value is sent to Hatly
       await card.getByTestId('option-value-name').fill('Family');
+      await card.getByTestId('option-value-name-ar').fill('عائلي');
       await card.getByTestId('option-value-price').fill('12');
       await card.getByTestId('option-value-add').click();
       await expect(card.getByTestId('option-group-error')).toContainText('Sent to Hatly for approval');
@@ -66,11 +67,13 @@ test.describe('Vendor — product options', () => {
 
       // a duplicate name is refused by the SERVER at once and the message is shown
       await card.getByTestId('option-value-name').fill('small');
+      await card.getByTestId('option-value-name-ar').fill('صغير');
       await card.getByTestId('option-value-add').click();
       await expect(card.getByTestId('option-group-error')).toContainText(/already has a value/i);
 
       // a price that is not an amount never reaches the server
       await card.getByTestId('option-value-name').fill('Weird');
+      await card.getByTestId('option-value-name-ar').fill('غريب');
       await card.getByTestId('option-value-price').fill('abc');
       await card.getByTestId('option-value-add').click();
       await expect(card.getByTestId('option-group-error')).toContainText('Enter the price in EGP');

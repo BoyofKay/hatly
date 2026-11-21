@@ -605,9 +605,9 @@ export default function BranchDetailPage() {
                 <button onClick={() => handleRenameProduct(p)} className="text-left font-medium hover:underline">
                   {p.name}
                 </button>
+                {p.nameAr ? <span className="ms-2 text-gray-600"><bdi dir="rtl">{p.nameAr}</bdi></span> : <span className="ms-2 rounded bg-amber-50 px-1.5 text-xs text-amber-700">no Arabic name</span>}
                 <p className="text-xs text-gray-500">
-                  {categoryName_(p.categoryId)} &middot; {(p.priceMinor / 100).toFixed(2)}
-                  {p.pricingUnit === 'WEIGHT' ? ' / kg' : ''} &middot; {p.pricingUnit}
+                  {categoryName_(p.categoryId)} &middot; {(p.priceMinor / 100).toFixed(2)} EGP {p.pricingUnit === 'WEIGHT' ? 'per kg' : 'per piece'}
                 </p>
               </div>
               <div className="flex items-center gap-2">

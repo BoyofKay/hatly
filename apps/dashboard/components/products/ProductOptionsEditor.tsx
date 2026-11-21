@@ -111,6 +111,7 @@ function GroupCard({
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [valueName, setValueName] = useState('');
+  const [valueNameAr, setValueNameAr] = useState('');
   const [valuePrice, setValuePrice] = useState('');
 
   async function run(action: () => Promise<void>) {
@@ -132,7 +133,7 @@ function GroupCard({
         <div>
           <p className="text-sm font-medium">
             {group.name}
-            {group.nameAr ? <span dir="rtl" className="text-gray-500"> / {group.nameAr}</span> : null}
+            {group.nameAr ? <span className="text-gray-500"> / <bdi dir="rtl">{group.nameAr}</bdi></span> : null}
           </p>
           <p data-testid="option-group-summary" className="text-xs text-gray-500">
             {describe(group)}
@@ -171,15 +172,18 @@ function GroupCard({
           e.preventDefault();
           const price = valuePrice.trim() === '' ? 0 : parseSignedEgpToMinor(valuePrice);
           if (!valueName.trim()) return setError('Enter a value name.');
+          if (!valueNameAr.trim()) return setError('Enter the Arabic name too (الاسم بالعربي).');
           if (price === null) return setError('Enter the price in EGP, e.g. 5, 5.50 or -2.');
           run(async () => {
-            onChanged(await addOptionValue(scope, group.id, { name: valueName.trim(), priceDeltaMinor: price }));
+            onChanged(await addOptionValue(scope, group.id, { name: valueName.trim(), nameAr: valueNameAr.trim(), priceDeltaMinor: price }));
             setValueName('');
+            setValueNameAr('');
             setValuePrice('');
           });
         }}
       >
-        <input data-testid="option-value-name" value={valueName} onChange={(e) => setValueName(e.target.value)} placeholder="New value" className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+        <input data-testid="option-value-name" value={valueName} onChange={(e) => setValueName(e.target.value)} placeholder="New value (English)" className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+        <input data-testid="option-value-name-ar" dir="rtl" value={valueNameAr} onChange={(e) => setValueNameAr(e.target.value)} placeholder="الاسم بالعربي" className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
         <input data-testid="option-value-price" value={valuePrice} onChange={(e) => setValuePrice(e.target.value)} placeholder="Price EGP (0)" className="w-28 rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
         <button data-testid="option-value-add" type="submit" disabled={busy} className="rounded-lg bg-hatly-orange px-2 py-1 text-xs text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
           Add value
@@ -233,7 +237,7 @@ function ValueRow({
     <li data-testid={`option-value-${value.id}`} className="flex items-center justify-between text-xs">
       <span>
         {value.name}
-        {value.nameAr ? <span dir="rtl" className="text-gray-500"> / {value.nameAr}</span> : null}
+        {value.nameAr ? <span className="text-gray-500"> / <bdi dir="rtl">{value.nameAr}</bdi></span> : null}
       </span>
       {editing ? (
         <span className="flex items-center gap-1">
