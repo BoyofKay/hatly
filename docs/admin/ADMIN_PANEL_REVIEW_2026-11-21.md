@@ -64,7 +64,7 @@ Gaps found: commission optional (orders then record **zero** commission, never b
 Fixes: **Go-live checklist** at the top of every branch page (9 must-fix + 6 recommended checks with links); new-branch form requires area and commission %, accepts a Maps link, and opens the branch page afterwards.
 
 ## 6. Clearing test data (point 8) — **script ready, you run it**
-`deploy/production/reset-test-orders-and-drivers.sh` + `.sql`. Removes every order up to a cutoff time and everything attached to it, and every driver (accounts switched off, phones freed); keeps customers, stores, menus, settings; resets sales counters, ratings and offer usage. Dry run by default; stops if any order is newer than the cutoff; asks you to type DELETE. Tested end to end (e2e 143).
+`deploy/production/reset-test-orders-and-drivers.sh` + `.sql`. Removes every order up to a cutoff time and everything attached to it, and every driver (accounts switched off, phones freed); keeps customers, stores, menus, settings; resets sales counters, ratings and offer usage. Dry run by default; stops if any order is newer than the cutoff; asks you to type DELETE. Tested end to end (e2e 147).
 I cannot reach the production server from here, and production must only be changed by you:
 ```
 ./prod.sh backup                       # copy the dump off the server
@@ -110,5 +110,8 @@ Suggested shift routine: supervisor opens **Orders › Operations board** at shi
 - Push/SMS providers, the open money decisions (§0), zone names and fees on the ground (§7), running the reset (§6).
 - Local test note: the package `xlsx` downloads from `cdn.sheetjs.com`; this cloud session's network blocks that host, so tests here used the npm build of the same library. Production builds are unaffected.
 
-## 10. Tests
-New end-to-end tests: `140-staff-accounts` (12), `141-admin-safe-delete` (11), `142-menu-import` (7), `143-reset-test-orders-script` (4); dashboard unit test for the Maps-link reader. Backend unit suite 2,488/2,488 green. Full e2e and browser click-throughs (staff creation, menu import with photo, password change in Arabic) — see the final results in the session report.
+## 10. Tests (all green on the final code)
+- New backend end-to-end tests: `144-staff-accounts` (12), `145-admin-safe-delete` (11, incl. the go-live checklist), `146-menu-import` (7), `147-reset-test-orders-script` (4).
+- Full backend suites: unit 2,488/2,488; end-to-end 95 files / 1,212 tests (the 4 files that first failed were caused by a duplicate offer-edit route, removed; re-run green).
+- Dashboard: type check, unit tests 59/59, production build; browser tests for Staff & permissions (create → permissions → delete) and the admin menu (17/17).
+- Manual browser click-through on a local copy: create a supervisor, import a menu .zip with a photo and options, supervisor sees only their levels, password change in Arabic.

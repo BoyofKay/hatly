@@ -21,7 +21,7 @@
 --   1) ./prod.sh backup                                                     (and copy the dump off the server)
 --   2) ./reset-test-orders-and-drivers.sh "2026-11-21 23:59:59+02"          DRY RUN: read the BEFORE / AFTER numbers
 --   3) ./reset-test-orders-and-drivers.sh "2026-11-21 23:59:59+02" apply    asks you to type DELETE, then commits
---   Tested end to end: apps/backend/test/e2e/143-reset-test-orders-script.e2e-spec.ts
+--   Tested end to end: apps/backend/test/e2e/147-reset-test-orders-script.e2e-spec.ts
 -- =====================================================================================================================================
 \set ON_ERROR_STOP on
 \if :{?cutoff}
