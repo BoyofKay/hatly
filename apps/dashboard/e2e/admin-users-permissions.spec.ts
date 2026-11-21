@@ -2,75 +2,62 @@ import { test, expect } from '@playwright/test';
 import { SUPER_ADMIN_STORAGE_STATE, VENDOR_A_STORAGE_STATE } from './env';
 
 /**
- * M3b (Launch-Readiness Gap Audit, G-08) — Admin Users & Permissions.
- *
- * LIMITATION (documented, not silently skipped — see the task's own
- * "do not create fake test architecture" instruction): a real
- * grant/revoke mutation needs a second ADMIN-role account to target,
- * and there is genuinely no HTTP-level way to create one anywhere in
- * this product — the backend's OWN e2e suite creates its ADMIN/
- * SUPER_ADMIN fixtures via a direct `dataSource.getRepository(User).
- * save(...)` insert (see `test/e2e/support/actors.ts`'s own
- * `insertStaffUser`), which this Playwright suite's `global-setup.ts`
- * deliberately never does (its own top comment: "through the REAL
- * backend HTTP API... no direct database writes, no shortcuts").
- * Adding direct DB access here just for this one page would be new,
- * parallel test infrastructure of exactly the kind the task says not
- * to build. What IS safely and meaningfully covered below: the page
- * loads with the real SUPER_ADMIN roster, the real permission catalog
- * renders, SUPER_ADMIN's own row correctly has no individual
- * grant/revoke controls (it isn't a valid grant target at all — the
- * backend's own `assertGrantableRole` rejects it), and a non-
- * SUPER_ADMIN session (the existing Vendor A fixture) cannot reach
- * this page's data.
+ * Staff & permissions (2026-11-21) — Super admin > Admin > Operations supervisor > Operations team, over real HTTP.
+ * Staff accounts can now be created through the product itself (`POST admin/staff`), so the full flow is exercised with an account this
+ * test creates and deletes again: create from a preset, see it listed with its level, change its permissions, delete it.
  */
-test.describe('Admin Users & Permissions', () => {
+test.describe('Staff & permissions', () => {
   test.use({ storageState: SUPER_ADMIN_STORAGE_STATE });
 
-  test('loads the real admin roster and the real permission catalog, over real HTTP', async ({ page }) => {
-    const usersResponse = page.waitForResponse((res) => res.url().endsWith('/admin/users') && res.request().method() === 'GET');
-    const catalogResponse = page.waitForResponse((res) => res.url().endsWith('/admin/permissions') && res.request().method() === 'GET');
+  test('loads the real staff list, never carries a password hash, and the super admin card has no manage controls', async ({ page }) => {
+    const staff = page.waitForResponse((res) => res.url().endsWith('/admin/staff') && res.request().method() === 'GET');
     await page.goto('/users');
-
-    const [usersRes, catalogRes] = await Promise.all([usersResponse, catalogResponse]);
-    expect(usersRes.ok()).toBe(true);
-    expect(catalogRes.ok()).toBe(true);
-
-    const usersBody = await usersRes.json();
-    expect(Array.isArray(usersBody.data)).toBe(true);
-    expect(usersBody.data.some((u: any) => u.role === 'SUPER_ADMIN')).toBe(true);
-    // The real DTO never carries a password hash — asserted directly on the wire response, not just the DOM.
-    expect(usersBody.data.every((u: any) => u.passwordHash === undefined)).toBe(true);
-
-    await expect(page.getByRole('heading', { name: 'Admin Users & Permissions' })).toBeVisible();
+    const body = await (await staff).json();
+    expect(body.data.some((u: any) => u.level === 'SUPER_ADMIN')).toBe(true);
+    expect(JSON.stringify(body)).not.toMatch(/passwordHash|password_hash/);
+    expect(body.meta.creatableLevels).toEqual(['ADMIN', 'OPS_SUPERVISOR', 'OPS_TEAM']);
+    await expect(page.getByRole('heading', { name: 'Staff & permissions' })).toBeVisible();
+    await expect(page.getByText('Has every permission by role.').first()).toBeVisible();
   });
 
-  test('a SUPER_ADMIN row shows no individual grant/revoke controls — it is not a valid grant target', async ({ page }) => {
+  test('create an operations team member from the preset, edit its permissions, then delete it', async ({ page }) => {
+    const phone = `+2010${String(Date.now()).slice(-8)}`;
     await page.goto('/users');
-    await expect(page.getByText('SUPER_ADMIN has every capability by role')).toBeVisible();
-  });
+    await page.getByRole('button', { name: 'Add staff member' }).click();
+    const form = page.getByRole('dialog');
+    await form.getByLabel('Full name').fill('E2E Team Member');
+    await form.getByLabel('Phone (sign-in)').fill(phone);
+    await form.getByLabel('Level').selectOption('OPS_TEAM');
+    const create = form.getByRole('button', { name: 'Create account' });
+    await form.getByLabel('First password').fill('short');
+    await expect(create).toBeDisabled(); // the password rule is checked before sending
+    await form.getByLabel('First password').fill('E2E-Team-Pass-1');
+    await create.click();
 
-  test('the empty-catalog-selection Grant button stays disabled until a permission is actually chosen (no accidental no-op submit)', async ({ page }) => {
-    await page.goto('/users');
-    // If any ADMIN-tier (non-SUPER_ADMIN) row exists in this dev database, its Grant button must be
-    // disabled before a permission is picked from the dropdown — proven generically, not against a
-    // fixture this suite invented.
-    const grantButtons = page.getByRole('button', { name: 'Grant' });
-    const count = await grantButtons.count();
-    for (let i = 0; i < count; i++) {
-      await expect(grantButtons.nth(i)).toBeDisabled();
-    }
+    const card = page.getByTestId('staff-card').filter({ hasText: 'E2E Team Member' });
+    await expect(card).toBeVisible();
+    await expect(card.getByText('Operations team')).toBeVisible();
+    await expect(card.getByText('VIEW_ORDERS')).toBeVisible();
+
+    await card.getByRole('button', { name: 'Permissions' }).click();
+    const perms = page.getByRole('dialog');
+    await perms.getByRole('button', { name: 'Clear all' }).click();
+    await perms.getByRole('checkbox', { name: 'FLEET_VIEW' }).check();
+    await perms.getByRole('button', { name: 'Save permissions' }).click();
+    await expect(card.getByText('1 permission(s)')).toBeVisible();
+
+    await card.getByRole('button', { name: 'Delete' }).click();
+    const confirm = page.getByRole('dialog');
+    await confirm.getByLabel('Type "DELETE" to confirm').fill('DELETE');
+    await confirm.getByRole('button', { name: 'Delete' }).click();
+    await expect(card).toHaveCount(0);
   });
 });
 
-test.describe('Admin Users & Permissions — unauthorized access', () => {
+test.describe('Staff & permissions — unauthorized access', () => {
   test.use({ storageState: VENDOR_A_STORAGE_STATE });
 
-  test('a non-admin session (Vendor Manager) is redirected away by the Admin route group\'s own guard before the page ever loads', async ({ page }) => {
-    // Client-side UX only (per AdminLayout's own comment) — the REAL boundary is proven separately,
-    // at the HTTP level, by the backend e2e authorization suite (RolesGuard/SUPER_ADMIN-only on
-    // GET admin/users and GET admin/permissions — see 20-authorization.e2e-spec.ts). This proves the
-    // dashboard's own first line of defense also works, not that it's the only one.
+  test('a store (vendor) session is sent away by the Admin route group before the page loads', async ({ page }) => {
     await page.goto('/users');
     await expect(page).toHaveURL(/\/login$/);
   });

@@ -14,7 +14,7 @@ test.describe('Admin navigation', () => {
   // The reference's flat menu: each page is reached by its sidebar section, then (when the section has several pages) its tab.
   const expectedLinks: Array<{ name: string; href: string; section: string; more?: boolean }> = [
     { name: 'Sectors', href: '/sectors', section: 'Categories' },
-    { name: 'Users', href: '/users', section: 'Settings' },
+    { name: 'Staff & permissions', href: '/users', section: 'Settings' },
     { name: 'Stores now', href: '/stores-now', section: 'Orders' },
     { name: 'Control Tower', href: '/control-tower', section: 'Orders', more: true },
     { name: 'Alerts', href: '/alerts', section: 'Orders', more: true },
