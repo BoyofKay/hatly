@@ -8,7 +8,6 @@ import { ProductCategory } from '../products/entities/product-category.entity';
 import { DiscountType } from './discount-type.enum';
 import { OfferMechanism } from './offer-mechanism.enum';
 import { CreateOfferDto } from './dto/create-offer.dto';
-import { UpdateOfferDto } from './dto/update-offer.dto';
 
 /**
  * FINAL DECISION: Admin-only (no Vendor-facing Offer endpoint or
@@ -168,48 +167,6 @@ export class AdminOffersService {
    * mechanism are not accepted... do not leave ambiguous combinations
    * without validation."
    */
-  /**
-   * Edit an offer (owner request 2026-11-21). What can change: the name, the discount amounts of its own mechanism, the limits/budget, and
-   * the end date — moved EARLIER only (or to any time while the offer has not started yet), so an edit can never create a new overlap
-   * with an offer of the other mechanism. The store, mechanism, targets, start date and coupon code stay fixed: to change those, create a new
-   * offer and delete this one. Orders already placed keep their recorded discount (nothing here touches order snapshots or consumptions).
-   */
-  async update(id: string, dto: UpdateOfferDto): Promise<Offer> {
-    return this.dataSource.transaction(async (manager) => {
-      const offer = await manager.findOne(Offer, { where: { id } });
-      if (!offer) throw new NotFoundException('Offer not found.');
-      const isSubtotal = offer.mechanism === OfferMechanism.SUBTOTAL_DISCOUNT;
-      const wrongField = isSubtotal
-        ? dto.specialPriceMinor !== undefined
-        : dto.discountValue !== undefined || dto.minimumEligibleSubtotalMinor !== undefined || dto.maximumDiscountMinor !== undefined;
-      if (wrongField) {
-        throw new BadRequestException({ message: 'That field does not apply to this kind of offer.', details: { code: 'FIELD_NOT_FOR_MECHANISM' } });
-      }
-      if (isSubtotal && dto.discountValue !== undefined && offer.discountType === DiscountType.PERCENTAGE && dto.discountValue > 10000) {
-        throw new BadRequestException({ message: 'A percentage discount cannot exceed 100% (10000 basis points).', details: { code: 'INVALID_DISCOUNT_VALUE' } });
-      }
-      if (dto.endAt !== undefined) {
-        const newEnd = new Date(dto.endAt);
-        if (newEnd <= offer.startAt) throw new BadRequestException({ message: 'The end must be after the start.', details: { code: 'INVALID_VALIDITY_WINDOW' } });
-        const started = offer.startAt <= new Date();
-        if (started && newEnd > offer.endAt) {
-          throw new BadRequestException({ message: 'A running offer can be shortened, not extended. Create a new offer to run longer.', details: { code: 'OFFER_EXTENSION_NOT_ALLOWED' } });
-        }
-        offer.endAt = newEnd;
-      }
-      if (dto.name !== undefined) offer.name = dto.name;
-      if (dto.discountValue !== undefined) offer.discountValue = dto.discountValue;
-      if (dto.minimumEligibleSubtotalMinor !== undefined) offer.minimumEligibleSubtotalMinor = dto.minimumEligibleSubtotalMinor;
-      if (dto.maximumDiscountMinor !== undefined) offer.maximumDiscountMinor = dto.maximumDiscountMinor;
-      if (dto.specialPriceMinor !== undefined) offer.specialPriceMinor = dto.specialPriceMinor;
-      if (dto.perOrderLimit !== undefined) offer.perOrderLimit = dto.perOrderLimit;
-      if (dto.perCustomerLifetimeLimit !== undefined) offer.perCustomerLifetimeLimit = dto.perCustomerLifetimeLimit;
-      if (dto.totalAllocationLimit !== undefined) offer.totalAllocationLimit = dto.totalAllocationLimit;
-      if (dto.budgetCapMinor !== undefined) offer.budgetCapMinor = dto.budgetCapMinor;
-      return manager.save(Offer, offer);
-    });
-  }
-
   private assertMechanismFieldsValid(dto: CreateOfferDto): void {
     if (dto.mechanism === OfferMechanism.SUBTOTAL_DISCOUNT) {
       if (dto.discountType === undefined || dto.discountValue === undefined) {

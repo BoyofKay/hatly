@@ -4,7 +4,6 @@ import { RequiresPermission } from '../permissions/decorators/requires-permissio
 import { Permission } from '../permissions/permission.enum';
 import { AdminOffersService } from './admin-offers.service';
 import { CreateOfferDto } from './dto/create-offer.dto';
-import { UpdateOfferDto } from './dto/update-offer.dto';
 
 /**
  * FINAL DECISION: Admin manages Offers; Vendors/Vendor Staff never do
@@ -46,12 +45,6 @@ export class AdminOffersController {
   async getOne(@Param('id') id: string) {
     const offer = await this.adminOffersService.getOne(id);
     return { data: offer };
-  }
-
-  @Patch(':id')
-  @RequiresPermission(Permission.MANAGE_OFFERS)
-  async update(@Param('id') id: string, @Body() dto: UpdateOfferDto) {
-    return { data: await this.adminOffersService.update(id, dto) };
   }
 
   @Patch(':id/activate')

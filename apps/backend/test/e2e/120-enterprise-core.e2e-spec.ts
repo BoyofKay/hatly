@@ -48,9 +48,9 @@ describe('E2E — Enterprise Admin core (templates, KPIs, cancel, settlements, l
   });
 
   describe('permission templates', () => {
-    it('lists the six system templates; none contains an approver or dangerous permission', async () => {
+    it('lists the nine system templates (incl. the staff-level presets); none contains an approver or dangerous permission', async () => {
       const res = expectData<any[]>(await get(superAdmin, '/admin/permission-templates'));
-      expect(res.map((t) => t.key).sort()).toEqual(['CATALOG', 'FINANCE', 'MARKETING', 'OPERATIONS', 'READ_ONLY', 'SUPPORT']);
+      expect(res.map((t) => t.key).sort()).toEqual(['ADMIN_GENERAL', 'CATALOG', 'FINANCE', 'MARKETING', 'OPERATIONS', 'OPS_SUPERVISOR', 'OPS_TEAM', 'READ_ONLY', 'SUPPORT']);
       const forbidden = [Permission.CAMPAIGN_APPROVE, Permission.BROADCAST_APPROVE, Permission.WALLET_ADJUST_APPROVE, Permission.APPROVE_SETTLEMENT_OVERPAYMENT, Permission.MEDIA_DELETE, Permission.AUDIT_EXPORT, Permission.VIEW_AUDIT_LOG, Permission.MANAGE_BUSINESS_CONFIG, Permission.MANAGE_VENDORS];
       for (const t of SYSTEM_TEMPLATES) for (const p of forbidden) expect(t.permissions).not.toContain(p);
     });

@@ -131,7 +131,7 @@ describe('E2E — admin safe delete and edit', () => {
     expect(await listed('/admin/vendor-staff', row.id)).toBe(false);
   });
 
-  it('an offer is edited (name, shortened end; extending a running offer is refused), then deleted', async () => {
+  it('an offer is renamed (rules stay locked), then deleted', async () => {
     const vendor = await s.vendor({ serviceAreaId: area.id, lat: area.lat, lng: area.lng });
     const start = new Date(Date.now() - 3600_000).toISOString();
     const end = new Date(Date.now() + 7 * 86400_000).toISOString();
@@ -139,13 +139,9 @@ describe('E2E — admin safe delete and edit', () => {
       await api('post', '/admin/offers', { vendorBranchId: vendor.branchId, name: 'Ten off', mechanism: 'SUBTOTAL_DISCOUNT', discountType: 'PERCENTAGE', discountValue: 1000, startAt: start, endAt: end }),
       201,
     );
-    const shorter = new Date(Date.now() + 2 * 86400_000).toISOString();
-    const edited = expectData<any>(await api('patch', `/admin/offers/${offer.id}`, { name: 'Ten percent off', endAt: shorter, discountValue: 1500 }));
-    expect(edited.name).toBe('Ten percent off');
-    expect(edited.discountValue).toBe(1500);
-    const longer = new Date(Date.now() + 30 * 86400_000).toISOString();
-    expect((await api('patch', `/admin/offers/${offer.id}`, { endAt: longer })).status).toBe(400);
-    expect((await api('patch', `/admin/offers/${offer.id}`, { specialPriceMinor: 100 })).status).toBe(400);
+    // edits go through the existing marketing endpoint (name / dates / limits; discount rules only via clone)
+    expect((await api('patch', `/admin/offers/${offer.id}`, { name: 'Ten percent off' })).status).toBe(200);
+    expect((await api('patch', `/admin/offers/${offer.id}`, { discountValue: 1500 })).status).toBe(400);
     expect((await api('delete', `/admin/offers/${offer.id}`)).status).toBe(200);
     expect(await listed('/admin/offers', offer.id)).toBe(false);
   });
