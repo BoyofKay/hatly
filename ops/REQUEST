@@ -1,3 +1,2 @@
-ACTION=status
+ACTION=deploy
 ARG=
-# run 2
