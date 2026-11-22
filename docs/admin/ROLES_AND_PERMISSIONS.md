@@ -71,6 +71,33 @@ The presets are the recommended starting point — the super admin (or an admin,
 | Reports; order and fleet exports | — | ✓ | ✓ | ✓ | VIEW_REPORTS, ORDERS_EXPORT, FLEET_EXPORT |
 | Catalog, report and finance exports | — | — | ✓ | ✓ | CATALOG_EXPORT, REPORTS_EXPORT, FINANCE_EXPORT |
 
+## Reports, executive dashboard, financial reports
+Every report checks its own permissions, and **money columns are hidden** from anyone without the financial permission (they see counts, not amounts).
+
+| Page / report | Team | Supervisor | Admin | Super |
+|---|:-:|:-:|:-:|:-:|
+| Operations board, Home, order alerts | ✓ | ✓ | ✓ | ✓ |
+| **Reports** — operations, sales, customers, catalog, fleet (counts) | — | ✓ | ✓ | ✓ |
+| Same reports **with money amounts** (GMV, revenue, values) | — | — | ✓ | ✓ |
+| **Executive dashboard** — KPIs, trends, SLA (counts) | — | ✓ | ✓ | ✓ |
+| Executive dashboard **money KPIs** (GMV, revenue) | — | — | ✓ | ✓ |
+| Driver settlement reports | — | ✓ | ✓ | ✓ |
+| **Financial reports** — ledger, revenue, receivables, liabilities, reconciliation, finance report family | — | — | ✓ | ✓ |
+| Store financial reports | — | — | ✓ | ✓ |
+| Security / audit reports | — | — | — | ✓ |
+
+Permissions behind it: reports and the executive dashboard need VIEW_REPORTS; money needs VIEW_FINANCIALS (store figures: VIEW_VENDOR_FINANCIAL_REPORTS; driver figures: VIEW_DRIVER_SETTLEMENTS); audit needs VIEW_AUDIT_LOG.
+
+## Who creates whom (top-down only)
+| Creator | Can create | Cannot create |
+|---|---|---|
+| **Super admin** | admins, supervisors, operations team; store staff; drivers | another super admin (only from the server setup) |
+| **Admin** | supervisors, operations team; store staff; drivers | admins (same level), super admins |
+| **Supervisor** | operations team | supervisors (same level) and above; store staff; drivers |
+| **Operations team** | nobody | — |
+
+The same rule applies to editing, resetting a password, deactivating and deleting a staff account: only accounts **below** your own level, never your own account, and only with permissions you hold yourself. Enforced by the server and covered by the e2e test `144-staff-accounts`.
+
 ## Staff and system
 | Action | Team | Supervisor | Admin | Super | Permission |
 |---|:-:|:-:|:-:|:-:|---|
