@@ -109,6 +109,7 @@ The same rule applies to editing, resetting a password, deactivating and deletin
 | Role templates, granting any permission to any admin | — | — | — | ✓ | super admin only |
 
 ### Notes
+- Owner decisions 2026-11-22: keep **one** super admin (admins can do almost everything except security and audit); supervisors keep the executive dashboard **without money figures** while the owner tests it.
 - "Refunds" for a cancelled or failed order are **recorded** by the supervisor; sending the money is done outside the system and then marked as sent.
 - Two decisions from the earlier notes are still open and affect money rows above: the driver cash balance rule and the store net-payable rule.
 - Source of truth: `apps/backend/src/modules/admin-platform/permission-templates/permission-templates.service.ts` (presets) and each endpoint's `@RequiresPermission`. The e2e test `144-staff-accounts` checks the split (team ⊂ supervisor ⊂ admin; cancel/refund/shift closing/driver cash at supervisor; edit/delete/store settlement at admin).
