@@ -36,6 +36,9 @@ export class DriverProfileService {
     // Presence: the time of the switch marks one online/offline incident (only when it really changes).
     if (driver.isOnline !== isOnline) await this.driversRepository.update({ id: driver.id }, { isOnline, onlineChangedAt: new Date() });
     else await this.driversRepository.update({ id: driver.id }, { isOnline });
+    // Driver shifts (2026-11-22): the older apps' online switch still records a shift — going online opens one if none is open. Going
+    // offline only stops new orders; the shift itself is ended by the driver's "End shift" or by the closing at the office.
+    if (isOnline) await this.driversRepository.query(`INSERT INTO driver_shifts (driver_id) VALUES ($1) ON CONFLICT DO NOTHING`, [driver.id]);
     return this.driversRepository.findOneOrFail({ where: { id: driver.id } });
   }
 

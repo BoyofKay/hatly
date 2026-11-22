@@ -101,6 +101,8 @@ describe('DriversService.listAll (Phase I-A, Chunk 6; operational fields — Con
         activeCount: 2,
         capacity: 2,
         lastSeenAt: new Date('2026-10-03T10:05:00Z'),
+        shiftStartedAt: null,
+        acceptingNewOrders: true,
       },
       {
         id: 'driver-2',
@@ -117,6 +119,8 @@ describe('DriversService.listAll (Phase I-A, Chunk 6; operational fields — Con
         activeCount: 0,
         capacity: 1,
         lastSeenAt: null,
+        shiftStartedAt: null,
+        acceptingNewOrders: true,
       },
     ]);
   });

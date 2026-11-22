@@ -7,6 +7,8 @@ import '../../deliveries/presentation/status_labels.dart';
 import '../../../core/localization/bilingual.dart';
 import '../../../core/utils/money.dart';
 import '../../../shared_widgets/driver_ui.dart';
+import '../../shift/shift_api.dart';
+import '../../shift/shift_card.dart';
 
 /// Real Driver Home — online/offline toggle (wired to the real
 /// `PATCH driver/online-status` + the GPS timer, see
@@ -75,6 +77,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final onlineAsync = ref.watch(driverOnlineStateProvider);
     final deliveriesAsync = ref.watch(deliveriesProvider);
     final isOnline = onlineAsync.valueOrNull ?? false;
+    final shiftState = ref.watch(shiftStateProvider).valueOrNull;
     // Money is secondary here: if it cannot be read the orders still work, so a failure is simply "no figure".
     final deliveredToday = ref.watch(earningsProvider).valueOrNull?.deliveredToday;
     final orange = Theme.of(context).colorScheme.primary;
@@ -88,6 +91,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       ),
       body: Column(
         children: [
+          // Driver shifts (2026-11-22): the shift card replaces the online switch when the server has shifts; otherwise the switch below.
+          if (shiftState != null)
+            ShiftCard(state: shiftState)
+          else
           // Online card: the one switch that decides whether orders can be assigned to you.
           Container(
             key: const Key('online-card'),

@@ -29,6 +29,9 @@ export interface AdminDriver {
   activeCount?: number;
   capacity?: number;
   lastSeenAt?: string | null;
+  /** Driver shifts (2026-11-22): open shift start (null = off duty) and the driver's "take new orders" switch. */
+  shiftStartedAt?: string | null;
+  acceptingNewOrders?: boolean;
 }
 
 /** Reuses the real backend `admin/orders/dispatchable` endpoint (Chunk 6 backend addition). */

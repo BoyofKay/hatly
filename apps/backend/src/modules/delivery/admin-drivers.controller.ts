@@ -12,6 +12,7 @@ import { CreateDriverDto } from './dto/create-driver.dto';
 import { UpdateDriverVerificationDto } from './dto/update-driver-verification.dto';
 import { UpdateDriverVehicleTypeDto } from './dto/update-driver-vehicle-type.dto';
 import { VehicleTypesService } from '../business-config/vehicle-types.service';
+import { DriverShiftService } from './driver-shift.service';
 
 @ApiTags('admin-drivers')
 @Controller('admin/drivers')
@@ -21,6 +22,7 @@ export class AdminDriversController {
     private readonly vehicleTypesService: VehicleTypesService,
     private readonly ds: DataSource,
     private readonly audit: AdminAuditService,
+    private readonly shifts: DriverShiftService,
   ) {}
 
   /** R18: a driver's capacity (override or vehicle), current active orders, and every override with its reason, approver and time. */
@@ -47,6 +49,20 @@ export class AdminDriversController {
    * before/after; recomputes whether the driver has room. Lowering it below the orders they already carry never takes an order away — they
    * simply get no new one until they are under it. Requires OVERRIDE_DISPATCH.
    */
+  /** The driver's shift state and recent shifts (Operations). */
+  @Get(':id/shifts')
+  @RequiresAnyPermission(Permission.MANAGE_DRIVERS, Permission.CLOSE_DRIVER_SETTLEMENTS, Permission.FLEET_VIEW)
+  async shiftsOf(@Param('id', ParseUUIDPipe) id: string) {
+    return { data: { state: await this.shifts.state(id), recent: await this.shifts.history(id, 20) } };
+  }
+
+  /** Supervisor force-end (lost phone, left without closing). Orders still with the driver stay with them — reassign them if needed. */
+  @Post(':id/shift/end')
+  @RequiresAnyPermission(Permission.CLOSE_DRIVER_SETTLEMENTS, Permission.CHANGE_DRIVER_ONLINE_STATUS)
+  async forceEndShift(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.shifts.forceEnd(id, user.id) };
+  }
+
   @Patch(':id/capacity')
   @RequiresPermission(Permission.OVERRIDE_DISPATCH)
   async setCapacity(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() body: { capacity?: number | null; reason?: string }) {

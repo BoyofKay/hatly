@@ -13,6 +13,7 @@ import {
   setDriverVehicleType,
   setDriverVerification,
 } from '../../../lib/api/admin-dispatch';
+import { apiClient } from '../../../lib/api/client';
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { DriverCommissionEditor } from '../../../components/drivers/DriverCommissionEditor';
 import { DriverCapacityEditor } from '../../../components/drivers/DriverCapacityEditor';
@@ -273,6 +274,21 @@ function AdminDriversScreen() {
                     </p>
                     {d.capacity != null && <p data-testid="driver-load">{t('drvLoad', { active: d.activeCount ?? 0, capacity: d.capacity })}</p>}
                     {d.lastSeenAt && <p data-testid="driver-last-seen">{t('drvLastSeen', { time: dateTime(d.lastSeenAt) })}</p>}
+                    {/* Driver shifts (2026-11-22): on duty since…, a 14-hour warning, "stopped new orders", and the supervisor's force-end. */}
+                    {d.shiftStartedAt ? (
+                      <p data-testid="driver-shift" className="flex flex-wrap items-center gap-1.5">
+                        <span>{tl('On shift since', 'في الوردية منذ')} {dateTime(d.shiftStartedAt)}</span>
+                        {Date.now() - new Date(d.shiftStartedAt).getTime() >= 14 * 3_600_000 && <Badge tone="red">{tl('Shift open 14h+', 'وردية مفتوحة +14 ساعة')}</Badge>}
+                        {d.acceptingNewOrders === false && <Badge tone="amber">{tl('Not taking new orders', 'لا يستقبل طلبات جديدة')}</Badge>}
+                        <button type="button" className="text-hatly-orangeDark underline" data-testid={`driver-end-shift-${d.id}`}
+                          onClick={async () => {
+                            if (!window.confirm(tl(`End ${d.fullName}'s shift now? Orders still with them stay with them — reassign them if needed.`, `إنهاء وردية ${d.fullName} الآن؟ الطلبات التي معه تبقى معه — أعد إسنادها إن لزم.`))) return;
+                            try { await apiClient.post(`/admin/drivers/${d.id}/shift/end`); await refresh(); } catch (e) { window.alert(apiErrorMessage(e, tl('Could not end the shift.', 'تعذّر إنهاء الوردية.'))); }
+                          }}>{tl('End shift', 'إنهاء الوردية')}</button>
+                      </p>
+                    ) : (
+                      <p data-testid="driver-shift" className="text-gray-400">{tl('Off duty', 'خارج الخدمة')}</p>
+                    )}
                     {d.lastLocationAt && <p>{t('drvLocationUpdated', { time: dateTime(d.lastLocationAt) })}</p>}
                     {d.activeDelivery && (
                       <p data-testid="driver-active-delivery">

@@ -10,6 +10,12 @@ import { DriverOrderActionsService } from './driver-order-actions.service';
 import { DriverPurchaseService } from './driver-purchase.service';
 import { DriverWeightRecordService } from './driver-weight-record.service';
 import { DriverEarningsService } from './driver-earnings.service';
+import { DriverShiftService } from './driver-shift.service';
+import { IsBoolean } from 'class-validator';
+
+class AcceptingNewOrdersDto {
+  @IsBoolean() accepting: boolean;
+}
 import { BusinessConfigService } from '../business-config/business-config.service';
 import { UpdateDriverOnlineStatusDto } from './dto/update-driver-online-status.dto';
 import { UpdateDriverLocationDto } from './dto/update-driver-location.dto';
@@ -40,7 +46,31 @@ export class DriverController {
     private readonly driverWeightRecordService: DriverWeightRecordService,
     private readonly driverEarningsService: DriverEarningsService,
     private readonly businessConfigService: BusinessConfigService,
+    private readonly driverShiftService: DriverShiftService,
   ) {}
+
+  /** Shift (owner decision 2026-11-22): on/off duty, the open shift, and whether the driver may end it now (and why not). */
+  @Get('shift')
+  async shift(@CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.driverShiftService.stateForUser(user.id) };
+  }
+
+  @Post('shift/start')
+  async startShift(@CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.driverShiftService.start(user.id) };
+  }
+
+  /** Refused while an order is with the driver or something is still to settle (then the office closing ends the shift). */
+  @Post('shift/end')
+  async endShift(@CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.driverShiftService.end(user.id) };
+  }
+
+  /** "Stop new orders": keep the shift and current orders, receive nothing new. */
+  @Patch('shift/accepting-new-orders')
+  async acceptingNewOrders(@CurrentUser() user: AuthenticatedUser, @Body() dto: AcceptingNewOrdersDto) {
+    return { data: await this.driverShiftService.setAcceptingNewOrders(user.id, dto.accepting) };
+  }
 
   /**
    * The driver's own online switch as the SERVER holds it (2026-11-15). The app used to start every launch at "offline" without asking, so a

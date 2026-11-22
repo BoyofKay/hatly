@@ -160,7 +160,7 @@ describe('E2E — Home product sections aggregation', () => {
       expect(typeof product.priceMinor).toBe('number');
       expect(typeof product.deliveredQuantityCount).toBe('number');
       expect(body.vendors[0]).toEqual(expect.objectContaining({ id: v.b1.branchId, name: 'HP b1', hasOffer: true, ratingCount: 20 }));
-      expect(Object.keys(body.vendors[0]).sort()).toEqual(['hasOffer', 'id', 'isOpen', 'logoUrl', 'name', 'nameAr', 'ratingAverage', 'ratingCount']);
+      expect(Object.keys(body.vendors[0]).sort()).toEqual(['coverImageUrl', 'hasOffer', 'id', 'isOpen', 'logoUrl', 'name', 'nameAr', 'ratingAverage', 'ratingCount']);
     });
 
     it('the three sections hold the right things: Most ordered (ordered ≥ once), New (last 30 days, available), Offers (a valid offer)', async () => {

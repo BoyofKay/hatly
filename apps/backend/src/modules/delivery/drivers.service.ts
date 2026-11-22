@@ -34,6 +34,9 @@ export interface AdminDriverView {
   capacity: number;
   /** Presence (2026-11-13): last call from the driver's app (not GPS). */
   lastSeenAt: Date | null;
+  /** Driver shifts (2026-11-22): when the open shift started (null = off duty), and whether the driver takes new orders. */
+  shiftStartedAt: Date | null;
+  acceptingNewOrders: boolean;
 }
 
 @Injectable()
@@ -115,10 +118,11 @@ export class DriversService {
         : [];
     const activeByDriver = new Map(active.map((a) => [a.driver_id, { orderId: a.order_id, orderNumber: a.order_number, status: a.status }]));
     // R18: load and capacity in one batched query (same definitions as driver-capacity.ts).
-    const loads: Array<{ id: string; active: number; capacity: number; last_seen_at: Date | null }> =
+    const loads: Array<{ id: string; active: number; capacity: number; last_seen_at: Date | null; shift_started_at: Date | null }> =
       drivers.length > 0
         ? await this.dataSource.query(
             `SELECT d.id, d.last_seen_at,
+                    (SELECT s.started_at FROM driver_shifts s WHERE s.driver_id = d.id AND s.ended_at IS NULL) AS shift_started_at,
                     (SELECT count(*)::int FROM deliveries x JOIN orders o ON o.id = x.order_id
                       WHERE x.driver_id = d.id AND x.deleted_at IS NULL AND (o.status::text = ANY($2::text[]) OR (x.early_assigned_at IS NOT NULL AND o.status::text IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP')))) AS active,
                     GREATEST(1, COALESCE(d.capacity_override, (SELECT v.max_active_deliveries FROM vehicle_types v WHERE v.id = d.vehicle_type_id), 1))::int AS capacity
@@ -142,6 +146,8 @@ export class DriversService {
       activeCount: loadByDriver.get(driver.id)?.active ?? 0,
       capacity: loadByDriver.get(driver.id)?.capacity ?? 1,
       lastSeenAt: loadByDriver.get(driver.id)?.last_seen_at ?? null,
+      shiftStartedAt: loadByDriver.get(driver.id)?.shift_started_at ?? null,
+      acceptingNewOrders: driver.acceptingNewOrders !== false,
     }));
   }
 

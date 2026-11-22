@@ -99,7 +99,10 @@ export class DriverRankingService {
       await this.driversRepository.find({
         where: { isOnline: true, isAvailable: true, verificationStatus: 'APPROVED' },
       })
-    ).filter((d) => d.lastSeenAt != null && new Date(d.lastSeenAt).getTime() >= freshSince);
+    )
+      .filter((d) => d.lastSeenAt != null && new Date(d.lastSeenAt).getTime() >= freshSince)
+      // "Stop new orders" (2026-11-22): a driver finishing up before ending the shift receives nothing new.
+      .filter((d) => d.acceptingNewOrders !== false);
 
     const maxBicycleDistanceMeters = await this.businessConfigService.getMaxBicyclePickupDistanceMeters();
 
