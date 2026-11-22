@@ -58,6 +58,10 @@ case "$action" in
     for i in $(seq 1 30); do
       if $SUDO docker exec hatly-prod-backend-1 curl -fsS -m 5 http://127.0.0.1:3000/api/v1/health/ready >/dev/null 2>&1; then break; fi; sleep 5
     done
+    # The dashboard starts after the backend; give it up to a minute so the status below reflects it.
+    for i in $(seq 1 12); do
+      [ "$($SUDO docker inspect -f '{{.State.Health.Status}}' hatly-prod-dashboard-1 2>/dev/null)" = healthy ] && break; sleep 5
+    done
     "$PD/current/deploy/production/prod.sh" status
     $SUDO docker exec hatly-prod-backend-1 curl -fsS -m 5 http://127.0.0.1:3000/api/v1/health/ready >/dev/null 2>&1 || {
       echo "BACKEND NOT HEALTHY — rolling back to $OLD (migrations stay applied; they are additive)"
