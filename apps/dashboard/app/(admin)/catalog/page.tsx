@@ -27,6 +27,7 @@ export default function ProductsPage() {
   const [excelBranch, setExcelBranch] = useState('');
   const [state, setState] = useState('');
   useEffect(() => { const v = new URLSearchParams(window.location.search).get('state'); if (v) setState(v); }, []);
+  useEffect(() => { const v = new URLSearchParams(window.location.search).get('branch'); if (v) setBranch(v); }, []);
   const [active, setActive] = useState('');
   const [hasImage, setHasImage] = useState('');
   const [sort, setSort] = useState('name:asc');

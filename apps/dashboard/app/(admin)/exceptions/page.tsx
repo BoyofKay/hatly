@@ -79,6 +79,13 @@ function ExceptionsQueue() {
   // A link from an alert opens that case directly.
   const wanted = useSearchParams().get('case');
   useEffect(() => { if (wanted && /^[0-9a-f-]{36}$/i.test(wanted)) setOpenId(wanted); }, [wanted]);
+  // From an order (Control Tower → "Exceptions queue"): open that order's case once the list has it.
+  const wantedOrder = useSearchParams().get('order');
+  useEffect(() => {
+    if (!wantedOrder || wanted) return;
+    const hit = (list.data ?? []).find((x: any) => (x.orderId ?? x.order?.id) === wantedOrder);
+    if (hit) setOpenId(hit.id);
+  }, [wantedOrder, wanted, list.data]);
   const ageText = (s: number) => (s < 3600 ? `${Math.max(1, Math.round(s / 60))} ${t('min', 'د')}` : s < 172800 ? `${Math.round(s / 3600)} ${t('h', 'س')}` : `${Math.round(s / 86400)} ${t('d', 'ي')}`);
   const sm = summary.data;
 

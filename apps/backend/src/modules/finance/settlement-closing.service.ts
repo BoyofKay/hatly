@@ -257,7 +257,7 @@ export class SettlementClosingService {
     const { lines, unresolved } = await this.courierFacts(m, driverId);
     const totals = courierTotals(lines);
     return {
-      courier: { id: driver.id, name: driver.full_name, commissionRateBasisPoints: driver.commission_rate_basis_points },
+      courier: { id: driver.id, userId: driver.user_id, name: driver.full_name, commissionRateBasisPoints: driver.commission_rate_basis_points },
       previousClosing: prev ? { periodEnd: iso(prev.period_end), reference: prev.reference } : null,
       lines,
       unresolved,

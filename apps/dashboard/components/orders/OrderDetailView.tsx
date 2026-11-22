@@ -212,8 +212,19 @@ function OrderDetailScreen({ orderId, embedded, onClose }: { orderId: string; em
                 <span className="inline-flex flex-wrap items-center gap-1.5">
                   {label(PAYMENT_METHOD, detail.paymentMethod, tl)}
                   {detail.payment && <><StatusPill status={detail.payment.status} label={label(PAYMENT_STATUS, detail.payment.status, tl)} /><span className="tabular-nums text-gray-600">{money(detail.payment.amountMinor ?? 0)}</span></>}
+                  {/* Jump to the transfer of THIS order (verify it, or record a refund) — the page opens on this order number. */}
+                  {detail.paymentMethod === 'MANUAL_TRANSFER' && (
+                    <Link href={`/manual-transfer?order=${encodeURIComponent(detail.orderNumber)}`} className="text-xs font-medium text-hatly-orangeDark hover:underline" data-testid="order-open-transfer">
+                      {tl('Open this transfer', 'فتح هذا التحويل')} <span aria-hidden className="rtl:rotate-180">→</span>
+                    </Link>
+                  )}
                 </span>
               </Fact>
+              {detail.status === 'FAILED_DELIVERY' && (
+                <Fact label={tl('Failed delivery', 'توصيل فاشل')}>
+                  <Link href={`/failed-deliveries/${detail.id}`} className="text-sm font-medium text-hatly-orangeDark hover:underline">{tl('Decide what happens next', 'قرّر الخطوة التالية')} <span aria-hidden className="rtl:rotate-180">→</span></Link>
+                </Fact>
+              )}
             </dl>
           </Card>
           <OrderTotals detail={detail} />
