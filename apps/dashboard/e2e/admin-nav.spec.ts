@@ -12,7 +12,7 @@ test.describe('Admin navigation', () => {
   test.use({ storageState: SUPER_ADMIN_STORAGE_STATE });
 
   // The reference's flat menu: each page is reached by its sidebar section, then (when the section has several pages) its tab.
-  // Owner order 2026-11-22: Home, Orders, Delivery, Customers, Stores, Products, Offers, Reports, Settings. `sub` = the shared tab the page
+  // Owner order 2026-11-22: Home, Orders, Delivery, Customers, Settlements, Stores, Products, Offers, Reports, Settings. `sub` = the shared tab the page
   // sits under (its pages are a second row of tabs).
   const expectedLinks: Array<{ name: string; href: string; section: string; more?: boolean; sub?: string }> = [
     { name: 'Sectors', href: '/sectors', section: 'Settings' },
@@ -25,9 +25,9 @@ test.describe('Admin navigation', () => {
     { name: 'Control Tower', href: '/control-tower', section: 'Orders', more: true },
     { name: 'Alerts', href: '/alerts', section: 'Orders', more: true },
     { name: 'Drivers today', href: '/drivers-today', section: 'Delivery' },
-    { name: 'Closing', href: '/settlement', section: 'Delivery', sub: 'Settlements' },
-    { name: 'Statements by period', href: '/settlement-statements', section: 'Delivery', sub: 'Settlements' },
-    { name: 'Settlement history', href: '/settlements', section: 'Delivery', sub: 'Settlements' },
+    { name: 'Closing', href: '/settlement', section: 'Settlements' },
+    { name: 'Statements by period', href: '/settlement-statements', section: 'Settlements' },
+    { name: 'Settlement history', href: '/settlements', section: 'Settlements' },
     { name: 'Cash Remainders', href: '/cash-remainders', section: 'Delivery' },
     { name: 'Employee Loans', href: '/employee-loans', section: 'Delivery' },
     { name: 'Banners', href: '/banners', section: 'Offers' },
@@ -36,7 +36,7 @@ test.describe('Admin navigation', () => {
   test('the sidebar is in the owner\'s order', async ({ page }) => {
     await page.goto('/home');
     const names = await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link').allInnerTexts();
-    const order = ['Home', 'Orders', 'Delivery', 'Customers', 'Stores', 'Products', 'Offers', 'Reports', 'Settings'];
+    const order = ['Home', 'Orders', 'Delivery', 'Customers', 'Settlements', 'Stores', 'Products', 'Offers', 'Reports', 'Settings'];
     const seen = names.map((n) => n.trim().replace(/\s*\d+$/, '')).filter((n) => order.includes(n));
     expect(seen).toEqual(order);
   });

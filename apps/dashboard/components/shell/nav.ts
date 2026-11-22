@@ -1,6 +1,6 @@
 /**
  * The Admin navigation, as in the approved reference (`docs/transformation/reference/admin-vendor-reference.jpg`): flat sections in the
- * sidebar (owner order 2026-11-22: Home, Orders, Delivery, Customers, Stores, Products, Offers, Reports, Settings); each section's pages are tabs at the top
+ * sidebar (owner order 2026-11-22: Home, Orders, Delivery, Customers, Settlements, Stores, Products, Offers, Reports, Settings); each section's pages are tabs at the top
  * of the page, so every existing page stays one click away. `perms` = the admin needs ANY of them to SEE the link (a UX filter only — the backend
  * enforces every route); a section shows when at least one of its pages does, and opens its first visible page. `match` adds address prefixes
  * that belong to the section without being a tab (detail pages). Labels are English/Arabic pairs; existing page link names are kept.
@@ -39,7 +39,6 @@ const P = {
   media: ['MEDIA_VIEW', 'MANAGE_MEDIA', 'MANAGE_CATALOG', 'MANAGE_VENDORS', 'MANAGE_MARKETPLACE_SECTORS', 'MANAGE_HOME_BANNERS'],
 };
 
-const SETTLEMENTS = { id: 'settlements', en: 'Settlements', ar: 'التسويات' };
 const USERS = { id: 'users', en: 'Users', ar: 'المستخدمون' };
 
 export const NAV: NavGroup[] = [
@@ -70,10 +69,6 @@ export const NAV: NavGroup[] = [
     items: [
       { href: '/fleet', en: 'Live fleet', ar: 'الأسطول المباشر', perms: P.fleet },
       { href: '/drivers-today', en: 'Drivers today', ar: 'المندوبون اليوم', perms: ['CLOSE_DRIVER_SETTLEMENTS'] },
-      // Owner request 2026-11-22: closing, statements and history together under one "Settlements" tab.
-      { href: '/settlement', en: 'Closing', ar: 'التقفيل', perms: ['CLOSE_VENDOR_SETTLEMENTS', 'CLOSE_DRIVER_SETTLEMENTS'], sub: SETTLEMENTS },
-      { href: '/settlement-statements', en: 'Statements by period', ar: 'الكشوف حسب الفترة', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'], sub: SETTLEMENTS },
-      { href: '/settlements', en: 'Settlement history', ar: 'سجل التسويات', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'], sub: SETTLEMENTS },
       { href: '/cash-remainders', en: 'Cash Remainders', ar: 'باقي النقد', perms: ['MANAGE_CUSTOMER_WALLET'] },
       { href: '/employee-loans', en: 'Employee Loans', ar: 'سلف الموظفين', perms: ['MANAGE_EMPLOYEE_LOANS'] },
     ],
@@ -85,6 +80,15 @@ export const NAV: NavGroup[] = [
       { href: '/reviews', en: 'Reviews', ar: 'التقييمات', perms: ['MODERATE_REVIEWS'] },
       { href: '/wallet-adjustments', en: 'Wallet adjustments', ar: 'تعديلات المحفظة', perms: P.fin },
       { href: '/account-deletion-requests', en: 'Deletion requests', ar: 'طلبات الحذف', perms: [] },
+    ],
+  },
+  {
+    // Owner request 2026-11-22: settlements are their own sidebar section, right after Customers.
+    id: 'settlements', en: 'Settlements', ar: 'التسويات', icon: 'coins',
+    items: [
+      { href: '/settlement', en: 'Closing', ar: 'التقفيل', perms: ['CLOSE_VENDOR_SETTLEMENTS', 'CLOSE_DRIVER_SETTLEMENTS'] },
+      { href: '/settlement-statements', en: 'Statements by period', ar: 'الكشوف حسب الفترة', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
+      { href: '/settlements', en: 'Settlement history', ar: 'سجل التسويات', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
     ],
   },
   {
