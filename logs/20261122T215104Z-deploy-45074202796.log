@@ -1,0 +1,345 @@
+action=deploy arg= commit=4fc0016768cb83e3fb90fea396ab73f84909bc39 run=45074202796 started=2026-11-22T21:49:13Z
+bundle OK: /home/runner/work/_temp/rel/hatly-prod-src.tar.gz  (30551327 bytes, 1907 entries, 86 migrations)
+release id: 20261122T214911Z-ceb689a804f1
+uploaded 20261122T214911Z-ceb689a804f1
+current release (rollback target): 20261122T213936Z-3d7f0a3be5bd
+
+==== 1. verify + extract  (21:49:21 UTC)
+incoming/20261122T214911Z-ceb689a804f1.tar.gz: OK
+
+==== 2. build images (the live release keeps serving)  (21:49:21 UTC)
+ Image hatly-prod-dashboard:20261122T214911Z-ceb689a804f1 Building 
+ Image hatly-prod-backend:20261122T214911Z-ceb689a804f1 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.29kB done
+#1 DONE 0.0s
+
+#2 [prod-dashboard internal] load build definition from dashboard.Dockerfile
+#2 transferring dockerfile: 2.02kB done
+#2 DONE 0.0s
+
+#3 [prod-backend internal] load build definition from backend.Dockerfile
+#3 transferring dockerfile: 2.58kB done
+#3 DONE 0.0s
+
+#4 [prod-backend internal] load metadata for docker.io/library/node:22-bookworm-slim
+#4 DONE 0.5s
+
+#5 [prod-backend build 1/9] FROM docker.io/library/node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+#5 resolve docker.io/library/node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee 0.0s done
+#5 DONE 0.0s
+
+#6 [prod-dashboard internal] load build context
+#6 transferring context: 3.11MB 0.1s done
+#6 DONE 0.1s
+
+#7 [prod-dashboard build 2/9] WORKDIR /repo
+#7 CACHED
+
+#8 [prod-dashboard build  5/10] COPY apps/dashboard/package.json apps/dashboard/package.json
+#8 CACHED
+
+#9 [prod-dashboard build  6/10] COPY packages packages
+#9 CACHED
+
+#10 [prod-dashboard build  4/10] COPY apps/backend/package.json apps/backend/package.json
+#10 CACHED
+
+#11 [prod-dashboard build  3/10] COPY package.json package-lock.json ./
+#11 CACHED
+
+#12 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#12 CACHED
+
+#13 [prod-dashboard build  8/10] COPY apps/dashboard apps/dashboard
+#13 ...
+
+#14 [prod-backend internal] load build context
+#14 transferring context: 9.45MB 0.2s done
+#14 DONE 0.2s
+
+#15 [prod-backend runtime 3/9] RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+#15 CACHED
+
+#16 [prod-backend build 3/9] COPY package.json package-lock.json ./
+#16 CACHED
+
+#17 [prod-backend runtime 5/9] COPY --from=prod-deps /repo/apps/backend/node_modules ./node_modules
+#17 CACHED
+
+#18 [prod-backend runtime 2/9] WORKDIR /repo/apps/backend
+#18 CACHED
+
+#19 [prod-backend build 4/9] COPY apps/backend/package.json apps/backend/package.json
+#19 CACHED
+
+#20 [prod-backend runtime 4/9] COPY --from=prod-deps /repo/node_modules /repo/node_modules
+#20 CACHED
+
+#21 [prod-backend build 9/9] RUN cd apps/backend && npx nest build
+#21 CACHED
+
+#22 [prod-backend prod-deps 7/7] RUN npm ci --omit=dev --workspace=apps/backend --include-workspace-root
+#22 CACHED
+
+#23 [prod-backend runtime 7/9] COPY apps/backend/assets ./assets
+#23 CACHED
+
+#24 [prod-backend build 8/9] COPY apps/backend apps/backend
+#24 CACHED
+
+#7 [prod-backend build 2/9] WORKDIR /repo
+#7 CACHED
+
+#25 [prod-backend build 7/9] RUN npm ci --workspace=apps/backend --include-workspace-root
+#25 CACHED
+
+#26 [prod-backend build 6/9] COPY packages packages
+#26 CACHED
+
+#27 [prod-backend runtime 6/9] COPY --from=build /repo/apps/backend/dist ./dist
+#27 CACHED
+
+#28 [prod-backend runtime 8/9] COPY apps/backend/package.json ./package.json
+#28 CACHED
+
+#29 [prod-backend build 5/9] COPY apps/dashboard/package.json apps/dashboard/package.json
+#29 CACHED
+
+#30 [prod-backend runtime 9/9] RUN mkdir -p /data/uploads && chown -R node:node /data /repo/apps/backend
+#30 CACHED
+
+#13 [prod-dashboard build  8/10] COPY apps/dashboard apps/dashboard
+#13 DONE 0.1s
+
+#31 [prod-backend] exporting to image
+#31 exporting layers done
+#31 exporting manifest sha256:b2ee4553466ed6513d60a61a7042e6bdb909c2ce2d1c18f4dc5f79c3d996cbfb done
+#31 exporting config sha256:8d07dab17111ab5277e14388b0202b617bf15708e9d2f0573bd8bb0fa137de1f done
+#31 exporting attestation manifest sha256:76b1fdd02dfc33a54f260ff0cea33078fc45edf9768549a518f567e40acc72a2 done
+#31 exporting manifest list sha256:62b3b2a7aaab84f9f8d0aec4c224ac2c13940c2346cf4489b1d2ed6d115f6c7d done
+#31 naming to docker.io/library/hatly-prod-backend:20261122T214911Z-ceb689a804f1 done
+#31 unpacking to docker.io/library/hatly-prod-backend:20261122T214911Z-ceb689a804f1 done
+#31 DONE 0.1s
+
+#32 [prod-backend] resolving provenance for metadata file
+#32 DONE 0.0s
+
+#33 [prod-dashboard build  9/10] RUN test -f apps/dashboard/postcss.config.js
+#33 DONE 0.2s
+
+#34 [prod-dashboard build 10/10] RUN test -n "https://api.hatly.dev/api/v1" && cd apps/dashboard && npx next build
+#34 1.058    ▲ Next.js 15.5.27
+#34 1.059 
+#34 1.097    Creating an optimized production build ...
+#34 17.56  ✓ Compiled successfully in 13.9s
+#34 17.57    Linting and checking validity of types ...
+#34 28.23    Collecting page data ...
+#34 30.71    Generating static pages (0/81) ...
+#34 31.35    Generating static pages (20/81) 
+#34 31.42    Generating static pages (40/81) 
+#34 31.48    Generating static pages (60/81) 
+#34 31.54  ✓ Generating static pages (81/81)
+#34 32.11    Finalizing page optimization ...
+#34 32.11    Collecting build traces ...
+#34 38.33 
+#34 38.34 Route (app)                                 Size  First Load JS
+#34 38.34 ┌ ○ /                                      136 B         103 kB
+#34 38.34 ├ ○ /_not-found                             1 kB         103 kB
+#34 38.34 ├ ○ /access/templates                     3.7 kB         157 kB
+#34 38.34 ├ ○ /account-deletion                    5.29 kB         126 kB
+#34 38.34 ├ ○ /account-deletion-requests           3.69 kB         151 kB
+#34 38.34 ├ ○ /alerts                              2.75 kB         159 kB
+#34 38.34 ├ ○ /audiences                           3.58 kB         157 kB
+#34 38.34 ├ ○ /audit-log                           3.38 kB         151 kB
+#34 38.34 ├ ○ /banners                             7.89 kB         141 kB
+#34 38.34 ├ ○ /branch-requests                     2.51 kB         150 kB
+#34 38.34 ├ ○ /branches                            4.84 kB         161 kB
+#34 38.34 ├ ƒ /branches/[id]                       10.7 kB         186 kB
+#34 38.34 ├ ○ /broadcasts                          4.28 kB         161 kB
+#34 38.34 ├ ƒ /broadcasts/[id]                     5.64 kB         162 kB
+#34 38.34 ├ ○ /campaigns                            3.3 kB         160 kB
+#34 38.34 ├ ƒ /campaigns/[id]                      5.57 kB         162 kB
+#34 38.34 ├ ○ /cash-remainders                     2.27 kB         153 kB
+#34 38.34 ├ ○ /catalog                             7.84 kB         175 kB
+#34 38.34 ├ ○ /config                               3.9 kB         161 kB
+#34 38.34 ├ ○ /control-tower                       14.2 kB         165 kB
+#34 38.34 ├ ○ /customers                           4.07 kB         161 kB
+#34 38.34 ├ ƒ /customers/[id]                      8.79 kB         165 kB
+#34 38.34 ├ ○ /delivery-zones                      6.01 kB         139 kB
+#34 38.34 ├ ○ /dispatch                              497 B         106 kB
+#34 38.34 ├ ○ /drivers                             8.53 kB         160 kB
+#34 38.34 ├ ○ /drivers-today                       9.68 kB         166 kB
+#34 38.34 ├ ○ /earnings                            3.09 kB         160 kB
+#34 38.34 ├ ○ /employee-loans                      4.74 kB         158 kB
+#34 38.34 ├ ○ /exceptions                           9.3 kB         166 kB
+#34 38.34 ├ ○ /executive                           8.14 kB         165 kB
+#34 38.34 ├ ○ /exports                              3.9 kB         157 kB
+#34 38.34 ├ ○ /failed-deliveries                   3.49 kB         155 kB
+#34 38.34 ├ ƒ /failed-deliveries/[id]              6.03 kB         157 kB
+#34 38.34 ├ ○ /finance                             4.93 kB         162 kB
+#34 38.34 ├ ○ /finance/ledger                      7.29 kB         164 kB
+#34 38.34 ├ ○ /finance/liabilities                  4.6 kB         158 kB
+#34 38.34 ├ ○ /finance/receivables                 2.85 kB         156 kB
+#34 38.34 ├ ○ /finance/reconciliation              3.29 kB         156 kB
+#34 38.34 ├ ○ /finance/revenue                     4.38 kB         158 kB
+#34 38.34 ├ ○ /fleet                               5.81 kB         162 kB
+#34 38.34 ├ ○ /growth                              2.54 kB         156 kB
+#34 38.34 ├ ○ /home                                10.2 kB         189 kB
+#34 38.34 ├ ○ /inbox                               2.22 kB         175 kB
+#34 38.34 ├ ○ /insights                            3.08 kB         156 kB
+#34 38.34 ├ ○ /inventory                           2.16 kB         159 kB
+#34 38.34 ├ ○ /login                               4.47 kB         146 kB
+#34 38.34 ├ ○ /manual-transfer                     7.06 kB         158 kB
+#34 38.34 ├ ○ /media                               4.67 kB         163 kB
+#34 38.34 ├ ○ /my-branches                         5.54 kB         163 kB
+#34 38.34 ├ ○ /notification-setup                  5.93 kB         172 kB
+#34 38.34 ├ ○ /notifications                         392 B         155 kB
+#34 38.34 ├ ○ /offers                              9.73 kB         166 kB
+#34 38.34 ├ ○ /operations                          2.07 kB         169 kB
+#34 38.34 ├ ○ /order-history                       3.33 kB         160 kB
+#34 38.34 ├ ○ /order-management                    10.3 kB         183 kB
+#34 38.34 ├ ○ /order-search                        5.07 kB         156 kB
+#34 38.34 ├ ƒ /order-search/[id]                     393 B         173 kB
+#34 38.34 ├ ○ /orders                              7.63 kB         165 kB
+#34 38.34 ├ ƒ /orders/[id]                           377 B         148 kB
+#34 38.34 ├ ○ /overview                            6.97 kB         166 kB
+#34 38.34 ├ ○ /payments                             6.1 kB         163 kB
+#34 38.34 ├ ○ /privacy                               136 B         103 kB
+#34 38.34 ├ ○ /product-requests                    3.73 kB         151 kB
+#34 38.34 ├ ○ /products                            9.86 kB         162 kB
+#34 38.34 ├ ○ /refunds                             2.25 kB         159 kB
+#34 38.34 ├ ○ /reports                             2.26 kB         159 kB
+#34 38.34 ├ ƒ /reports/[id]                        4.41 kB         161 kB
+#34 38.34 ├ ○ /reviews                             2.53 kB         156 kB
+#34 38.34 ├ ○ /sectors                             6.95 kB         165 kB
+#34 38.34 ├ ○ /security                            2.87 kB         151 kB
+#34 38.34 ├ ○ /service-areas                       4.97 kB         153 kB
+#34 38.34 ├ ○ /settings                            7.68 kB         149 kB
+#34 38.34 ├ ○ /settlement                          9.17 kB         166 kB
+#34 38.34 ├ ○ /settlement-statements               7.75 kB         164 kB
+#34 38.34 ├ ○ /settlements                          5.3 kB         162 kB
+#34 38.34 ├ ƒ /settlements/[party]/[id]            10.5 kB         167 kB
+#34 38.34 ├ ○ /stock                               3.11 kB         151 kB
+#34 38.34 ├ ○ /stock-history                        7.1 kB         155 kB
+#34 38.34 ├ ○ /stores-now                          6.55 kB         163 kB
+#34 38.34 ├ ○ /system                              3.25 kB         160 kB
+#34 38.34 ├ ○ /system/jobs                         2.68 kB         159 kB
+#34 38.34 ├ ○ /system/metrics                      3.01 kB         156 kB
+#34 38.34 ├ ○ /team                                 6.3 kB         160 kB
+#34 38.34 ├ ○ /users                               6.36 kB         154 kB
+#34 38.34 ├ ○ /vehicle-types                        4.3 kB         152 kB
+#34 38.34 ├ ○ /vendor-staff                        4.57 kB         156 kB
+#34 38.34 ├ ○ /vendors                             5.48 kB         162 kB
+#34 38.34 ├ ƒ /vendors/[id]                        10.6 kB         162 kB
+#34 38.34 └ ○ /wallet-adjustments                   3.3 kB         160 kB
+#34 38.34 + First Load JS shared by all             102 kB
+#34 38.34   ├ chunks/1255-8dc91b756d944555.js      46.2 kB
+#34 38.34   ├ chunks/4bd1b696-100b9d70ed4e49c1.js  54.2 kB
+#34 38.34   └ other shared chunks (total)          1.94 kB
+#34 38.34 
+#34 38.34 
+#34 38.34 ○  (Static)   prerendered as static content
+#34 38.34 ƒ  (Dynamic)  server-rendered on demand
+#34 38.34 
+#34 DONE 38.5s
+
+#35 [prod-dashboard runtime 3/5] RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+#35 CACHED
+
+#36 [prod-dashboard runtime 4/5] COPY --from=build /repo /repo
+#36 DONE 3.7s
+
+#37 [prod-dashboard runtime 5/5] WORKDIR /repo/apps/dashboard
+#37 DONE 0.2s
+
+#38 [prod-dashboard] exporting to image
+#38 exporting layers
+#38 exporting layers 26.9s done
+#38 exporting manifest sha256:5280c628cd326560c0a09624c0cd502be101fd543be3f92caef2935a1a2604f9
+#38 exporting manifest sha256:5280c628cd326560c0a09624c0cd502be101fd543be3f92caef2935a1a2604f9 done
+#38 exporting config sha256:c8e95e1d1470de8a3c4c75a9c1c63b49fd5ce4d2391bde9e081e2f6e02c52730 done
+#38 exporting attestation manifest sha256:217de022c0016e4e81f4eafabea6762b0ef11dbb95565055c3d383dc25557a23 done
+#38 exporting manifest list sha256:77ce581d78ede27020bf07c0016a5946ce98e76218976abee68f1738b09e18d7 done
+#38 naming to docker.io/library/hatly-prod-dashboard:20261122T214911Z-ceb689a804f1 done
+#38 unpacking to docker.io/library/hatly-prod-dashboard:20261122T214911Z-ceb689a804f1
+#38 unpacking to docker.io/library/hatly-prod-dashboard:20261122T214911Z-ceb689a804f1 5.2s done
+#38 DONE 32.2s
+
+#39 [prod-dashboard] resolving provenance for metadata file
+#39 DONE 0.0s
+ Image hatly-prod-backend:20261122T214911Z-ceb689a804f1 Built 
+ Image hatly-prod-dashboard:20261122T214911Z-ceb689a804f1 Built 
+
+==== 3. env check with the new image  (21:50:41 UTC)
+ Container hatly-prod-prod-backend-run-0e2a14a759d7 Creating 
+ Container hatly-prod-prod-backend-run-0e2a14a759d7 Created 
+WARN   REDIS_URL is not TLS (redis://): acceptable only on a private network (e.g. the staging compose network); use rediss:// for a managed/remote Redis.
+WARN   MAPS_PROVIDER=none: Google Maps is disabled — delivery fees and serviceability come from the selected Delivery Zone only, address search/suggestions are off, and dispatch ranks drivers by straight-line distance (bicycle drivers are not auto-ranked).
+WARN   SMS provider (Unifonic) is not configured (ALLOW_MISSING_SMS_PROVIDER=true): OTP/phone-verification messages cannot be sent.
+WARN   Firebase push (FCM) is not configured (ALLOW_MISSING_PUSH_PROVIDER=true): push notifications are disabled.
+ENV CHECK PASSED (4 warnings)
+
+==== 4. migration plan  (21:50:42 UTC)
+ Container hatly-prod-prod-backend-run-7032e44112d7 Creating 
+ Container hatly-prod-prod-backend-run-7032e44112d7 Created 
+ Container hatly-prod-prod-backend-run-37515889ac97 Creating 
+ Container hatly-prod-prod-backend-run-37515889ac97 Created 
+[X] 79 OpsAlertsWebPush1700007800000
+[X] 80 SettlementClosingLines1700007900000
+[X] 81 OptionalProofPhoto1700008000000
+[X] 82 DriverPresence1700008100000
+[X] 83 StaffLevels1700008200000
+[X] 84 BranchAndOfferArabicNames1700008300000
+[X] 85 VendorCoverImage1700008400000
+[X] 86 SectorsAdminOnly1700008500000
+pending migrations: 0
+
+==== 5. backup + restore drill  (21:50:44 UTC)
+backup OK: hatly-prod-20261122T215044Z.dump 1683152 bytes, 106 table-data sections, sha256 3e9f4eecc3a8…, off-site: NOT CONFIGURED
+uploads backup OK: hatly-prod-uploads-20261122T215045Z.tar.gz 11814117 bytes, 103 files, sha256 9ca42f39df11…, off-site: NOT CONFIGURED
+newest dump: hatly-prod-20261122T215044Z.dump
+drill database hatly_drill_20261122215045 restored from hatly-prod-20261122T215044Z.dump: 106 tables, 86 migrations recorded, 22 users
+restore drill OK
+
+==== 6. no migrations to run  (21:50:48 UTC)
+
+==== 7. switch release + start the new apps  (21:50:48 UTC)
+ Container hatly-prod-redis-1 Running 
+ Container hatly-prod-postgres-1 Running 
+ Container hatly-prod-backend-1 Recreate 
+ Container hatly-prod-backend-1 Recreated 
+ Container hatly-prod-dashboard-1 Recreate 
+ Container hatly-prod-dashboard-1 Recreated 
+ Container hatly-prod-redis-1 Waiting 
+ Container hatly-prod-postgres-1 Waiting 
+ Container hatly-prod-postgres-1 Healthy 
+ Container hatly-prod-redis-1 Healthy 
+ Container hatly-prod-backend-1 Starting 
+ Container hatly-prod-backend-1 Started 
+ Container hatly-prod-backend-1 Waiting 
+ Container hatly-prod-backend-1 Healthy 
+ Container hatly-prod-dashboard-1 Starting 
+ Container hatly-prod-dashboard-1 Started 
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED         STATUS                                     PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261122T214911Z-ceb689a804f1     "docker-entrypoint.s…"   prod-backend     8 seconds ago   Up 5 seconds (healthy)                     3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261122T214911Z-ceb689a804f1   "docker-entrypoint.s…"   prod-dashboard   8 seconds ago   Up Less than a second (health: starting)   3001/tcp
+
+==== 8. health  (21:50:56 UTC)
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED          STATUS                    PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261122T214911Z-ceb689a804f1     "docker-entrypoint.s…"   prod-backend     13 seconds ago   Up 11 seconds (healthy)   3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261122T214911Z-ceb689a804f1   "docker-entrypoint.s…"   prod-dashboard   13 seconds ago   Up 5 seconds (healthy)    3001/tcp
+hatly-prod-postgres-1    postgres:16-alpine                                   "docker-entrypoint.s…"   postgres         4 weeks ago      Up 12 days (healthy)      5432/tcp
+hatly-prod-redis-1       redis:7-alpine                                       "docker-entrypoint.s…"   redis            4 weeks ago      Up 12 days (healthy)      6379/tcp
+{"data":{"status":"ok","checks":{"database":"up","redis":"up"}}}
+dashboard /privacy 200
+
+==== 9. recent backend errors  (21:51:01 UTC)
+0
+
+==== 10. tidy disk (keeps the 3 newest releases + their images; build cache capped at 5 GB)  (21:51:01 UTC)
+/dev/sda1        96G   20G   77G  21% /
+DEPLOYED 20261122T214911Z-ceb689a804f1 (previous: 20261122T213936Z-3d7f0a3be5bd — rollback: request ACTION=rollback RELEASE=20261122T213936Z-3d7f0a3be5bd)
+200  https://api.hatly.dev/api/v1/health/ready
+307  https://admin.hatly.dev/
+job status: success
