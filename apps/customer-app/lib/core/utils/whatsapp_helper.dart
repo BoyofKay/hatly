@@ -41,11 +41,12 @@ Future<bool> openWhatsAppWithMessage(
 /// customer still types/sends the actual proof themselves; this is
 /// only the message shell.
 String buildTransferProofMessage({
-  required String orderId,
+  /// The customer-facing order number (HT-…), never the internal id.
+  required String orderNumber,
   required String paymentMethodLabel,
   required String formattedAmount,
 }) {
-  return 'Hatly Order #$orderId\n'
+  return 'Hatly Order #$orderNumber\n'
       'Payment method: $paymentMethodLabel\n'
       'Amount: $formattedAmount\n\n'
       'Hi, I\'ve sent the payment for this order. Attaching my transfer proof below.';

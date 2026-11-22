@@ -161,7 +161,7 @@ class _Content extends StatelessWidget {
           key: const Key('tracking-support-contact'),
           label: l10n.supportContactOrderAction,
           hideWhenUnavailable: true,
-          messageBuilder: (l10n) => l10n.supportMessageOrder(tracking.orderId),
+          messageBuilder: (l10n) => l10n.supportMessageOrder(tracking.orderNumber),
         ),
       ],
     );

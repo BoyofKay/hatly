@@ -216,11 +216,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final orderId = state.pathParameters['orderId']!;
           final extra =
-              state.extra as ({int? totalMinor, String paymentMethodLabel})?;
+              state.extra as ({int? totalMinor, String paymentMethodLabel, String? orderNumber})?;
           return TransferInstructionsScreen(
             orderId: orderId,
             totalMinor: extra?.totalMinor,
             paymentMethodLabel: extra?.paymentMethodLabel ?? '',
+            orderNumber: extra?.orderNumber,
           );
         },
       ),
