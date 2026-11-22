@@ -1,2 +1,3 @@
-ACTION=disk-report
+ACTION=deploy
 ARG=
+# banner + photos in edit + zone fee d972793
