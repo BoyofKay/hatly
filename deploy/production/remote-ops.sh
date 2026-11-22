@@ -153,5 +153,28 @@ SELECT to_char(ad.created_at, 'YYYY-MM-DD HH24:MI') AS saved, coalesce(ad.mode, 
 SQL
     ;;
 
+  maps-on|maps-off)
+    # maps-on: the key was uploaded by the workflow to $PD/.maps-key (mode 600) — never on a command line or in a log.
+    ENVF="$PD/.env.production"
+    BAK="$ENVF.bak-$(date -u +%Y%m%dT%H%M%SZ)"; $SUDO cp -p "$ENVF" "$BAK"
+    $SUDO sed -i '/^MAPS_PROVIDER=/d; /^GOOGLE_MAPS_API_KEY=/d' "$ENVF"
+    if [ "$action" = maps-on ]; then
+      KEYF="$PD/.maps-key"; [ -s "$KEYF" ] || { echo "no key uploaded"; exit 2; }
+      KEY="$(cat "$KEYF")"; rm -f "$KEYF"
+      [[ "$KEY" =~ ^[A-Za-z0-9_-]{30,60}$ ]] || { echo "that does not look like a Google API key"; exit 2; }
+      printf 'MAPS_PROVIDER=google\nGOOGLE_MAPS_API_KEY=%s\n' "$KEY" | $SUDO tee -a "$ENVF" >/dev/null
+      echo "Google Maps: ON (key ending …${KEY: -4})"
+    else
+      echo 'MAPS_PROVIDER=none' | $SUDO tee -a "$ENVF" >/dev/null
+      echo "Google Maps: OFF (delivery fees come from zones only)"
+    fi
+    step "env check"
+    if ! "$PD/current/deploy/production/prod.sh" env-check; then
+      echo "ENV CHECK FAILED — the previous settings are restored and nothing was restarted"; $SUDO cp -p "$BAK" "$ENVF"; exit 1
+    fi
+    step "restart apps"; "$PD/current/deploy/production/prod.sh" apps
+    sleep 20; "$PD/current/deploy/production/prod.sh" status
+    ;;
+
   *) echo "unknown action $action"; exit 2;;
 esac
