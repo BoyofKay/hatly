@@ -128,7 +128,7 @@ export enum BusinessConfigKey {
   DISPATCH_PREFERRED_RADIUS_METERS = 'DISPATCH_PREFERRED_RADIUS_METERS',
   /**
    * Early dispatch (owner decision 2026-11-22): attach a driver while the store prepares the order. OFF by default — switch it on once the
-   * drivers run driver app 1.0.1+ (older apps do not show an order before it is ready, so they could not acknowledge it in time).
+   * drivers run driver app 1.0.2+ (older apps do not show an order before it is ready, so they could not acknowledge it in time).
    */
   EARLY_DISPATCH_ENABLED = 'EARLY_DISPATCH_ENABLED',
 

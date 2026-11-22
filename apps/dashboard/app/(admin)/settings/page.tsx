@@ -75,7 +75,7 @@ const CONFIG_FIELDS: ConfigFieldDef[] = [
     key: 'EARLY_DISPATCH_ENABLED',
     label: 'Early dispatch (driver while the store prepares)',
     type: 'boolean',
-    help: 'ON: a driver is attached when the store accepts the order, or the lead time below before the expected ready time — whichever is later; the driver heads to the store and marks Picked up once it is ready. Needs Automatic Dispatch ON. Switch it on only after the drivers have driver app 1.0.1 or newer.',
+    help: 'ON: a driver is attached when the store accepts the order, or the lead time below before the expected ready time — whichever is later; the driver heads to the store and marks Picked up once it is ready. Needs Automatic Dispatch ON. Switch it on only after the drivers have driver app 1.0.2 (build 11) or newer.',
   },
   {
     key: 'DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES',
