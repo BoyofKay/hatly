@@ -56,7 +56,7 @@ jobs:
             ACTION="$(sed -n 's/^ACTION=//p' ops/REQUEST | head -1 | tr -d '\r')"
             ARG="$(sed -n 's/^ARG=//p' ops/REQUEST | head -1 | tr -d '\r' | sed 's/^"//; s/"$//')"
           fi
-          case "$ACTION" in status|deploy|rollback|reset-dry-run|reset-apply|disk-report|cleanup) ;; *) echo "unknown ACTION '$ACTION'"; exit 2;; esac
+          case "$ACTION" in status|deploy|rollback|reset-dry-run|reset-apply|disk-report|cleanup|service-areas) ;; *) echo "unknown ACTION '$ACTION'"; exit 2;; esac
           # ARG goes to the server as one argument; allow only release ids and cutoff timestamps.
           [[ -z "$ARG" || "$ARG" =~ ^[0-9A-Za-z:+\ -]{1,40}$ ]] || { echo "ARG has characters that are not allowed"; exit 2; }
           { echo "action=$ACTION"; echo "arg=$ARG"; } >> "$GITHUB_OUTPUT"
@@ -107,7 +107,7 @@ jobs:
           } 2>&1 | tee "$log"
 
       - name: Public checks
-        if: always() && steps.req.outputs.action != 'status' && steps.req.outputs.action != 'disk-report'
+        if: always() && steps.req.outputs.action != 'status' && steps.req.outputs.action != 'disk-report' && steps.req.outputs.action != 'service-areas'
         run: |
           for u in https://api.hatly.dev/api/v1/health/ready https://admin.hatly.dev/; do
             printf '%s  %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -m 15 "$u")" "$u"

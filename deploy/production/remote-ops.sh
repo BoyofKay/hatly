@@ -124,5 +124,24 @@ case "$action" in
     "$PD/current/deploy/production/prod.sh" status
     ;;
 
+  service-areas)
+    # Read-only: the service areas, and how the 10 most recently saved addresses relate to them (mode, zone or not, distance in km
+    # from each active area's centre vs its radius). No names, phones or address text are printed.
+    $SUDO docker exec -i hatly-prod-postgres-1 sh -c 'psql -X -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -P pager=off' <<'SQL'
+\echo '== service areas'
+SELECT name, is_active, round(center_latitude::numeric, 5) AS lat, round(center_longitude::numeric, 5) AS lng, radius_meters FROM service_areas WHERE deleted_at IS NULL ORDER BY name;
+\echo '== delivery zones'
+SELECT z.name, z.is_active, z.delivery_fee_minor / 100.0 AS fee_egp, a.name AS area FROM delivery_zones z JOIN service_areas a ON a.id = z.service_area_id ORDER BY a.name, z.display_order;
+\echo '== latest saved addresses vs active areas (km from centre / radius km)'
+SELECT to_char(ad.created_at, 'YYYY-MM-DD HH24:MI') AS saved, coalesce(ad.mode, 'legacy') AS mode, (ad.delivery_zone_id IS NOT NULL) AS has_zone,
+       (ad.latitude IS NOT NULL) AS has_pin, a.name AS area,
+       round((6371 * acos(least(1, cos(radians(a.center_latitude)) * cos(radians(ad.latitude)) * cos(radians(ad.longitude) - radians(a.center_longitude)) + sin(radians(a.center_latitude)) * sin(radians(ad.latitude)))))::numeric, 2) AS km_from_centre,
+       round(a.radius_meters / 1000.0, 2) AS radius_km
+  FROM (SELECT * FROM addresses WHERE is_active ORDER BY created_at DESC LIMIT 10) ad
+  LEFT JOIN service_areas a ON a.is_active AND a.deleted_at IS NULL AND ad.latitude IS NOT NULL
+ ORDER BY ad.created_at DESC;
+SQL
+    ;;
+
   *) echo "unknown action $action"; exit 2;;
 esac
