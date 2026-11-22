@@ -10,8 +10,8 @@ const PHONE_RE = /^\+[1-9]\d{7,14}$/;
 
 /**
  * A branch manager's staff management — deliberately narrower than the Admin's. A manager can, WITHIN THEIR OWN branches: create an OPERATOR account,
- * activate or deactivate an operator, and add/remove an operator on another of their branches. Everything else stays with the Admin: creating or
- * promoting a manager, changing anyone's role, touching a manager's account or one's own, and touching an account that also works at a branch the
+ * activate or deactivate an operator, add/remove an operator on another of their branches, and (owner decision 2026-11-22) PROMOTE one of their own
+ * operators to manager. Everything else stays with the Admin: demoting a manager, changing anyone's role, touching a manager's account or one's own, and touching an account that also works at a branch the
  * caller does not own (the person is an identity shared with another branch, not this manager's to switch off). Accounts are created with the same
  * phone + password rules as the Admin path; no existing customer/driver/admin number is ever turned into staff. Every change is audited.
  */
@@ -58,6 +58,15 @@ export class VendorTeamService {
     const created = await this.staff.create({ phone, fullName, password: body.password, vendorBranchId: branchId, role: Role.VENDOR });
     await this.audit.record({ actorUserId: user.id, actorRole: user.role, action: AdminAuditAction.VENDOR_STAFF_CREATED, targetType: 'vendor_staff', targetId: String(created.id), metadata: { role: Role.VENDOR, branchId, via: 'vendor_manager' } });
     return { id: created.userId };
+  }
+
+  /** Owner decision 2026-11-22: a store manager may make one of their OWN operators (working only at the manager's branches) a manager. */
+  async promoteToManager(user: Actor, targetUserId: string) {
+    this.managerOnly(user);
+    await this.manageableOperator(user, targetUserId); // VENDOR role, not the caller, every branch owned by the caller
+    await this.ds.query(`UPDATE users SET role = 'VENDOR_MANAGER', updated_at = now() WHERE id = $1 AND role = 'VENDOR'`, [targetUserId]);
+    await this.audit.record({ actorUserId: user.id, actorRole: user.role, action: AdminAuditAction.VENDOR_STAFF_PROMOTED, targetType: 'user', targetId: targetUserId, metadata: { to: 'VENDOR_MANAGER' } });
+    return { userId: targetUserId, role: 'VENDOR_MANAGER' };
   }
 
   async setActive(user: Actor, targetUserId: string, isActive: unknown) {

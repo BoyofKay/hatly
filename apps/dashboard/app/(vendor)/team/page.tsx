@@ -6,7 +6,7 @@ import { ICONS } from '../../../components/ui/icons';
 import { useApi } from '../../../lib/ui/api';
 import { useLang } from '../../../lib/ui/lang';
 import { apiErrorMessage } from '../../../lib/api/errors';
-import { assignOperatorBranch, createOperator, setOperatorActive, unassignOperatorBranch, type TeamMember, type TeamView } from '../../../lib/api/vendor-operations';
+import { assignOperatorBranch, createOperator, promoteOperator, setOperatorActive, unassignOperatorBranch, type TeamMember, type TeamView } from '../../../lib/api/vendor-operations';
 
 /**
  * The people linked to your branches. A branch MANAGER can, within their own branches only: add an operator, activate or deactivate an operator, and
@@ -28,6 +28,7 @@ export default function VendorTeamPage() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [toggle, setToggle] = useState<TeamMember | null>(null);
+  const [promote, setPromote] = useState<TeamMember | null>(null);
   const [branchesFor, setBranchesFor] = useState<TeamMember | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -114,6 +115,7 @@ export default function VendorTeamPage() {
             cell: (m) => m.manageable ? (
               <span className="inline-flex gap-2">
                 {(team?.branches.length ?? 0) > 1 && <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setBranchesFor(m); }}>{t('Branches', 'الفروع')}</Button>}
+                {m.role !== 'MANAGER' && m.isActive && <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setPromote(m); }}>{t('Make manager', 'ترقية لمدير')}</Button>}
                 <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setToggle(m); }}>{m.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</Button>
               </span>
             ) : null,
@@ -159,6 +161,31 @@ export default function VendorTeamPage() {
         error={actionError}
         onConfirm={() => void confirmToggle()}
         onClose={() => setToggle(null)}
+      />
+
+      <ConfirmDialog
+        open={!!promote}
+        title={t('Make this person a manager?', 'ترقية هذا الشخص إلى مدير؟')}
+        message={promote ? t(`${promote.fullName} will be able to manage the team, products and settings of your branches. Only Hatly can undo this.`, `سيتمكن ${promote.fullName} من إدارة الفريق والمنتجات وإعدادات فروعك. هاتلي فقط يمكنها التراجع عن ذلك.`) : ''}
+        confirmLabel={t('Make manager', 'ترقية لمدير')}
+        busy={busy}
+        error={actionError}
+        onConfirm={() => void (async () => {
+          if (!promote || busy) return;
+          setBusy(true);
+          setActionError(null);
+          try {
+            await promoteOperator(promote.id);
+            toast.push('success', t('Promoted. They get manager rights the next time they sign in.', 'تمت الترقية. تظهر صلاحيات المدير عند تسجيل دخوله التالي.'));
+            setPromote(null);
+            state.reload();
+          } catch (err) {
+            setActionError(apiErrorMessage(err, t('Could not promote this person.', 'تعذّرت الترقية.')));
+          } finally {
+            setBusy(false);
+          }
+        })()}
+        onClose={() => setPromote(null)}
       />
 
       <Modal open={!!live} title={live ? t(`Branches of ${live.fullName}`, `فروع ${live.fullName}`) : ''} onClose={() => !busy && setBranchesFor(null)} footer={<Button onClick={() => setBranchesFor(null)}>{t('Close', 'إغلاق')}</Button>}>

@@ -21,6 +21,8 @@ export const AdminAuditAction = {
   VENDOR_STAFF_CREATED: 'vendor_staff.created',
   VENDOR_STAFF_ACTIVATED: 'vendor_staff.activated',
   VENDOR_STAFF_DEACTIVATED: 'vendor_staff.deactivated',
+  /** A store manager made one of their own operators a manager (owner decision 2026-11-22). */
+  VENDOR_STAFF_PROMOTED: 'vendor_staff.promoted',
   BUSINESS_CONFIG_CHANGED: 'business_config.changed',
   SECTOR_CUSTOM_REQUESTS_CHANGED: 'sector.custom_requests_changed',
   /** A customer deleted their own account (store policy). Records the id only — never the name or phone that were erased. */

@@ -19,6 +19,7 @@ export interface TeamView {
   branches: Array<{ id: string; name: string }>;
 }
 export const createOperator = async (body: { fullName: string; phone: string; password: string; branchId: string }) => (await apiClient.post('/vendor/team/members', body)).data.data as { id: string };
+export const promoteOperator = async (userId: string) => (await apiClient.post(`/vendor/team/members/${userId}/promote`)).data.data;
 export const setOperatorActive = async (userId: string, isActive: boolean) => (await apiClient.patch(`/vendor/team/members/${userId}/active`, { isActive })).data.data;
 export const assignOperatorBranch = async (userId: string, branchId: string) => (await apiClient.post(`/vendor/team/members/${userId}/branches/${branchId}`)).data.data;
 export const unassignOperatorBranch = async (userId: string, branchId: string) => (await apiClient.delete(`/vendor/team/members/${userId}/branches/${branchId}`)).data.data;

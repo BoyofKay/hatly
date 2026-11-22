@@ -32,6 +32,12 @@ export class VendorTeamController {
     return { data: await this.team.setActive(user, userId, body?.isActive) };
   }
 
+  /** A manager makes one of their own operators a manager (takes effect when that person next signs in or their session refreshes). */
+  @Post(':userId/promote')
+  async promote(@CurrentUser() user: AuthenticatedUser, @Param('userId') userId: string) {
+    return { data: await this.team.promoteToManager(user, userId) };
+  }
+
   @Post(':userId/branches/:branchId')
   async assign(@CurrentUser() user: AuthenticatedUser, @Param('userId') userId: string, @Param('branchId') branchId: string) {
     return { data: await this.team.assignBranch(user, userId, branchId) };
