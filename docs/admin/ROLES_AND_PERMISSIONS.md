@@ -43,9 +43,9 @@ The presets are the recommended starting point — the super admin (or an admin,
 | **Open / close a store** (also temporary closures) | — | ✓ | ✓ | ✓ | OPEN_CLOSE_VENDOR_BRANCHES |
 | Create / edit stores and branches; activate / deactivate | — | — | ✓ | ✓ | MANAGE_VENDORS |
 | Menu: products, categories, options, menu import, photos | — | — | ✓ | ✓ | MANAGE_CATALOG |
-| Store staff accounts | — | — | ✓ | ✓ | MANAGE_VENDOR_STAFF |
-| Sections, service areas, vehicle types; rename / order / activate delivery zones | — | — | ✓ | ✓ | MANAGE_MARKETPLACE_SECTORS, MANAGE_SERVICE_AREAS, MANAGE_VEHICLE_TYPES |
-| **Delete** any of the above | — | — | ✓ | ✓ | the area permission **+ DELETE_RECORDS** |
+| Store staff accounts (also promote an operator to manager) | — | — | ✓ | ✓ | MANAGE_VENDOR_STAFF |
+| Sections, vehicle types; service areas (rename, move the centre, expand the radius); delivery zones (rename, move the point, order, activate / deactivate) | — | — | ✓ | ✓ | MANAGE_MARKETPLACE_SECTORS, MANAGE_SERVICE_AREAS, MANAGE_VEHICLE_TYPES |
+| **Delete** any of the above (except delivery zones, which are never deleted — deactivate or edit them) | — | — | ✓ | ✓ | the area permission **+ DELETE_RECORDS** |
 | Commission rate, who accepts orders (acceptance mode) | — | — | — | ✓ | MANAGE_VENDOR_COMMISSION |
 | Create a delivery zone, change a zone's fee | — | — | — | ✓ | MANAGE_SERVICE_AREAS + MANAGE_DELIVERY_FEE_MULTIPLIER |
 
@@ -58,7 +58,8 @@ The presets are the recommended starting point — the super admin (or an admin,
 | **Store / driver settlement payments** (record, void) | — | — | ✓ | ✓ | MANAGE_SETTLEMENT_PAYMENTS |
 | Approve a payment above the amount due | — | — | — | ✓ | APPROVE_SETTLEMENT_OVERPAYMENT |
 | Ledger, revenue, receivables, reconciliation | — | — | ✓ | ✓ | VIEW_FINANCIALS, VIEW_VENDOR_FINANCIAL_REPORTS |
-| Employee loans | — | — | — | ✓ | MANAGE_EMPLOYEE_LOANS |
+| **Loans to drivers** (lend, record repayment) — shown again at the driver's shift closing | — | ✓ | ✓ | ✓ | MANAGE_EMPLOYEE_LOANS |
+| Maximum a driver may owe in loans (Settings; empty = no cap, the supervisor decides) | — | — | — | ✓ | MANAGE_BUSINESS_CONFIG |
 
 ## Customers, marketing, reports
 | Action | Team | Supervisor | Admin | Super | Permission |
@@ -109,6 +110,8 @@ The same rule applies to editing, resetting a password, deactivating and deletin
 | Role templates, granting any permission to any admin | — | — | — | ✓ | super admin only |
 
 ### Notes
+- Store managers can also promote their own operators to manager from the store dashboard (owner decision 2026-11-22).
+- Driver money (decisions 2026-11-13, confirmed 2026-11-22): cash order — the driver pays the store, collects from the customer and owes Hatly only his commission; prepaid order — Hatly owes the driver the goods + his fee − commission, paid at his shift closing.
 - Owner decisions 2026-11-22: keep **one** super admin (admins can do almost everything except security and audit); supervisors keep the executive dashboard **without money figures** while the owner tests it.
 - "Refunds" for a cancelled or failed order are **recorded** by the supervisor; sending the money is done outside the system and then marked as sent.
 - Two decisions from the earlier notes are still open and affect money rows above: the driver cash balance rule and the store net-payable rule.
