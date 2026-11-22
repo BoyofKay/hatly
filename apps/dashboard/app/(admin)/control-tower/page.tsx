@@ -787,7 +787,7 @@ function ControlTowerScreen() {
             )}
             <div className="mt-5 flex flex-wrap gap-2">
               <Link href={`/order-management?order=${panel.orderId}`} className="inline-flex min-h-[44px] items-center rounded-lg bg-hatly-orange px-4 text-sm font-medium text-white hover:bg-hatly-orangeDark md:min-h-0 md:py-1.5">{tt('Open the order', 'فتح الطلب')}</Link>
-              <Link href="/exceptions" className="inline-flex min-h-[44px] items-center rounded-lg border border-gray-300 px-4 text-sm hover:bg-gray-50 md:min-h-0 md:py-1.5">{tt('Exceptions queue', 'قائمة الاستثناءات')}</Link>
+              <Link href={`/exceptions?order=${panel.orderId}`} className="inline-flex min-h-[44px] items-center rounded-lg border border-gray-300 px-4 text-sm hover:bg-gray-50 md:min-h-0 md:py-1.5">{tt('Exceptions queue', 'قائمة الاستثناءات')}</Link>
             </div>
           </aside>
         </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { apiErrorMessage } from '../../lib/api/errors';
 import { useState } from 'react';
 import { Button, Card, LabeledInput } from '../ui';
 import { useLang } from '../../lib/ui/lang';
@@ -29,7 +30,7 @@ export function BranchHoursEditor({ initialHours, initialPrep, canEdit, onSave }
     const p = prep.trim() === '' ? null : Number(prep);
     if (p !== null && (!Number.isInteger(p) || p < 1 || p > 600)) return setError(t('Preparation time must be a whole number of minutes from 1 to 600.', 'مدة التحضير عدد صحيح من الدقائق بين 1 و600.'));
     setSaving(true);
-    try { await onSave(hours, p); setSaved(true); } catch (e: any) { setError(e?.response?.data?.error?.message ?? t('The settings were refused.', 'تم رفض الإعدادات.')); } finally { setSaving(false); }
+    try { await onSave(hours, p); setSaved(true); } catch (e: any) { setError(apiErrorMessage(e, t('The settings were refused.', 'تم رفض الإعدادات.'))); } finally { setSaving(false); }
   }
   return (
     <Card title={t('Weekly hours and preparation time', 'المواعيد الأسبوعية ومدة التحضير')}>

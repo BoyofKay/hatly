@@ -45,6 +45,7 @@ const CLEARABLE_KEYS: ReadonlySet<string> = new Set([
   BusinessConfigKey.MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES,
   BusinessConfigKey.DRIVER_PRESENCE_STALE_MINUTES, // unset = the "app silent" driver alert is off
   BusinessConfigKey.EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR, // unset = no cap; the supervisor decides
+  BusinessConfigKey.DISPATCH_PREFERRED_RADIUS_METERS, // unset = 3000 m
 ]);
 
 /** Keys whose value has a known shape: a write that does not match is refused (400) instead of breaking pricing later. */
@@ -84,6 +85,10 @@ const VALUE_VALIDATORS: Partial<Record<string, { valid: (v: unknown) => boolean;
   [BusinessConfigKey.DRIVER_PRESENCE_STALE_MINUTES]: {
     valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 2 && v <= 240,
     message: 'DRIVER_PRESENCE_STALE_MINUTES must be a whole number of minutes from 2 to 240; clear it to turn the "driver app silent" alert off.',
+  },
+  [BusinessConfigKey.DISPATCH_PREFERRED_RADIUS_METERS]: {
+    valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 300 && v <= 50_000,
+    message: 'DISPATCH_PREFERRED_RADIUS_METERS must be a whole number of metres from 300 to 50000; clear it for the 3000 m default.',
   },
   [BusinessConfigKey.EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR]: {
     valid: (v) => typeof v === 'number' && Number.isInteger(v) && v > 0 && v <= 100_000_000,
@@ -227,6 +232,12 @@ export class BusinessConfigService {
    * yet," which DriverRankingService interprets as "exclude bicycles
    * entirely" (fail closed), never as "no limit at all."
    */
+  /** Owner decision 2026-11-22: the distance within which dispatch prefers the least-busy driver (default 3000 m). */
+  async getDispatchPreferredRadiusMeters(): Promise<number> {
+    const v = await this.get<number | null>(BusinessConfigKey.DISPATCH_PREFERRED_RADIUS_METERS, null);
+    return typeof v === 'number' && v >= 300 && v <= 50_000 ? v : 3000;
+  }
+
   async getMaxBicyclePickupDistanceMeters(): Promise<number | null> {
     return this.get<number | null>(BusinessConfigKey.MAX_BICYCLE_PICKUP_DISTANCE_METERS, null);
   }

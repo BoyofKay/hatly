@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   EmployeeLoan,
   EmployeeLoanStatus,
@@ -55,6 +55,13 @@ export default function EmployeeLoansPage() {
   const [issueError, setIssueError] = useState<string | null>(null);
   const [confirmIssue, setConfirmIssue] = useState(false);
   const [issuing, setIssuing] = useState(false);
+
+  // Opened from a courier's shift closing (?person=<user id>): show that person's loans straight away.
+  useEffect(() => {
+    const person = new URLSearchParams(window.location.search).get('person');
+    if (person && /^[0-9a-f-]{36}$/i.test(person)) { setEmployeeId(person); void lookup(undefined, person); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function lookup(e?: React.FormEvent, id = employeeId) {
     e?.preventDefault();

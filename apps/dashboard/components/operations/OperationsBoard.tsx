@@ -259,7 +259,7 @@ function Board() {
 
                 <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:min-w-[22rem]">
                   {o.unverifiedTransfer && ['PENDING', 'CONFIRMED', 'PREPARING'].includes(o.status) ? (
-                    <Link href="/manual-transfer" className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-hatly-orange px-3 text-sm font-semibold text-white hover:bg-hatly-orangeDark" data-testid="board-verify-transfer">{t('Verify the transfer', 'تحقق من التحويل')}</Link>
+                    <Link href={`/manual-transfer?order=${encodeURIComponent(o.orderNumber)}`} className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-hatly-orange px-3 text-sm font-semibold text-white hover:bg-hatly-orangeDark" data-testid="board-verify-transfer">{t('Verify the transfer', 'تحقق من التحويل')}</Link>
                   ) : (
                     live.filter((g: any) => ['PENDING', 'CONFIRMED', 'PREPARING'].includes(g.status)).map((g: any) => (
                       <div key={g.id} className="flex flex-wrap items-center gap-2" data-testid={`board-seg-${g.id}`}>
@@ -320,7 +320,7 @@ function Board() {
                     <a href={`tel:${o.driver.phone}`} className="inline-flex min-h-[40px] items-center justify-center rounded-lg border border-gray-300 px-3 text-sm font-medium text-gray-800" data-testid="board-call-driver">{t('Call the driver', 'اتصل بالمندوب')} <bdi className="ms-1">{o.driver.phone}</bdi></a>
                   )}
                   {o.reason === 'FAILED_DELIVERY' && (
-                    <Link href="/failed-deliveries" className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-red-600 px-3 text-sm font-semibold text-white">{t('Decide what happens next', 'قرّر الخطوة التالية')}</Link>
+                    <Link href={`/failed-deliveries/${o.id}`} className="inline-flex min-h-[40px] items-center justify-center rounded-lg bg-red-600 px-3 text-sm font-semibold text-white">{t('Decide what happens next', 'قرّر الخطوة التالية')}</Link>
                   )}
                 </div>
               </div>

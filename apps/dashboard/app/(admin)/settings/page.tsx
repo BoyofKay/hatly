@@ -63,13 +63,21 @@ const CONFIG_FIELDS: ConfigFieldDef[] = [
   },
   { key: 'EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR', label: 'Maximum a driver may owe in loans', type: 'money', unit: 'EGP', clearable: true, help: 'The most one employee (driver) may owe in loans at a time. Empty = no cap: the operations supervisor decides each loan.' },
   { key: 'MAX_BICYCLE_PICKUP_DISTANCE_METERS', label: 'Max Bicycle Pickup Distance', type: 'integer', unit: 'meters' },
+  {
+    key: 'DISPATCH_PREFERRED_RADIUS_METERS',
+    label: 'Dispatch: preferred driver radius',
+    type: 'integer',
+    unit: 'meters',
+    help: 'Automatic assignment prefers the driver with the FEWEST active orders among drivers within this distance of the store (then the nearest). Drivers farther away are used only when nobody is this close. Empty = 3000 m. Allowed 300 to 50000.',
+    clearable: true,
+  },
   { key: 'DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES', label: 'Dispatch Assignment Lead Time', type: 'integer', unit: 'minutes' },
   {
     key: 'DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES',
     label: 'Driver Acknowledgement Window',
     type: 'integer',
     unit: 'minutes',
-    help: 'How long a driver has to acknowledge an assignment (manual or automatic). Default 5 when empty; allowed 1 to 30. When it passes, Operations get an alert — the order is never released or reassigned automatically. Applies to new assignments only.',
+    help: 'How long a driver has to acknowledge an assignment (manual or automatic). Default 5 when empty; allowed 1 to 30. When it passes, Operations get an alert and — when automatic assignment is on — the order is offered to the next driver automatically. Applies to new assignments only.',
     clearable: true,
   },
   {

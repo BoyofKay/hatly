@@ -531,7 +531,7 @@ void main() {
 
   group('add to cart', () {
     testWidgets(
-        'success: the original LISTING id is sent, and a Cart Mini-Sheet appears (no SnackBar-only)',
+        'success: the original LISTING id is sent, and the customer lands on the store page with a short note (no sheet)',
         (tester) async {
       _phone(tester);
       final api = _FakeCartApi();
@@ -542,43 +542,21 @@ void main() {
 
       expect(api.calls.single['productId'], 'listing-1');
       expect(api.calls.single['quantity'], 2);
-      expect(find.text('تمت الإضافة إلى السلة'), findsOneWidget);
-      // sheet contents: item, quantity, vendor, total, cart summary, both actions
-      expect(find.text('×2'), findsOneWidget);
-      expect(find.text('من ماركت وان'), findsOneWidget);
-      expect(find.text('عرض السلة'), findsOneWidget);
-      expect(find.text('متابعة التسوق'), findsOneWidget);
-      expect(find.textContaining('السلة:'), findsOneWidget);
-      expect(find.byType(SnackBar), findsNothing);
-      // not checkout: no payment / address / order placement anywhere in the sheet
-      expect(find.textContaining('الدفع'), findsNothing);
-      expect(find.textContaining('العنوان'), findsNothing);
+      expect(find.text('page /vendors/b1'), findsOneWidget);
+      expect(find.byKey(const Key('added-to-cart-snackbar')), findsOneWidget);
+      expect(find.textContaining('تمت الإضافة إلى السلة'), findsOneWidget);
+      expect(find.text('متابعة التسوق'), findsNothing, reason: 'no extra sheet to dismiss');
     });
 
-    testWidgets('"متابعة التسوق" dismisses the sheet and stays on the product',
-        (tester) async {
+    testWidgets('"عرض السلة" on the note opens the cart', (tester) async {
       _phone(tester);
       final visited = <String>[];
       await _open(
           tester, _app(_product(), cartApi: _FakeCartApi(), visited: visited));
       await _tapAdd(tester);
-      await tester.tap(find.text('متابعة التسوق'));
+      tester.widget<SnackBarAction>(find.byType(SnackBarAction)).onPressed();
       await tester.pumpAndSettle();
-      expect(find.text('تمت الإضافة إلى السلة'), findsNothing);
-      expect(find.byType(HatlyCtaButton), findsOneWidget);
-      expect(visited, isEmpty);
-    });
-
-    testWidgets('"عرض السلة" dismisses the sheet and opens the cart',
-        (tester) async {
-      _phone(tester);
-      final visited = <String>[];
-      await _open(
-          tester, _app(_product(), cartApi: _FakeCartApi(), visited: visited));
-      await _tapAdd(tester);
-      await tester.tap(find.text('عرض السلة'));
-      await tester.pumpAndSettle();
-      expect(visited, ['/cart']);
+      expect(visited, contains('/cart'));
       expect(find.text('page /cart'), findsOneWidget);
     });
 

@@ -139,7 +139,7 @@ function CourierClosing() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/employee-loans" className="mt-2 inline-block text-sm font-medium text-hatly-orangeDark hover:underline">{t('Record a repayment →', 'تسجيل سداد ←')}</Link>
+                <Link href={`/employee-loans?person=${p.courier?.userId ?? ''}`} className="mt-2 inline-block text-sm font-medium text-hatly-orangeDark hover:underline">{t('Record a repayment →', 'تسجيل سداد ←')}</Link>
               </Card>
             )}
             <Card title={t('Orders in this closing', 'طلبات هذا التقفيل')} pad={false}>

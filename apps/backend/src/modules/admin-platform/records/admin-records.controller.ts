@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsPhoneNumber, IsString, MaxLength, MinLength } from 'class-validator';
 import { RequiresAnyPermission, RequiresPermission } from '../../permissions/decorators/requires-permission.decorator';
@@ -9,6 +9,10 @@ import { AdminRecordsService, DeletableKind } from './admin-records.service';
 class EditPersonDto {
   @IsOptional() @IsString() @MinLength(2) @MaxLength(150) fullName?: string;
   @IsOptional() @IsPhoneNumber() phone?: string;
+}
+
+class ResetPersonPasswordDto {
+  @IsString() @MinLength(8) @MaxLength(128) newPassword: string;
 }
 
 class EditVendorStaffDto extends EditPersonDto {
@@ -111,6 +115,21 @@ export class AdminRecordsController {
   @RequiresPermission(Permission.MANAGE_DRIVERS)
   async editDriver(@Param('id', ParseUUIDPipe) id: string, @Body() dto: EditPersonDto) {
     return { data: await this.records.editDriver(id, dto) };
+  }
+
+  /** A driver who forgot their password: set a temporary one (they are signed out everywhere). Supervisors can do this too. */
+  @Post('drivers/:id/reset-password')
+  @HttpCode(204)
+  @RequiresAnyPermission(Permission.MANAGE_DRIVERS, Permission.CHANGE_DRIVER_ONLINE_STATUS)
+  async resetDriverPassword(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ResetPersonPasswordDto) {
+    await this.records.resetPersonPassword('driver', id, dto.newPassword);
+  }
+
+  @Post('vendor-staff/:id/reset-password')
+  @HttpCode(204)
+  @RequiresPermission(Permission.MANAGE_VENDOR_STAFF)
+  async resetVendorStaffPassword(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ResetPersonPasswordDto) {
+    await this.records.resetPersonPassword('vendor-staff', id, dto.newPassword);
   }
 
   @Patch('vendor-staff/:id')

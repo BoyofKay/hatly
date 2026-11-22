@@ -201,13 +201,8 @@ function ZoneForm({
         <Field label="Display order" value={form.displayOrder} onChange={set('displayOrder')} testId="zone-display-order" />
         {showFee && <Field label="Delivery fee (EGP)" value={form.fee} onChange={set('fee')} testId="zone-fee" placeholder="15.00" />}
       </div>
-      <fieldset className="rounded border border-dashed p-3">
-        <legend className="px-1 text-xs text-gray-500">Representative point (optional metadata — never used for pricing or serviceability)</legend>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Latitude" value={form.lat} onChange={set('lat')} testId="zone-lat" />
-          <Field label="Longitude" value={form.lng} onChange={set('lng')} testId="zone-lng" />
-        </div>
-      </fieldset>
+      {/* The optional representative point (lat/lng) is not used by pricing, coverage or dispatch, so it is hidden (owner decision
+          2026-11-22); an existing value is kept unchanged on save. */}
       {error && (
         <p data-testid="zone-form-error" className="text-sm text-red-600">
           {error}
@@ -410,7 +405,6 @@ export default function DeliveryZonesPage() {
                 <th className="px-3 py-2 text-start font-medium">City / service area</th>
                 <th className="px-3 py-2 text-start font-medium">Delivery fee</th>
                 <th className="px-3 py-2 text-start font-medium">Order</th>
-                <th className="px-3 py-2 text-start font-medium">Point</th>
                 <th className="px-3 py-2 text-start font-medium">Status</th>
                 <th className="px-3 py-2 text-start font-medium" />
               </tr>
@@ -454,9 +448,6 @@ export default function DeliveryZonesPage() {
                       <FeeEditor zone={z} canEdit={canPrice === true && canManage === true} onSaved={refresh} />
                     </td>
                     <td className="px-3 py-2">{z.displayOrder}</td>
-                    <td className="px-3 py-2 text-xs text-gray-500">
-                      {z.representativeLatitude != null ? `${z.representativeLatitude}, ${z.representativeLongitude}` : '—'}
-                    </td>
                     <td className="px-3 py-2">
                       <span data-testid="zone-status" className={`rounded px-2 py-0.5 text-xs ${z.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
                         {z.isActive ? 'Active' : 'Inactive'}

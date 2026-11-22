@@ -61,6 +61,18 @@ export default function ManualTransferPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Opened for one order (?order=HT-…, e.g. "Verify the transfer" on the operations board): that transfer is highlighted and scrolled
+  // to, and the refund box below is pre-filled with the same order number.
+  const [focusOrder, setFocusOrder] = useState<string | null>(null);
+  useEffect(() => {
+    const o = new URLSearchParams(window.location.search).get('order');
+    if (o) { setFocusOrder(o); setRefundOrder(o); }
+  }, []);
+  useEffect(() => {
+    if (!focusOrder || !payments) return;
+    document.querySelector(`[data-testid="transfer-${CSS.escape(focusOrder)}"]`)?.scrollIntoView({ block: 'center' });
+  }, [focusOrder, payments]);
+
   async function decide(reason: string) {
     if (!action || busy) return;
     setBusy(true);
@@ -144,7 +156,7 @@ export default function ManualTransferPage() {
       ) : (
         <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {payments.map((p) => (
-            <li key={p.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm" data-testid={`transfer-${p.orderNumber ?? p.orderId}`}>
+            <li key={p.id} className={`rounded-xl border bg-white p-4 shadow-sm ${focusOrder && p.orderNumber === focusOrder ? 'border-hatly-orange ring-2 ring-hatly-orange/40' : 'border-gray-200'}`} data-testid={`transfer-${p.orderNumber ?? p.orderId}`}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-2xl font-semibold tabular-nums text-gray-900">{p.amountMinor != null ? money(p.amountMinor) : t('Amount not yet available', 'المبلغ غير متاح بعد')}</p>

@@ -1,5 +1,6 @@
 'use client';
 import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
+import { ResetPasswordButton } from '../../../components/admin/ResetPasswordButton';
 import { SimpleEditModal } from '../../../components/admin/SimpleEditModal';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -132,6 +133,7 @@ export default function VendorStaffPage() {
       <span className="inline-flex flex-wrap justify-end gap-2">
         <Button size="sm" className="min-h-[36px]" onClick={() => setEditingStaff(s)}>{t('Edit', 'تعديل')}</Button>
         <Button size="sm" className="min-h-[36px]" onClick={() => { setToggleError(null); setToggle(s); }}>{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</Button>
+        <ResetPasswordButton path={`/admin/vendor-staff/${s.id}/reset-password`} name={s.fullName} />
         <DeleteRecordButton path={`/admin/vendor-staff/${s.id}`} name={s.fullName} what={['Staff member', 'الموظف']} consequence={['They are signed out and removed from every branch. The phone number can be used again.', 'سيتم تسجيل خروجه وإزالته من كل الفروع. يمكن استخدام رقم الهاتف مجددًا.']} onDeleted={refresh} />
       </span>
     ) },

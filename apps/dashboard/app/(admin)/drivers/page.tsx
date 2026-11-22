@@ -1,6 +1,7 @@
 'use client';
 import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 import { SimpleEditModal } from '../../../components/admin/SimpleEditModal';
+import { ResetPasswordButton } from '../../../components/admin/ResetPasswordButton';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -287,6 +288,7 @@ function AdminDriversScreen() {
                       {d.verificationStatus !== 'APPROVED' && <Button variant="primary" size="sm" className="min-h-[40px]" onClick={() => { setVerifyError(null); setVerifying({ driver: d, status: 'APPROVED' }); }}>{t('drvApprove')}</Button>}
                       {d.verificationStatus !== 'REJECTED' && <Button size="sm" className="min-h-[40px]" onClick={() => { setVerifyError(null); setVerifying({ driver: d, status: 'REJECTED' }); }}>{t('drvReject')}</Button>}
                       <Button size="sm" className="min-h-[40px]" onClick={() => setEditingDriver({ id: d.id, fullName: d.fullName, phone: d.phone })}>{tl('Edit details', 'تعديل البيانات')}</Button>
+                      <ResetPasswordButton path={`/admin/drivers/${d.id}/reset-password`} name={d.fullName} />
                       <DeleteRecordButton path={`/admin/drivers/${d.id}`} name={d.fullName} what={['Driver', 'السائق']} consequence={['They are signed out of the driver app and cannot sign in again. Refused while they have deliveries in progress. Their past deliveries and settlements stay.', 'سيتم تسجيل خروجه من تطبيق السائق ولن يستطيع الدخول. يُرفض إذا كان لديه توصيلات جارية. تبقى توصيلاته وتسوياته السابقة.']} onDeleted={refresh} />
                     </div>
                   )}

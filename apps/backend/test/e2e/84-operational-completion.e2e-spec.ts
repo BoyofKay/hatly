@@ -355,7 +355,7 @@ describe('E2E — operational completion', () => {
       }
     });
 
-    it('1. the acknowledgement sweep vs a manual ASSIGNMENT of an already-assigned order — refused, the order keeps its driver', async () => {
+    it('1. the acknowledgement sweep vs a manual ASSIGNMENT of an already-assigned order — the manual one is refused; the sweep hands the silent driver\'s order to the other driver (owner decision 2026-11-22)', async () => {
       for (let round = 0; round < ROUNDS; round++) {
         const [d1, d2] = await pair();
         const order = await readyOrder();
@@ -368,7 +368,8 @@ describe('E2E — operational completion', () => {
         expect(manual.status).toBe(409);
         expect(errCode(manual)).toBe('ORDER_NOT_ASSIGNABLE');
         const { status, carrier } = await expectConsistent(order.id, [d1, d2]);
-        expect([status, carrier]).toEqual(['ASSIGNED_TO_DRIVER', d1.driverId]);
+        // d1 never acknowledged and automatic assignment is on, so the sweep offered the order to d2 — never left unassigned or doubled.
+        expect([status, carrier]).toEqual(['ASSIGNED_TO_DRIVER', d2.driverId]);
         await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', false);
       }
     });

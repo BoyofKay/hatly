@@ -121,6 +121,11 @@ export enum BusinessConfigKey {
    * safety parameter.
    */
   MAX_BICYCLE_PICKUP_DISTANCE_METERS = 'MAX_BICYCLE_PICKUP_DISTANCE_METERS',
+  /**
+   * Owner decision 2026-11-22: automatic dispatch prefers the driver with the FEWEST active orders among those within this distance of
+   * the first pickup (then the nearest); only when nobody is that close does it fall back to the nearest driver. Unset = 3000 m.
+   */
+  DISPATCH_PREFERRED_RADIUS_METERS = 'DISPATCH_PREFERRED_RADIUS_METERS',
 
   /**
    * Manual Transfer payment addition. Deliberately NOT seeded with any
