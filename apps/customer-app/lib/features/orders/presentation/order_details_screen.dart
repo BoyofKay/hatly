@@ -250,7 +250,7 @@ class _OrderDetailsContent extends ConsumerWidget {
           key: const Key('order-support-contact'),
           label: l10n.supportContactOrderAction,
           hideWhenUnavailable: true,
-          messageBuilder: (l10n) => l10n.supportMessageOrder(order.id),
+          messageBuilder: (l10n) => l10n.supportMessageOrder(order.orderNumber),
         ),
       ],
     );

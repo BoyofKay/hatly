@@ -145,6 +145,7 @@ class _Content extends StatelessWidget {
                 extra: (
                   // What must be TRANSFERRED is the amount due after the wallet — never the full total.
                   totalMinor: order.amountDueMinor ?? order.totalMinor,
+                  orderNumber: order.orderNumber,
                   paymentMethodLabel: order.electronicPaymentMethod == null
                       ? ''
                       : electronicMethodLabel(

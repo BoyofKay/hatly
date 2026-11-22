@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Async, Badge, Card, DataTable, FilterBar, LabeledInput, LabeledSelect, Modal, PageHeader, Pagination, Button, DateRange, cairoDate, useDebounced, usePaging } from '../../../components/ui';
 import { useApi } from '../../../lib/ui/api';
 import { useLang } from '../../../lib/ui/lang';
+import { usePermissions } from '../../../lib/ui/permissions';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 
 export default function BranchesPage() {
   const { t, num } = useLang();
@@ -13,6 +15,7 @@ export default function BranchesPage() {
   const [open, setOpen] = useState('');
   const search = useDebounced(q);
   const { page, setPage, limit } = usePaging(JSON.stringify([search, active, open]));
+  const canManage = usePermissions().can('MANAGE_VENDORS');
   const list = useApi<any[]>('/admin/branch-directory', { q: search || undefined, active: active || undefined, open: open || undefined, page, limit });
   const [perf, setPerf] = useState<any>(null);
 
@@ -33,7 +36,7 @@ export default function BranchesPage() {
           { key: 'rt', header: t('Rating', 'التقييم'), align: 'end', cell: (r) => (r.rating === null ? <span className="text-gray-400">{t('No ratings', 'لا تقييمات')}</span> : <span title={`${r.ratingCount}`}>{r.rating} ★ <span className="text-xs text-gray-500">({num(r.ratingCount)})</span></span>) },
           { key: 'cm', header: t('Commission', 'العمولة'), align: 'end', cell: (r) => `${r.commissionPercent}%` },
           { key: 'ac', header: t('Accepts orders', 'قبول الطلبات'), cell: (r) => { const m = r.acceptanceMode ?? (r.autoAccept ? 'AUTO' : 'VENDOR'); return m === 'AUTO' ? t('Automatic', 'تلقائي') : m === 'HATLY' ? <Badge tone="amber">{t('Hatly', 'هاتلي')}</Badge> : t('Vendor', 'البائع'); } },
-          { key: 'a', header: '', align: 'end', cell: (r) => <Button size="sm" onClick={() => setPerf(r)}>{t('Performance', 'الأداء')}</Button> },
+          { key: 'a', header: '', align: 'end', cell: (r) => <span className="flex justify-end gap-1.5"><Button size="sm" onClick={() => setPerf(r)}>{t('Performance', 'الأداء')}</Button>{canManage && <Link href={`/branches/${r.id}#sec-details`} className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">{t('Edit', 'تعديل')}</Link>}{canManage && <DeleteRecordButton path={`/admin/vendor-branches/${r.id}`} name={r.name} what={['Branch', 'الفرع']} consequence={['Its menu and offers are switched off with it. Refused while it has orders in progress.', 'يتم إيقاف المنيو والعروض الخاصة به. يُرفض الحذف إذا كانت لديه طلبات جارية.']} onDeleted={list.reload} />}</span> },
         ]} />
         {list.meta && <Pagination page={page} limit={limit} total={list.meta.total} onPage={setPage} />}
       </Card>

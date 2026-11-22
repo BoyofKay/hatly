@@ -10,6 +10,7 @@ import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/ltr_text.dart';
 import '../data/checkout_providers.dart';
 import '../data/manual_transfer_api.dart';
+import '../../orders/data/orders_providers.dart';
 import '../../../core/routing/router_stack.dart';
 
 /// CONFIRMED (Payment Verification chunk, sections 2/6): shown once,
@@ -28,9 +29,13 @@ class TransferInstructionsScreen extends ConsumerStatefulWidget {
     required this.orderId,
     required this.totalMinor,
     required this.paymentMethodLabel,
+    this.orderNumber,
   });
 
   final String orderId;
+
+  /// The HT-… number the customer and Hatly staff use. When the screen is opened without it, it is read from the order.
+  final String? orderNumber;
   final int? totalMinor;
 
   /// The customer's actually-chosen sub-option (InstaPay / Wallet) —
@@ -58,8 +63,17 @@ class _TransferInstructionsScreenState
     if (_sendingProof) return;
     setState(() => _sendingProof = true);
     try {
+      var orderNumber = widget.orderNumber;
+      if (orderNumber == null) {
+        try {
+          orderNumber = (await ref.read(orderDetailsProvider(widget.orderId).future)).orderNumber;
+        } catch (_) {
+          orderNumber = widget.orderId; // offline: still identifies the order for staff
+        }
+      }
+      if (!mounted) return;
       final message = buildTransferProofMessage(
-        orderId: widget.orderId,
+        orderNumber: orderNumber,
         paymentMethodLabel: widget.paymentMethodLabel,
         formattedAmount: widget.totalMinor != null
             ? formatMinorUnits(widget.totalMinor!, context)

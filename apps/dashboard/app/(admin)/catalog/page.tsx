@@ -8,6 +8,9 @@ import { apiErrorMessage } from '../../../lib/api/errors';
 import { resolveMediaUrl } from '../../../lib/media-url';
 import { useLang } from '../../../lib/ui/lang';
 import { usePermissions } from '../../../lib/ui/permissions';
+import Link from 'next/link';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
+import { MenuImportPanel } from '../../../components/admin/MenuImportPanel';
 import { MediaPicker } from '../../../components/media/MediaPicker';
 import { ExportButton } from '../../../components/reports/ExportButton';
 
@@ -19,6 +22,8 @@ export default function ProductsPage() {
   // Quick find (Ctrl+K) opens this page with the search term already in the box.
   useEffect(() => { const v = new URLSearchParams(window.location.search).get('q'); if (v) setQ(v); }, []);
   const [branch, setBranch] = useState('');
+  const [excelOpen, setExcelOpen] = useState(false);
+  const [excelBranch, setExcelBranch] = useState('');
   const [state, setState] = useState('');
   useEffect(() => { const v = new URLSearchParams(window.location.search).get('state'); if (v) setState(v); }, []);
   const [active, setActive] = useState('');
@@ -49,7 +54,14 @@ export default function ProductsPage() {
 
   return (
     <div>
-      <PageHeader title={t('Products', 'المنتجات')} subtitle={t('All products across vendors. Select up to 50 for a bulk action with a before/after preview. Images are managed through the media library.', 'كل المنتجات عبر الموردين. حدد حتى 50 لإجراء جماعي مع معاينة قبل/بعد. تُدار الصور عبر مكتبة الوسائط.')} actions={can('CATALOG_EXPORT') ? <ExportButton report="S07" params={{ vendorBranchId: branch || undefined, state: state || undefined }} /> : undefined} />
+      <PageHeader title={t('Products', 'المنتجات')} subtitle={t('All products across vendors. Select up to 50 for a bulk action with a before/after preview. Images are managed through the media library.', 'كل المنتجات عبر الموردين. حدد حتى 50 لإجراء جماعي مع معاينة قبل/بعد. تُدار الصور عبر مكتبة الوسائط.')} actions={<span className="flex flex-wrap gap-2">{can('MANAGE_CATALOG') && <Button variant="primary" onClick={() => { setExcelBranch(branch); setExcelOpen(true); }}>{t('Excel: update / add products', 'إكسل: تعديل / إضافة منتجات')}</Button>}{can('CATALOG_EXPORT') && <ExportButton report="S07" params={{ vendorBranchId: branch || undefined, state: state || undefined }} />}</span>} />
+      <Modal open={excelOpen} title={t('Products by Excel', 'المنتجات عبر الإكسل')} onClose={() => setExcelOpen(false)}>
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600">{t('Choose the branch, download its sheet (it already lists every product with its current price, names, stock and availability), change what you need, then upload it. Rows with a productId update that product; rows without one add a new product.', 'اختر الفرع ونزّل ملفه (فيه كل المنتجات بأسعارها وأسمائها ومخزونها وحالتها الحالية)، عدّل ما تريد ثم ارفعه. الصف الذي به productId يعدّل المنتج، والصف بدونه يضيف منتجًا جديدًا.')}</p>
+          <LabeledSelect label={t('Branch', 'الفرع')} value={excelBranch} onChange={(e) => setExcelBranch(e.target.value)}><option value="">{t('Choose a branch…', 'اختر فرعًا…')}</option>{(branches.data ?? []).map((b: any) => <option key={b.id} value={b.id}>{b.vendorName} — {b.name}</option>)}</LabeledSelect>
+          {excelBranch && <MenuImportPanel key={excelBranch} branchId={excelBranch} branchName={(() => { const b = (branches.data ?? []).find((x: any) => x.id === excelBranch); return b ? `${b.vendorName} — ${b.name}` : ''; })()} onImported={() => list.reload()} />}
+        </div>
+      </Modal>
       {counts && (
         <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4" data-testid="catalog-kpis">
           {[
@@ -88,6 +100,7 @@ export default function ProductsPage() {
           { key: 'st', header: t('Stock', 'المخزون'), cell: (r: any) => <span className="flex items-center gap-1"><StatusPill status={r.stockState} />{r.inventoryMode === 'TRACKED' && <span className="text-xs tabular-nums">{num(r.quantity)}</span>}</span> },
           { key: 'av', header: t('Available', 'متاح'), cell: (r: any) => (r.available ? <Badge tone="green">{t('Yes', 'نعم')}</Badge> : <Badge tone="red">{t('No', 'لا')}</Badge>) },
           { key: 'im', header: t('Images', 'الصور'), cell: (r: any) => (canEdit ? <Button size="sm" onClick={() => setImgProduct(r)}>{num(r.imageCount)} · {t('Manage', 'إدارة')}</Button> : num(r.imageCount)) },
+          ...(canEdit ? [{ key: 'act', header: '', align: 'end' as const, cell: (r: any) => <span className="flex justify-end gap-1.5"><Link href={`/branches/${r.branchId}#sec-products`} className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">{t('Edit', 'تعديل')}</Link><DeleteRecordButton path={`/admin/products/${r.id}`} name={r.name} what={['Product', 'المنتج']} consequence={['It disappears from the menu. Past orders keep it.', 'يختفي من المنيو. الطلبات السابقة تحتفظ به.']} onDeleted={list.reload} /></span> }] : []),
         ]} />
         {list.meta && <Pagination page={page} limit={limit} total={list.meta.total} onPage={setPage} />}
       </Card>

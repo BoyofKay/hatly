@@ -338,7 +338,7 @@ void main() {
         'openWhatsAppWithMessage still builds the same wa.me link with the payment-proof text',
         () {
       final message = buildTransferProofMessage(
-          orderId: 'o-1',
+          orderNumber: 'o-1',
           paymentMethodLabel: 'InstaPay',
           formattedAmount: 'EGP 10.00');
       final uri =

@@ -118,7 +118,7 @@ void main() {
         'the payment-proof builder is unchanged and shares nothing with the support messages',
         () async {
       final proof = buildTransferProofMessage(
-          orderId: 'o-1',
+          orderNumber: 'o-1',
           paymentMethodLabel: 'InstaPay',
           formattedAmount: 'EGP 10.00');
       expect(
