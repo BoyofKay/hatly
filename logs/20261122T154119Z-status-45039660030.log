@@ -1,0 +1,35 @@
+action=status arg= commit=b2268dbc01ef67c4d5643b6a09e08a8b45c25488 run=45039660030 started=2026-11-22T15:41:14Z
+
+==== current release  (15:41:17 UTC)
+20261115T032058Z-26e146606679
+
+==== status  (15:41:17 UTC)
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED       STATUS                 PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261115T032058Z-26e146606679     "docker-entrypoint.s…"   prod-backend     7 days ago    Up 7 days (healthy)    3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261115T032058Z-26e146606679   "docker-entrypoint.s…"   prod-dashboard   7 days ago    Up 7 days (healthy)    3001/tcp
+hatly-prod-postgres-1    postgres:16-alpine                                   "docker-entrypoint.s…"   postgres         4 weeks ago   Up 12 days (healthy)   5432/tcp
+hatly-prod-redis-1       redis:7-alpine                                       "docker-entrypoint.s…"   redis            4 weeks ago   Up 12 days (healthy)   6379/tcp
+{"data":{"status":"ok","checks":{"database":"up","redis":"up"}}}
+dashboard /privacy 200
+
+==== migrations  (15:41:17 UTC)
+ Container hatly-prod-prod-backend-run-dad0c609077e Creating 
+ Container hatly-prod-prod-backend-run-dad0c609077e Created 
+ Container hatly-prod-prod-backend-run-ff587f6211e3 Creating 
+ Container hatly-prod-prod-backend-run-ff587f6211e3 Created 
+[X] 78 DriverCapacity1700007700000
+[X] 79 OpsAlertsWebPush1700007800000
+[X] 80 SettlementClosingLines1700007900000
+[X] 81 OptionalProofPhoto1700008000000
+[X] 82 DriverPresence1700008100000
+
+==== releases on disk  (15:41:19 UTC)
+20261106T195428Z-50ef7fbe7cd6
+20261106T214231Z-27f40e93dabb
+20261107T004846Z-593d380baae2
+20261107T015613Z-812d1a88e4d4
+20261107T022800Z-feb790433010
+
+==== disk  (15:41:19 UTC)
+/dev/sda1        96G   77G   19G  81% /
+job status: success
