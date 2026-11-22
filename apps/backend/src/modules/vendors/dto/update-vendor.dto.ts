@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
 
 /**
  * CONFIRMED (Phase I-A, Chunk 1): mirrors CreateVendorDto's own scope
@@ -21,4 +21,9 @@ export class UpdateVendorDto {
   @IsOptional()
   @IsUrl()
   logoUrl?: string;
+
+  /** Only '' (remove the banner) — a banner is set by uploading it (POST admin/vendors/:id/cover). */
+  @IsOptional()
+  @IsIn([''])
+  coverImageUrl?: string;
 }

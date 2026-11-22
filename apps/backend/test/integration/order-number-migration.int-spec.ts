@@ -50,6 +50,9 @@ describe('OrderNumber migration — backfill on real PostgreSQL', () => {
     const from = ordered.indexOf('OrderNumber1700004300000');
     expect(from).toBeGreaterThanOrEqual(0);
     const expectedReapply = ordered.slice(from);
+    // The customer is created on the CURRENT schema (the User entity knows columns later migrations add, e.g. staff_level),
+    // before the schema is rolled back; the legacy orders below are raw SQL on the old schema.
+    const customer = await data.user();
     for (let i = 0; i < expectedReapply.length; i++) await dataSource.undoLastMigration();
     const columnsBefore = await dataSource.query(
       "SELECT column_name FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'order_number'",
@@ -58,7 +61,6 @@ describe('OrderNumber migration — backfill on real PostgreSQL', () => {
 
     // Three "legacy" orders, inserted directly (as they would have existed before this migration ever ran), with created_at
     // spread out and NOT in insertion order — the backfill must follow created_at, not insertion order or id.
-    const customer = await data.user();
     const legacyIds: string[] = [];
     const createdAts = [
       new Date('2024-01-03T00:00:00Z'),

@@ -113,7 +113,7 @@ void main() {
 
   group('Order Details → "تواصل مع Hatly بخصوص الطلب"', () {
     testWidgets(
-        'opens the configured number with a message carrying the FULL order id',
+        'opens the configured number with a message carrying the HT- order number',
         (tester) async {
       final launched = <Uri>[];
       await _pump(tester, const OrderDetailsScreen(orderId: _orderId),
@@ -127,9 +127,9 @@ void main() {
       expect(launched, hasLength(1));
       expect(launched.single.path, '/201104949903');
       final text = launched.single.queryParameters['text']!;
-      expect(text, 'مرحبًا Hatly، أحتاج إلى مساعدة بخصوص الطلب رقم $_orderId.');
-      expect(text, contains(_orderId),
-          reason: 'the full id, not a truncated one');
+      expect(text, 'مرحبًا Hatly، أحتاج إلى مساعدة بخصوص الطلب رقم HT-100001.');
+      expect(text, isNot(contains(_orderId)),
+          reason: 'customers and staff use the HT- number, not the internal id');
     });
 
     testWidgets(

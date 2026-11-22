@@ -62,6 +62,8 @@ export class AdminVendorsService {
     if (dto.name !== undefined) vendor.name = dto.name;
     if (dto.nameAr !== undefined) vendor.nameAr = dto.nameAr;
     if (dto.logoUrl !== undefined) vendor.logoUrl = dto.logoUrl;
+    // An empty string removes the banner.
+    if (dto.coverImageUrl !== undefined) vendor.coverImageUrl = dto.coverImageUrl || null;
     return this.vendorsRepository.save(vendor);
   }
 
@@ -71,7 +73,7 @@ export class AdminVendorsService {
    * is the vendor row updated, with the provider's stable `/uploads/files/...` reference — so a refused file leaves the old logo alone.
    * The free-text `logoUrl` on create/update stays an absolute-URL field; this is the way to set an uploaded one.
    */
-  async uploadLogo(id: string, file: { buffer: Buffer; mimetype: string; size: number }, uploadedByUserId: string): Promise<Vendor> {
+  async uploadLogo(id: string, file: { buffer: Buffer; mimetype: string; size: number }, uploadedByUserId: string, kind: 'logo' | 'cover' = 'logo'): Promise<Vendor> {
     const vendor = await this.getVendor(id);
     const extension = LOGO_EXTENSIONS[file.mimetype];
     if (!extension) {
@@ -80,8 +82,9 @@ export class AdminVendorsService {
     if (file.size > MAX_LOGO_BYTES) {
       throw new BadRequestException({ message: 'Image exceeds the maximum allowed size of 5MB.', details: { code: 'IMAGE_TOO_LARGE' } });
     }
-    const upload = await this.uploads.upload(file.buffer.toString('base64'), `vendor-logo${extension}`, uploadedByUserId);
-    vendor.logoUrl = upload.url;
+    const upload = await this.uploads.upload(file.buffer.toString('base64'), `vendor-${kind}${extension}`, uploadedByUserId);
+    if (kind === 'cover') vendor.coverImageUrl = upload.url;
+    else vendor.logoUrl = upload.url;
     return this.vendorsRepository.save(vendor);
   }
 

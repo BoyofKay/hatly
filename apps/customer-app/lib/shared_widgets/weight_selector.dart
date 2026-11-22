@@ -2,9 +2,21 @@ import 'package:flutter/material.dart';
 import '../core/localization/l10n/app_localizations.dart';
 import '../core/theme/hatly_theme.dart';
 
-/// Quick picks for a weighed product, in grams. Fractional weights stay possible (the − / + stepper moves in 100 g steps and the
-/// value can be typed): these only save the customer ten taps to reach the common amounts.
-const List<int> kQuickWeightsGrams = [250, 500, 1000, 2000];
+/// Quick picks for a weighed product, in grams — the amounts people actually ask for at a butcher or a grocer (¼, ½, 1, 1½, 2, 3 kg).
+/// Any other weight can still be typed (e.g. 0.3 kg).
+const List<int> kQuickWeightsGrams = [250, 500, 1000, 1500, 2000, 3000];
+
+/// The − / + stepper moves by a quarter kilo and SNAPS to quarters: from 0.3 kg, "+" goes to ½ kg and "−" to ¼ kg.
+const int kWeightStepGrams = 250;
+
+/// The next quarter kilo above [grams].
+int weightStepUp(int grams) => (grams ~/ kWeightStepGrams + 1) * kWeightStepGrams;
+
+/// The quarter kilo below [grams] (never below one quarter — the caller disables "−" at ¼ kg or less).
+int weightStepDown(int grams) {
+  final down = grams % kWeightStepGrams == 0 ? grams - kWeightStepGrams : (grams ~/ kWeightStepGrams) * kWeightStepGrams;
+  return down < kWeightStepGrams ? kWeightStepGrams : down;
+}
 
 /// The weight bounds the app lets a customer pick. The floor is the existing 100 g minimum; the ceiling is a UX sanity cap (the
 /// backend independently validates every weight and stays authoritative for stock and price).
@@ -31,10 +43,15 @@ int? parseKilogramsToGrams(String input) {
   return whole * 1000 + int.parse(fraction);
 }
 
-/// "250 g" / "1 kg" / "1.5 kg" (localised) for a preset or a typed weight.
+/// How a weight reads to a customer: quarters as fractions ("¼ kg", "½ kg", "1½ kg"), anything else in kg ("0.3 kg", "1.2 kg").
 String weightShortLabel(int grams, AppLocalizations l10n) {
   if (grams % 1000 == 0) return l10n.weightKgShort('${grams ~/ 1000}');
-  if (grams < 1000) return l10n.weightGramsShort(grams);
+  if (grams % 250 == 0) {
+    const fractions = {250: '¼', 500: '½', 750: '¾'};
+    final whole = grams ~/ 1000;
+    return l10n.weightKgShort('${whole == 0 ? '' : whole}${fractions[grams % 1000]}');
+  }
+  if (grams < 1000 && grams % 100 != 0) return l10n.weightGramsShort(grams);
   final kg = (grams / 1000).toStringAsFixed(3).replaceFirst(RegExp(r'0+$'), '');
   return l10n.weightKgShort(kg);
 }

@@ -11,6 +11,7 @@ class VendorProfile {
     this.nameAr,
     required this.category,
     this.logoUrl,
+    this.coverImageUrl,
   });
 
   final String id;
@@ -18,4 +19,7 @@ class VendorProfile {
   final String? nameAr;
   final String category;
   final String? logoUrl;
+
+  /// The store's wide banner (admin › Stores › Banner). Null → the header falls back to the logo.
+  final String? coverImageUrl;
 }

@@ -15,6 +15,7 @@ export interface SearchVendorResult {
   name: string;
   nameAr: string | null;
   logoUrl: string | null;
+  coverImageUrl: string | null;
   isOpen: boolean;
   ratingAverage: number;
   ratingCount: number;
@@ -190,6 +191,7 @@ export class SearchService {
       name: branch.vendor.name,
       nameAr: branch.vendor.nameAr ?? null,
       logoUrl: branch.vendor.logoUrl ?? null,
+      coverImageUrl: branch.vendor.coverImageUrl ?? null,
       isOpen: branch.isOpen && !underClosure.has(branch.id),
       ratingAverage: branch.ratingCount > 0 ? branch.ratingSumStars / branch.ratingCount : 0,
       ratingCount: branch.ratingCount,

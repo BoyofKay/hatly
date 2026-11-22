@@ -48,6 +48,7 @@ export interface VendorBranchDetailsView {
     name: string;
     nameAr: string | null;
     logoUrl: string | null;
+    coverImageUrl: string | null;
   };
 }
 
@@ -72,11 +73,7 @@ export interface StockActor {
   note?: string;
 }
 
-/** Upper bound for one store's whole menu in a single response (the menu screen asks without paging). */
-export const STORE_MENU_MAX_PRODUCTS = 500;
-
 @Injectable()
-
 export class ProductsService {
   constructor(
     @InjectRepository(ProductCategory)
@@ -124,6 +121,7 @@ export class ProductsService {
         name: branch.vendor.name,
         nameAr: branch.vendor.nameAr ?? null,
         logoUrl: branch.vendor.logoUrl ?? null,
+        coverImageUrl: branch.vendor.coverImageUrl ?? null,
       },
     };
   }
@@ -186,8 +184,6 @@ export class ProductsService {
       /** Filters V1. `Product.priceMinor` bounds — inclusive, integer minor units. */
       minPriceMinor?: number;
       maxPriceMinor?: number;
-      /** The store's own menu screen: no paging was asked for, so return the whole menu (capped) — a 79-item menu must not stop at 20. */
-      wholeMenu?: boolean;
     } = {},
   ): Promise<ProductListResult> {
     if (params.minPriceMinor != null && params.maxPriceMinor != null && params.minPriceMinor > params.maxPriceMinor) {
@@ -209,8 +205,8 @@ export class ProductsService {
       }
     }
 
-    const page = params.wholeMenu ? 1 : resolvePage(params.page);
-    const limit = params.wholeMenu ? STORE_MENU_MAX_PRODUCTS : resolveLimit(params.limit);
+    const page = resolvePage(params.page);
+    const limit = resolveLimit(params.limit);
     const searchTerm = normalizedSearchTerm(params.search);
 
     let qb = this.productsRepository

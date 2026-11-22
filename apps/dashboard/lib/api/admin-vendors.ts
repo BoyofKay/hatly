@@ -5,6 +5,7 @@ export interface Vendor {
   name: string;
   nameAr: string | null;
   logoUrl: string | null;
+  coverImageUrl?: string | null;
   isActive: boolean;
 }
 
@@ -142,5 +143,18 @@ export async function closeVendorBranch(id: string): Promise<VendorBranch> {
 /** Reuses the EXISTING, untouched Sectors-module endpoint — not duplicated here. */
 export async function assignVendorBranchSector(branchId: string, marketplaceSectorId: string): Promise<VendorBranch> {
   const res = await apiClient.patch(`/admin/vendor-branches/${branchId}/sector`, { marketplaceSectorId });
+  return res.data.data;
+}
+
+/** The store banner (wide image at the top of the store page in the customer app). Same contract as the logo. */
+export async function uploadVendorCover(id: string, file: File): Promise<Vendor> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await apiClient.post(`/admin/vendors/${id}/cover`, formData);
+  return res.data.data;
+}
+
+export async function removeVendorCover(id: string): Promise<Vendor> {
+  const res = await apiClient.patch(`/admin/vendors/${id}`, { coverImageUrl: '' });
   return res.data.data;
 }

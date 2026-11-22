@@ -290,7 +290,7 @@ class _VendorHeader extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               HatlySoftImage(
-                url: details.vendor.logoUrl,
+                url: details.vendor.coverImageUrl ?? details.vendor.logoUrl,
                 width: double.infinity,
                 height: 140,
                 radius: HatlyRadius.card,

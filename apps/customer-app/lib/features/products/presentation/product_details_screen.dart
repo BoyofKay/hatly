@@ -444,8 +444,7 @@ class _QuantityRow extends StatelessWidget {
         if (product.isWeighted)
           // Weighted: 100g steps, the same floor and (tracked) stock guard as the cart's weight editor.
           HatlyQuantityControl(
-            valueLabel:
-                '${(config.requestedWeightGrams / 1000).toStringAsFixed(2)} kg',
+            valueLabel: weightShortLabel(config.requestedWeightGrams, l10n),
             decreaseTooltip: l10n.quantityDecrease,
             increaseTooltip: l10n.quantityIncrease,
             valueTapTooltip: l10n.weightEntryTooltip,
@@ -456,14 +455,12 @@ class _QuantityRow extends StatelessWidget {
               if (grams != null) onChanged(config.withWeight(product, grams));
             },
             onDecrease: config.canDecreaseWeight
-                ? () => onChanged(config.copyWith(
-                    requestedWeightGrams: config.requestedWeightGrams -
-                        ProductConfiguration.weightStepGrams))
+                ? () => onChanged(config.withWeight(
+                    product, weightStepDown(config.requestedWeightGrams)))
                 : null,
             onIncrease: config.canIncreaseWeight(product)
-                ? () => onChanged(config.copyWith(
-                    requestedWeightGrams: config.requestedWeightGrams +
-                        ProductConfiguration.weightStepGrams))
+                ? () => onChanged(config.withWeight(
+                    product, weightStepUp(config.requestedWeightGrams)))
                 : null,
           )
         else

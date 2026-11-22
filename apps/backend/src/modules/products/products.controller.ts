@@ -119,8 +119,6 @@ export class ProductsController {
       hasOffers: query.hasOffers,
       minPriceMinor: query.minPriceMinor,
       maxPriceMinor: query.maxPriceMinor,
-      // The customer app's store screen sends neither page nor limit and shows ONE list (no "load more"): give it the whole menu.
-      wholeMenu: query.page === undefined && query.limit === undefined,
     });
 
     // Customer Product-Level Offers Display. ONE batch resolution for
