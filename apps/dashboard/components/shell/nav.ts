@@ -1,6 +1,6 @@
 /**
- * The Admin navigation, as in the approved reference (`docs/transformation/reference/admin-vendor-reference.jpg`): ten flat sections in the
- * sidebar (Home, Orders, Stores, Products, Categories, Offers, Customers, Delivery, Reports, Settings); each section's pages are tabs at the top
+ * The Admin navigation, as in the approved reference (`docs/transformation/reference/admin-vendor-reference.jpg`): flat sections in the
+ * sidebar (owner order 2026-11-22: Home, Orders, Delivery, Customers, Stores, Products, Offers, Reports, Settings); each section's pages are tabs at the top
  * of the page, so every existing page stays one click away. `perms` = the admin needs ANY of them to SEE the link (a UX filter only — the backend
  * enforces every route); a section shows when at least one of its pages does, and opens its first visible page. `match` adds address prefixes
  * that belong to the section without being a tab (detail pages). Labels are English/Arabic pairs; existing page link names are kept.
@@ -14,6 +14,11 @@ export interface NavItem {
   superOnly?: boolean;
   /** Stage 5: a page kept one click away under the section's "More" menu instead of a tab of its own (less-used / overlapping views). */
   more?: boolean;
+  /**
+   * Owner request 2026-11-22: pages that belong together share ONE tab (e.g. "Settlements") and appear as a second row of tabs
+   * when you are on any of them. Items with the same `sub.id` must be next to each other.
+   */
+  sub?: { id: string; en: string; ar: string };
 }
 export interface NavGroup {
   id: string;
@@ -33,6 +38,9 @@ const P = {
   marketing: ['MARKETING_VIEW', 'MANAGE_OFFERS', 'MANAGE_CAMPAIGNS', 'MANAGE_BROADCASTS'],
   media: ['MEDIA_VIEW', 'MANAGE_MEDIA', 'MANAGE_CATALOG', 'MANAGE_VENDORS', 'MANAGE_MARKETPLACE_SECTORS', 'MANAGE_HOME_BANNERS'],
 };
+
+const SETTLEMENTS = { id: 'settlements', en: 'Settlements', ar: 'التسويات' };
+const USERS = { id: 'users', en: 'Users', ar: 'المستخدمون' };
 
 export const NAV: NavGroup[] = [
   {
@@ -58,6 +66,28 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
+    id: 'delivery', en: 'Delivery', ar: 'التوصيل', icon: 'truck',
+    items: [
+      { href: '/fleet', en: 'Live fleet', ar: 'الأسطول المباشر', perms: P.fleet },
+      { href: '/drivers-today', en: 'Drivers today', ar: 'المندوبون اليوم', perms: ['CLOSE_DRIVER_SETTLEMENTS'] },
+      // Owner request 2026-11-22: closing, statements and history together under one "Settlements" tab.
+      { href: '/settlement', en: 'Closing', ar: 'التقفيل', perms: ['CLOSE_VENDOR_SETTLEMENTS', 'CLOSE_DRIVER_SETTLEMENTS'], sub: SETTLEMENTS },
+      { href: '/settlement-statements', en: 'Statements by period', ar: 'الكشوف حسب الفترة', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'], sub: SETTLEMENTS },
+      { href: '/settlements', en: 'Settlement history', ar: 'سجل التسويات', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'], sub: SETTLEMENTS },
+      { href: '/cash-remainders', en: 'Cash Remainders', ar: 'باقي النقد', perms: ['MANAGE_CUSTOMER_WALLET'] },
+      { href: '/employee-loans', en: 'Employee Loans', ar: 'سلف الموظفين', perms: ['MANAGE_EMPLOYEE_LOANS'] },
+    ],
+  },
+  {
+    id: 'customers', en: 'Customers', ar: 'العملاء', icon: 'users',
+    items: [
+      { href: '/customers', en: 'Customers', ar: 'العملاء', perms: ['VIEW_CUSTOMERS'] },
+      { href: '/reviews', en: 'Reviews', ar: 'التقييمات', perms: ['MODERATE_REVIEWS'] },
+      { href: '/wallet-adjustments', en: 'Wallet adjustments', ar: 'تعديلات المحفظة', perms: P.fin },
+      { href: '/account-deletion-requests', en: 'Deletion requests', ar: 'طلبات الحذف', perms: [] },
+    ],
+  },
+  {
     id: 'stores', en: 'Stores', ar: 'المتاجر', icon: 'shop',
     items: [
       { href: '/vendors', en: 'Vendors', ar: 'المتاجر', perms: P.vendors },
@@ -76,10 +106,6 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    id: 'categories', en: 'Categories', ar: 'الأقسام', icon: 'layers',
-    items: [{ href: '/sectors', en: 'Sectors', ar: 'الأقسام', perms: ['MANAGE_MARKETPLACE_SECTORS'] }],
-  },
-  {
     id: 'offers', en: 'Offers', ar: 'العروض', icon: 'tag',
     items: [
       { href: '/offers', en: 'Offers', ar: 'العروض', perms: ['MANAGE_OFFERS'] },
@@ -88,32 +114,6 @@ export const NAV: NavGroup[] = [
       { href: '/broadcasts', en: 'Broadcasts', ar: 'الرسائل الجماعية', perms: P.marketing },
       { href: '/audiences', en: 'Audiences', ar: 'الجمهور', perms: P.marketing },
       { href: '/growth', en: 'Growth', ar: 'النمو', perms: P.marketing },
-    ],
-  },
-  {
-    id: 'customers', en: 'Customers', ar: 'العملاء', icon: 'users',
-    items: [
-      { href: '/customers', en: 'Customers', ar: 'العملاء', perms: ['VIEW_CUSTOMERS'] },
-      { href: '/reviews', en: 'Reviews', ar: 'التقييمات', perms: ['MODERATE_REVIEWS'] },
-      { href: '/wallet-adjustments', en: 'Wallet adjustments', ar: 'تعديلات المحفظة', perms: P.fin },
-      { href: '/account-deletion-requests', en: 'Deletion requests', ar: 'طلبات الحذف', perms: [] },
-    ],
-  },
-  {
-    id: 'delivery', en: 'Delivery', ar: 'التوصيل', icon: 'truck',
-    items: [
-      { href: '/drivers-today', en: 'Drivers today', ar: 'المندوبون اليوم', perms: ['CLOSE_DRIVER_SETTLEMENTS'] },
-      // Stage 5: closing is daily operations work, next to "Drivers today" (it was under Reports)
-      { href: '/settlement', en: 'Closing', ar: 'التقفيل', perms: ['CLOSE_VENDOR_SETTLEMENTS', 'CLOSE_DRIVER_SETTLEMENTS'] },
-      { href: '/settlement-statements', en: 'Statements by period', ar: 'الكشوف حسب الفترة', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
-      { href: '/settlements', en: 'Settlement history', ar: 'سجل التسويات', perms: ['VIEW_VENDOR_FINANCIAL_REPORTS', 'VIEW_DRIVER_SETTLEMENTS'] },
-      { href: '/fleet', en: 'Live fleet', ar: 'الأسطول المباشر', perms: P.fleet },
-      { href: '/drivers', en: 'Drivers', ar: 'السائقون', perms: ['MANAGE_DRIVERS'] },
-      { href: '/delivery-zones', en: 'Delivery Zones', ar: 'مناطق التوصيل', perms: ['MANAGE_SERVICE_AREAS'] },
-      { href: '/service-areas', en: 'Service Areas', ar: 'مناطق الخدمة', perms: ['MANAGE_SERVICE_AREAS'] },
-      { href: '/vehicle-types', en: 'Vehicle Types', ar: 'أنواع المركبات', perms: ['MANAGE_VEHICLE_TYPES'] },
-      { href: '/cash-remainders', en: 'Cash Remainders', ar: 'باقي النقد', perms: ['MANAGE_CUSTOMER_WALLET'] },
-      { href: '/employee-loans', en: 'Employee Loans', ar: 'سلف الموظفين', perms: ['MANAGE_EMPLOYEE_LOANS'] },
     ],
   },
   {
@@ -133,14 +133,21 @@ export const NAV: NavGroup[] = [
     id: 'settings', en: 'Settings', ar: 'الإعدادات', icon: 'cog',
     items: [
       { href: '/settings', en: 'Settings', ar: 'الإعدادات', perms: ['MANAGE_BUSINESS_CONFIG', 'CONFIG_VIEW'] },
-      { href: '/config', en: 'Configuration overview', ar: 'نظرة عامة على الإعدادات', perms: ['MANAGE_BUSINESS_CONFIG', 'CONFIG_VIEW'] },
-      { href: '/users', en: 'Staff & permissions', ar: 'الموظفون والصلاحيات', perms: ['MANAGE_STAFF_ACCOUNTS'] },
-      { href: '/access/templates', en: 'Role templates', ar: 'قوالب الأدوار', superOnly: true },
+      // Owner request 2026-11-22: people who sign in — staff and drivers — under one "Users" tab.
+      { href: '/users', en: 'Staff & permissions', ar: 'الموظفون والصلاحيات', perms: ['MANAGE_STAFF_ACCOUNTS'], sub: USERS },
+      { href: '/drivers', en: 'Drivers', ar: 'السائقون', perms: ['MANAGE_DRIVERS'], sub: USERS },
+      // Owner request 2026-11-22: the critical setup lives in Settings.
+      { href: '/sectors', en: 'Sectors', ar: 'الأقسام', perms: ['MANAGE_MARKETPLACE_SECTORS'] },
+      { href: '/service-areas', en: 'Service Areas', ar: 'مناطق الخدمة', perms: ['MANAGE_SERVICE_AREAS'] },
+      { href: '/delivery-zones', en: 'Delivery Zones', ar: 'مناطق التوصيل', perms: ['MANAGE_SERVICE_AREAS'] },
+      { href: '/vehicle-types', en: 'Vehicle Types', ar: 'أنواع المركبات', perms: ['MANAGE_VEHICLE_TYPES'] },
       { href: '/audit-log', en: 'Audit log', ar: 'سجل التدقيق', perms: ['VIEW_AUDIT_LOG'] },
       { href: '/security', en: 'Security', ar: 'الأمان', perms: [] },
-      { href: '/system', en: 'System health', ar: 'صحة النظام', perms: ['VIEW_SYSTEM_HEALTH'] },
-      { href: '/system/metrics', en: 'Metrics', ar: 'المقاييس', perms: ['VIEW_SYSTEM_HEALTH'] },
-      { href: '/system/jobs', en: 'Jobs', ar: 'المهام', perms: ['VIEW_SYSTEM_HEALTH'] },
+      { href: '/config', en: 'Configuration overview', ar: 'نظرة عامة على الإعدادات', perms: ['MANAGE_BUSINESS_CONFIG', 'CONFIG_VIEW'], more: true },
+      { href: '/access/templates', en: 'Role templates', ar: 'قوالب الأدوار', superOnly: true, more: true },
+      { href: '/system', en: 'System health', ar: 'صحة النظام', perms: ['VIEW_SYSTEM_HEALTH'], more: true },
+      { href: '/system/metrics', en: 'Metrics', ar: 'المقاييس', perms: ['VIEW_SYSTEM_HEALTH'], more: true },
+      { href: '/system/jobs', en: 'Jobs', ar: 'المهام', perms: ['VIEW_SYSTEM_HEALTH'], more: true },
     ],
   },
 ];
