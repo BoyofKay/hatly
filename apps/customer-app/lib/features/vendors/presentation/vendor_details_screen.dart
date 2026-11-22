@@ -137,6 +137,11 @@ class _VendorDetailsContent extends ConsumerWidget {
       maxPriceMinor: filters.maxPriceMinor,
     );
     final productsAsync = ref.watch(productListProvider(productListParams));
+    // The menu loads 20 at a time: the first page above, then the next pages as the customer nears the end of the list.
+    final more = ref.watch(moreProductsProvider(productListParams));
+    final firstPage = productsAsync.valueOrNull;
+    final canLoadMore =
+        firstPage != null && firstPage.length >= kMenuPageSize && !more.done;
 
     // Filters V1: real bounds derived from the vendor's own currently-loaded (unfiltered-by-price)
     // product list — never a hardcoded/arbitrary business limit, never a second network call.
@@ -150,119 +155,148 @@ class _VendorDetailsContent extends ConsumerWidget {
         ? null
         : loadedPrices.reduce((a, b) => a > b ? a : b);
 
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          title: Text(vendorName),
-          pinned: true,
-          actions: [
-            _FavoriteHeartButton(vendorId: details.vendor.id),
-            const CartIconButton()
-          ],
-        ),
-        SliverToBoxAdapter(
-            child: _VendorHeader(details: details, vendorName: vendorName)),
-        SliverToBoxAdapter(child: _BranchInfoSection(branch: details.branch)),
-        // Visual UX (reference comparison): the menu search comes straight after the vendor/branch
-        // info, then the menu sections, directly above the products they filter.
-        const SliverToBoxAdapter(child: SizedBox(height: HatlySpacing.sm)),
-        SliverToBoxAdapter(
-          child: _ProductSearchAndSortBar(
-            searchQuery: searchQuery,
-            onSearchChanged: onSearchChanged,
-            sortOption: sortOption,
-            onSortChanged: onSortChanged,
-            filters: filters,
-            onFiltersChanged: onFiltersChanged,
-            minAvailablePriceMinor: minAvailablePriceMinor,
-            maxAvailablePriceMinor: maxAvailablePriceMinor,
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        if (canLoadMore && !more.loading && n.metrics.extentAfter < 600) {
+          ref.read(moreProductsProvider(productListParams).notifier).loadMore();
+        }
+        return false;
+      },
+      child: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            title: Text(vendorName),
+            pinned: true,
+            actions: [
+              _FavoriteHeartButton(vendorId: details.vendor.id),
+              const CartIconButton()
+            ],
           ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: HatlySpacing.sm)),
-        SliverToBoxAdapter(
-          child: categoriesAsync.when(
-            loading: () => const SizedBox(height: 44),
-            // Non-critical: the product list below still works
-            // unfiltered even if this vendor's own category chips fail
-            // to load — no need to block the whole screen on it.
-            error: (error, stackTrace) => const SizedBox.shrink(),
-            data: (categories) => _CategoryChipsRow(
-              categories: categories,
-              selectedCategoryId: selectedCategoryId,
-              onCategorySelected: onCategorySelected,
+          SliverToBoxAdapter(
+              child: _VendorHeader(details: details, vendorName: vendorName)),
+          SliverToBoxAdapter(child: _BranchInfoSection(branch: details.branch)),
+          // Visual UX (reference comparison): the menu search comes straight after the vendor/branch
+          // info, then the menu sections, directly above the products they filter.
+          const SliverToBoxAdapter(child: SizedBox(height: HatlySpacing.sm)),
+          SliverToBoxAdapter(
+            child: _ProductSearchAndSortBar(
+              searchQuery: searchQuery,
+              onSearchChanged: onSearchChanged,
+              sortOption: sortOption,
+              onSortChanged: onSortChanged,
+              filters: filters,
+              onFiltersChanged: onFiltersChanged,
+              minAvailablePriceMinor: minAvailablePriceMinor,
+              maxAvailablePriceMinor: maxAvailablePriceMinor,
             ),
           ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 8)),
-        productsAsync.when(
-          loading: () => const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  ProductListTileSkeleton(),
-                  ProductListTileSkeleton(),
-                  ProductListTileSkeleton(),
-                ],
+          const SliverToBoxAdapter(child: SizedBox(height: HatlySpacing.sm)),
+          SliverToBoxAdapter(
+            child: categoriesAsync.when(
+              loading: () => const SizedBox(height: 44),
+              // Non-critical: the product list below still works
+              // unfiltered even if this vendor's own category chips fail
+              // to load — no need to block the whole screen on it.
+              error: (error, stackTrace) => const SizedBox.shrink(),
+              data: (categories) => _CategoryChipsRow(
+                categories: categories,
+                selectedCategoryId: selectedCategoryId,
+                onCategorySelected: onCategorySelected,
               ),
             ),
           ),
-          error: (error, stackTrace) => SliverToBoxAdapter(
-            child: SizedBox(
-              height: 200,
-              child: HatlyStateView(
-                icon: Icons.wifi_off_rounded,
-                title: l10n.somethingWentWrong,
-                retryLabel: l10n.retry,
-                onRetry: () =>
-                    ref.invalidate(productListProvider(productListParams)),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          productsAsync.when(
+            loading: () => const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    ProductListTileSkeleton(),
+                    ProductListTileSkeleton(),
+                    ProductListTileSkeleton(),
+                  ],
+                ),
               ),
             ),
-          ),
-          data: (products) {
-            if (products.isEmpty) {
-              return SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 180,
-                  child: HatlyStateView(
-                      icon: Icons.no_food_outlined,
-                      title: l10n.noProductsFound),
+            error: (error, stackTrace) => SliverToBoxAdapter(
+              child: SizedBox(
+                height: 200,
+                child: HatlyStateView(
+                  icon: Icons.wifi_off_rounded,
+                  title: l10n.somethingWentWrong,
+                  retryLabel: l10n.retry,
+                  onRetry: () =>
+                      ref.invalidate(productListProvider(productListParams)),
+                ),
+              ),
+            ),
+            data: (firstProducts) {
+              final products = [...firstProducts, ...more.items];
+              if (products.isEmpty) {
+                return SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 180,
+                    child: HatlyStateView(
+                        icon: Icons.no_food_outlined,
+                        title: l10n.noProductsFound),
+                  ),
+                );
+              }
+              return SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final product = products[index];
+                      return ProductListTile(
+                        product: product,
+                        onTap: () => context.push('/products/${product.id}'),
+                        // Same one-tap add as Home (one unit via the cart controller; hands off to the product
+                        // page when the backend needs an option/weight choice or the cart is another branch's).
+                        onQuickAdd: () =>
+                            handleQuickAdd(context, ref, product.id),
+                      );
+                    },
+                    childCount: products.length,
+                  ),
                 ),
               );
-            }
-            return SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final product = products[index];
-                    return ProductListTile(
-                      product: product,
-                      onTap: () => context.push('/products/${product.id}'),
-                      // Same one-tap add as Home (one unit via the cart controller; hands off to the product
-                      // page when the backend needs an option/weight choice or the cart is another branch's).
-                      onQuickAdd: () =>
-                          handleQuickAdd(context, ref, product.id),
-                    );
-                  },
-                  childCount: products.length,
+            },
+          ),
+          if (more.loading)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: ProductListTileSkeleton(),
+              ),
+            )
+          else if (more.failed && canLoadMore)
+            SliverToBoxAdapter(
+              child: Center(
+                child: TextButton(
+                  key: const Key('menu-load-more-retry'),
+                  onPressed: () => ref
+                      .read(moreProductsProvider(productListParams).notifier)
+                      .loadMore(),
+                  child: Text(l10n.retry),
                 ),
               ),
-            );
-          },
-        ),
-        // Only where the server allows it (the branch's sector setting; the cart endpoint enforces the same rule).
-        if (details.branch.allowsCustomRequests)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Center(
-                  child:
-                      CustomRequestAction(vendorBranchId: details.branch.id)),
             ),
-          ),
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
-      ],
+          // Only where the server allows it (the branch's sector setting; the cart endpoint enforces the same rule).
+          if (details.branch.allowsCustomRequests)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Center(
+                    child:
+                        CustomRequestAction(vendorBranchId: details.branch.id)),
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
     );
   }
 }
