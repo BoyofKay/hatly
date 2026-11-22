@@ -11,7 +11,7 @@ import { forgetAccount, maskPhone, readRecentAccounts, rememberAccount, RecentAc
  * Dashboard sign-in — phone + password (+ authenticator code when the admin account has one). Serves VENDOR/VENDOR_MANAGER/ADMIN/
  * SUPER_ADMIN through the same `auth/dashboard/login` endpoint (role-checked server-side; never trusted from this form).
  * Arabic/English, show/hide password, "Forgot password?" (reset by a manager — there is no SMS provider yet, so no self-service
- * code), and "Switch account": people who ticked "Remember me" on this browser are listed to pick from.
+ * code), and "Switch account": people who ticked "Remember my phone number" on this browser are listed (name + phone only — never a password).
  */
 export default function LoginPage() {
   return (
@@ -190,7 +190,7 @@ function LoginForm() {
 
             <label className="flex items-center gap-2 text-sm text-gray-600">
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded border-gray-300 accent-hatly-orange" />
-              {t('Remember me on this device', 'تذكرني على هذا الجهاز')}
+              {t('Remember my phone number on this device', 'تذكّر رقم هاتفي على هذا الجهاز')}
             </label>
 
             {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
@@ -199,7 +199,7 @@ function LoginForm() {
             </button>
           </form>
         </div>
-        <p className="mt-4 text-center text-xs text-gray-400">{t('On a shared device, untick “Remember me”.', 'على جهاز مشترك، ألغِ اختيار «تذكرني».')}</p>
+        <p className="mt-4 text-center text-xs text-gray-400">{t('Passwords are never saved — everyone types their own password each time.', 'كلمات المرور لا تُحفظ أبداً — كل شخص يكتب كلمة مروره في كل مرة.')}</p>
       </div>
     </main>
   );
