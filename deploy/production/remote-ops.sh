@@ -136,6 +136,12 @@ SELECT z.name, z.is_active, z.delivery_fee_minor / 100.0 AS fee_egp, a.name AS a
 SELECT v.name AS store, b.name AS branch, b.is_active, b.is_open, b.delivery_enabled, b.pickup_enabled, coalesce(a.name, '(none)') AS service_area
   FROM vendor_branches b JOIN vendors v ON v.id = b.vendor_id LEFT JOIN service_areas a ON a.id = b.service_area_id
  WHERE b.deleted_at IS NULL AND v.is_active ORDER BY v.name, b.name;
+\echo '== the address(es) matching the checkout screenshot (settings only)'
+SELECT to_char(ad.created_at, 'YYYY-MM-DD HH24:MI') AS saved, ad.is_active, coalesce(ad.mode, 'legacy') AS mode, (ad.delivery_zone_id IS NOT NULL) AS has_zone,
+       coalesce(z.is_active::text, '-') AS zone_active, (ad.latitude IS NOT NULL) AS has_pin,
+       round(ad.latitude::numeric, 3) AS lat3, round(ad.longitude::numeric, 3) AS lng3
+  FROM addresses ad LEFT JOIN delivery_zones z ON z.id = ad.delivery_zone_id
+ WHERE ad.line1 ILIKE '%فتحي خليل%' OR ad.street ILIKE '%فتحي خليل%' OR ad.formatted_address ILIKE '%فتحي خليل%' ORDER BY ad.created_at DESC LIMIT 5;
 \echo '== latest saved addresses vs active areas (km from centre / radius km)'
 SELECT to_char(ad.created_at, 'YYYY-MM-DD HH24:MI') AS saved, coalesce(ad.mode, 'legacy') AS mode, (ad.delivery_zone_id IS NOT NULL) AS has_zone,
        (ad.latitude IS NOT NULL) AS has_pin, a.name AS area,
