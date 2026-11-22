@@ -1,0 +1,38 @@
+action=disk-report arg= commit=585732fac8a5df0cf74e82497faaea9315a77b90 run=45058011762 started=2026-11-22T18:57:58Z
+
+==== filesystem  (18:58:01 UTC)
+/dev/sda1        96G   77G   19G  81% /
+
+==== docker (images / containers / volumes / build cache)  (18:58:01 UTC)
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          72        9         41.85GB   30.37GB (72%)
+Containers      9         9         2.793MB   0B (0%)
+Local Volumes   8         8         285MB     0B (0%)
+Build Cache     237       0         32.18GB   31.18GB
+
+==== hatly folders  (18:58:02 UTC)
+1.2G	/opt/hatly-prod/releases
+758M	/opt/hatly-prod/incoming
+170M	/opt/hatly-prod/backups
+
+==== releases on disk  (18:58:04 UTC)
+32
+
+==== largest top-level folders  (18:58:04 UTC)
+77G	/
+69G	/var
+5.6G	/opt
+2.3G	/usr
+506M	/home
+6.1M	/etc
+100K	/root
+64K	/tmp
+16K	/lost+found
+8.0K	/snap
+4.0K	/srv
+4.0K	/sbin.usr-is-merged
+
+==== logs  (18:59:10 UTC)
+1.6G	/var/log
+195M	/var/lib/docker/containers
+job status: success
