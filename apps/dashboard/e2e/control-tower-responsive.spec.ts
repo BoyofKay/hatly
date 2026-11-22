@@ -27,7 +27,7 @@ test.describe('Control Tower — responsive layouts', () => {
         const page = await ctx.newPage();
         try {
           await page.goto('/control-tower');
-          await expect(page.getByRole('heading', { level: 1 })).toHaveText(lang === 'ar' ? 'برج المراقبة' : 'Control Tower');
+          await expect(page.getByRole('heading', { level: 1 })).toHaveText(lang === 'ar' ? 'برج التحكم' : 'Control Tower');
           await expect(page.locator('html')).toHaveAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
           await expect(page.getByTestId('ct-urgent')).toBeVisible();
           await expect(page.getByTestId('ct-cards')).toBeVisible();

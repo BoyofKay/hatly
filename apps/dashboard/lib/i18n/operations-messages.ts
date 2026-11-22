@@ -126,7 +126,7 @@ export const opAr: Record<keyof typeof opEn, string> = {
   opBannerPendingOverdue: '{count} جزء من البائعين لم يُقبل منذ أكثر من {minutes} دقائق',
   opBannerPrepOverdue: '{count} جزء من البائعين تجاوز وقت الجاهزية المتوقع',
   opBannerRefunds: '{count} استرداد بتحويل يدوي لم يُرسل بعد',
-  opBannerOpen: 'فتح برج المراقبة',
+  opBannerOpen: 'فتح برج التحكم',
   opBannerDismiss: 'إخفاء حتى التغيير التالي',
 
   opCtTitle: 'عمليات الطلبات',

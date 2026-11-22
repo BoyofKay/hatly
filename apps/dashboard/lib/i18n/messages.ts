@@ -374,7 +374,7 @@ export const ar: Record<MessageKey, string> = {
   errNetwork: 'تعذّر الاتصال بالخادم. تحقق من الاتصال وحاول مرة أخرى.',
   errUnknown: 'تعذّر تأكيد السعر. حاول مرة أخرى أو أعد تحميل الطلب.',
   // ---- control tower / dispatch (Control Tower milestone)
-  ctTitle: 'برج المراقبة',
+  ctTitle: 'برج التحكم',
   ctRefresh: 'تحديث',
   ctUpdatedAt: 'آخر تحديث {time}',
   ctLoadFailed: 'تعذّر تحميل لوحة التشغيل.',

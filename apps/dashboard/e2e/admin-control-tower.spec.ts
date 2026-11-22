@@ -333,7 +333,7 @@ test.describe('Admin — Control Tower', () => {
 
   test('Arabic: the Control Tower renders right-to-left with Arabic labels', async ({ page }) => {
     await page.goto('/control-tower?lang=ar');
-    await expect(page.getByRole('heading', { name: 'برج المراقبة' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'برج التحكم' })).toBeVisible();
     await expect(page.locator('[dir="rtl"]').first()).toBeVisible();
     await page.getByRole('button', { name: 'التبديل إلى الإنجليزية' }).click(); // the shell's single language control; leave the remembered locale as English for other specs
   });

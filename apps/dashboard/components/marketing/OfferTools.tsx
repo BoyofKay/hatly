@@ -1,5 +1,5 @@
 'use client';
-import { minorToEgpInput, parseEgpToMinor } from '../../lib/money';
+import { gramsToKg, minorToEgpInput, parseEgpToMinor, parseKgToGrams } from '../../lib/money';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -10,7 +10,7 @@ import { useLang } from '../../lib/ui/lang';
 import { usePermissions } from '../../lib/ui/permissions';
 
 /** Performance, clone and safe-edit actions added to each offer. Discount rules never change on an offer already used — clone instead. */
-export function OfferTools({ offer, onChanged }: { offer: { id: string; name: string; endAt: string; budgetCapMinor: number | null; totalAllocationLimit: number | null }; onChanged: () => void }) {
+export function OfferTools({ offer, onChanged, weightLimits = false }: { offer: { id: string; name: string; endAt: string; budgetCapMinor: number | null; totalAllocationLimit: number | null }; onChanged: () => void; /** The offer covers only items sold by weight: its limit is shown and typed in kg (stored in grams). */ weightLimits?: boolean }) {
   const { t } = useLang();
   const { can } = usePermissions();
   const toast = useToast();
@@ -20,7 +20,8 @@ export function OfferTools({ offer, onChanged }: { offer: { id: string; name: st
   const [name, setName] = useState(offer.name);
   const [endAt, setEndAt] = useState(offer.endAt.slice(0, 16));
   const [budget, setBudget] = useState(minorToEgpInput(offer.budgetCapMinor));
-  const [alloc, setAlloc] = useState(offer.totalAllocationLimit === null ? '' : String(offer.totalAllocationLimit));
+  const allocShown = (v: number | null) => (v === null ? '' : weightLimits ? gramsToKg(v) : String(v));
+  const [alloc, setAlloc] = useState(allocShown(offer.totalAllocationLimit));
   const [cloneName, setCloneName] = useState(`${offer.name} (copy)`);
   const [cloneCode, setCloneCode] = useState('');
   const manage = can('MANAGE_OFFERS');
@@ -36,7 +37,11 @@ export function OfferTools({ offer, onChanged }: { offer: { id: string; name: st
         if (!b.ok) { setError(t('Enter the budget in EGP, e.g. 500 or 750.50.', 'أدخل الميزانية بالجنيه، مثل 500 أو 750.50.')); return; }
         body.budgetCapMinor = b.minor;
       }
-      if (alloc !== (offer.totalAllocationLimit === null ? '' : String(offer.totalAllocationLimit)) && alloc !== '') body.totalAllocationLimit = Number(alloc);
+      if (alloc !== allocShown(offer.totalAllocationLimit) && alloc !== '') {
+        const v = weightLimits ? parseKgToGrams(alloc.trim()) : Number.isInteger(Number(alloc)) ? Number(alloc) : null;
+        if (v === null) { setError(weightLimits ? t('Enter the limit in kg, e.g. 0.5 or 3.5.', 'أدخل الحد بالكيلو، مثل 0.5 أو 3.5.') : t('Enter a whole number of pieces.', 'أدخل عددًا صحيحًا من القطع.')); return; }
+        body.totalAllocationLimit = v;
+      }
       if (Object.keys(body).length === 0) { setError(t('Nothing to change.', 'لا شيء لتغييره.')); return; }
       await send('patch', `/admin/offers/${offer.id}`, body);
       toast.push('success', t('Offer updated.', 'تم تحديث العرض.')); setView(null); onChanged();
@@ -63,7 +68,7 @@ export function OfferTools({ offer, onChanged }: { offer: { id: string; name: st
           <LabeledInput label={t('Name', 'الاسم')} value={name} onChange={(e) => setName(e.target.value)} />
           <LabeledInput label={t('Ends at', 'ينتهي في')} type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} />
           <LabeledInput label={t('Budget cap (EGP, can only be raised after use)', 'سقف الميزانية (بالجنيه، يمكن رفعه فقط بعد الاستخدام)')} inputMode="decimal" dir="ltr" value={budget} onChange={(e) => setBudget(e.target.value)} />
-          <LabeledInput label={t('Total uses (can only be raised after use)', 'إجمالي الاستخدامات (يمكن رفعه فقط بعد الاستخدام)')} inputMode="numeric" value={alloc} onChange={(e) => setAlloc(e.target.value.replace(/\D/g, ''))} />
+          <LabeledInput label={weightLimits ? t('Total quantity in kg (can only be raised after use)', 'إجمالي الكمية بالكيلو (يمكن رفعه فقط بعد الاستخدام)') : t('Total uses (can only be raised after use)', 'إجمالي الاستخدامات (يمكن رفعه فقط بعد الاستخدام)')} inputMode={weightLimits ? 'decimal' : 'numeric'} dir="ltr" value={alloc} onChange={(e) => setAlloc(weightLimits ? e.target.value : e.target.value.replace(/\D/g, ''))} />
           <p className="text-xs text-gray-500">{t('Discount type, value, coupon code and branch cannot change. To change those, clone the offer and edit the copy.', 'لا يمكن تغيير نوع الخصم وقيمته ورمز القسيمة والفرع. لتغييرها انسخ العرض وعدّل النسخة.')}</p>
           {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         </div>

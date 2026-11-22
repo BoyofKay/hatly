@@ -51,7 +51,7 @@ export const NAV: NavGroup[] = [
       { href: '/manual-transfer', en: 'Manual Transfer', ar: 'التحويل اليدوي', perms: ['VERIFY_MANUAL_PAYMENTS'] },
       { href: '/refunds', en: 'Refunds', ar: 'المستردات', perms: ['VERIFY_MANUAL_PAYMENTS', 'VIEW_FINANCIALS'] },
       { href: '/payments', en: 'Payments', ar: 'المدفوعات', perms: ['VERIFY_MANUAL_PAYMENTS', 'VIEW_FINANCIALS'] },
-      { href: '/control-tower', en: 'Control Tower', ar: 'برج المراقبة', perms: P.orders, more: true },
+      { href: '/control-tower', en: 'Control Tower', ar: 'برج التحكم', perms: P.orders, more: true },
       { href: '/alerts', en: 'Alerts', ar: 'التنبيهات', perms: P.orders, more: true },
       { href: '/inbox', en: 'Notifications', ar: 'الإشعارات', perms: P.orders, more: true },
       { href: '/notification-setup', en: 'Notification setup', ar: 'إعداد الإشعارات', perms: P.orders, more: true },

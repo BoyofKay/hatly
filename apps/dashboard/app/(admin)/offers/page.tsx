@@ -1,4 +1,5 @@
 'use client';
+import { parseKgToGrams } from '../../../lib/money';
 import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 
 import { useEffect, useState } from 'react';
@@ -104,9 +105,30 @@ export default function AdminOffersPage() {
     setCreateError(null);
   }
 
+  // Offer limits count pieces, or GRAMS for products sold by weight. Work out which applies from the targeted products so the admin types
+  // pieces or kg (with decimals) — never grams. A mix of both cannot share one limit number.
+  const targeted = (products ?? []).filter((p) =>
+    targetingMode === 'PRODUCT' ? p.id === targetProductId : targetingMode === 'CATEGORY' ? p.categoryId === targetCategoryId : true,
+  );
+  const limitUnit: 'PIECE' | 'WEIGHT' | 'MIXED' = targeted.length > 0 && targeted.every((p) => p.pricingUnit === 'WEIGHT') ? 'WEIGHT' : targeted.some((p) => p.pricingUnit === 'WEIGHT') ? 'MIXED' : 'PIECE';
+  const limitLabel = limitUnit === 'WEIGHT' ? '(kg, e.g. 0.5 or 3.5)' : limitUnit === 'MIXED' ? '(pieces — items sold by weight need their own offer)' : '(pieces)';
+  const toLimit = (v: string): number | undefined | null => {
+    if (!v.trim()) return undefined;
+    if (limitUnit === 'WEIGHT') { const g = parseKgToGrams(v.trim()); return g !== null && g > 0 ? g : null; }
+    const n = Number(v); return Number.isInteger(n) && n > 0 ? n : null;
+  };
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (isCreating || !selectedBranchId) return;
+    if (mechanism === 'FLASH_SALE' && limitUnit === 'MIXED' && (perCustomerLifetimeLimit.trim() || totalAllocationLimit.trim())) {
+      setCreateError('These products mix items sold by piece and by weight, so one limit cannot fit both. Create separate offers, or leave the limits empty.');
+      return;
+    }
+    if (toLimit(perCustomerLifetimeLimit) === null || toLimit(totalAllocationLimit) === null) {
+      setCreateError(limitUnit === 'WEIGHT' ? 'Enter the limits in kg, e.g. 0.5, 1 or 3.5 (up to 3 decimals).' : 'Enter the limits as whole numbers of pieces.');
+      return;
+    }
     setIsCreating(true);
     setCreateError(null);
     try {
@@ -119,8 +141,8 @@ export default function AdminOffersPage() {
         endAt: new Date(endAt).toISOString(),
         productIds: targetingMode === 'PRODUCT' && targetProductId ? [targetProductId] : undefined,
         categoryIds: targetingMode === 'CATEGORY' && targetCategoryId ? [targetCategoryId] : undefined,
-        perCustomerLifetimeLimit: perCustomerLifetimeLimit ? Number(perCustomerLifetimeLimit) : undefined,
-        totalAllocationLimit: totalAllocationLimit ? Number(totalAllocationLimit) : undefined,
+        perCustomerLifetimeLimit: toLimit(perCustomerLifetimeLimit) ?? undefined,
+        totalAllocationLimit: toLimit(totalAllocationLimit) ?? undefined,
         budgetCapMinor: budgetCapMinor ? Math.round(Number(budgetCapMinor) * 100) : undefined,
       };
       if (mechanism === 'SUBTOTAL_DISCOUNT') {
@@ -355,9 +377,10 @@ export default function AdminOffersPage() {
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="block text-sm font-medium">Per-Customer Cumulative Limit (units/grams)</label>
+                      <label className="block text-sm font-medium">Per-Customer Cumulative Limit {limitLabel}</label>
                       <input
-                        type="number"
+                        inputMode="decimal"
+                        dir="ltr"
                         value={perCustomerLifetimeLimit}
                         onChange={(e) => setPerCustomerLifetimeLimit(e.target.value)}
                         min="0"
@@ -365,9 +388,10 @@ export default function AdminOffersPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium">Global Total Allocation (units/grams)</label>
+                      <label className="block text-sm font-medium">Global Total Allocation {limitLabel}</label>
                       <input
-                        type="number"
+                        inputMode="decimal"
+                        dir="ltr"
                         value={totalAllocationLimit}
                         onChange={(e) => setTotalAllocationLimit(e.target.value)}
                         min="0"
@@ -461,7 +485,7 @@ export default function AdminOffersPage() {
                   {targetingSummary(offer)} · {new Date(offer.startAt).toLocaleDateString()} –{' '}
                   {new Date(offer.endAt).toLocaleDateString()}
                 </p>
-                <div className="mt-1"><OfferTools offer={offer} onChanged={() => refresh(selectedBranchId)} /></div>
+                <div className="mt-1"><OfferTools offer={offer} weightLimits={(() => { const ids = offer.productIds.length ? offer.productIds : (products ?? []).filter((p) => offer.categoryIds.length ? offer.categoryIds.includes(p.categoryId) : true).map((p) => p.id); const ps = (products ?? []).filter((p) => ids.includes(p.id)); return ps.length > 0 && ps.every((p) => p.pricingUnit === 'WEIGHT'); })()} onChanged={() => refresh(selectedBranchId)} /></div>
                 {actionErrorById[offer.id] && <p className="text-xs text-red-600">{actionErrorById[offer.id]}</p>}
               </div>
             ))}
