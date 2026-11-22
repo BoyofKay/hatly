@@ -62,15 +62,13 @@ test.describe('Admin — Delivery Zones', () => {
     await expect(row.getByTestId('zone-fee-value')).toHaveText('17.50 EGP');
     await expect(row.getByTestId('zone-status')).toHaveText('Active');
 
-    // edit names / order / representative point
+    // edit names / order (the representative point is no longer shown — owner decision 2026-11-22)
     await row.getByTestId('zone-edit').click();
     const form = page.getByTestId('zone-form');
+    await expect(form.getByTestId('zone-lat')).toHaveCount(0);
     await form.getByTestId('zone-name').fill(`PW Zone ${id} edited`);
-    await form.getByTestId('zone-lat').fill('30.41');
-    await form.getByTestId('zone-lng').fill('31.55');
     await form.getByRole('button', { name: 'Save changes' }).click();
     await expect(row).toContainText(`PW Zone ${id} edited`);
-    await expect(row).toContainText('30.41, 31.55');
 
     // fee change — applies to new quotes only (the backend e2e proves placed orders keep theirs)
     await row.getByTestId('zone-fee-edit').click();
@@ -89,7 +87,7 @@ test.describe('Admin — Delivery Zones', () => {
     await deactivate(page, zone.id);
   });
 
-  test('form validation happens before anything is sent: missing names, a bad fee, half a point', async ({ page }) => {
+  test('form validation happens before anything is sent: missing names, a bad fee', async ({ page }) => {
     let posted = 0;
     page.on('request', (r) => r.method() === 'POST' && r.url().endsWith('/admin/delivery-zones') && posted++);
     await openPage(page);
@@ -106,10 +104,6 @@ test.describe('Admin — Delivery Zones', () => {
     await form.getByTestId('zone-fee').fill('abc');
     await form.getByRole('button', { name: 'Create zone' }).click();
     await expect(page.getByTestId('zone-form-error')).toContainText('Delivery fee must be an amount in EGP');
-    await form.getByTestId('zone-fee').fill('15');
-    await form.getByTestId('zone-lat').fill('30.4');
-    await form.getByRole('button', { name: 'Create zone' }).click();
-    await expect(page.getByTestId('zone-form-error')).toHaveText('Enter both representative latitude and longitude, or neither.');
     expect(posted).toBe(0);
   });
 
