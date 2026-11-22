@@ -45,6 +45,7 @@ The presets are the recommended starting point — the super admin (or an admin,
 | Menu: products, categories, options, menu import, photos | — | — | ✓ | ✓ | MANAGE_CATALOG |
 | Store staff accounts (also promote an operator to manager) | — | — | ✓ | ✓ | MANAGE_VENDOR_STAFF |
 | Sections, vehicle types; service areas (rename, move the centre, expand the radius); delivery zones (rename, move the point, order, activate / deactivate) | — | — | ✓ | ✓ | MANAGE_MARKETPLACE_SECTORS, MANAGE_SERVICE_AREAS, MANAGE_VEHICLE_TYPES |
+| Marketplace sectors (Home categories, their photos, custom-request switch) — **admin-only, enforced**: cannot be given to a supervisor or team member, and is removed when an admin is moved down a level | — | — | ✓ | ✓ | MANAGE_MARKETPLACE_SECTORS |
 | **Delete** any of the above (except delivery zones, which are never deleted — deactivate or edit them) | — | — | ✓ | ✓ | the area permission **+ DELETE_RECORDS** |
 | Commission rate, who accepts orders (acceptance mode) | — | — | — | ✓ | MANAGE_VENDOR_COMMISSION |
 | Create a delivery zone, change a zone's fee | — | — | — | ✓ | MANAGE_SERVICE_AREAS + MANAGE_DELIVERY_FEE_MULTIPLIER |

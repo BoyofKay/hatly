@@ -12,6 +12,12 @@ import { assertStrongStaffPassword } from './staff-password-policy';
 export type StaffLevel = 'ADMIN' | 'OPS_SUPERVISOR' | 'OPS_TEAM';
 export const STAFF_LEVELS: StaffLevel[] = ['ADMIN', 'OPS_SUPERVISOR', 'OPS_TEAM'];
 
+/**
+ * Permissions only an ADMIN-level account (or the super admin) may hold — never an operations supervisor or team member, whoever grants it.
+ * Owner decision 2026-11-22: marketplace sectors (the Home categories, their photos and the custom-request switch) are admin-only.
+ */
+export const ADMIN_LEVEL_ONLY_PERMISSIONS: ReadonlySet<string> = new Set([Permission.MANAGE_MARKETPLACE_SECTORS]);
+
 /** Higher number = more authority. SUPER_ADMIN is a role, above every level. */
 const RANK: Record<StaffLevel | 'SUPER_ADMIN', number> = { SUPER_ADMIN: 4, ADMIN: 3, OPS_SUPERVISOR: 2, OPS_TEAM: 1 };
 
@@ -104,6 +110,7 @@ export class StaffAccountsService {
     assertStrongStaffPassword(input.password);
     const wanted = await this.resolveRequestedPermissions(input.permissions, input.templateKey);
     await this.assertActorMayGrant(actor, wanted);
+    this.assertFitsLevel(input.level, wanted);
     await this.assertPhoneFree(input.phone);
 
     const passwordHash = await bcrypt.hash(input.password, 10);
@@ -139,6 +146,10 @@ export class StaffAccountsService {
     if (input.email !== undefined) patch.email = input.email?.trim() || null;
     if (input.level !== undefined) patch.staffLevel = input.level;
     if (Object.keys(patch).length > 0) await this.users.update({ id }, patch);
+    // Moved below ADMIN: admin-only permissions go with the old level.
+    if (input.level !== undefined && input.level !== 'ADMIN') {
+      for (const p of ADMIN_LEVEL_ONLY_PERMISSIONS) await this.permissions.revoke(id, p as Permission);
+    }
     // A phone change is a sign-in identity change: end the current session so the account signs in again with the new number.
     if (patch.phone) await this.sessions.revoke(id);
     return this.view((await this.users.findOne({ where: { id } }))!, true);
@@ -166,6 +177,7 @@ export class StaffAccountsService {
     const target = await this.loadManageable(actor, id);
     const wanted = await this.resolveRequestedPermissions(permissions, undefined);
     await this.assertActorMayGrant(actor, wanted);
+    this.assertFitsLevel(((target.staffLevel as StaffLevel) ?? 'ADMIN'), wanted);
     const actorHeld = actor.role === Role.SUPER_ADMIN ? ALL_PERMISSIONS : new Set<string>(await this.permissions.listPermissions(actor.id));
     const current = new Set<string>(await this.permissions.listPermissions(id));
     for (const p of wanted) if (!current.has(p)) await this.permissions.grant(id, p as Permission, actor.id);
@@ -242,6 +254,15 @@ export class StaffAccountsService {
     const unknown = wanted.filter((p) => !ALL_PERMISSIONS.has(p));
     if (unknown.length > 0) throw new BadRequestException({ message: `Unknown permission(s): ${unknown.join(', ')}.`, details: { code: 'UNKNOWN_PERMISSION' } });
     return wanted;
+  }
+
+  /** An admin-only permission can never be given to a supervisor or a team member. */
+  private assertFitsLevel(level: StaffLevel, wanted: string[]): void {
+    if (level === 'ADMIN') return;
+    const adminOnly = wanted.filter((p) => ADMIN_LEVEL_ONLY_PERMISSIONS.has(p));
+    if (adminOnly.length > 0) {
+      throw new ForbiddenException({ message: `Only admins can hold: ${adminOnly.join(', ')}.`, details: { code: 'ADMIN_LEVEL_ONLY_PERMISSION', permissions: adminOnly } });
+    }
   }
 
   private async assertActorMayGrant(actor: StaffActor, wanted: string[]): Promise<void> {

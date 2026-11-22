@@ -156,6 +156,18 @@ describe('E2E — staff accounts and hierarchy', () => {
     });
   });
 
+  it('sectors are admin-only: a supervisor or team member can never be given MANAGE_MARKETPLACE_SECTORS; demoting an admin removes it', async () => {
+    const refused = await createAs(superAdmin.accessToken, { level: 'OPS_SUPERVISOR', permissions: [Permission.VIEW_ORDERS, Permission.MANAGE_MARKETPLACE_SECTORS] });
+    expect(refused.status).toBe(403);
+    expect(JSON.stringify(refused.body)).toContain('ADMIN_LEVEL_ONLY_PERMISSION');
+    const team = expectData<any>(await createAs(superAdmin.accessToken, { level: 'OPS_TEAM', permissions: [Permission.VIEW_ORDERS] }), 201);
+    expect((await api('put', `/admin/staff/${team.id}/permissions`, superAdmin.accessToken, { permissions: [Permission.VIEW_ORDERS, Permission.MANAGE_MARKETPLACE_SECTORS] })).status).toBe(403);
+    const adm = expectData<any>(await createAs(superAdmin.accessToken, { level: 'ADMIN', permissions: [Permission.MANAGE_MARKETPLACE_SECTORS] }), 201);
+    expect(adm.permissions).toContain(Permission.MANAGE_MARKETPLACE_SECTORS);
+    const demoted = expectData<any>(await api('patch', `/admin/staff/${adm.id}`, superAdmin.accessToken, { level: 'OPS_SUPERVISOR' }));
+    expect(demoted.permissions).not.toContain(Permission.MANAGE_MARKETPLACE_SECTORS);
+  });
+
   it('a staff member without MANAGE_STAFF_ACCOUNTS cannot manage anyone', async () => {
     const plain = await s.admin([Permission.VIEW_ORDERS], 'Plain Admin');
     expect((await createAs(plain.accessToken, { level: 'OPS_TEAM' })).status).toBe(403);
