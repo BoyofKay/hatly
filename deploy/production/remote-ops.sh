@@ -69,6 +69,14 @@ case "$action" in
       echo "BACKEND NOT HEALTHY — rolling back to $OLD (migrations stay applied; they are additive)"
       echo "$OLD" > "$PD/RELEASE"; ln -sfn "releases/$OLD" "$PD/current"; "$PD/current/deploy/production/prod.sh" apps; exit 1; }
     step "9. recent backend errors"; $SUDO docker logs --since 3m hatly-prod-backend-1 2>&1 | grep -c '"level":"error"\|ERROR' || true
+    step "10. tidy disk (keeps the 3 newest releases + their images; build cache capped at 5 GB)"
+    for r in $(ls -1t "$PD/releases" | grep -v '\.partial$' | tail -n +4); do
+      [ "$r" = "$REL" ] || [ "$r" = "$OLD" ] && continue
+      $SUDO rm -rf "$PD/releases/$r" "$PD/incoming/$r.tar.gz" "$PD/incoming/$r.tar.gz.sha256"
+      $SUDO docker image rm "hatly-prod-backend:$r" "hatly-prod-dashboard:$r" >/dev/null 2>&1 || true
+    done
+    $SUDO docker builder prune -f --keep-storage 5gb >/dev/null 2>&1 || true
+    df -h / | tail -1
     echo "DEPLOYED $REL (previous: $OLD — rollback: request ACTION=rollback RELEASE=$OLD)"
     ;;
 
