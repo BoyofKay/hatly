@@ -1,3 +1,2 @@
-ACTION=deploy
+ACTION=cleanup
 ARG=
-# banner + photos in edit + zone fee d972793
