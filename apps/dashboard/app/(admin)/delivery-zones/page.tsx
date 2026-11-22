@@ -423,11 +423,13 @@ export default function DeliveryZonesPage() {
                       <ZoneForm
                         initial={toForm(z)}
                         areas={areas}
-                        showFee={false}
+                        showFee
                         submitLabel="Save changes"
                         onCancel={() => setEditingId(null)}
                         onSubmit={async (v) => {
                           await updateDeliveryZone(z.id, v.details);
+                          // The fee has its own audited endpoint; call it only when it actually changed.
+                          if (v.feeMinor !== null && v.feeMinor !== Number(z.deliveryFeeMinor)) await updateDeliveryZoneFee(z.id, v.feeMinor);
                           setEditingId(null);
                           await refresh();
                         }}
@@ -480,7 +482,7 @@ export default function DeliveryZonesPage() {
             {sorted.map((z) => (
               <li key={`card-${z.id}`} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
                 {editingId === z.id ? (
-                  <ZoneForm initial={toForm(z)} areas={areas} showFee={false} submitLabel="Save changes" onCancel={() => setEditingId(null)} onSubmit={async (v) => { await updateDeliveryZone(z.id, v.details); setEditingId(null); await refresh(); }} />
+                  <ZoneForm initial={toForm(z)} areas={areas} showFee submitLabel="Save changes" onCancel={() => setEditingId(null)} onSubmit={async (v) => { await updateDeliveryZone(z.id, v.details); if (v.feeMinor !== null && v.feeMinor !== Number(z.deliveryFeeMinor)) await updateDeliveryZoneFee(z.id, v.feeMinor); setEditingId(null); await refresh(); }} />
                 ) : (
                   <>
                     <div className="flex items-start justify-between gap-2">

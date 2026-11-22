@@ -5,10 +5,11 @@ import { Product, ProductCategory, updateCategory, updateProduct } from '../../l
 import { apiErrorMessage } from '../../lib/api/errors';
 import { useLang } from '../../lib/ui/lang';
 import { Button, LabeledInput, LabeledSelect, LabeledTextarea, Modal, useToast } from '../ui';
+import { ProductImages } from './ProductImages';
 import { gramsToKg, minorToEgpInput, parseEgpToMinor, parseKgToGrams } from '../../lib/money';
 
 /** Full product edit for admins (replaces the old name-only prompt): names, descriptions, category, price and stock mode. */
-export function ProductEditModal({ product, categories, onClose, onSaved }: { product: Product; categories: ProductCategory[]; onClose: () => void; onSaved: () => void | Promise<void> }) {
+export function ProductEditModal({ product, categories, onClose, onSaved, onPhotosChanged }: { product: Product; categories: ProductCategory[]; onClose: () => void; onSaved: () => void | Promise<void>; onPhotosChanged?: () => void }) {
   const { t } = useLang();
   const toast = useToast();
   const [name, setName] = useState(product.name);
@@ -85,7 +86,12 @@ export function ProductEditModal({ product, categories, onClose, onSaved }: { pr
           />
         )}
       </div>
-      <p className="text-xs text-gray-500">{t('Pricing unit (piece / weight) cannot change; photos are managed from Products › Images.', 'لا يمكن تغيير وحدة التسعير (قطعة/وزن)؛ الصور من المنتجات › الصور.')}</p>
+      <p className="text-xs text-gray-500">{t('Pricing unit (piece / weight) cannot change.', 'لا يمكن تغيير وحدة التسعير (قطعة/وزن).')}</p>
+      <div className="mt-4 border-t border-gray-100 pt-4">
+        <h3 className="mb-2 text-sm font-semibold text-gray-800">{t('Photos', 'الصور')}</h3>
+        {/* Photos save immediately (they do not wait for the Save button above). */}
+        <ProductImages productId={product.id} onChanged={() => onPhotosChanged?.()} />
+      </div>
       {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
     </Modal>
   );

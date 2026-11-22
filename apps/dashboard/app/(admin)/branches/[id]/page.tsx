@@ -638,7 +638,7 @@ export default function BranchDetailPage() {
           ))}
         </ul>
       </div>
-      {editingProduct && <ProductEditModal product={editingProduct} categories={categories ?? []} onClose={() => setEditingProduct(null)} onSaved={async () => { setEditingProduct(null); await refresh(); }} />}
+      {editingProduct && <ProductEditModal product={editingProduct} categories={categories ?? []} onClose={() => setEditingProduct(null)} onSaved={async () => { setEditingProduct(null); await refresh(); }} onPhotosChanged={() => void refresh()} />}
       {editingCategory && <CategoryEditModal category={editingCategory} onClose={() => setEditingCategory(null)} onSaved={async () => { setEditingCategory(null); await refresh(); }} />}
     </div>
   );
