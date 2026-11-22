@@ -8,6 +8,8 @@ import { apiErrorMessage } from '../../../lib/api/errors';
 import { useApi } from '../../../lib/ui/api';
 import { useLang } from '../../../lib/ui/lang';
 import { usePermissions } from '../../../lib/ui/permissions';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
+import { SimpleEditModal } from '../../../components/admin/SimpleEditModal';
 
 /**
  * Vendor directory — consumes `GET/POST admin/vendors`. Only `name`/`nameAr`/`logoUrl` are collected when creating — `category`/`commissionPercent`
@@ -21,6 +23,7 @@ export default function VendorsPage() {
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Vendor | null>(null);
   const [name, setName] = useState('');
   const [nameAr, setNameAr] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
@@ -79,9 +82,41 @@ export default function VendorsPage() {
             { key: 'n', header: t('Vendor', 'المورد'), cell: (v) => <Link href={`/vendors/${v.id}`} className="font-medium text-hatly-orangeDark hover:underline"><bdi>{locale === 'ar' && v.nameAr ? v.nameAr : v.name}</bdi></Link> },
             { key: 'o', header: t('Other name', 'الاسم الآخر'), cell: (v) => <bdi className="text-gray-500">{locale === 'ar' ? v.name : v.nameAr ?? '—'}</bdi> },
             { key: 's', header: t('Status', 'الحالة'), cell: (v) => (v.isActive ? <Badge tone="green">{t('Active', 'مفعّل')}</Badge> : <Badge tone="gray">{t('Inactive', 'غير مفعّل')}</Badge>) },
+            ...(can('MANAGE_VENDORS')
+              ? [{
+                  key: 'a',
+                  header: t('Actions', 'إجراءات'),
+                  cell: (v: Vendor) => (
+                    <div className="flex justify-end gap-1.5">
+                      <Button size="sm" onClick={() => setEditing(v)}>{t('Edit', 'تعديل')}</Button>
+                      <DeleteRecordButton
+                        path={`/admin/vendors/${v.id}`}
+                        name={v.name}
+                        what={['Store', 'المتجر']}
+                        consequence={['All its branches, menus, offers and store staff are switched off with it. Refused while any branch has orders in progress.', 'يتم إيقاف كل فروعه والمنيو والعروض وموظفي المتجر. يُرفض الحذف إذا كان لأي فرع طلبات جارية.']}
+                        strong
+                        onDeleted={list.reload}
+                      />
+                    </div>
+                  ),
+                }]
+              : []),
           ]}
         />
       </Card>
+      {editing && (
+        <SimpleEditModal
+          title={['Edit store', 'تعديل المتجر']}
+          path={`/admin/vendors/${editing.id}`}
+          fields={[
+            { key: 'name', label: ['Name (English)', 'الاسم (بالإنجليزية)'], required: true, dir: 'ltr' },
+            { key: 'nameAr', label: ['Name (Arabic)', 'الاسم (بالعربية)'], required: true, dir: 'rtl' },
+          ]}
+          initial={{ name: editing.name, nameAr: editing.nameAr ?? '' }}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); list.reload(); }}
+        />
+      )}
       <Modal open={open} title={t('New Vendor', 'مورد جديد')} onClose={() => setOpen(false)}>
         <form onSubmit={submit} className="space-y-3">
           <LabeledInput label={t('Name', 'الاسم')} required value={name} onChange={(e) => setName(e.target.value)} />

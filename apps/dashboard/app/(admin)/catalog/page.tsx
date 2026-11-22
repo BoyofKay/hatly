@@ -8,6 +8,8 @@ import { apiErrorMessage } from '../../../lib/api/errors';
 import { resolveMediaUrl } from '../../../lib/media-url';
 import { useLang } from '../../../lib/ui/lang';
 import { usePermissions } from '../../../lib/ui/permissions';
+import Link from 'next/link';
+import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 import { MediaPicker } from '../../../components/media/MediaPicker';
 import { ExportButton } from '../../../components/reports/ExportButton';
 
@@ -88,6 +90,7 @@ export default function ProductsPage() {
           { key: 'st', header: t('Stock', 'المخزون'), cell: (r: any) => <span className="flex items-center gap-1"><StatusPill status={r.stockState} />{r.inventoryMode === 'TRACKED' && <span className="text-xs tabular-nums">{num(r.quantity)}</span>}</span> },
           { key: 'av', header: t('Available', 'متاح'), cell: (r: any) => (r.available ? <Badge tone="green">{t('Yes', 'نعم')}</Badge> : <Badge tone="red">{t('No', 'لا')}</Badge>) },
           { key: 'im', header: t('Images', 'الصور'), cell: (r: any) => (canEdit ? <Button size="sm" onClick={() => setImgProduct(r)}>{num(r.imageCount)} · {t('Manage', 'إدارة')}</Button> : num(r.imageCount)) },
+          ...(canEdit ? [{ key: 'act', header: '', align: 'end' as const, cell: (r: any) => <span className="flex justify-end gap-1.5"><Link href={`/branches/${r.branchId}#sec-products`} className="inline-flex items-center rounded-lg border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">{t('Edit', 'تعديل')}</Link><DeleteRecordButton path={`/admin/products/${r.id}`} name={r.name} what={['Product', 'المنتج']} consequence={['It disappears from the menu. Past orders keep it.', 'يختفي من المنيو. الطلبات السابقة تحتفظ به.']} onDeleted={list.reload} /></span> }] : []),
         ]} />
         {list.meta && <Pagination page={page} limit={limit} total={list.meta.total} onPage={setPage} />}
       </Card>
