@@ -69,7 +69,7 @@ export class AdminHomeBannersController {
   }
 
   @Delete(':id')
-  @RequiresPermission(Permission.MANAGE_HOME_BANNERS)
+  @RequiresPermission(Permission.MANAGE_HOME_BANNERS, Permission.DELETE_RECORDS)
   async remove(@Param('id', ParseUUIDPipe) id: string) {
     return { data: await this.banners.remove(id) };
   }

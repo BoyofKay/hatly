@@ -153,6 +153,14 @@ describe('E2E — admin safe delete and edit', () => {
     expect((await api('delete', `/admin/sectors/${sector.id}`)).status).toBe(409);
     const noPerm = await s.admin([Permission.VIEW_ORDERS], 'No Delete Perm');
     expect((await api('delete', `/admin/products/00000000-0000-4000-8000-000000000000`, undefined, noPerm.accessToken)).status).toBe(403);
+    // editing rights alone are not enough to delete: DELETE_RECORDS is needed too
+    const editor = await s.admin([Permission.MANAGE_CATALOG], 'Catalog Editor');
+    const vendor2 = await s.vendor({ serviceAreaId: area.id, lat: area.lat, lng: area.lng });
+    const p2 = await s.product(vendor2);
+    expect((await api('patch', `/admin/products/${p2.id}`, { name: 'Edited by editor' }, editor.accessToken)).status).toBe(200);
+    expect((await api('delete', `/admin/products/${p2.id}`, undefined, editor.accessToken)).status).toBe(403);
+    const deleter = await s.admin([Permission.MANAGE_CATALOG, Permission.DELETE_RECORDS], 'Catalog Admin');
+    expect((await api('delete', `/admin/products/${p2.id}`, undefined, deleter.accessToken)).status).toBe(200);
   });
 
   it('branch go-live checklist: a bare branch lists its blockers; once fixed it is ready', async () => {

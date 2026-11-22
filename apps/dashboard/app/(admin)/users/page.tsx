@@ -18,6 +18,7 @@ import {
 } from '../../../lib/api/admin-staff';
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { useLang } from '../../../lib/ui/lang';
+import { usePermissions } from '../../../lib/ui/permissions';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, inputCls, KpiCard, LabeledInput, LabeledSelect, Modal, PageHeader, Skeleton, useToast } from '../../../components/ui';
 
 type Editor =
@@ -48,6 +49,7 @@ export default function StaffPage() {
   const [busy, setBusy] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const label = (l: string) => { const pair = LEVEL_LABEL[l as StaffLevel] ?? [l, l]; return t(pair[0], pair[1]); };
+  const canDelete = usePermissions().can('DELETE_RECORDS');
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -153,7 +155,7 @@ export default function StaffPage() {
                   <Button size="sm" onClick={() => setEditor({ kind: 'permissions', user: u })}>{t('Permissions', 'الصلاحيات')}</Button>
                   <Button size="sm" onClick={() => setEditor({ kind: 'password', user: u })}>{t('Reset password', 'إعادة تعيين كلمة المرور')}</Button>
                   <Button size="sm" onClick={() => { setConfirmError(null); setConfirm({ kind: u.isActive ? 'deactivate' : 'activate', user: u }); }}>{u.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</Button>
-                  <Button size="sm" variant="danger" onClick={() => { setConfirmError(null); setConfirm({ kind: 'delete', user: u }); }}>{t('Delete', 'حذف')}</Button>
+                  {canDelete && <Button size="sm" variant="danger" onClick={() => { setConfirmError(null); setConfirm({ kind: 'delete', user: u }); }}>{t('Delete', 'حذف')}</Button>}
                 </div>
               )}
             </section>

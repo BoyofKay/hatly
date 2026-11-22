@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { apiClient } from '../../lib/api/client';
 import { apiErrorMessage } from '../../lib/api/errors';
 import { useLang } from '../../lib/ui/lang';
+import { usePermissions } from '../../lib/ui/permissions';
 import { Button, ConfirmDialog, useToast } from '../ui';
 
 /**
@@ -35,6 +36,8 @@ export function DeleteRecordButton({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Deleting is an admin decision (DELETE_RECORDS, on top of the area permission). Others deactivate instead; the server enforces it too.
+  const canDelete = usePermissions().can('DELETE_RECORDS');
 
   async function confirm() {
     setBusy(true);
@@ -51,6 +54,7 @@ export function DeleteRecordButton({
     }
   }
 
+  if (!canDelete) return null;
   return (
     <>
       <Button size={size} variant="danger" disabled={disabled} onClick={(e) => { e.stopPropagation(); setError(null); setOpen(true); }} aria-label={t(`Delete ${what[0].toLowerCase()} ${name}`, `حذف ${what[1]} ${name}`)}>

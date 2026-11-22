@@ -63,41 +63,46 @@ export const SYSTEM_TEMPLATES: TemplateDef[] = [
     descriptionAr: 'العروض والقسائم والحملات والبث والولاء واللافتات.',
     permissions: [P.MANAGE_OFFERS, P.MANAGE_HOME_BANNERS, P.MANAGE_CAMPAIGNS, P.MANAGE_BROADCASTS, P.MANAGE_LOYALTY_CONFIG, P.MARKETING_VIEW, P.MARKETING_EXPORT, P.MANAGE_MEDIA, P.MEDIA_VIEW, P.VIEW_REPORTS, P.VIEW_CUSTOMERS],
   },
-  // ---- Staff hierarchy presets (2026-11-21): the recommended starting set for each level. Still copied, still editable per person. ----
+  // ---- Staff hierarchy presets (owner decision 2026-11-22). Each level includes the one below it.
+  //  Team: watch and run orders. Supervisor: + the day-to-day critical decisions. Admin: + edit, delete, store settlement, period closing.
+  //  Super admin keeps commissions, business settings, approvals and the audit trail. Copied on creation, editable per person.
   {
     key: 'OPS_TEAM',
     nameEn: 'Operations team',
     nameAr: 'فريق التشغيل',
-    descriptionEn: 'Day-to-day order handling: follow orders, act for a store, assign drivers, open/close stores. No money, no personal data, no settings.',
-    descriptionAr: 'متابعة الطلبات يوميًا: تنفيذ الطلب نيابة عن المتجر وإسناد السائقين وفتح/إغلاق المتاجر. بدون أموال أو بيانات شخصية أو إعدادات.',
-    permissions: [P.VIEW_ORDERS, P.MANAGE_ORDER_FULFILMENT, P.ASSIGN_REASSIGN_ORDERS, P.OPEN_CLOSE_VENDOR_BRANCHES, P.VENDORS_VIEW, P.CATALOG_VIEW, P.FLEET_VIEW, P.VIEW_CUSTOMERS],
+    descriptionEn: 'Watch orders and act on them: accept/prepare/ready on a store’s behalf, handle unavailable items, assign drivers; watch drivers (live fleet) and stores. No cancelling, refunds, money, editing or deleting.',
+    descriptionAr: 'متابعة الطلبات وتنفيذها: القبول/التحضير/الجاهزية نيابة عن المتجر، الأصناف غير المتاحة، إسناد السائقين؛ متابعة السائقين والمتاجر. بدون إلغاء أو استرداد أو أموال أو تعديل أو حذف.',
+    permissions: [P.VIEW_ORDERS, P.MANAGE_ORDER_FULFILMENT, P.ASSIGN_REASSIGN_ORDERS, P.FLEET_VIEW, P.VENDORS_VIEW, P.CATALOG_VIEW, P.VIEW_CUSTOMERS],
   },
   {
     key: 'OPS_SUPERVISOR',
     nameEn: 'Operations supervisor',
     nameAr: 'مشرف التشغيل',
-    descriptionEn: 'Everything the operations team does, plus order issues, dispatch overrides, drivers, driver closing, transfer checks, customer contact details, reports, and managing the operations team.',
-    descriptionAr: 'كل ما يفعله فريق التشغيل، بالإضافة إلى مشكلات الطلبات وتجاوز الإسناد والسائقين وتقفيل السائقين ومراجعة التحويلات وبيانات تواصل العملاء والتقارير وإدارة فريق التشغيل.',
+    descriptionEn: 'Everything the team does, plus the daily critical decisions: cancel orders and order issues, refunds, transfer checks, driver shift closing, driver cash in hand, open/close stores, take drivers offline, dispatch overrides, customer contact details, reports, and the team’s accounts (no deleting).',
+    descriptionAr: 'كل ما يفعله فريق التشغيل، بالإضافة إلى القرارات اليومية الحرجة: إلغاء الطلبات ومشكلاتها، الاسترداد، مراجعة التحويلات، تقفيل ورديات السائقين، النقدية مع السائق، فتح/غلق المتاجر، إيقاف السائقين، تجاوز الإسناد، بيانات تواصل العملاء، التقارير، وحسابات الفريق (بدون حذف).',
     permissions: [
-      P.VIEW_ORDERS, P.MANAGE_ORDER_FULFILMENT, P.ASSIGN_REASSIGN_ORDERS, P.OPEN_CLOSE_VENDOR_BRANCHES, P.VENDORS_VIEW, P.CATALOG_VIEW, P.FLEET_VIEW, P.VIEW_CUSTOMERS,
-      P.MANAGE_ORDER_ISSUES, P.OVERRIDE_DISPATCH, P.MANAGE_DRIVERS, P.CHANGE_DRIVER_ONLINE_STATUS, P.VIEW_DRIVER_SETTLEMENTS, P.CLOSE_DRIVER_SETTLEMENTS,
-      P.VERIFY_MANUAL_PAYMENTS, P.VIEW_CUSTOMER_PII, P.VIEW_REPORTS, P.ORDERS_EXPORT, P.FLEET_EXPORT, P.MANAGE_STAFF_ACCOUNTS,
+      P.VIEW_ORDERS, P.MANAGE_ORDER_FULFILMENT, P.ASSIGN_REASSIGN_ORDERS, P.FLEET_VIEW, P.VENDORS_VIEW, P.CATALOG_VIEW, P.VIEW_CUSTOMERS,
+      P.MANAGE_ORDER_ISSUES, P.VERIFY_MANUAL_PAYMENTS, P.CLOSE_DRIVER_SETTLEMENTS, P.VIEW_DRIVER_SETTLEMENTS, P.MANAGE_CUSTOMER_WALLET,
+      P.OPEN_CLOSE_VENDOR_BRANCHES, P.CHANGE_DRIVER_ONLINE_STATUS, P.OVERRIDE_DISPATCH, P.VIEW_CUSTOMER_PII, P.VIEW_REPORTS,
+      P.ORDERS_EXPORT, P.FLEET_EXPORT, P.MANAGE_STAFF_ACCOUNTS,
     ],
   },
   {
     key: 'ADMIN_GENERAL',
     nameEn: 'Admin (general)',
     nameAr: 'مدير (عام)',
-    descriptionEn: 'Runs the platform: menus, zones, drivers, offers, customers, reports and the staff below them. Creating/deleting stores (MANAGE_VENDORS), commissions, business settings, approvals and the audit trail are granted individually by the super admin.',
-    descriptionAr: 'إدارة المنصة: المنيو والمناطق والسائقون والعروض والعملاء والتقارير والموظفون الأقل منه. إنشاء/حذف المتاجر (MANAGE_VENDORS) والعمولات وإعدادات العمل والاعتمادات وسجل التدقيق يمنحها المدير العام لكل شخص على حدة.',
+    descriptionEn: 'Everything the supervisor does, plus: create, edit and delete stores, menus, zones, offers, drivers and store staff; store settlements and monthly period closing; financial views. Commissions, settings, approvals and the audit trail stay with the super admin.',
+    descriptionAr: 'كل ما يفعله المشرف، بالإضافة إلى: إنشاء وتعديل وحذف المتاجر والفروع والمنيو والأقسام والمناطق والعروض والبنرات والسائقين وموظفي المتاجر؛ دفعات تسوية المتاجر وتقفيل الفترة (الشهري)؛ العملاء؛ العرض المالي. العمولات وإعدادات العمل والاعتمادات وسجل التدقيق تبقى مع المدير العام.',
     permissions: [
-      P.VIEW_ORDERS, P.MANAGE_ORDER_FULFILMENT, P.MANAGE_ORDER_ISSUES, P.ASSIGN_REASSIGN_ORDERS, P.OVERRIDE_DISPATCH, P.OPEN_CLOSE_VENDOR_BRANCHES,
-      P.MANAGE_DRIVERS, P.CHANGE_DRIVER_ONLINE_STATUS, P.MANAGE_DRIVER_VENDOR_PREFERENCES, P.VIEW_DRIVER_SETTLEMENTS, P.CLOSE_DRIVER_SETTLEMENTS,
-      P.VENDORS_VIEW, P.MANAGE_VENDOR_STAFF, P.MANAGE_CATALOG, P.CATALOG_VIEW, P.MANAGE_MARKETPLACE_SECTORS, P.MANAGE_SERVICE_AREAS,
-      P.MANAGE_VEHICLE_TYPES, P.MANAGE_OFFERS, P.MANAGE_HOME_BANNERS, P.MARKETING_VIEW, P.MANAGE_MEDIA, P.MEDIA_VIEW, P.FLEET_VIEW, P.CONFIG_VIEW,
-      P.VIEW_CUSTOMERS, P.VIEW_CUSTOMER_PII, P.MANAGE_CUSTOMERS, P.MODERATE_REVIEWS, P.VERIFY_MANUAL_PAYMENTS, P.VIEW_FINANCIALS,
-      P.VIEW_VENDOR_FINANCIAL_REPORTS, P.VIEW_REPORTS, P.VIEW_SYSTEM_HEALTH, P.ORDERS_EXPORT, P.CATALOG_EXPORT, P.FLEET_EXPORT, P.REPORTS_EXPORT,
-      P.MANAGE_STAFF_ACCOUNTS,
+      P.VIEW_ORDERS, P.MANAGE_ORDER_FULFILMENT, P.ASSIGN_REASSIGN_ORDERS, P.FLEET_VIEW, P.VENDORS_VIEW, P.CATALOG_VIEW, P.VIEW_CUSTOMERS,
+      P.MANAGE_ORDER_ISSUES, P.VERIFY_MANUAL_PAYMENTS, P.CLOSE_DRIVER_SETTLEMENTS, P.VIEW_DRIVER_SETTLEMENTS, P.MANAGE_CUSTOMER_WALLET,
+      P.OPEN_CLOSE_VENDOR_BRANCHES, P.CHANGE_DRIVER_ONLINE_STATUS, P.OVERRIDE_DISPATCH, P.VIEW_CUSTOMER_PII, P.VIEW_REPORTS,
+      P.ORDERS_EXPORT, P.FLEET_EXPORT, P.MANAGE_STAFF_ACCOUNTS,
+      P.DELETE_RECORDS, P.MANAGE_VENDORS, P.MANAGE_VENDOR_STAFF, P.MANAGE_CATALOG, P.MANAGE_MARKETPLACE_SECTORS, P.MANAGE_SERVICE_AREAS,
+      P.MANAGE_VEHICLE_TYPES, P.MANAGE_DRIVERS, P.MANAGE_DRIVER_VENDOR_PREFERENCES, P.MANAGE_OFFERS, P.MANAGE_HOME_BANNERS, P.MARKETING_VIEW,
+      P.MANAGE_MEDIA, P.MEDIA_VIEW, P.CONFIG_VIEW, P.MANAGE_CUSTOMERS, P.MODERATE_REVIEWS,
+      P.CLOSE_VENDOR_SETTLEMENTS, P.MANAGE_SETTLEMENT_PAYMENTS, P.VIEW_VENDOR_FINANCIAL_REPORTS, P.VIEW_FINANCIALS,
+      P.VIEW_SYSTEM_HEALTH, P.CATALOG_EXPORT, P.REPORTS_EXPORT, P.FINANCE_EXPORT,
     ],
   },
   {
@@ -125,6 +130,7 @@ export class PermissionTemplatesService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     try {
       for (const t of SYSTEM_TEMPLATES) {
+        if (t.descriptionEn.length > 300 || t.descriptionAr.length > 300) this.logger.warn(`System template ${t.key}: description longer than 300 characters.`);
         await this.ds.query(
           `INSERT INTO permission_templates (key, name_en, name_ar, description_en, description_ar, is_system, permissions)
            VALUES ($1, $2, $3, $4, $5, true, $6)

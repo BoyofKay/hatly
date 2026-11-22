@@ -128,12 +128,31 @@ describe('E2E — staff accounts and hierarchy', () => {
       expectData(await api('patch', `/admin/staff/${teamMember.id}/deactivate`, supervisorToken));
       expect((await api('get', '/admin/me/permissions', memberToken)).status).toBe(401);
       expectData(await api('patch', `/admin/staff/${teamMember.id}/activate`, supervisorToken));
-      expect((await api('delete', `/admin/staff/${teamMember.id}`, supervisorToken)).status).toBe(200);
+      // deleting is an admin decision (DELETE_RECORDS): the supervisor may deactivate, not delete
+      expect((await api('delete', `/admin/staff/${teamMember.id}`, supervisorToken)).status).toBe(403);
+      expect((await api('delete', `/admin/staff/${teamMember.id}`, superAdmin.accessToken)).status).toBe(200);
       expect((await api('get', '/admin/me/permissions', memberToken)).status).toBe(401);
       expect((await signIn(teamMember.phone, 'Reset-Pass-456')).status).toBe(401);
       const list = (await api('get', '/admin/staff', supervisorToken)).body.data as any[];
       expect(list.some((r) => r.id === teamMember.id)).toBe(false);
       expect((await createAs(supervisorToken, { level: 'OPS_TEAM', phone: teamMember.phone })).status).toBe(201);
+    });
+
+    it('the presets follow the owner’s split: team runs orders, supervisor makes daily decisions, admin edits/deletes/settles', async () => {
+      const presets = (await api('get', '/admin/staff', superAdmin.accessToken)).body.meta.presets as Array<{ key: string; permissions: string[] }>;
+      const of = (k: string) => new Set(presets.find((p) => p.key === k)!.permissions);
+      const team = of('OPS_TEAM'), sup = of('OPS_SUPERVISOR'), admin = of('ADMIN_GENERAL');
+      for (const p of team) expect(sup.has(p)).toBe(true); // each level includes the one below
+      for (const p of sup) expect(admin.has(p)).toBe(true);
+      expect([...team]).toEqual(expect.arrayContaining([Permission.VIEW_ORDERS, Permission.MANAGE_ORDER_FULFILMENT, Permission.ASSIGN_REASSIGN_ORDERS, Permission.FLEET_VIEW]));
+      for (const p of [Permission.MANAGE_ORDER_ISSUES, Permission.VERIFY_MANUAL_PAYMENTS, Permission.CLOSE_DRIVER_SETTLEMENTS, Permission.MANAGE_CUSTOMER_WALLET]) {
+        expect(team.has(p)).toBe(false);
+        expect(sup.has(p)).toBe(true);
+      }
+      for (const p of [Permission.DELETE_RECORDS, Permission.MANAGE_CATALOG, Permission.MANAGE_VENDORS, Permission.CLOSE_VENDOR_SETTLEMENTS, Permission.MANAGE_SETTLEMENT_PAYMENTS]) {
+        expect(sup.has(p)).toBe(false);
+        expect(admin.has(p)).toBe(true);
+      }
     });
   });
 

@@ -1,7 +1,8 @@
 # How to add a new restaurant (store) — step by step
 
 دليل إضافة مطعم جديد خطوة بخطوة. Button names are shown in English with the Arabic in brackets.
-Who can do it: the super admin, or an admin with `MANAGE_VENDORS` + `MANAGE_CATALOG` + `MANAGE_VENDOR_STAFF`.
+**Who:** an **Admin** (the Admin preset has everything needed) or the super admin. Supervisors and the operations team cannot create or edit stores — see `ROLES_AND_PERMISSIONS.md`.
+Every name is entered **in English and Arabic** — the forms and the import refuse a missing Arabic name. Money is typed in **EGP** (95 or 12.50), commission in **%** (12.5), weights in **kg** (1.5).
 
 ## Before you start — collect from the restaurant
 
@@ -16,10 +17,10 @@ Who can do it: the super admin, or an admin with `MANAGE_VENDORS` + `MANAGE_CATA
 
 ## The steps
 
-1. **Check the area exists.** Delivery › Service Areas (مناطق الخدمة) must have the city (e.g. Belbeis), and Delivery › Delivery Zones (مناطق التوصيل) must have active zones in it. Without zones, customers without a map pin cannot order.
-2. **Create the store.** Stores › Vendors (المتاجر) › **New Vendor**: name (EN + AR). Open it, upload the logo, **Save**.
+1. **Check the area exists.** Delivery › Service Areas (مناطق الخدمة) must have the city (e.g. Belbeis), and Delivery › Delivery Zones (مناطق التوصيل) must have active zones in it. Without zones, customers without a map pin cannot order. (Creating a zone or changing its fee is a super-admin step.)
+2. **Create the store.** Stores › Vendors (المتاجر) › **New Vendor**: name in English **and** Arabic. Open it, upload the logo, **Save**.
 3. **Create the branch.** On the store page › Branches › **New branch** (فرع جديد):
-   - name and address;
+   - branch name in English **and** Arabic, and the address;
    - **Location**: paste the Google Maps link or "lat, lng" — the two coordinate boxes fill themselves;
    - **Service area** (required);
    - **Hatly commission (%)** (required), e.g. `15`.
@@ -31,8 +32,8 @@ Who can do it: the super admin, or an admin with `MANAGE_VENDORS` + `MANAGE_CATA
    - Delivery / pickup ticks as agreed.
 5. **Upload the menu.** Products › **Import menu (Excel)** (استيراد المنيو):
    1. **Download template** — a new branch gets two example rows (a burger with sizes/extras and a kofta sold by weight); overwrite or delete them.
-   2. Fill the **Menu** sheet: one row per product; leave `productId` empty for new products. `category` is created automatically. `price` in EGP; `unit` = `PIECE` or `WEIGHT` (price per kg).
-   3. Sizes / add-ons in the **Options** sheet: one row per choice, repeat the product and group names.
+   2. Fill the **Menu** sheet: one row per product with `name` (English) **and** `nameAr` (Arabic); leave `productId` empty for new products. A new `category` needs `categoryAr` too and is created automatically. `price` in EGP (95 or 12.50); `unit` = `PIECE` or `WEIGHT` (price per kg); stock `quantity` in pieces, or in **kg** for weighed items (12.5).
+   3. Sizes / add-ons in the **Options** sheet: one row per choice (with `choiceAr`), repeat the product and group names (`groupAr` once). For sizes, give the product its **smallest** price and each bigger size the **difference** as `extraPrice` (Margherita 90 → L +20, XL +40). A full worked example: `samples/troika-menu.xlsx` (77 items).
    4. **Photos**: put the .xlsx and the photos in **one .zip**, write each photo's file name in the `image` column. JPG/PNG/WebP, max 5 MB each.
    5. Upload the .xlsx (or the .zip) → **Check file** (فحص الملف). Every problem is listed by sheet and row; nothing is saved yet. Fix and re-check.
    6. When it says **Ready to import** → **Import**. If anything fails, nothing is saved.

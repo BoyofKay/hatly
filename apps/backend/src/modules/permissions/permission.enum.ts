@@ -195,4 +195,10 @@ export enum Permission {
    * (ADMIN > OPS_SUPERVISOR > OPS_TEAM), and give them permissions the holder already has. SUPER_ADMIN always passes.
    */
   MANAGE_STAFF_ACCOUNTS = 'MANAGE_STAFF_ACCOUNTS',
+  /**
+   * Owner decision 2026-11-22: deleting is an ADMIN decision, separate from editing and from day-to-day operations. Every delete
+   * (stores, branches, products, categories, sections, offers, zones, areas, vehicle types, drivers, store staff, banners, staff accounts)
+   * needs this IN ADDITION to the permission that manages that record. Supervisors and the operations team deactivate instead.
+   */
+  DELETE_RECORDS = 'DELETE_RECORDS',
 }

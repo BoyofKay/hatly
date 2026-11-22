@@ -40,73 +40,73 @@ export class AdminRecordsController {
   }
 
   @Delete('vendors/:id')
-  @RequiresPermission(Permission.MANAGE_VENDORS)
+  @RequiresPermission(Permission.MANAGE_VENDORS, Permission.DELETE_RECORDS)
   deleteVendor(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('vendor', id);
   }
 
   @Delete('vendor-branches/:id')
-  @RequiresPermission(Permission.MANAGE_VENDORS)
+  @RequiresPermission(Permission.MANAGE_VENDORS, Permission.DELETE_RECORDS)
   deleteBranch(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('branch', id);
   }
 
   @Delete('products/:id')
-  @RequiresPermission(Permission.MANAGE_CATALOG)
+  @RequiresPermission(Permission.MANAGE_CATALOG, Permission.DELETE_RECORDS)
   deleteProduct(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('product', id);
   }
 
   @Delete('product-categories/:id')
-  @RequiresPermission(Permission.MANAGE_CATALOG)
+  @RequiresPermission(Permission.MANAGE_CATALOG, Permission.DELETE_RECORDS)
   deleteProductCategory(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('product-category', id);
   }
 
   @Delete('sectors/:id')
-  @RequiresPermission(Permission.MANAGE_MARKETPLACE_SECTORS)
+  @RequiresPermission(Permission.MANAGE_MARKETPLACE_SECTORS, Permission.DELETE_RECORDS)
   deleteSector(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('sector', id);
   }
 
   @Delete('subcategories/:id')
-  @RequiresPermission(Permission.MANAGE_MARKETPLACE_SECTORS)
+  @RequiresPermission(Permission.MANAGE_MARKETPLACE_SECTORS, Permission.DELETE_RECORDS)
   deleteSubcategory(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('subcategory', id);
   }
 
   @Delete('offers/:id')
-  @RequiresPermission(Permission.MANAGE_OFFERS)
+  @RequiresPermission(Permission.MANAGE_OFFERS, Permission.DELETE_RECORDS)
   deleteOffer(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('offer', id);
   }
 
   @Delete('delivery-zones/:id')
-  @RequiresPermission(Permission.MANAGE_SERVICE_AREAS)
+  @RequiresPermission(Permission.MANAGE_SERVICE_AREAS, Permission.DELETE_RECORDS)
   deleteDeliveryZone(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('delivery-zone', id);
   }
 
   @Delete('service-areas/:id')
-  @RequiresPermission(Permission.MANAGE_SERVICE_AREAS)
+  @RequiresPermission(Permission.MANAGE_SERVICE_AREAS, Permission.DELETE_RECORDS)
   deleteServiceArea(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('service-area', id);
   }
 
   @Delete('vehicle-types/:id')
-  @RequiresPermission(Permission.MANAGE_VEHICLE_TYPES)
+  @RequiresPermission(Permission.MANAGE_VEHICLE_TYPES, Permission.DELETE_RECORDS)
   deleteVehicleType(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('vehicle-type', id);
   }
 
   @Delete('drivers/:id')
-  @RequiresPermission(Permission.MANAGE_DRIVERS)
+  @RequiresPermission(Permission.MANAGE_DRIVERS, Permission.DELETE_RECORDS)
   deleteDriver(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('driver', id);
   }
 
   @Delete('vendor-staff/:id')
-  @RequiresPermission(Permission.MANAGE_VENDOR_STAFF)
+  @RequiresPermission(Permission.MANAGE_VENDOR_STAFF, Permission.DELETE_RECORDS)
   deleteVendorStaff(@Param('id', ParseUUIDPipe) id: string) {
     return this.del('vendor-staff', id);
   }

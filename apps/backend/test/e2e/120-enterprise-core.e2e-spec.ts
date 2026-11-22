@@ -51,8 +51,10 @@ describe('E2E — Enterprise Admin core (templates, KPIs, cancel, settlements, l
     it('lists the nine system templates (incl. the staff-level presets); none contains an approver or dangerous permission', async () => {
       const res = expectData<any[]>(await get(superAdmin, '/admin/permission-templates'));
       expect(res.map((t) => t.key).sort()).toEqual(['ADMIN_GENERAL', 'CATALOG', 'FINANCE', 'MARKETING', 'OPERATIONS', 'OPS_SUPERVISOR', 'OPS_TEAM', 'READ_ONLY', 'SUPPORT']);
-      const forbidden = [Permission.CAMPAIGN_APPROVE, Permission.BROADCAST_APPROVE, Permission.WALLET_ADJUST_APPROVE, Permission.APPROVE_SETTLEMENT_OVERPAYMENT, Permission.MEDIA_DELETE, Permission.AUDIT_EXPORT, Permission.VIEW_AUDIT_LOG, Permission.MANAGE_BUSINESS_CONFIG, Permission.MANAGE_VENDORS];
-      for (const t of SYSTEM_TEMPLATES) for (const p of forbidden) expect(t.permissions).not.toContain(p);
+      const forbidden = [Permission.CAMPAIGN_APPROVE, Permission.BROADCAST_APPROVE, Permission.WALLET_ADJUST_APPROVE, Permission.APPROVE_SETTLEMENT_OVERPAYMENT, Permission.MEDIA_DELETE, Permission.AUDIT_EXPORT, Permission.VIEW_AUDIT_LOG, Permission.MANAGE_BUSINESS_CONFIG, Permission.MANAGE_VENDORS, Permission.MANAGE_VENDOR_COMMISSION, Permission.MANAGE_DRIVER_COMMISSION, Permission.MANAGE_HATLY_SERVICE_PRICING];
+      for (const t of SYSTEM_TEMPLATES) expect([t.key, t.descriptionEn.length <= 300 && t.descriptionAr.length <= 300 && t.nameEn.length <= 80 && t.key.length <= 40]).toEqual([t.key, true]);
+      // Owner decision 2026-11-22: the Admin level creates/edits/deletes stores, so MANAGE_VENDORS is in ADMIN_GENERAL only; every other rule stands.
+      for (const t of SYSTEM_TEMPLATES) for (const p of forbidden) if (!(t.key === 'ADMIN_GENERAL' && p === Permission.MANAGE_VENDORS)) expect(t.permissions).not.toContain(p);
     });
 
     it('applying a template COPIES its permissions (ADD keeps existing grants, REPLACE makes them exact) and is SUPER_ADMIN only', async () => {

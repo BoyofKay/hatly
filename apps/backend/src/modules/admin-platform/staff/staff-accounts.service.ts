@@ -175,6 +175,9 @@ export class StaffAccountsService {
 
   async remove(actor: StaffActor, id: string): Promise<void> {
     const target = await this.loadManageable(actor, id);
+    if (!(await this.permissions.actorHolds(actor, Permission.DELETE_RECORDS))) {
+      throw new ForbiddenException({ message: 'Deleting needs the DELETE_RECORDS permission (admins). Deactivate the account instead.', details: { code: 'DELETE_NOT_ALLOWED' } });
+    }
     // `phone` is unique and at most 20 characters: free it for reuse with a marker that cannot collide with a real number.
     const releasedPhone = `del-${target.id.replace(/-/g, '').slice(0, 16)}`;
     await this.ds.transaction(async (m) => {

@@ -35,6 +35,8 @@ Branch `admin-panel-review` (not merged, not deployed). Everything below marked 
   Rules: you only manage levels **below** yours; you can only give permissions **you hold**, and never remove ones given by someone above you; nobody edits their own account there.
   Kept with the super admin and granted one by one (project rule): creating/deleting stores (`MANAGE_VENDORS`), commissions, business settings, approvals, audit log.
 
+**Update 2026-11-22 (owner decision):** the levels were re-cut — team runs orders; supervisor takes the daily critical decisions (cancel, refunds, driver shift closing, driver cash, open/close stores); admin edits, deletes (new `DELETE_RECORDS` permission), settles stores and closes periods. Full table: `docs/admin/ROLES_AND_PERMISSIONS.md`.
+
 ## 3. Edit and delete everywhere (point 4) — **Done**
 Delete is a **safe soft delete**: the record disappears from the panel and the apps, old orders/settlements/audit keep pointing at it, and the delete is **refused with a reason** when it would break something live.
 
