@@ -120,7 +120,7 @@ export class DriversService {
         ? await this.dataSource.query(
             `SELECT d.id, d.last_seen_at,
                     (SELECT count(*)::int FROM deliveries x JOIN orders o ON o.id = x.order_id
-                      WHERE x.driver_id = d.id AND x.deleted_at IS NULL AND o.status::text = ANY($2::text[])) AS active,
+                      WHERE x.driver_id = d.id AND x.deleted_at IS NULL AND (o.status::text = ANY($2::text[]) OR (x.early_assigned_at IS NOT NULL AND o.status::text IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP')))) AS active,
                     GREATEST(1, COALESCE(d.capacity_override, (SELECT v.max_active_deliveries FROM vehicle_types v WHERE v.id = d.vehicle_type_id), 1))::int AS capacity
                FROM drivers d WHERE d.id = ANY($1)`,
             [drivers.map((d) => d.id), ACTIVE_DRIVER_ORDER_STATUSES],

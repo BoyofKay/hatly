@@ -85,7 +85,7 @@ function buildHarness(
   // OrderReadinessService's or AutomaticDispatchService's, which each
   // have their own dedicated spec files.
   const orderReadinessService = { checkAndAdvance: jest.fn(async () => false) };
-  const automaticDispatchService = { attemptAutomaticDispatch: jest.fn(async () => undefined), recordAssignmentError: jest.fn(async () => undefined) };
+  const automaticDispatchService = { attemptAutomaticDispatch: jest.fn(async () => undefined), onOrderReady: jest.fn(async () => undefined), recordAssignmentError: jest.fn(async () => undefined) };
   // The financial consequences of a cancellation have their own dedicated specs (order-segment-cancellation.service.spec.ts,
   // order-state-machine.service.spec.ts) — this file only checks that THIS service routes to them correctly.
   const orderSegmentCancellationService = { applyPartialCancellation: jest.fn(async () => ({})) };
@@ -277,7 +277,7 @@ describe('OrderVendorSegmentStateMachineService', () => {
     });
 
     expect(orderReadinessService.checkAndAdvance).not.toHaveBeenCalled();
-    expect(automaticDispatchService.attemptAutomaticDispatch).not.toHaveBeenCalled();
+    expect(automaticDispatchService.onOrderReady).not.toHaveBeenCalled();
   });
 
   it('PHASE 4: attempts automatic dispatch only when checkAndAdvance reports the order JUST became fully ready', async () => {
@@ -295,7 +295,8 @@ describe('OrderVendorSegmentStateMachineService', () => {
       actorRole: Role.VENDOR,
     });
 
-    expect(automaticDispatchService.attemptAutomaticDispatch).toHaveBeenCalledWith('order-1');
+    // Early dispatch: the ready order goes through onOrderReady (a pre-assigned driver keeps it; otherwise the usual automatic dispatch).
+    expect(automaticDispatchService.onOrderReady).toHaveBeenCalledWith('order-1');
   });
 });
 
@@ -592,7 +593,7 @@ describe('OrderVendorSegmentStateMachineService — operations on behalf of the 
   it('a dispatch failure AFTER the commit never fails the successful transition: it is recorded as an assignment error for operations', async () => {
     const h = buildHarness({ ...baseSegment, status: OrderVendorSegmentStatus.PREPARING }, ['branch-1']);
     h.orderReadinessService.checkAndAdvance.mockResolvedValueOnce(true as never);
-    h.automaticDispatchService.attemptAutomaticDispatch.mockRejectedValueOnce(new Error('redis down') as never);
+    h.automaticDispatchService.onOrderReady.mockRejectedValueOnce(new Error('redis down') as never);
     const result = await h.service.transition({ segmentId: 'segment-1', to: OrderVendorSegmentStatus.READY_FOR_PICKUP, actorUserId: 'u1', actorRole: Role.VENDOR });
     expect(result.status).toBe('READY_FOR_PICKUP');
     expect(h.automaticDispatchService.recordAssignmentError).toHaveBeenCalledWith('order-1', expect.any(Error));

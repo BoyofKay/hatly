@@ -121,6 +121,7 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
       if (this.shuttingDown) return; // never start new work once shutdown has begun (Dispatch Hardening)
       this.inFlightSweep = this.alertUnacknowledgedAssignments()
         .then(() => this.retryOpenAlerts())
+        .then(() => this.dispatchDueEarlyOrders())
         .then(() => this.switchOffSilentDrivers())
         .catch((error) => {
           this.logger.error(`Unexpected error during timeout-driven reassignment sweep: ${(error as Error).message}`);
@@ -284,7 +285,10 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
         .where('delivery.accept_deadline_at IS NOT NULL')
         .andWhere('delivery.accept_deadline_at < NOW()')
         .andWhere('delivery.acknowledged_at IS NULL')
-        .andWhere('order.status = :status', { status: OrderStatus.ASSIGNED_TO_DRIVER })
+        .andWhere(
+          `("order"."status" = :status OR (delivery.early_assigned_at IS NOT NULL AND delivery.driver_id IS NOT NULL AND "order"."status"::text IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP')))`,
+          { status: OrderStatus.ASSIGNED_TO_DRIVER },
+        )
         .andWhere(
           `NOT EXISTS (SELECT 1 FROM dispatch_alerts a WHERE a.order_id = delivery.order_id AND a.reason = 'ACKNOWLEDGEMENT_OVERDUE'
              AND a.deleted_at IS NULL AND (a.resolved_at IS NULL OR a.created_at >= delivery.assigned_at))`,
@@ -388,7 +392,18 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
    */
   async offerToNextDriver(orderId: string, silentDriverId: string): Promise<string | null> {
     const order = await this.ordersRepository.findOne({ where: { id: orderId }, relations: { segments: true } });
-    if (!order || order.status !== OrderStatus.ASSIGNED_TO_DRIVER) return null;
+    if (!order) return null;
+    if (order.status === OrderStatus.PENDING || order.status === OrderStatus.CONFIRMED || order.status === OrderStatus.PREPARING) {
+      // A pre-assignment (early dispatch) nobody acknowledged: hand it to the next driver only if there is one.
+      const early = (await this.driverRankingService.rankCandidates(order)).filter((id) => id !== silentDriverId);
+      if (early.length === 0) return null;
+      if (!(await this.deliveryAssignmentService.releaseEarlyAssignment(orderId, silentDriverId))) return null;
+      const next = await this.deliveryAssignmentService.assignEarly({ orderId, candidateDriverIds: early });
+      await this.recordAttempt(orderId, 'DRIVER_TIMED_OUT', silentDriverId, 'Pre-assignment not acknowledged in time — offered to the next driver.');
+      if (next?.driverId) await this.recordAttempt(orderId, 'ASSIGNED', next.driverId, 'Early dispatch: re-offered after the first driver did not acknowledge.');
+      return next?.driverId ?? null;
+    }
+    if (order.status !== OrderStatus.ASSIGNED_TO_DRIVER) return null;
     const candidates = (await this.driverRankingService.rankCandidates(order)).filter((id) => id !== silentDriverId);
     for (const driverId of candidates) {
       try {
@@ -406,6 +421,61 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * The order has just become Ready. A driver pre-assigned while it was prepared (early dispatch) simply keeps it — the pre-assignment
+   * becomes the normal assignment with no new search; otherwise automatic dispatch runs as before.
+   */
+  async onOrderReady(orderId: string): Promise<void> {
+    if (await this.deliveryAssignmentService.promoteEarlyAssignment(orderId)) {
+      await this.recordAttempt(orderId, 'ASSIGNED', null, 'Early dispatch: the pre-assigned driver keeps the order now that it is ready.');
+      return;
+    }
+    await this.attemptAutomaticDispatch(orderId);
+  }
+
+  /**
+   * Early dispatch (owner decision 2026-11-22, option b): every delivery order the stores have accepted gets a driver when the store
+   * accepts, or `lead` minutes before the latest expected ready time, whichever is later. Runs on the sweep (every few seconds), only
+   * with automatic assignment on. No driver yet → simply tried again on the next tick (no alert: the usual "no eligible driver" alert
+   * comes if the order is still without a driver when it is ready). Returns how many orders got a driver.
+   */
+  async dispatchDueEarlyOrders(): Promise<number> {
+    if (!(await this.businessConfigService.isAutomaticDispatchEnabled())) return 0;
+    if (!(await this.businessConfigService.isEarlyDispatchEnabled())) return 0;
+    const lead = await this.businessConfigService.getDispatchLeadTimeMinutes();
+    const due: Array<{ id: string }> = await this.ordersRepository.query(
+      `SELECT o.id FROM orders o
+        WHERE o.status::text IN ('PENDING','CONFIRMED','PREPARING') AND o.fulfillment_type::text = 'DELIVERY' AND o.deleted_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM deliveries x WHERE x.order_id = o.id AND x.driver_id IS NOT NULL AND x.deleted_at IS NULL)
+          AND NOT EXISTS (SELECT 1 FROM order_vendor_segments g WHERE g.order_id = o.id AND g.status::text = 'PENDING')
+          -- a bank transfer not yet verified as paid blocks preparation and dispatch (OrderPaymentGateService)
+          AND (o.payment_method::text <> 'MANUAL_TRANSFER' OR EXISTS (SELECT 1 FROM payments p WHERE p.order_id = o.id AND p.status::text = 'PAID'))
+          AND EXISTS (SELECT 1 FROM order_vendor_segments g WHERE g.order_id = o.id AND g.status::text <> 'CANCELLED')
+          AND COALESCE((SELECT max(g.expected_ready_at) FROM order_vendor_segments g WHERE g.order_id = o.id AND g.status::text <> 'CANCELLED'), now())
+              - make_interval(mins => $1::int) <= now()
+        ORDER BY o.created_at ASC
+        LIMIT $2`,
+      [lead, this.sweepBatchLimit],
+    );
+    let assigned = 0;
+    for (const { id } of due) {
+      try {
+        const order = await this.ordersRepository.findOne({ where: { id }, relations: { segments: true } });
+        if (!order) continue;
+        const candidates = await this.driverRankingService.rankCandidates(order);
+        if (candidates.length === 0) continue;
+        const delivery = await this.deliveryAssignmentService.assignEarly({ orderId: id, candidateDriverIds: candidates });
+        if (delivery?.driverId) {
+          await this.recordAttempt(id, 'ASSIGNED', delivery.driverId, 'Early dispatch: attached while the store prepares the order.');
+          assigned++;
+        }
+      } catch (error) {
+        this.logger.error(`Early dispatch failed for order ${id}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return assigned;
+  }
+
+  /**
    * Bug 2026-11-22: the online switch stayed on after a driver closed the app (or the phone died), so the driver looked online for days.
    * A driver whose app has been silent for 30 minutes and who carries no active order is switched offline (the app shows it, and they
    * go online again when they start working). Drivers with an active order are left alone: Operations get the "app silent" alert.
@@ -415,7 +485,8 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
       `UPDATE drivers d SET is_online = false, online_changed_at = now()
         WHERE d.is_online = true AND (d.last_seen_at IS NULL OR d.last_seen_at < now() - interval '30 minutes')
           AND NOT EXISTS (SELECT 1 FROM deliveries x JOIN orders o ON o.id = x.order_id
-                           WHERE x.driver_id = d.id AND x.deleted_at IS NULL AND o.status::text IN ('ASSIGNED_TO_DRIVER','PICKED_UP','ON_THE_WAY'))
+                           WHERE x.driver_id = d.id AND x.deleted_at IS NULL
+                             AND (o.status::text IN ('ASSIGNED_TO_DRIVER','PICKED_UP','ON_THE_WAY') OR (x.early_assigned_at IS NOT NULL AND o.status::text IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP'))))
         RETURNING d.id`,
     );
     const n = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0].length : rows.length) : 0;

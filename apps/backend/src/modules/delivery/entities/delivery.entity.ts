@@ -18,6 +18,10 @@ export class Delivery extends BaseEntity {
   @Column({ name: 'assigned_at', type: 'timestamptz', nullable: true })
   assignedAt?: Date | null;
 
+  /** Early dispatch: set while the driver is attached before the order is Ready (cleared when it becomes the normal assignment). */
+  @Column({ name: 'early_assigned_at', type: 'timestamptz', nullable: true })
+  earlyAssignedAt?: Date | null;
+
   @Column({ name: 'accept_deadline_at', type: 'timestamptz', nullable: true })
   acceptDeadlineAt?: Date | null;
 

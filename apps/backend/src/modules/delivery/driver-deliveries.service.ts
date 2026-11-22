@@ -182,7 +182,7 @@ export class DriverDeliveriesService {
       `WITH ack AS (
          UPDATE deliveries d SET acknowledged_at = now()
            FROM orders o
-          WHERE d.id = $1 AND d.driver_id = $2 AND d.acknowledged_at IS NULL AND o.id = d.order_id AND o.status = 'ASSIGNED_TO_DRIVER'
+          WHERE d.id = $1 AND d.driver_id = $2 AND d.acknowledged_at IS NULL AND o.id = d.order_id AND (o.status = 'ASSIGNED_TO_DRIVER' OR (d.early_assigned_at IS NOT NULL AND o.status::text IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP')))
         RETURNING d.order_id
        )
        UPDATE dispatch_alerts SET resolved_at = now(), updated_at = now()

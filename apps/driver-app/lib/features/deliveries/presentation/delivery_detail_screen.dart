@@ -360,7 +360,17 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
             decoration: BoxDecoration(color: const Color(0xFFFDECEA), borderRadius: BorderRadius.circular(12)),
             child: Text(_actionError!, style: const TextStyle(color: Color(0xFFB71C1C))),
           ),
-        if (delivery.orderStatus == 'ASSIGNED_TO_DRIVER') _AcknowledgementCard(delivery: delivery),
+        if (delivery.orderStatus == 'ASSIGNED_TO_DRIVER' || delivery.isBeingPrepared) _AcknowledgementCard(delivery: delivery),
+        if (delivery.isBeingPrepared)
+          Container(
+            key: const Key('being-prepared-note'),
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: const Color(0xFFFFF4E5), borderRadius: BorderRadius.circular(12)),
+            child: Text(context.t(
+                'The store is still preparing this order. Head to the store now — you can mark it picked up once the store marks it ready.',
+                'المتجر ما زال يحضّر هذا الطلب. توجّه إلى المتجر الآن — يمكنك تسجيل الاستلام بعد أن يعلن المتجر أنه جاهز.')),
+          ),
         _SectionCard(
           title: context.t('Order', 'الطلب'),
           icon: Icons.receipt_long_outlined,
