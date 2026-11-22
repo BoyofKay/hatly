@@ -1,3 +1,2 @@
-ACTION=deploy
+ACTION=disk-report
 ARG=
-# row actions + excel 8dda263
