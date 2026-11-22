@@ -8,6 +8,8 @@ export interface AdminSector {
   slug: string;
   sortOrder: number;
   isActive: boolean;
+  /** The tile picture customers see on Home. */
+  imageUrl?: string | null;
   /** May customers send a free-text / photo custom request ("لا تجد ما تبحث عنه؟") to vendors of this sector? Off by default. */
   customRequestsEnabled: boolean;
 }
