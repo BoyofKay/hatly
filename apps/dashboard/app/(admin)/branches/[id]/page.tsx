@@ -493,7 +493,7 @@ export default function BranchDetailPage() {
           {categories.map((c) => (
             <li key={c.id} className="flex items-center justify-between px-4 py-3">
               <button onClick={() => handleRenameCategory(c)} className="text-left hover:underline">
-                {c.name}{c.nameAr ? <span dir="rtl" className="text-gray-500"> — {c.nameAr}</span> : null}
+                {c.name}{c.nameAr ? <span className="ms-2 text-gray-500"><bdi dir="rtl">{c.nameAr}</bdi></span> : null}
               </button>
               <div className="flex items-center gap-2">
                 <span className={`rounded px-2 py-0.5 text-xs ${c.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
