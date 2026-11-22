@@ -19,6 +19,10 @@ export class Vendor extends BaseEntity {
   @Column({ name: 'logo_url', type: 'varchar', nullable: true })
   logoUrl?: string | null;
 
+  /** Wide banner shown at the top of the store page (customer app). Optional. */
+  @Column({ name: 'cover_image_url', type: 'varchar', nullable: true })
+  coverImageUrl?: string | null;
+
   @Column({ name: 'commission_percent', type: 'numeric', precision: 5, scale: 2, default: 0 })
   commissionPercent: number;
 

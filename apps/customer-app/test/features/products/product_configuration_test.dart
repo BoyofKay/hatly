@@ -154,13 +154,13 @@ void main() {
     });
 
     test(
-        'weighted: 100g steps, never below 100g, tracked stock (grams) is respected',
+        'weighted: starts at ¼ kg, steps by a quarter kilo, "−" stops at ¼ kg, tracked stock (grams) is respected',
         () {
       final open = _product(pricingUnit: 'WEIGHT');
       var config = const ProductConfiguration();
-      expect(config.requestedWeightGrams, 100);
+      expect(config.requestedWeightGrams, 250);
       expect(config.canDecreaseWeight, isFalse);
-      config = config.copyWith(requestedWeightGrams: 200);
+      config = config.copyWith(requestedWeightGrams: 500);
       expect(config.canDecreaseWeight, isTrue);
       expect(config.canIncreaseWeight(open), isTrue);
 
@@ -174,7 +174,7 @@ void main() {
           const ProductConfiguration(requestedWeightGrams: 300)
               .canIncreaseWeight(tracked),
           isFalse);
-      expect(ProductConfiguration.weightStepGrams, 100);
+      expect(ProductConfiguration.weightStepGrams, 250);
     });
   });
 

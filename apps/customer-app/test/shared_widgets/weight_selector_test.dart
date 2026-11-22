@@ -59,8 +59,18 @@ void main() {
   group(
       'the weight a customer can pick (1 kg is one tap; fractions stay possible)',
       () {
-    test('the presets include 1 kg and the usual fractions', () {
-      expect(kQuickWeightsGrams, [250, 500, 1000, 2000]);
+    test('the presets are the amounts people ask for: ¼, ½, 1, 1½, 2, 3 kg', () {
+      expect(kQuickWeightsGrams, [250, 500, 1000, 1500, 2000, 3000]);
+    });
+
+    test('the stepper snaps to quarter kilos', () {
+      expect(weightStepUp(250), 500);
+      expect(weightStepUp(300), 500);
+      expect(weightStepUp(1000), 1250);
+      expect(weightStepDown(500), 250);
+      expect(weightStepDown(300), 250);
+      expect(weightStepDown(1300), 1250);
+      expect(weightStepDown(250), 250); // never below a quarter
     });
 
     test(

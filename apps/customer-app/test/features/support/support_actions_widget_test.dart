@@ -277,8 +277,9 @@ void main() {
 
       expect(rec.calls, hasLength(1));
       final text = rec.calls.single.queryParameters['text']!;
-      expect(text, contains(_orderId));
-      expect(text, 'مرحبًا Hatly، أحتاج إلى مساعدة بخصوص الطلب رقم $_orderId.');
+      expect(text, contains('HT-100001'));
+      expect(text, isNot(contains(_orderId)), reason: 'customers and staff use the HT- number, not the internal id');
+      expect(text, 'مرحبًا Hatly، أحتاج إلى مساعدة بخصوص الطلب رقم HT-100001.');
       // Support message only — never the manual-transfer payment-proof wording.
       expect(text, isNot(contains('transfer proof')));
     });
@@ -329,7 +330,7 @@ void main() {
       await tester.tap(find.byKey(_orderKey));
       await tester.pumpAndSettle();
       expect(rec.calls.single.queryParameters['text'],
-          'Hi Hatly, I need help with order $_orderId.');
+          'Hi Hatly, I need help with order HT-100001.');
     });
   });
 

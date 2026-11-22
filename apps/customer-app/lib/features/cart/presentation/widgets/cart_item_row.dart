@@ -227,7 +227,7 @@ class CartItemRow extends StatelessWidget {
       final maxGrams = item.isTracked ? item.availableQuantity : null;
       final atMax = maxGrams != null && grams >= maxGrams;
       return HatlyQuantityControl(
-        valueLabel: '${(grams / 1000).toStringAsFixed(2)} kg',
+        valueLabel: weightShortLabel(grams, l10n),
         decreaseTooltip: l10n.quantityDecrease,
         increaseTooltip: l10n.quantityIncrease,
         valueTapTooltip: l10n.weightEntryTooltip,
@@ -239,9 +239,13 @@ class CartItemRow extends StatelessWidget {
                     initialGrams: grams, maxGrams: maxGrams);
                 if (typed != null && typed != grams) onWeightChanged(typed);
               },
-        onDecrease:
-            busy || grams <= 100 ? null : () => onWeightChanged(grams - 100),
-        onIncrease: busy || atMax ? null : () => onWeightChanged(grams + 100),
+        // Quarter-kilo steps that snap to quarters (0.3 kg → + ½ kg, − ¼ kg); never above known stock.
+        onDecrease: busy || grams <= kWeightStepGrams
+            ? null
+            : () => onWeightChanged(weightStepDown(grams)),
+        onIncrease: busy || atMax
+            ? null
+            : () => onWeightChanged(maxGrams != null && weightStepUp(grams) > maxGrams ? maxGrams : weightStepUp(grams)),
       );
     }
     final maxQuantity =

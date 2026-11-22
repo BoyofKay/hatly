@@ -455,7 +455,7 @@ void main() {
     });
 
     testWidgets(
-        'weighted lines step by 100g through updateItemWeight (never updateItemQuantity)',
+        'weighted lines step by a quarter kilo (snapping to quarters) through updateItemWeight (never updateItemQuantity)',
         (tester) async {
       _phone(tester);
       final api = _FakeCartApi([
@@ -469,23 +469,18 @@ void main() {
         ])
       ]);
       await _open(tester, _app(api));
-      expect(find.text('0.30 kg'), findsOneWidget);
+      expect(find.text('0.3 كجم'), findsOneWidget); // a typed, non-quarter weight shows as kg
       await tester.tap(_plus(0));
       await tester.pumpAndSettle();
-      expect(api.calls, ['weight:w=400']);
-      expect(find.text('0.40 kg'), findsOneWidget);
+      expect(api.calls, ['weight:w=500']); // 0.3 → ½ (next quarter)
+      expect(find.text('½ كجم'), findsOneWidget);
       await tester.tap(_minus(0));
       await tester.pumpAndSettle();
-      expect(api.calls, ['weight:w=400', 'weight:w=300']);
-      // floor at 100g
+      expect(api.calls, ['weight:w=500', 'weight:w=250']);
+      // "−" stops at ¼ kg (a smaller weight can still be typed)
       await tester.tap(_minus(0));
       await tester.pumpAndSettle();
-      await tester.tap(_minus(0));
-      await tester.pumpAndSettle();
-      expect(api.calls.last, 'weight:w=100');
-      await tester.tap(_minus(0));
-      await tester.pumpAndSettle();
-      expect(api.calls.length, 4, reason: 'no call below 100g');
+      expect(api.calls.length, 2, reason: 'no step below ¼ kg');
     });
 
     testWidgets(
@@ -515,7 +510,7 @@ void main() {
       await tester.tap(find.byKey(const Key('weight-entry-confirm')));
       await tester.pumpAndSettle();
       expect(api.calls, ['weight:w=1000']);
-      expect(find.text('1.00 kg'), findsOneWidget);
+      expect(find.text('1 كجم'), findsOneWidget);
     });
 
     testWidgets(

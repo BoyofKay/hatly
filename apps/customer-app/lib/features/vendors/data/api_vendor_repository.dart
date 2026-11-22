@@ -77,6 +77,7 @@ class ApiVendorRepository implements VendorRepository {
             category:
                 '', // same as _toVendor below — no longer sourced from the legacy Vendor.category column
             logoUrl: vendorJson['logoUrl'] as String?,
+            coverImageUrl: vendorJson['coverImageUrl'] as String?,
           ),
           branch: VendorBranchSummary(
             id: json['id'] as String,
@@ -189,6 +190,7 @@ class ApiVendorRepository implements VendorRepository {
       category:
           '', // no longer sourced from the legacy Vendor.category column — unused by any real UI rendering
       logoUrl: json['logoUrl'] as String?,
+      coverImageUrl: json['coverImageUrl'] as String?,
       ratingAverage: (json['ratingAverage'] as num).toDouble(),
       ratingCount: json['ratingCount'] as int,
       etaMinMinutes:

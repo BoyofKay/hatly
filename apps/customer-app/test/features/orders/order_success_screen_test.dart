@@ -8,7 +8,7 @@ import '../../support/order_fixtures.dart';
 import '../../support/orders_fakes.dart';
 import '../../support/router_test_app.dart';
 
-({int? totalMinor, String paymentMethodLabel})? lastTransferExtra;
+({int? totalMinor, String paymentMethodLabel, String? orderNumber})? lastTransferExtra;
 
 Future<List<String>> _pump(
   WidgetTester tester,
@@ -41,7 +41,7 @@ Future<List<String>> _pump(
         path: '/checkout/transfer/:orderId',
         builder: (c, st) {
           visited.add(st.uri.toString());
-          lastTransferExtra = st.extra as ({int? totalMinor, String paymentMethodLabel})?;
+          lastTransferExtra = st.extra as ({int? totalMinor, String paymentMethodLabel, String? orderNumber})?;
           return const Scaffold(body: Text('transfer'));
         },
       ),

@@ -48,6 +48,7 @@ export interface VendorBranchDetailsView {
     name: string;
     nameAr: string | null;
     logoUrl: string | null;
+    coverImageUrl: string | null;
   };
 }
 
@@ -120,6 +121,7 @@ export class ProductsService {
         name: branch.vendor.name,
         nameAr: branch.vendor.nameAr ?? null,
         logoUrl: branch.vendor.logoUrl ?? null,
+        coverImageUrl: branch.vendor.coverImageUrl ?? null,
       },
     };
   }

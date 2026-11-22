@@ -13,12 +13,14 @@ class ProductConfiguration {
   const ProductConfiguration({
     this.selections = const {},
     this.quantity = 1,
-    this.requestedWeightGrams = minWeightGrams,
+    this.requestedWeightGrams = defaultWeightGrams,
   });
 
-  /// Weighted products step in 100g, never below 100g — same as the cart's weight editor.
-  static const int weightStepGrams = 100;
+  /// Weighted products: the stepper moves by a quarter kilo (snapping to quarters, see weightStepUp/Down); a weight can still be typed
+  /// down to 100 g. A weighed product starts at ¼ kg.
+  static const int weightStepGrams = 250;
   static const int minWeightGrams = 100;
+  static const int defaultWeightGrams = 250;
 
   /// The product screen's existing UX cap for piece quantity (the backend stays authoritative).
   static const int maxPieceQuantity = 50;
@@ -148,7 +150,7 @@ class ProductConfiguration {
   bool canIncreaseWeight(Product product) => !(product.isTracked &&
       product.quantity != null &&
       requestedWeightGrams >= product.quantity!);
-  bool get canDecreaseWeight => requestedWeightGrams > minWeightGrams;
+  bool get canDecreaseWeight => requestedWeightGrams > weightStepGrams;
 
   ProductConfiguration copyWith({
     Map<String, Set<String>>? selections,

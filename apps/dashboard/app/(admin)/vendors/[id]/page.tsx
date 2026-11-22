@@ -12,6 +12,8 @@ import {
   getVendor,
   listVendorBranches,
   updateVendor,
+  uploadVendorCover,
+  removeVendorCover,
   uploadVendorLogo,
 } from '../../../../lib/api/admin-vendors';
 import { apiErrorMessage } from '../../../../lib/api/errors';
@@ -49,6 +51,9 @@ export default function VendorDetailPage() {
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
   const logoInput = useRef<HTMLInputElement>(null);
+  const coverInput = useRef<HTMLInputElement>(null);
+  const [coverBusy, setCoverBusy] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
   const [confirmToggle, setConfirmToggle] = useState(false);
   const [toggleBusy, setToggleBusy] = useState(false);
 
@@ -119,6 +124,35 @@ export default function VendorDetailPage() {
       setLogoError(apiErrorMessage(err, t('Failed to upload the logo.', 'تعذّر رفع الشعار.')));
     } finally {
       setIsUploadingLogo(false);
+    }
+  }
+
+  async function handleCoverChosen(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || coverBusy) return;
+    const problem = checkImageFile(file, LOGO_TYPES, LOGO_MAX_BYTES);
+    if (problem) return setCoverError(problem);
+    setCoverBusy(true);
+    setCoverError(null);
+    try {
+      setVendor(await uploadVendorCover(id, file));
+    } catch (err: any) {
+      setCoverError(apiErrorMessage(err, t('Failed to upload the banner.', 'تعذّر رفع البانر.')));
+    } finally {
+      setCoverBusy(false);
+    }
+  }
+
+  async function handleCoverRemove() {
+    setCoverBusy(true);
+    setCoverError(null);
+    try {
+      setVendor(await removeVendorCover(id));
+    } catch (err: any) {
+      setCoverError(apiErrorMessage(err, t('Failed to remove the banner.', 'تعذّر حذف البانر.')));
+    } finally {
+      setCoverBusy(false);
     }
   }
 
@@ -232,6 +266,20 @@ export default function VendorDetailPage() {
               <Button type="button" onClick={() => logoInput.current?.click()} loading={isUploadingLogo}>{isUploadingLogo ? t('Uploading...', 'جارٍ الرفع...') : vendor.logoUrl ? t('Change logo', 'تغيير الشعار') : t('Upload logo', 'رفع شعار')}</Button>
               <p className="mt-1 text-xs text-gray-500">{t('JPEG, PNG or WebP, up to 5 MB. It is saved immediately.', 'JPEG أو PNG أو WebP حتى 5 ميجابايت. يُحفظ فورًا.')}</p>
               {logoError && <p role="alert" className="mt-1 text-sm text-red-600">{logoError}</p>}
+            </div>
+            <div>
+              <span className="mb-1 block text-xs font-medium text-gray-700">{t('Banner (top of the store page in the app)', 'البانر (أعلى صفحة المتجر في التطبيق)')}</span>
+              {vendor.coverImageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img data-testid="vendor-cover" src={resolveMediaUrl(vendor.coverImageUrl)} alt="" className="mb-2 aspect-[3/1] w-full rounded-lg border object-cover" />
+              )}
+              <input ref={coverInput} data-testid="vendor-cover-file" type="file" accept={LOGO_TYPES.join(',')} onChange={handleCoverChosen} className="hidden" />
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" onClick={() => coverInput.current?.click()} loading={coverBusy}>{vendor.coverImageUrl ? t('Change banner', 'تغيير البانر') : t('Upload banner', 'رفع بانر')}</Button>
+                {vendor.coverImageUrl && <Button type="button" variant="ghost" disabled={coverBusy} onClick={() => void handleCoverRemove()}>{t('Remove', 'إزالة')}</Button>}
+              </div>
+              <p className="mt-1 text-xs text-gray-500">{t('A wide photo, about 1200 × 400 (3:1). JPEG, PNG or WebP, up to 5 MB. Saved immediately. Without a banner the app shows the logo.', 'صورة عريضة حوالي 1200 × 400 (3:1). JPEG أو PNG أو WebP حتى 5 ميجا. تُحفظ فورًا. بدون بانر يعرض التطبيق الشعار.')}</p>
+              {coverError && <p role="alert" className="mt-1 text-sm text-red-600">{coverError}</p>}
             </div>
             <LabeledInput label={t('Logo URL (optional — an external https address)', 'رابط الشعار (اختياري — عنوان https خارجي)')} dir="ltr" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
             <Button type="submit" variant="primary" loading={isSaving} className="min-h-[44px] w-full">{isSaving ? t('Saving...', 'جارٍ الحفظ...') : t('Save', 'حفظ')}</Button>

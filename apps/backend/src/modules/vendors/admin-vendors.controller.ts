@@ -66,6 +66,20 @@ export class AdminVendorsController {
     return { data: vendor };
   }
 
+  /** The store banner — same contract as the logo (one `image`, JPEG/PNG/WebP, up to 5 MB). */
+  @Post(':id/cover')
+  @RequiresPermission(Permission.MANAGE_VENDORS)
+  @Throttled(RateLimitPolicies.productImageUpload)
+  @UseInterceptors(FileInterceptor('image', { limits: singleFileMultipartLimits(5 * 1024 * 1024) }))
+  async uploadCover(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const vendor = await this.adminVendorsService.uploadLogo(id, requireUploadedFile(file, 'image'), user.id, 'cover');
+    return { data: vendor };
+  }
+
   @Patch(':id/activate')
   @RequiresPermission(Permission.MANAGE_VENDORS)
   async activate(@Param('id') id: string) {

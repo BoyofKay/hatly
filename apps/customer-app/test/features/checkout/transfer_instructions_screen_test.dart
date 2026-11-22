@@ -72,6 +72,7 @@ Future<void> _pump(WidgetTester tester, _FakeManualTransferApi api) async {
       orderId: 'o-1',
       totalMinor: 10000,
       paymentMethodLabel: 'InstaPay',
+      orderNumber: 'HT-100001',
     ),
     locale: const Locale('en'),
     overrides: [

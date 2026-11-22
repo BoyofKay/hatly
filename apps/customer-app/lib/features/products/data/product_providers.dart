@@ -61,3 +61,77 @@ final productDetailsProvider =
     FutureProvider.autoDispose.family<Product, String>((ref, productId) {
   return ref.watch(productRepositoryProvider).getProductDetails(productId);
 });
+
+/// How many products a store page loads at a time (the server's default page size). The first page comes from
+/// [productListProvider]; the next ones are fetched by [moreProductsProvider] as the customer scrolls.
+const int kMenuPageSize = 20;
+
+class MoreProductsState {
+  const MoreProductsState(
+      {this.items = const [],
+      this.loading = false,
+      this.done = false,
+      this.failed = false,
+      this.nextPage = 2});
+  final List<Product> items;
+  final bool loading;
+  final bool done;
+  final bool failed;
+  final int nextPage;
+
+  MoreProductsState copyWith(
+          {List<Product>? items,
+          bool? loading,
+          bool? done,
+          bool? failed,
+          int? nextPage}) =>
+      MoreProductsState(
+        items: items ?? this.items,
+        loading: loading ?? this.loading,
+        done: done ?? this.done,
+        failed: failed ?? this.failed,
+        nextPage: nextPage ?? this.nextPage,
+      );
+}
+
+/// Pages 2, 3, … of one store's product list (same filters as the first page). One request at a time; stops when a page comes
+/// back shorter than [kMenuPageSize]. A failed page can be retried by scrolling again.
+class MoreProductsNotifier extends StateNotifier<MoreProductsState> {
+  MoreProductsNotifier(this._ref, this._params)
+      : super(const MoreProductsState());
+  final Ref _ref;
+  final ProductListParams _params;
+
+  Future<void> loadMore() async {
+    if (state.loading || state.done) return;
+    state = state.copyWith(loading: true, failed: false);
+    try {
+      final page = await _ref.read(productRepositoryProvider).getProducts(
+            _params.vendorBranchId,
+            categoryId: _params.categoryId,
+            sort: _params.sort,
+            search: _params.search,
+            page: state.nextPage,
+            limit: kMenuPageSize,
+            availableOnly: _params.availableOnly,
+            hasOffers: _params.hasOffers,
+            minPriceMinor: _params.minPriceMinor,
+            maxPriceMinor: _params.maxPriceMinor,
+          );
+      if (!mounted) return;
+      final seen = state.items.map((p) => p.id).toSet();
+      state = state.copyWith(
+        items: [...state.items, ...page.where((p) => !seen.contains(p.id))],
+        loading: false,
+        done: page.length < kMenuPageSize,
+        nextPage: state.nextPage + 1,
+      );
+    } catch (_) {
+      if (mounted) state = state.copyWith(loading: false, failed: true);
+    }
+  }
+}
+
+final moreProductsProvider = StateNotifierProvider.autoDispose
+    .family<MoreProductsNotifier, MoreProductsState, ProductListParams>(
+        (ref, params) => MoreProductsNotifier(ref, params));

@@ -10,6 +10,7 @@ export interface FavoriteVendorView {
   name: string;
   nameAr: string | null;
   logoUrl: string | null;
+  coverImageUrl: string | null;
   isActive: boolean;
   favoritedAt: Date;
 }
@@ -107,6 +108,7 @@ export class FavoritesService {
       name: favorite.vendor.name,
       nameAr: favorite.vendor.nameAr ?? null,
       logoUrl: favorite.vendor.logoUrl ?? null,
+      coverImageUrl: favorite.vendor.coverImageUrl ?? null,
       isActive: favorite.vendor.isActive,
       favoritedAt: favorite.createdAt,
     }));

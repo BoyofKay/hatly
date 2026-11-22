@@ -377,24 +377,24 @@ void main() {
     });
 
     testWidgets(
-        'weighted: 100g steps shown in kg; the request carries requestedWeightGrams and quantity 1',
+        'weighted: starts at ¼ kg and steps by a quarter kilo (shown as ¼ ½ ¾); the request carries requestedWeightGrams and quantity 1',
         (tester) async {
       _phone(tester);
       final api = _FakeCartApi();
       await _open(tester, _app(_product(pricingUnit: 'WEIGHT'), cartApi: api));
-      expect(find.text('0.10 kg'), findsOneWidget);
+      expect(find.text('¼ كجم'), findsWidgets); // the stepper value (and the ¼ preset chip)
       await tester.tap(find.byKey(const Key('qty-increase')));
       await tester.pump();
       await tester.tap(find.byKey(const Key('qty-increase')));
       await tester.pump();
-      expect(find.text('0.30 kg'), findsOneWidget);
-      expect(find.text('30 ج.م'), findsOneWidget); // 100 per kg × 0.3
+      expect(find.text('¾ كجم'), findsOneWidget);
+      expect(find.text('75 ج.م'), findsOneWidget); // 100 per kg × 0.75
       await tester.tap(find.byKey(const Key('qty-decrease')));
       await tester.pump();
-      expect(find.text('0.20 kg'), findsOneWidget);
+      expect(find.text('½ كجم'), findsWidgets);
       await _tapAdd(tester);
       expect(api.calls.single['quantity'], 1);
-      expect(api.calls.single['grams'], 200);
+      expect(api.calls.single['grams'], 500);
     });
 
     testWidgets(
@@ -403,10 +403,9 @@ void main() {
       _phone(tester);
       final api = _FakeCartApi();
       await _open(tester, _app(_product(pricingUnit: 'WEIGHT'), cartApi: api));
-      expect(find.text('0.10 kg'), findsOneWidget);
       await tester.tap(find.byKey(const Key('weight-preset-1000')));
       await tester.pump();
-      expect(find.text('1.00 kg'), findsOneWidget);
+      expect(find.text('1 كجم'), findsNWidgets(2)); // the stepper value and the selected chip
       expect(find.text('100 ج.م'), findsWidgets); // 100 per kg × 1
       await _tapAdd(tester);
       expect(api.calls.single['grams'], 1000);
@@ -421,13 +420,13 @@ void main() {
       await _open(tester, _app(_product(pricingUnit: 'WEIGHT'), cartApi: api));
       await tester.tap(find.byKey(const Key('weight-preset-500')));
       await tester.pump();
-      expect(find.text('0.50 kg'), findsOneWidget);
+      expect(find.text('½ كجم'), findsNWidgets(2));
       await tester.tap(find.byKey(const Key('qty-increase')));
       await tester.pump();
-      expect(find.text('0.60 kg'), findsOneWidget);
+      expect(find.text('¾ كجم'), findsOneWidget);
       await tester.tap(find.byKey(const Key('weight-preset-2000')));
       await tester.pump();
-      expect(find.text('2.00 kg'), findsOneWidget);
+      expect(find.text('2 كجم'), findsNWidgets(2));
       expect(find.text('200 ج.م'), findsWidgets);
     });
 
@@ -456,7 +455,7 @@ void main() {
           find.byKey(const Key('weight-entry-field')), '1.25');
       await tester.tap(find.byKey(const Key('weight-entry-confirm')));
       await tester.pumpAndSettle();
-      expect(find.text('1.25 kg'), findsOneWidget);
+      expect(find.text('1¼ كجم'), findsOneWidget);
       await _tapAdd(tester);
       expect(api.calls.single['grams'], 1250);
     });
