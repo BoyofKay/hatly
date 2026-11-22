@@ -268,14 +268,23 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
     final vendor = product.vendor;
     final addedName =
         isArabic && product.nameAr != null ? product.nameAr! : product.name;
-    // Owner decision 2026-11-22: after adding, go straight back to where the customer came from (normally the store page, whose
-    // cart bar shows the new total) with a short note and a "View cart" shortcut — no extra sheet to dismiss. Opened directly
-    // (a deep link, nothing to go back to): the sheet below is still shown.
-    if (context.canPop()) {
+    // Owner decision 2026-11-22: after adding, the customer lands on the product's store page (whose cart bar shows the new total)
+    // with a short note and a "View cart" shortcut — no extra sheet to dismiss. Only a product without a store keeps the sheet.
+    if (product.vendorBranchId.isNotEmpty) {
       final l10n = AppLocalizations.of(context);
       final messenger = ScaffoldMessenger.of(context);
       final router = GoRouter.of(context);
-      context.pop();
+      // Always land on THIS product's store page: back to it when the customer came from it, otherwise (opened from Home's
+      // best sellers / offers, search, a link) the product page is replaced by the store page, so the system back gesture then
+      // returns to wherever they started (e.g. Home).
+      final storePath = '/vendors/${product.vendorBranchId}';
+      final matches = router.routerDelegate.currentConfiguration.matches;
+      final previous = matches.length >= 2 ? matches[matches.length - 2].matchedLocation : null;
+      if (previous == storePath && context.canPop()) {
+        context.pop();
+      } else {
+        context.pushReplacement(storePath);
+      }
       messenger
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(
