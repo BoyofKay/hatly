@@ -1,0 +1,60 @@
+action=service-areas arg= commit=c021f28b56c336879ffa516143894e8f2b85dc0a run=45064028745 started=2026-11-22T20:01:33Z
+== service areas
+     name     | is_active |   lat    |   lng    | radius_meters 
+--------------+-----------+----------+----------+---------------
+ Belbies City | t         | 30.41966 | 31.56188 |         13000
+(1 row)
+
+== delivery zones
+  name  | is_active |       fee_egp       |     area     
+--------+-----------+---------------------+--------------
+ Zone 1 | t         | 15.0000000000000000 | Belbies City
+(1 row)
+
+== active store branches: delivery on? in which service area?
+          store          |    branch     | is_active | is_open | delivery_enabled | pickup_enabled | service_area 
+-------------------------+---------------+-----------+---------+------------------+----------------+--------------
+ Abu Aly Grills          | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Ahl Al Dahabi Bakery | الفرع الرئيسي | t         | t       | t                | f              | Belbies City
+ Al Amal Pharmacy        | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Amana Minimarket     | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Baraka Greengrocer   | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Fayrouz Sweets       | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Gomhoria Grocery     | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Hayah Supermarket    | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Noor Pharmacy        | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Saada Fruit Shop     | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Sharq Pharmacy       | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Shifa Pharmacy       | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Belbeis Supermarket     | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Care Plus Pharmacy      | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Delta Mart              | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Family Corner Grocery   | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Garden Fresh            | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Sharqia Fruits          | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Tarweqa                 | Tarweqa       | t         | t       | t                | t              | Belbies City
+ Test                    | Branch Test 1 | t         | t       | t                | f              | Belbies City
+(20 rows)
+
+== the address(es) matching the checkout screenshot (settings only)
+      saved       | is_active |  mode  | has_zone | zone_active | has_pin |  lat3  |  lng3  
+------------------+-----------+--------+----------+-------------+---------+--------+--------
+ 2026-10-28 19:16 | t         | legacy | t        | true        | t       | 24.776 | 46.617
+(1 row)
+
+== latest saved addresses vs active areas (km from centre / radius km)
+      saved       |  mode  | has_zone | has_pin |     area     | km_from_centre | radius_km 
+------------------+--------+----------+---------+--------------+----------------+-----------
+ 2026-11-14 17:05 | MANUAL | t        | f       |              |           0.00 |          
+ 2026-11-12 19:00 | MANUAL | t        | f       |              |           0.00 |          
+ 2026-11-02 01:05 | MANUAL | t        | f       |              |           0.00 |          
+ 2026-11-01 13:41 | MANUAL | t        | f       |              |           0.00 |          
+ 2026-10-31 19:54 | legacy | t        | f       |              |           0.00 |          
+ 2026-10-30 21:05 | legacy | t        | t       | Belbies City |           0.73 |     13.00
+ 2026-10-30 11:41 | legacy | t        | f       |              |           0.00 |          
+ 2026-10-28 19:27 | legacy | t        | t       | Belbies City |           0.73 |     13.00
+ 2026-10-28 19:20 | legacy | t        | f       |              |           0.00 |          
+ 2026-10-28 19:19 | legacy | t        | t       | Belbies City |           0.73 |     13.00
+(10 rows)
+
+job status: success
