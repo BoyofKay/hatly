@@ -21,6 +21,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isSubmitting = false;
+  bool _showPassword = false;
   String? _error;
 
   @override
@@ -45,13 +46,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           password: _passwordController.text);
       ref.read(authStateProvider.notifier).setAuthenticated(true);
     } on DioException catch (error) {
-      final message = error.response?.data is Map
-          ? (error.response?.data as Map)['message']
-          : null;
+      // The server explains in English; the driver always sees their own language.
+      final status = error.response?.statusCode;
       setState(() {
-        _error = (message as String?) ??
-            context.t('Invalid credentials. Please try again.',
-                'بيانات الدخول غير صحيحة. حاول مرة أخرى.');
+        _error = status == 429
+            ? context.t('Too many attempts. Please wait a few minutes and try again.',
+                'محاولات كثيرة. انتظر بضع دقائق ثم حاول مرة أخرى.')
+            : status == null
+                ? context.t('Something went wrong. Please check your connection.',
+                    'حدث خطأ. تحقق من اتصالك بالإنترنت.')
+                : context.t('Invalid phone number or password. Please try again.',
+                    'رقم الهاتف أو كلمة المرور غير صحيحة. حاول مرة أخرى.');
       });
     } catch (_) {
       setState(() => _error = context.t(
@@ -60,6 +65,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  /// No SMS provider yet, so no self-service code: Hatly operations set a temporary password from the admin panel (Drivers ›
+  /// Reset password) and send it to the driver, who signs in with it.
+  void _showForgotPassword(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.t('Forgot your password?', 'نسيت كلمة المرور؟')),
+        content: Text(ctx.t(
+            'Contact your Hatly supervisor or Hatly operations. They will set a temporary password for you and send it to you — then sign in with it here.',
+            'تواصل مع مشرفك في هاتلي أو فريق التشغيل. سيعيّنون لك كلمة مرور مؤقتة ويرسلونها لك — ثم سجّل الدخول بها هنا.')),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(ctx.t('OK', 'حسنًا'))),
+        ],
+      ),
+    );
   }
 
   @override
@@ -106,12 +130,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextField(
+                  key: const Key('login-password'),
                   controller: _passwordController,
-                  obscureText: true,
+                  obscureText: !_showPassword,
                   decoration: InputDecoration(
-                      labelText: context.t('Password', 'كلمة المرور'),
-                      border: const OutlineInputBorder()),
+                    labelText: context.t('Password', 'كلمة المرور'),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      key: const Key('toggle-password'),
+                      tooltip: _showPassword
+                          ? context.t('Hide password', 'إخفاء كلمة المرور')
+                          : context.t('Show password', 'إظهار كلمة المرور'),
+                      icon: Icon(_showPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined),
+                      onPressed: () =>
+                          setState(() => _showPassword = !_showPassword),
+                    ),
+                  ),
                   onSubmitted: (_) => _handleLogin(),
+                ),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton(
+                    key: const Key('forgot-password'),
+                    onPressed: () => _showForgotPassword(context),
+                    child: Text(context.t('Forgot password?', 'نسيت كلمة المرور؟')),
+                  ),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
