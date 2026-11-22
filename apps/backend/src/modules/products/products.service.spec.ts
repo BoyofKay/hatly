@@ -276,7 +276,7 @@ describe('ProductsService.getBranchDetails (L1-B)', () => {
 
     expect(result.id).toBe('branch-1');
     expect(result.address).toBe('12 Market St');
-    expect(result.vendor).toEqual({ id: 'vendor-1', name: 'Pizza House', nameAr: null, logoUrl: null });
+    expect(result.vendor).toEqual({ id: 'vendor-1', name: 'Pizza House', nameAr: null, logoUrl: null, coverImageUrl: null });
   });
 
   it('computes ratingAverage with the EXACT same formula as MarketplaceVendorsService — ratingSumStars/ratingCount', async () => {

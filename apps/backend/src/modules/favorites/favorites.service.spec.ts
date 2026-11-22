@@ -183,6 +183,7 @@ describe('FavoritesService', () => {
         name: 'Vendor One',
         nameAr: 'فيندور واحد',
         logoUrl: 'https://x/logo.png',
+        coverImageUrl: null,
         isActive: true,
         favoritedAt: new Date('2026-01-01'),
       },
