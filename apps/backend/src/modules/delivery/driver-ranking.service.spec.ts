@@ -8,6 +8,8 @@ function buildHarness(opts: {
   branches?: any[];
   distances?: Record<string, number>; // key: "lat,lng->lat,lng"
   maxBicycleDistanceMeters?: number | null;
+  preferredRadiusMeters?: number;
+  activeLoads?: Record<string, number>;
 }) {
   const drivers = opts.drivers ?? [];
   const branches = opts.branches ?? [];
@@ -23,7 +25,10 @@ function buildHarness(opts: {
       ),
     ),
     findOne: jest.fn(async ({ where }: any) => drivers.find((d) => d.id === where.id) ?? null),
-    query: jest.fn(async (): Promise<any[]> => []),
+    // activeLoad() and roundRobinOrder() both read through query(): answer the load query from opts.activeLoads, everything else empty.
+    query: jest.fn(async (sql: string): Promise<any[]> =>
+      /count\(\*\) AS n/.test(sql) ? Object.entries(opts.activeLoads ?? {}).map(([driver_id, n]) => ({ driver_id, n: String(n) })) : [],
+    ),
   };
   const vendorBranchesRepository = {
     findOne: jest.fn(async ({ where }: any) => branches.find((b) => b.id === where.id) ?? null),
@@ -37,6 +42,7 @@ function buildHarness(opts: {
   };
   const businessConfigService = {
     getMaxBicyclePickupDistanceMeters: jest.fn(async () => opts.maxBicycleDistanceMeters ?? null),
+    getDispatchPreferredRadiusMeters: jest.fn(async () => opts.preferredRadiusMeters ?? 3000),
   };
   // Every existing fixture in this file predates ServiceArea — default
   // to "everything resolves to the same single zone" so the new
@@ -71,6 +77,7 @@ function makeDriver(overrides: Partial<any> = {}) {
     lastLongitude: 31.0,
     vehicleTypeId: null,
     vehicleType: null,
+    lastSeenAt: new Date(), // the app is open (DISPATCH_APP_FRESH_MS)
     ...overrides,
   };
 }
@@ -86,6 +93,39 @@ function makeCatalogOrder(overrides: Partial<any> = {}): Order {
 }
 
 describe('DriverRankingService', () => {
+  describe('owner decisions 2026-11-22: least-busy within the preferred radius; an app that is not open is not offered orders', () => {
+    const branches = [{ id: 'branch-1', latitude: 30.1, longitude: 31.1 }];
+    const near = (id: string, lat: number, extra: Partial<any> = {}) => makeDriver({ id, lastLatitude: lat, lastLongitude: 31.05, ...extra });
+    const distances = {
+      '30.05,31.05->30.1,31.1': 500, // busy, nearest
+      '30.06,31.05->30.1,31.1': 900, // idle, a little farther
+      '30.07,31.05->30.1,31.1': 2500, // one order
+      '30.2,31.05->30.1,31.1': 7000, // idle but outside the radius
+    };
+
+    it('inside the radius the driver with the fewest active orders goes first, then the nearest; outside the radius come last, nearest first', async () => {
+      const drivers = [near('busy-nearest', 30.05), near('idle-900m', 30.06), near('one-order-2500m', 30.07), near('idle-far', 30.2)];
+      const { service } = buildHarness({ drivers, branches, distances, activeLoads: { 'busy-nearest': 4, 'one-order-2500m': 1 } });
+      expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['idle-900m', 'one-order-2500m', 'busy-nearest', 'idle-far']);
+    });
+
+    it('a smaller radius makes distance matter again', async () => {
+      const drivers = [near('busy-nearest', 30.05), near('idle-900m', 30.06)];
+      const { service } = buildHarness({ drivers, branches, distances, preferredRadiusMeters: 600, activeLoads: { 'busy-nearest': 4 } });
+      expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['busy-nearest', 'idle-900m']);
+    });
+
+    it('a driver switched online whose app has not checked in for over 3 minutes (or never) is not offered the order', async () => {
+      const drivers = [
+        near('app-closed-days-ago', 30.05, { lastSeenAt: new Date(Date.now() - 7 * 86_400_000) }),
+        near('never-seen', 30.07, { lastSeenAt: null }),
+        near('app-open', 30.06),
+      ];
+      const { service } = buildHarness({ drivers, branches, distances });
+      expect(await service.rankCandidates(makeCatalogOrder())).toEqual(['app-open']);
+    });
+  });
+
   it('ranks eligible drivers nearest-first to the first pickup point', async () => {
     const branches = [{ id: 'branch-1', latitude: 30.1, longitude: 31.1 }];
     const drivers = [
@@ -279,7 +319,8 @@ describe('DriverRankingService', () => {
     // method this service ever calls — never anything resembling a
     // pricing parameter lookup (price-per-100m, minimum fee, etc.).
     expect(businessConfigService.getMaxBicyclePickupDistanceMeters).toHaveBeenCalledTimes(1);
-    expect(Object.keys(businessConfigService)).toEqual(['getMaxBicyclePickupDistanceMeters']);
+    // The dispatch radius (owner decision 2026-11-22) is a ranking preference, not a price.
+    expect(Object.keys(businessConfigService)).toEqual(['getMaxBicyclePickupDistanceMeters', 'getDispatchPreferredRadiusMeters']);
   });
 
   it('isDriverEligibleForOrder returns true for a driver who appears in rankCandidates', async () => {

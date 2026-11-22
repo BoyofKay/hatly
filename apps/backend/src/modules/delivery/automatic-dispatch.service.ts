@@ -121,6 +121,7 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
       if (this.shuttingDown) return; // never start new work once shutdown has begun (Dispatch Hardening)
       this.inFlightSweep = this.alertUnacknowledgedAssignments()
         .then(() => this.retryOpenAlerts())
+        .then(() => this.switchOffSilentDrivers())
         .catch((error) => {
           this.logger.error(`Unexpected error during timeout-driven reassignment sweep: ${(error as Error).message}`);
         });
@@ -293,13 +294,19 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
         .orderBy('delivery.accept_deadline_at', 'ASC')
         .limit(this.sweepBatchLimit)
         .getRawMany<{ orderId: string; driverId: string | null }>();
+      const autoOn = await this.businessConfigService.isAutomaticDispatchEnabled();
       for (const row of overdue) {
         result.processed++;
         await this.recordAttempt(row.orderId, 'ACKNOWLEDGEMENT_OVERDUE', row.driverId, 'The assigned driver did not acknowledge in time.');
+        // Owner decision 2026-11-22: with automatic assignment on, the order is offered to the next driver at once (the silent driver is
+        // skipped); the alert stays so Operations still know the first driver did not respond.
+        const movedTo = autoOn && row.driverId ? await this.offerToNextDriver(row.orderId, row.driverId) : null;
         await this.raiseAlert(
           row.orderId,
           'ACKNOWLEDGEMENT_OVERDUE',
-          'The assigned driver has not acknowledged this order. Contact the driver; release or reassign it if needed.',
+          movedTo
+            ? 'The first driver did not acknowledge in time; the order was offered to the next driver automatically. Check with the first driver.'
+            : 'The assigned driver has not acknowledged this order. Contact the driver; release or reassign it if needed.',
         );
         result.alerted++;
       }
@@ -372,6 +379,48 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
         reason: (error as Error).message,
       });
     }
+  }
+
+  /**
+   * Moves an unacknowledged order to the best other driver (same ranking as automatic dispatch, the silent driver excluded). Returns the
+   * new driver id, or null when nobody else is available (the order then stays with the first driver and Operations decide).
+   * `expectedCurrentDriverId` makes it a no-op if someone already changed the assignment meanwhile.
+   */
+  async offerToNextDriver(orderId: string, silentDriverId: string): Promise<string | null> {
+    const order = await this.ordersRepository.findOne({ where: { id: orderId }, relations: { segments: true } });
+    if (!order || order.status !== OrderStatus.ASSIGNED_TO_DRIVER) return null;
+    const candidates = (await this.driverRankingService.rankCandidates(order)).filter((id) => id !== silentDriverId);
+    for (const driverId of candidates) {
+      try {
+        await this.deliveryAssignmentService.reassignDriver({ orderId, newDriverId: driverId, expectedCurrentDriverId: silentDriverId });
+        await this.recordAttempt(orderId, 'DRIVER_TIMED_OUT', silentDriverId, 'Not acknowledged in time — offered to the next driver.');
+        await this.recordAttempt(orderId, 'ASSIGNED', driverId, 'Re-offered after the first driver did not acknowledge.');
+        return driverId;
+      } catch (error) {
+        const code = (error as { response?: { details?: { code?: string } } })?.response?.details?.code;
+        if (error instanceof OrderNotAssignableException || code === 'ASSIGNMENT_CHANGED') return null; // someone already acted
+        // this candidate became unavailable meanwhile — try the next one
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Bug 2026-11-22: the online switch stayed on after a driver closed the app (or the phone died), so the driver looked online for days.
+   * A driver whose app has been silent for 30 minutes and who carries no active order is switched offline (the app shows it, and they
+   * go online again when they start working). Drivers with an active order are left alone: Operations get the "app silent" alert.
+   */
+  async switchOffSilentDrivers(): Promise<number> {
+    const rows: Array<{ id: string }> = await this.ordersRepository.query(
+      `UPDATE drivers d SET is_online = false, online_changed_at = now()
+        WHERE d.is_online = true AND (d.last_seen_at IS NULL OR d.last_seen_at < now() - interval '30 minutes')
+          AND NOT EXISTS (SELECT 1 FROM deliveries x JOIN orders o ON o.id = x.order_id
+                           WHERE x.driver_id = d.id AND x.deleted_at IS NULL AND o.status::text IN ('ASSIGNED_TO_DRIVER','PICKED_UP','ON_THE_WAY'))
+        RETURNING d.id`,
+    );
+    const n = Array.isArray(rows) ? (Array.isArray(rows[0]) ? rows[0].length : rows.length) : 0;
+    if (n > 0) this.logger.log(`switched ${n} silent driver(s) offline (app not seen for 30 minutes, no active order)`);
+    return n;
   }
 
   /** ONE open alert per (order, reason): repeating the same situation refreshes it instead of stacking duplicates. */

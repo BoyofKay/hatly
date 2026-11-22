@@ -33,6 +33,13 @@ import { ServiceAreaResolverService, haversineDistanceMeters } from '../service-
  *   - Eligibility: isOnline, isAvailable, verificationStatus ===
  *     APPROVED — all already-established Driver fields, nothing new.
  */
+/**
+ * A driver whose app has not called the API for this long is not offered orders automatically, even if their switch says online: the
+ * app polls about every 25 s while open, and with no push notifications a closed app never sees the order (bug 2026-11-22: a driver
+ * who closed the app days earlier kept receiving orders). Operations can still assign them by hand.
+ */
+export const DISPATCH_APP_FRESH_MS = 3 * 60_000;
+
 @Injectable()
 export class DriverRankingService {
   private readonly logger = new Logger(DriverRankingService.name);
@@ -87,9 +94,12 @@ export class DriverRankingService {
       return [];
     }
 
-    const eligibleDrivers = await this.driversRepository.find({
-      where: { isOnline: true, isAvailable: true, verificationStatus: 'APPROVED' },
-    });
+    const freshSince = Date.now() - DISPATCH_APP_FRESH_MS;
+    const eligibleDrivers = (
+      await this.driversRepository.find({
+        where: { isOnline: true, isAvailable: true, verificationStatus: 'APPROVED' },
+      })
+    ).filter((d) => d.lastSeenAt != null && new Date(d.lastSeenAt).getTime() >= freshSince);
 
     const maxBicycleDistanceMeters = await this.businessConfigService.getMaxBicyclePickupDistanceMeters();
 
@@ -153,7 +163,21 @@ export class DriverRankingService {
       withDistance.push({ driverId: driver.id, distanceMeters });
     }
 
-    withDistance.sort((a, b) => a.distanceMeters - b.distanceMeters);
+    // Owner decision 2026-11-22: among the drivers close enough (preferred radius), the one with the FEWEST active orders goes first
+    // (then the nearest) — spreads the work and the earnings instead of piling orders onto one busy driver. Drivers farther away follow,
+    // nearest first, so an order is never left waiting just because nobody is inside the radius.
+    const radius = await this.businessConfigService.getDispatchPreferredRadiusMeters();
+    const load = await this.activeLoad(withDistance.map((d) => d.driverId));
+    withDistance.sort((a, b) => {
+      const aNear = a.distanceMeters <= radius ? 0 : 1;
+      const bNear = b.distanceMeters <= radius ? 0 : 1;
+      if (aNear !== bNear) return aNear - bNear;
+      if (aNear === 0) {
+        const byLoad = (load.get(a.driverId) ?? 0) - (load.get(b.driverId) ?? 0);
+        if (byLoad !== 0) return byLoad;
+      }
+      return a.distanceMeters - b.distanceMeters;
+    });
     const inTurn = await this.roundRobinOrder(withoutGps);
     if (straightLine) {
       this.logger.log(
@@ -161,6 +185,21 @@ export class DriverRankingService {
       );
     }
     return [...withDistance.map((d) => d.driverId), ...inTurn];
+  }
+
+  /** Active orders (assigned / picked up / on the way) per driver. */
+  private async activeLoad(driverIds: string[]): Promise<Map<string, number>> {
+    if (driverIds.length === 0) return new Map();
+    const query = (this.driversRepository as unknown as { query?: (sql: string, p: unknown[]) => Promise<any[]> }).query;
+    const rows: Array<{ driver_id: string; n: string }> =
+      (await query?.call(
+        this.driversRepository,
+        `SELECT x.driver_id, count(*) AS n FROM deliveries x JOIN orders o ON o.id = x.order_id
+          WHERE x.driver_id = ANY($1) AND x.deleted_at IS NULL AND o.status::text IN ('ASSIGNED_TO_DRIVER','PICKED_UP','ON_THE_WAY')
+          GROUP BY x.driver_id`,
+        [driverIds],
+      )) ?? [];
+    return new Map(rows.map((r) => [r.driver_id, Number(r.n)]));
   }
 
   /** R14 round-robin: the driver assigned longest ago (or never) first; ties by id so the order is stable. */
