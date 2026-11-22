@@ -14,7 +14,6 @@ export type DeletableKind =
   | 'sector'
   | 'subcategory'
   | 'offer'
-  | 'delivery-zone'
   | 'service-area'
   | 'vehicle-type'
   | 'driver'
@@ -69,8 +68,6 @@ export class AdminRecordsService {
           return this.removeSubcategory(m, id);
         case 'offer':
           return this.removeOffer(m, id);
-        case 'delivery-zone':
-          return this.removeDeliveryZone(m, id);
         case 'service-area':
           return this.removeServiceArea(m, id);
         case 'vehicle-type':
@@ -197,14 +194,6 @@ export class AdminRecordsService {
   }
 
   // ------------------------------------------------------------------ delivery
-
-  private async removeDeliveryZone(m: EntityManager, id: string): Promise<Record<string, number>> {
-    await this.mustExist(m, 'delivery_zones', id, 'Delivery zone not found.');
-    const [a] = await m.query(`SELECT count(*)::int AS n FROM addresses WHERE delivery_zone_id = $1 AND deleted_at IS NULL`, [id]);
-    // Saved addresses keep pointing at the zone (their history), but the zone is off: checkout asks the customer to choose an active zone.
-    await m.query(`UPDATE delivery_zones SET is_active = false, deleted_at = now(), updated_at = now() WHERE id = $1`, [id]);
-    return { savedAddressesAffected: a.n };
-  }
 
   private async removeServiceArea(m: EntityManager, id: string): Promise<Record<string, number>> {
     await this.mustExist(m, 'service_areas', id, 'Service area not found.');

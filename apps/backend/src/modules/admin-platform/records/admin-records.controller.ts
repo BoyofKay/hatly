@@ -81,11 +81,7 @@ export class AdminRecordsController {
     return this.del('offer', id);
   }
 
-  @Delete('delivery-zones/:id')
-  @RequiresPermission(Permission.MANAGE_SERVICE_AREAS, Permission.DELETE_RECORDS)
-  deleteDeliveryZone(@Param('id', ParseUUIDPipe) id: string) {
-    return this.del('delivery-zone', id);
-  }
+  // Delivery zones are never deleted (owner decision 2026-11-22: zones are required to operate) — deactivate or edit them instead.
 
   @Delete('service-areas/:id')
   @RequiresPermission(Permission.MANAGE_SERVICE_AREAS, Permission.DELETE_RECORDS)

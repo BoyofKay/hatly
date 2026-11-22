@@ -1,4 +1,5 @@
 'use client';
+import { parseLatLng } from '../../../lib/admin/lat-lng';
 import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -29,6 +30,9 @@ export default function ServiceAreasPage() {
   const [renaming, setRenaming] = useState<ServiceArea | null>(null);
   const [newName, setNewName] = useState('');
   const [newNameAr, setNewNameAr] = useState('');
+  const [editLat, setEditLat] = useState('');
+  const [editLng, setEditLng] = useState('');
+  const [editRadius, setEditRadius] = useState('');
   const [nameAr, setNameAr] = useState('');
   const [deactivate, setDeactivate] = useState<ServiceArea | null>(null);
   const [busy, setBusy] = useState(false);
@@ -99,7 +103,7 @@ export default function ServiceAreasPage() {
       key: 'actions', header: '', align: 'end',
       cell: (a) => (
         <span className="inline-flex gap-2">
-          <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setNewName(a.name); setNewNameAr(a.nameAr ?? ''); setRenaming(a); }}>{t('Rename', 'إعادة تسمية')}</Button>
+          <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setNewName(a.name); setNewNameAr(a.nameAr ?? ''); setEditLat(String(a.centerLatitude)); setEditLng(String(a.centerLongitude)); setEditRadius(String(Number((a.radiusMeters / 1000).toFixed(3)))); setRenaming(a); }}>{t('Edit', 'تعديل')}</Button>
           {a.isActive
             ? <Button size="sm" className="min-h-[36px]" onClick={() => { setActionError(null); setDeactivate(a); }}>{t('Deactivate', 'إيقاف')}</Button>
             : <Button size="sm" variant="primary" className="min-h-[36px]" loading={busy} onClick={() => void run(() => activateServiceArea(a.id), t('Service area activated.', 'تم تفعيل منطقة الخدمة.'), t('Failed to update service area.', 'تعذّر تحديث منطقة الخدمة.'), () => undefined)}>{t('Activate', 'تفعيل')}</Button>}
@@ -140,13 +144,20 @@ export default function ServiceAreasPage() {
 
       <Modal
         open={!!renaming}
-        title={t('Rename service area', 'إعادة تسمية منطقة الخدمة')}
+        title={t('Edit service area', 'تعديل منطقة الخدمة')}
         onClose={() => !busy && setRenaming(null)}
-        footer={<><Button onClick={() => setRenaming(null)} disabled={busy}>{t('Cancel', 'إلغاء')}</Button><Button variant="primary" type="submit" form="sa-rename" loading={busy} disabled={!newName.trim() || !newNameAr.trim() || (newName === renaming?.name && newNameAr === (renaming?.nameAr ?? ''))}>{t('Save', 'حفظ')}</Button></>}
+        footer={<><Button onClick={() => setRenaming(null)} disabled={busy}>{t('Cancel', 'إلغاء')}</Button><Button variant="primary" type="submit" form="sa-rename" loading={busy} disabled={!newName.trim() || !newNameAr.trim() || !(Number(editRadius) > 0) || Number.isNaN(Number(editLat)) || Number.isNaN(Number(editLng))}>{t('Save', 'حفظ')}</Button></>}
       >
-        <form id="sa-rename" onSubmit={(e) => { e.preventDefault(); if (renaming) void run(() => updateServiceArea(renaming.id, { name: newName.trim(), nameAr: newNameAr.trim() }), t('Service area renamed.', 'تمت إعادة تسمية المنطقة.'), t('Failed to rename service area.', 'تعذّرت إعادة التسمية.'), () => setRenaming(null)); }} className="space-y-3">
+        <form id="sa-rename" onSubmit={(e) => { e.preventDefault(); if (renaming) void run(() => updateServiceArea(renaming.id, { name: newName.trim(), nameAr: newNameAr.trim(), centerLatitude: Number(editLat), centerLongitude: Number(editLng), radiusMeters: Math.round(Number(editRadius) * 1000) }), t('Service area saved.', 'تم حفظ منطقة الخدمة.'), t('Failed to save the service area.', 'تعذّر حفظ منطقة الخدمة.'), () => setRenaming(null)); }} className="space-y-3">
           <LabeledInput label={t('Name (English)', 'الاسم (إنجليزي)')} required value={newName} onChange={(e) => setNewName(e.target.value)} />
           <LabeledInput label={t('Name (Arabic)', 'الاسم (عربي)')} required dir="rtl" value={newNameAr} onChange={(e) => setNewNameAr(e.target.value)} />
+          <LabeledInput label={t('Move the centre: paste a Google Maps link or "lat, lng"', 'تحريك المركز: الصق رابط خرائط جوجل أو "خط العرض، خط الطول"')} dir="ltr" placeholder="30.4170, 31.5620" onChange={(e) => { const p = parseLatLng(e.target.value); if (p) { setEditLat(String(p.lat)); setEditLng(String(p.lng)); } }} />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <LabeledInput label={t('Centre latitude', 'خط عرض المركز')} dir="ltr" inputMode="decimal" value={editLat} onChange={(e) => setEditLat(e.target.value)} />
+            <LabeledInput label={t('Centre longitude', 'خط طول المركز')} dir="ltr" inputMode="decimal" value={editLng} onChange={(e) => setEditLng(e.target.value)} />
+            <LabeledInput label={t('Radius (km)', 'نصف القطر (كم)')} dir="ltr" inputMode="decimal" value={editRadius} onChange={(e) => setEditRadius(e.target.value)} hint={t('Increase to expand the area.', 'زِد الرقم لتوسيع المنطقة.')} />
+          </div>
+          <p className="text-xs text-gray-500">{t('Stores and customers outside the new circle stop being served from this area; their delivery zones stay as they are.', 'المتاجر والعملاء خارج الدائرة الجديدة لن تُخدم من هذه المنطقة؛ مناطق التوصيل تبقى كما هي.')}</p>
           {actionError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{actionError}</p>}
         </form>
       </Modal>

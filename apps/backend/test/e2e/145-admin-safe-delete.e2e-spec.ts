@@ -96,12 +96,11 @@ describe('E2E — admin safe delete and edit', () => {
     expect(await listed('/admin/service-areas', empty.id)).toBe(false);
   });
 
-  it('a delivery zone is deleted and leaves the customer zone list', async () => {
-    const zone = await s.deliveryZone({ serviceAreaId: area.id, name: 'Zone To Delete' });
-    expect((await api('delete', `/admin/delivery-zones/${zone.id}`)).status).toBe(200);
-    expect(await listed('/admin/delivery-zones', zone.id)).toBe(false);
-    const customer = await s.customer();
-    expect(JSON.stringify((await world.api('get', '/delivery-zones', { token: customer.accessToken })).body)).not.toContain(zone.id);
+  it('delivery zones cannot be deleted (owner decision): there is no delete route, deactivate or edit instead', async () => {
+    const own = await s.serviceArea({ name: 'Zone Keep Area' });
+    const zone = await s.deliveryZone({ serviceAreaId: own.id, name: 'Zone Kept' });
+    expect((await api('delete', `/admin/delivery-zones/${zone.id}`)).status).toBe(404);
+    expect(await listed('/admin/delivery-zones', zone.id)).toBe(true);
   });
 
   it('a driver is edited, then deleted: signed out, gone from the list, phone free again', async () => {
