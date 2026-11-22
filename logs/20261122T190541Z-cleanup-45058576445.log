@@ -1,0 +1,56 @@
+action=cleanup arg= commit=cb035ef0bf97d99d0627caa7673556f0905ee821 run=45058576445 started=2026-11-22T19:03:53Z
+
+==== before  (19:03:56 UTC)
+/dev/sda1        96G   77G   20G  80% /
+removing release 20261024T010009Z-926df2d14ca9
+removing release 20261025T203941Z-86a4f42e14a8
+removing release 20261030T133417Z-d37d5469afb7
+removing release 20261031T043120Z-cff7808bf657
+removing release 20261031T045345Z-97e64fe22247
+removing release 20261031T194401Z-edcbb1a8617d
+removing release 20261031T214027Z-bcf556957636
+removing release 20261101T050831Z-24badedcb209
+removing release 20261101T084822Z-5fa93b99c384
+removing release 20261101T102911Z-6abe9a04c7d9
+removing release 20261101T191813Z-084657feb275
+removing release 20261106T195227Z-1b323dab4ea2
+removing release 20261106T195428Z-50ef7fbe7cd6
+removing release 20261106T214231Z-27f40e93dabb
+removing release 20261107T004846Z-593d380baae2
+removing release 20261107T015613Z-812d1a88e4d4
+removing release 20261107T022800Z-feb790433010
+removing release 20261107T034236Z-55f7b9f54724
+removing release 20261107T035612Z-d19b76161a80
+removing release 20261107T045937Z-1a61e340d9bc
+removing release 20261107T053628Z-079cf82fb4dc
+removing release 20261107T072134Z-b308f21c41d3
+removing release 20261107T223459Z-7b9dd3cbe3b3
+removing release 20261108T052118Z-02c8091cd3e1
+removing release 20261110T225253Z-d5d27b5c0c3e
+removing release 20261113T130702Z-6955b8b05679
+removing release 20261113T211742Z-96b47a8d0cb3
+removing release 20261114T043549Z-06e85f770a16
+removing release 20261115T032058Z-26e146606679
+removing release 20261122T154223Z-ab69c48c095f
+
+==== docker build cache  (19:04:41 UTC)
+Total:	29.87GB
+
+==== unused images (not used by any container, older than 1 day)  (19:05:32 UTC)
+Total reclaimed space: 2.298GB
+
+==== old journal logs (keep 200 MB)  (19:05:36 UTC)
+Vacuuming done, freed 0B of archived journals from /run/log/journal.
+
+==== after  (19:05:37 UTC)
+/dev/sda1        96G   15G   82G  15% /
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED         STATUS                   PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261122T190104Z-190541035dde     "docker-entrypoint.s…"   prod-backend     2 minutes ago   Up 2 minutes (healthy)   3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261122T190104Z-190541035dde   "docker-entrypoint.s…"   prod-dashboard   2 minutes ago   Up 2 minutes (healthy)   3001/tcp
+hatly-prod-postgres-1    postgres:16-alpine                                   "docker-entrypoint.s…"   postgres         4 weeks ago     Up 12 days (healthy)     5432/tcp
+hatly-prod-redis-1       redis:7-alpine                                       "docker-entrypoint.s…"   redis            4 weeks ago     Up 12 days (healthy)     6379/tcp
+{"data":{"status":"ok","checks":{"database":"up","redis":"up"}}}
+dashboard /privacy 200
+200  https://api.hatly.dev/api/v1/health/ready
+307  https://admin.hatly.dev/
+job status: success
