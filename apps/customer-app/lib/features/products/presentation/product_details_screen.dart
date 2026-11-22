@@ -266,6 +266,29 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
 
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final vendor = product.vendor;
+    final addedName =
+        isArabic && product.nameAr != null ? product.nameAr! : product.name;
+    // Owner decision 2026-11-22: after adding, go straight back to where the customer came from (normally the store page, whose
+    // cart bar shows the new total) with a short note and a "View cart" shortcut — no extra sheet to dismiss. Opened directly
+    // (a deep link, nothing to go back to): the sheet below is still shown.
+    if (context.canPop()) {
+      final l10n = AppLocalizations.of(context);
+      final messenger = ScaffoldMessenger.of(context);
+      final router = GoRouter.of(context);
+      context.pop();
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          key: const Key('added-to-cart-snackbar'),
+          content: Text('${l10n.addedToCartConfirmation} · $addedName'),
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          action: SnackBarAction(
+              label: l10n.cartSummaryViewCart,
+              onPressed: () => router.push('/cart')),
+        ));
+      return;
+    }
     await showCartMiniSheet(
       context,
       item: AddedCartItem(

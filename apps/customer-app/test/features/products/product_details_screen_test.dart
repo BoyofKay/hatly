@@ -204,6 +204,28 @@ Future<void> _tapAdd(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+      'opened from the store page: adding goes straight back to the store with a short "added" note and a View cart shortcut',
+      (tester) async {
+    _phone(tester);
+    final visited = <String>[];
+    final api = _FakeCartApi();
+    await _open(
+        tester, _app(_product(), cartApi: api, visited: visited, location: '/vendors/b1'));
+    GoRouter.of(tester.element(find.byType(Scaffold).first)).push('/products/listing-1');
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await _tapAdd(tester);
+    expect(api.calls, hasLength(1));
+    expect(find.byType(ProductDetailsScreen), findsNothing, reason: 'back on the store page');
+    expect(find.byKey(const Key('added-to-cart-snackbar')), findsOneWidget);
+    expect(find.textContaining('كولا'), findsOneWidget);
+    final action = tester.widget<SnackBarAction>(find.byType(SnackBarAction));
+    action.onPressed();
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    expect(visited, contains('/cart'));
+    expect(find.text('page /cart'), findsOneWidget);
+  });
+
   group('Product Details — content', () {
     testWidgets(
         'shows the selling store: name, real rating + count, open state; CTA is in the content (not sticky)',
