@@ -241,8 +241,18 @@ export class SettlementClosingService {
 
   async courierPreview(driverId: string, m: EntityManager = this.ds.manager) {
     assertUuid(driverId, 'Courier');
-    const [driver] = await m.query(`SELECT d.id, u.full_name, u.phone, d.commission_rate_basis_points FROM drivers d JOIN users u ON u.id = d.user_id WHERE d.id = $1 AND d.deleted_at IS NULL`, [driverId]);
+    const [driver] = await m.query(`SELECT d.id, d.user_id, u.full_name, u.phone, d.commission_rate_basis_points FROM drivers d JOIN users u ON u.id = d.user_id WHERE d.id = $1 AND d.deleted_at IS NULL`, [driverId]);
     if (!driver) throw notFound('Courier');
+    // Owner decision 2026-11-22: money lent to the driver (employee loan) is his liability and is handed back at settlement — shown here so
+    // the closing never misses it. Informational: it does not change the closing amounts; repayments are recorded on the loan itself.
+    const loanRows: Array<{ id: string; borrowed: string; repaid: string; issued_at: Date; reason: string | null }> = await m.query(
+      `SELECT l.id, l.borrowed_amount_minor AS borrowed, COALESCE((SELECT sum(r.amount_minor) FROM employee_loan_repayments r WHERE r.employee_loan_id = l.id), 0) AS repaid, l.issued_at, l.reason
+         FROM employee_loans l WHERE l.employee_user_id = $1 AND l.deleted_at IS NULL ORDER BY l.issued_at`,
+      [driver.user_id],
+    );
+    const loans = loanRows
+      .map((l) => ({ id: l.id, borrowedMinor: Number(l.borrowed), outstandingMinor: Number(l.borrowed) - Number(l.repaid), issuedAt: iso(l.issued_at), reason: l.reason }))
+      .filter((l) => l.outstandingMinor > 0);
     const [prev] = await m.query(`SELECT period_end, reference FROM driver_settlement_periods WHERE driver_id = $1 AND status = 'CLOSED' AND deleted_at IS NULL ORDER BY period_end DESC LIMIT 1`, [driverId]);
     const { lines, unresolved } = await this.courierFacts(m, driverId);
     const totals = courierTotals(lines);
@@ -253,6 +263,7 @@ export class SettlementClosingService {
       unresolved,
       totals,
       direction: totals.netToCourierMinor >= 0 ? 'PAYOUT' : 'COLLECTION',
+      loans: { outstandingMinor: loans.reduce((s, l) => s + l.outstandingMinor, 0), items: loans },
       previewToken: SettlementClosingService.token(lines.map((l) => ({ id: l.orderId, net: l.netToCourierMinor }))),
     };
   }

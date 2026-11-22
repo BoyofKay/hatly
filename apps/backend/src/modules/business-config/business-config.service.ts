@@ -44,6 +44,7 @@ const CLEARABLE_KEYS: ReadonlySet<string> = new Set([
   BusinessConfigKey.OPERATIONS_CONTACT_PHONE,
   BusinessConfigKey.MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES,
   BusinessConfigKey.DRIVER_PRESENCE_STALE_MINUTES, // unset = the "app silent" driver alert is off
+  BusinessConfigKey.EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR, // unset = no cap; the supervisor decides
 ]);
 
 /** Keys whose value has a known shape: a write that does not match is refused (400) instead of breaking pricing later. */
@@ -83,6 +84,10 @@ const VALUE_VALIDATORS: Partial<Record<string, { valid: (v: unknown) => boolean;
   [BusinessConfigKey.DRIVER_PRESENCE_STALE_MINUTES]: {
     valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 2 && v <= 240,
     message: 'DRIVER_PRESENCE_STALE_MINUTES must be a whole number of minutes from 2 to 240; clear it to turn the "driver app silent" alert off.',
+  },
+  [BusinessConfigKey.EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR]: {
+    valid: (v) => typeof v === 'number' && Number.isInteger(v) && v > 0 && v <= 100_000_000,
+    message: 'EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR must be a positive whole amount in piastres; clear it for no cap.',
   },
   [BusinessConfigKey.MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES]: {
     valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 15 && v <= 10080,

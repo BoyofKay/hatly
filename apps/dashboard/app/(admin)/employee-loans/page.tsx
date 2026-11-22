@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import {
   EmployeeLoan,
@@ -13,6 +12,7 @@ import {
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { parseEgpToMinor } from '../../../lib/money';
 import { useLang } from '../../../lib/ui/lang';
+import { useApi } from '../../../lib/ui/api';
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorState, inputCls, KpiCard, LabeledInput, LabeledTextarea, PageHeader, Tabs, useToast } from '../../../components/ui';
 
 /**
@@ -31,6 +31,8 @@ export default function EmployeeLoansPage() {
 
   // Look up
   const [employeeId, setEmployeeId] = useState('');
+  // Drivers to choose from (name, phone, what they owe now) — no raw account ids typed by hand.
+  const people = useApi<Array<{ userId: string; fullName: string; phone: string; outstandingMinor: number }>>('/admin/employee-loans/people');
   const [loans, setLoans] = useState<EmployeeLoan[] | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [looking, setLooking] = useState(false);
@@ -145,7 +147,13 @@ export default function EmployeeLoansPage() {
       {tab === 'issue' && (
         <Card title={t('Issue a loan', 'إصدار سلفة')}>
           <form onSubmit={askIssue} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2"><LabeledInput label={t('Employee user id', 'معرّف المستخدم للموظف')} dir="ltr" value={issueEmployee} onChange={(e) => setIssueEmployee(e.target.value)} hint={t('Copy it from the Users page.', 'انسخه من صفحة المستخدمين.')} required /></div>
+            <div className="sm:col-span-2">
+              <label htmlFor="loan-issue-driver" className="mb-1 block text-xs font-medium text-gray-700">{t('Driver', 'المندوب')}</label>
+              <select id="loan-issue-driver" required value={issueEmployee} onChange={(e) => setIssueEmployee(e.target.value)} className={`${inputCls} min-h-[44px]`}>
+                <option value="">{t('Choose a driver…', 'اختر مندوبًا…')}</option>
+                {(people.data ?? []).map((d) => <option key={d.userId} value={d.userId}>{d.fullName} · {d.phone}{d.outstandingMinor > 0 ? ` · ${t('owes', 'عليه')} ${money(d.outstandingMinor)}` : ''}</option>)}
+              </select>
+            </div>
             <LabeledInput label={t('Amount (EGP)', 'المبلغ (ج.م)')} inputMode="decimal" dir="ltr" placeholder="0.00" value={borrowed} onChange={(e) => setBorrowed(e.target.value)} hint={asMinor(borrowed) !== null ? `= ${money(asMinor(borrowed))}` : undefined} required />
             <LabeledInput label={t('Issued on', 'تاريخ الإصدار')} type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} required />
             <div className="sm:col-span-2"><LabeledTextarea label={t('Reason (optional)', 'السبب (اختياري)')} rows={2} value={issueReason} onChange={(e) => setIssueReason(e.target.value)} /></div>
@@ -160,10 +168,13 @@ export default function EmployeeLoansPage() {
           <div className="space-y-4 lg:col-span-2">
             <Card title={t('Find an employee’s loans', 'ابحث عن سلف موظف')}>
               <form onSubmit={lookup} className="space-y-2">
-                <input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder={t('Employee user id', 'معرّف المستخدم للموظف')} aria-label={t('Employee user id', 'معرّف المستخدم للموظف')} dir="ltr" className={`${inputCls} min-h-[44px]`} />
+                <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} aria-label={t('Driver', 'المندوب')} className={`${inputCls} min-h-[44px]`}>
+                  <option value="">{t('Choose a driver…', 'اختر مندوبًا…')}</option>
+                  {(people.data ?? []).map((d) => <option key={d.userId} value={d.userId}>{d.fullName} · {d.phone}{d.outstandingMinor > 0 ? ` · ${t('owes', 'عليه')} ${money(d.outstandingMinor)}` : ''}</option>)}
+                </select>
                 <Button type="submit" variant="primary" loading={looking} disabled={!employeeId.trim()} className="min-h-[44px] w-full">{t('Look up', 'بحث')}</Button>
               </form>
-              <p className="mt-2 text-xs text-gray-500">{t('Find the id on the', 'ستجد المعرّف في صفحة')} <Link href="/users" className="font-medium text-hatly-orangeDark hover:underline">{t('Users page', 'المستخدمين')}</Link>.</p>
+
             </Card>
             {lookupError && <ErrorState message={lookupError} onRetry={() => void lookup()} />}
             {loans && (

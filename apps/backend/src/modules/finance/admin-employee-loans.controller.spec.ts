@@ -10,7 +10,7 @@ function buildHarness() {
     getStatus: jest.fn(async () => ({ outstandingMinor: 500, fullyRepaid: false })),
     listForEmployee: jest.fn(async () => [{ id: 'loan-1' }, { id: 'loan-2' }]),
   };
-  const controller = new AdminEmployeeLoansController(employeeLoanService as any);
+  const controller = new AdminEmployeeLoansController(employeeLoanService as any, {} as any);
   return { controller, employeeLoanService };
 }
 

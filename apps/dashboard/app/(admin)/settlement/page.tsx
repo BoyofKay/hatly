@@ -128,6 +128,20 @@ function CourierClosing() {
                 </div>
               </div>
             </Card>
+            {p.loans?.outstandingMinor > 0 && (
+              <Card title={t('Loans the courier still owes', 'سلف مستحقة على المندوب')} testId="courier-loans">
+                <p className="text-sm text-gray-700">{t(`Collect ${money(p.loans.outstandingMinor)} in loans at this settlement and record the repayment. The closing amounts above do not include loans.`, `حصّل ${money(p.loans.outstandingMinor)} من السلف في هذه التسوية وسجّل السداد. مبالغ التقفيل أعلاه لا تشمل السلف.`)}</p>
+                <ul className="mt-2 divide-y divide-gray-100 text-sm">
+                  {p.loans.items.map((l: any) => (
+                    <li key={l.id} className="flex flex-wrap justify-between gap-2 py-1.5">
+                      <span className="text-gray-600">{new Date(l.issuedAt).toLocaleDateString()}{l.reason ? ` · ${l.reason}` : ''}</span>
+                      <span className="tabular-nums font-medium">{money(l.outstandingMinor)} <span className="text-gray-400">/ {money(l.borrowedMinor)}</span></span>
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/employee-loans" className="mt-2 inline-block text-sm font-medium text-hatly-orangeDark hover:underline">{t('Record a repayment →', 'تسجيل سداد ←')}</Link>
+              </Card>
+            )}
             <Card title={t('Orders in this closing', 'طلبات هذا التقفيل')} pad={false}>
               <DataTable rows={p.lines} rowKey={(x: any) => x.orderId} columns={columns} emptyTitle={t('No delivered orders to settle', 'لا توجد طلبات مُسلّمة للتسوية')} emptyHint=" " />
             </Card>

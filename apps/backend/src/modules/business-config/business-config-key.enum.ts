@@ -58,6 +58,13 @@ export enum BusinessConfigKey {
   DRIVER_PRESENCE_STALE_MINUTES = 'DRIVER_PRESENCE_STALE_MINUTES',
 
   /**
+   * Owner decision 2026-11-22: the most a single employee (driver) may owe in employee loans at one time, in minor units. OPTIONAL:
+   * unset = no cap — the operations supervisor decides each loan. When set, issuing a loan that would take the person's outstanding
+   * total above it is refused.
+   */
+  EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR = 'EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR',
+
+  /**
    * PHASE 3 DELIVERY-FEE addition. Registered-vendor (CATALOG-only)
    * pricing parameters — see DeliveryFeeCalculationService. Deliberately
    * NOT seeded with any value by any migration: "do not invent business
