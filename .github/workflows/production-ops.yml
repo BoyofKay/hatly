@@ -1,0 +1,131 @@
+# Production operations that Claude (or the owner) can start without a Mac: push a commit to the `ops-request` branch whose file
+# `ops/REQUEST` says what to do. The commit itself is what gets deployed. Every run waits for approval on the `production` environment
+# (add yourself as required reviewer in Settings → Environments → production), then runs deploy/production/remote-ops.sh on the server
+# over SSH and writes the full log to the `ops-log` branch (logs/<run>.log) so it can be read back with `git fetch origin ops-log`.
+#
+# ops/REQUEST (one KEY=value per line):
+#   ACTION=status | deploy | rollback | reset-dry-run | reset-apply
+#   ARG=<release id for rollback, or cutoff like "2026-11-21 23:59:59+02" for reset-*>   (not used by status/deploy)
+#
+# Secrets (Settings → Secrets and variables → Actions → New repository secret; never paste them in chat):
+#   PROD_SSH_KEY      private half of a deploy key whose public half is in ubuntu's ~/.ssh/authorized_keys on the server
+#   PROD_HOST         server address
+#   PROD_USER         ubuntu
+#   PROD_KNOWN_HOSTS  optional: the server's line from known_hosts (pins the host key; without it the key is fetched on first contact)
+name: Production ops
+
+on:
+  push:
+    branches: [ops-request]
+    paths: [ops/REQUEST]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: status | deploy | rollback | reset-dry-run | reset-apply
+        required: true
+        default: status
+      arg:
+        description: release id (rollback) or cutoff (reset-*)
+        required: false
+
+permissions:
+  contents: write # only to append the log to the ops-log branch
+
+concurrency:
+  group: production-ops
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Read request
+        id: req
+        env:
+          IN_ACTION: ${{ github.event.inputs.action }}
+          IN_ARG: ${{ github.event.inputs.arg }}
+        run: |
+          if [ -n "$IN_ACTION" ]; then ACTION="$IN_ACTION"; ARG="$IN_ARG"
+          else
+            ACTION="$(sed -n 's/^ACTION=//p' ops/REQUEST | head -1 | tr -d '\r')"
+            ARG="$(sed -n 's/^ARG=//p' ops/REQUEST | head -1 | tr -d '\r' | sed 's/^"//; s/"$//')"
+          fi
+          case "$ACTION" in status|deploy|rollback|reset-dry-run|reset-apply) ;; *) echo "unknown ACTION '$ACTION'"; exit 2;; esac
+          # ARG goes to the server as one argument; allow only release ids and cutoff timestamps.
+          [[ -z "$ARG" || "$ARG" =~ ^[0-9A-Za-z:+\ -]{1,40}$ ]] || { echo "ARG has characters that are not allowed"; exit 2; }
+          { echo "action=$ACTION"; echo "arg=$ARG"; } >> "$GITHUB_OUTPUT"
+          echo "### $ACTION ${ARG}  (commit ${GITHUB_SHA:0:12})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: SSH setup
+        env:
+          KEY: ${{ secrets.PROD_SSH_KEY }}
+          HOST: ${{ secrets.PROD_HOST }}
+          KNOWN: ${{ secrets.PROD_KNOWN_HOSTS }}
+        run: |
+          [ -n "$KEY" ] && [ -n "$HOST" ] || { echo "PROD_SSH_KEY / PROD_HOST secrets are not set"; exit 2; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          if [ -n "$KNOWN" ]; then printf '%s\n' "$KNOWN" > ~/.ssh/known_hosts; else ssh-keyscan -T 15 -t ed25519 "$HOST" > ~/.ssh/known_hosts 2>/dev/null; fi
+          ssh-keygen -lf ~/.ssh/known_hosts | sed 's/^/server host key: /'
+
+      - name: Build release bundle
+        if: steps.req.outputs.action == 'deploy'
+        id: bundle
+        run: |
+          rm -rf ops
+          bash deploy/production/make-release-bundle.sh "$RUNNER_TEMP/rel" | tee "$RUNNER_TEMP/bundle.txt"
+          echo "id=$(cat "$RUNNER_TEMP/rel/RELEASE")" >> "$GITHUB_OUTPUT"
+
+      - name: Run on server
+        env:
+          HOST: ${{ secrets.PROD_HOST }}
+          USER_: ${{ secrets.PROD_USER }}
+          ACTION: ${{ steps.req.outputs.action }}
+          ARG: ${{ steps.req.outputs.arg }}
+          REL: ${{ steps.bundle.outputs.id }}
+        run: |
+          set -o pipefail
+          S="ssh -i $HOME/.ssh/id_deploy -o BatchMode=yes -o ServerAliveInterval=30 ${USER_:-ubuntu}@$HOST"
+          log="$RUNNER_TEMP/run.log"
+          {
+            echo "action=$ACTION arg=$ARG commit=$GITHUB_SHA run=$GITHUB_RUN_ID started=$(date -u +%FT%TZ)"
+            if [ "$ACTION" = deploy ]; then
+              cat "$RUNNER_TEMP/bundle.txt"
+              ARG="$REL"
+              $S "cat > /opt/hatly-prod/incoming/$REL.tar.gz.partial" < "$RUNNER_TEMP/rel/hatly-prod-src.tar.gz"
+              $S "cat > /opt/hatly-prod/incoming/$REL.tar.gz.sha256" < "$RUNNER_TEMP/rel/hatly-prod-src.tar.gz.sha256"
+              $S "mv /opt/hatly-prod/incoming/$REL.tar.gz.partial /opt/hatly-prod/incoming/$REL.tar.gz"
+              echo "uploaded $REL"
+            fi
+            $S "bash -s -- $ACTION '$ARG'" < deploy/production/remote-ops.sh
+          } 2>&1 | tee "$log"
+
+      - name: Public checks
+        if: always() && steps.req.outputs.action != 'status'
+        run: |
+          for u in https://api.hatly.dev/api/v1/health/ready https://admin.hatly.dev/; do
+            printf '%s  %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -m 15 "$u")" "$u"
+          done | tee -a "$RUNNER_TEMP/run.log"
+
+      - name: Save log to ops-log branch
+        if: always()
+        run: |
+          [ -f "$RUNNER_TEMP/run.log" ] || echo "no log (failed before reaching the server: ${{ job.status }})" > "$RUNNER_TEMP/run.log"
+          echo "job status: ${{ job.status }}" >> "$RUNNER_TEMP/run.log"
+          git config user.name "hatly-ops"; git config user.email "ops@users.noreply.github.com"
+          W="$RUNNER_TEMP/opslog"
+          if git fetch -q --depth 1 origin ops-log 2>/dev/null; then git worktree add -q -B ops-log "$W" FETCH_HEAD
+          else git worktree add -q --detach "$W" && git -C "$W" checkout -q --orphan ops-log && git -C "$W" rm -rfq .; fi
+          mkdir -p "$W/logs" && cp "$RUNNER_TEMP/run.log" "$W/logs/$(date -u +%Y%m%dT%H%M%SZ)-${{ steps.req.outputs.action }}-$GITHUB_RUN_ID.log"
+          git -C "$W" add logs && git -C "$W" commit -qm "ops log run $GITHUB_RUN_ID" && git -C "$W" push -q origin ops-log
+          tail -60 "$RUNNER_TEMP/run.log" | sed 's/^/    /' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove key
+        if: always()
+        run: rm -f ~/.ssh/id_deploy
