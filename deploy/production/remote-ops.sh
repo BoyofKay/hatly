@@ -5,6 +5,8 @@
 #   remote-ops.sh rollback <release-id>          (switch back to a release already on disk; never reverts migrations)
 #   remote-ops.sh reset-dry-run "<cutoff>"       (test-data reset: prints what would be removed, changes nothing)
 #   remote-ops.sh reset-apply "<cutoff>"         (test-data reset: really deletes; a fresh backup is taken first)
+#   remote-ops.sh disk-report                    (read-only: where the disk space goes)
+#   remote-ops.sh cleanup                        (removes old releases/images/build cache; keeps the 3 newest releases + live)
 # Same order and guards as docs/launch/RELEASE_ADMIN_VENDOR_MAINTENANCE_RUNBOOK.md: verify → build → env-check → plan → backup + restore drill →
 # guarded migrate (only when the plan shows pending migrations; prod.sh migrate takes its own backup again) → switch → status → health.
 set -euo pipefail
@@ -87,6 +89,31 @@ case "$action" in
     if [ "$action" = reset-apply ]; then APPLY=yes; step "backup first"; "$PD/current/deploy/production/prod.sh" backup; fi
     step "test-data reset ($([ $APPLY = yes ] && echo APPLY || echo DRY RUN)), cutoff $CUTOFF"
     $SUDO docker exec -i hatly-prod-postgres-1 sh -c "psql -X -q -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -v cutoff=\"'$CUTOFF'\" -v apply=$APPLY -f -" < "$SQL"
+    ;;
+
+  disk-report)
+    step "filesystem"; df -h / | tail -1
+    step "docker (images / containers / volumes / build cache)"; $SUDO docker system df
+    step "hatly folders"; $SUDO du -sh "$PD/releases" "$PD/incoming" "$PD/backups" 2>/dev/null
+    step "releases on disk"; ls -1 "$PD/releases" | wc -l
+    step "largest top-level folders"; $SUDO du -xh --max-depth=1 / 2>/dev/null | sort -rh | head -12
+    step "logs"; $SUDO du -sh /var/log /var/lib/docker/containers 2>/dev/null
+    ;;
+
+  cleanup)
+    # Safe: never touches the database volume, uploads, or the live/previous release. Keeps the 3 newest releases and their images.
+    step "before"; df -h / | tail -1
+    keep="$(ls -1t "$PD/releases" | grep -v '\.partial$' | head -3; current)"
+    for r in $(ls -1 "$PD/releases"); do
+      echo "$keep" | grep -qx "$r" && continue
+      echo "removing release $r"; $SUDO rm -rf "$PD/releases/$r" "$PD/incoming/$r.tar.gz" "$PD/incoming/$r.tar.gz.sha256"
+      $SUDO docker image rm "hatly-prod-backend:$r" "hatly-prod-dashboard:$r" >/dev/null 2>&1 || true
+    done
+    step "docker build cache"; $SUDO docker builder prune -af 2>&1 | tail -1
+    step "unused images (not used by any container, older than 1 day)"; $SUDO docker image prune -af --filter "until=24h" 2>&1 | tail -1
+    step "old journal logs (keep 200 MB)"; $SUDO journalctl --vacuum-size=200M 2>&1 | tail -1 || true
+    step "after"; df -h / | tail -1
+    "$PD/current/deploy/production/prod.sh" status
     ;;
 
   *) echo "unknown action $action"; exit 2;;
