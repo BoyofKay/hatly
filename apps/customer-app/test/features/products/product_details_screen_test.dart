@@ -183,6 +183,7 @@ Widget _app(
         probeRoute('/cart', visited: visited),
         probeRoute('/catalog-products/:id', visited: visited),
         probeRoute('/vendors/:id', visited: visited),
+        probeRoute('/home', visited: visited),
       ],
     );
 
@@ -204,6 +205,25 @@ Future<void> _tapAdd(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets(
+      'opened from Home (best sellers / offers): adding takes the customer to THAT product\'s store page, and back returns to Home',
+      (tester) async {
+    _phone(tester);
+    final visited = <String>[];
+    final api = _FakeCartApi();
+    await _open(tester, _app(_product(), cartApi: api, visited: visited, location: '/home'));
+    GoRouter.of(tester.element(find.byType(Scaffold).first)).push('/products/listing-1');
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    await _tapAdd(tester);
+    expect(api.calls, hasLength(1));
+    final storePath = '/vendors/${_product().vendorBranchId}';
+    expect(find.text('page $storePath'), findsOneWidget);
+    expect(find.byKey(const Key('added-to-cart-snackbar')), findsOneWidget);
+    GoRouter.of(tester.element(find.text('page $storePath'))).pop();
+    await tester.pumpAndSettle(const Duration(milliseconds: 100));
+    expect(find.text('page /home'), findsOneWidget, reason: 'back goes to where the customer started');
+  });
+
   testWidgets(
       'opened from the store page: adding goes straight back to the store with a short "added" note and a View cart shortcut',
       (tester) async {
