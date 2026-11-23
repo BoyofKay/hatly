@@ -21,7 +21,7 @@ class DriverBrandHeader extends ConsumerWidget {
         child: Row(children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.asset('assets/images/hatly-logo.jpg', width: 42, height: 42, fit: BoxFit.contain),
+            child: Image.asset('assets/images/hatly-driver-logo.png', width: 42, height: 42, fit: BoxFit.contain),
           ),
           const SizedBox(width: 10),
           Expanded(child: Column(
