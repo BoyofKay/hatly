@@ -14,6 +14,8 @@ class ShiftState {
     required this.activeOrders,
     required this.unsettledOrders,
     this.allowanceOutMinor = 0,
+    this.serverElapsedMinutes,
+    this.readAt,
   });
 
   final bool onDuty;
@@ -28,6 +30,9 @@ class ShiftState {
 
   /// Daily allowance (cash from Hatly for paying stores) he holds — returned at the office before the shift can end.
   final int allowanceOutMinor;
+  /// The backend already computes shift.minutes from its authoritative UTC clock.
+  final int? serverElapsedMinutes;
+  final DateTime? readAt;
 
   factory ShiftState.fromJson(Map<String, dynamic> j) {
     final shift = j['shift'] as Map<String, dynamic>?;
@@ -43,6 +48,8 @@ class ShiftState {
       activeOrders: (canEnd['activeOrders'] as num?)?.toInt() ?? 0,
       unsettledOrders: (canEnd['unsettledOrders'] as num?)?.toInt() ?? 0,
       allowanceOutMinor: (j['allowanceOutMinor'] as num?)?.toInt() ?? 0,
+      serverElapsedMinutes: (shift?['minutes'] as num?)?.toInt(),
+      readAt: DateTime.now(),
     );
   }
 }
