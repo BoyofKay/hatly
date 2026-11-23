@@ -256,8 +256,10 @@ class _VendorDetailsContent extends ConsumerWidget {
                         onTap: () => context.push('/products/${product.id}'),
                         // Same one-tap add as Home (one unit via the cart controller; hands off to the product
                         // page when the backend needs an option/weight choice or the cart is another branch's).
-                        onQuickAdd: () =>
-                            handleQuickAdd(context, ref, product.id),
+                        onQuickAdd: details.branch.isOpen
+                            ? () => handleQuickAdd(context, ref, product.id)
+                            : null,
+                        orderingDisabled: !details.branch.isOpen,
                       );
                     },
                     childCount: products.length,
@@ -286,7 +288,7 @@ class _VendorDetailsContent extends ConsumerWidget {
               ),
             ),
           // Only where the server allows it (the branch's sector setting; the cart endpoint enforces the same rule).
-          if (details.branch.allowsCustomRequests)
+          if (details.branch.allowsCustomRequests && details.branch.isOpen)
             SliverToBoxAdapter(
               child: Padding(
                 padding:
