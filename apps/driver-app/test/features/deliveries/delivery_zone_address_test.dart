@@ -45,7 +45,7 @@ void main() {
       });
       expect(a.hasPin, isFalse);
       expect(a.latitude, isNull);
-      expect(a.areaLabel, 'بلبيس — أبو نصيب');
+      expect(a.areaLabel, 'بلبيس | أبو نصيب');
       expect(a.floor, '2');
     });
 
@@ -63,6 +63,14 @@ void main() {
     });
   });
 
+  test('a classified child prints parent | village, not city | village', () {
+    final a = DeliveryAddress.fromJson({
+      'line1': 'شارع أبو نصيب',
+      'deliveryZone': {'nameAr': 'أبو نصيب', 'zoneNameAr': 'وسط بلبيس', 'cityAr': 'بلبيس'},
+    });
+    expect(a.areaLabel, 'وسط بلبيس | أبو نصيب');
+  });
+
   group('DeliveryDetailScreen', () {
     testWidgets('a pin-less order shows the area + written details and NO Maps button', (tester) async {
       await _pump(
@@ -77,7 +85,7 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       expect(find.byKey(const Key('delivery-area')), findsOneWidget);
-      expect(find.text('بلبيس — أبو نصيب'), findsOneWidget);
+      expect(find.text('بلبيس | أبو نصيب'), findsOneWidget);
       expect(find.text('شارع أبو نصيب جنب جامع الكردي، منزل 15'), findsOneWidget);
       expect(find.textContaining('Floor 2'), findsOneWidget);
       expect(find.byKey(const Key('delivery-no-pin')), findsOneWidget);
@@ -146,7 +154,7 @@ void main() {
       expect(d.totalMinor, isNull);
       expect(d.amountDueMinor, isNull);
       expect(d.deliveryAddress.hasPin, isFalse);
-      expect(d.deliveryAddress.areaLabel, 'بلبيس — أبو نصيب');
+      expect(d.deliveryAddress.areaLabel, 'بلبيس | أبو نصيب');
     });
 
     testWidgets('the detail screen renders it: price pending (no fake 0), the area, and no fake location for the customer', (tester) async {
@@ -154,7 +162,7 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.text('Total: price pending (confirmed during preparation)'), findsOneWidget);
       expect(find.textContaining('Total: 0'), findsNothing);
-      expect(find.text('بلبيس — أبو نصيب'), findsOneWidget);
+      expect(find.text('بلبيس | أبو نصيب'), findsOneWidget);
       expect(find.byKey(const Key('delivery-no-pin')), findsOneWidget);
     });
   });

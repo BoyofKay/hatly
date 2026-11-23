@@ -40,6 +40,21 @@ jobs:
       - name: Build
         run: npm run build --workspace=apps/backend
 
+  dashboard:
+    name: Admin dashboard (typecheck, unit tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --workspace=apps/dashboard --include-workspace-root
+      - run: npx tsc --noEmit -p apps/dashboard/tsconfig.json
+      - run: npm run test:unit --workspace=apps/dashboard
+
   backend-integration:
     name: Backend integration (PostgreSQL + Redis)
     runs-on: ubuntu-latest

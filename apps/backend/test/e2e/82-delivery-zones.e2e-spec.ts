@@ -27,6 +27,8 @@ describe('E2E — Delivery Zones (PD-009)', () => {
     governorateAr: 'الشرقية',
     city: 'Belbeis',
     cityAr: 'بلبيس',
+    zoneName: 'Central Belbeis',
+    zoneNameAr: 'وسط بلبيس',
     name: `Z ${Math.random().toString(36).slice(2, 8)}`,
     nameAr: `م ${Math.random().toString(36).slice(2, 8)}`,
     deliveryFeeMinor: 1800,
@@ -115,7 +117,7 @@ describe('E2E — Delivery Zones (PD-009)', () => {
       const list = expectData<any[]>(await world.api('get', '/delivery-zones', { token: c.accessToken }));
       expect(list.map((z) => z.id)).toContain(abuNaseeb.id);
       expect(list.map((z) => z.id)).not.toContain(hidden.id);
-      expect(Object.keys(list.find((z) => z.id === abuNaseeb.id)).sort()).toEqual(['city', 'cityAr', 'deliveryFeeMinor', 'governorate', 'governorateAr', 'id', 'name', 'nameAr']);
+      expect(Object.keys(list.find((z) => z.id === abuNaseeb.id)).sort()).toEqual(['areas', 'city', 'cityAr', 'deliveryFeeMinor', 'governorate', 'governorateAr', 'id', 'name', 'nameAr', 'zoneName', 'zoneNameAr']);
     });
   });
 

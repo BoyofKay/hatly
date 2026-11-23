@@ -107,8 +107,8 @@ void main() {
       final snap = q.address!.snapshot!;
       expect(snap.latitude, isNull);
       expect(snap.deliveryZone!.nameAr, 'أبو نصيب');
-      expect(snap.detailLinesFor(true).first, 'بلبيس — أبو نصيب');
-      expect(snap.detailLinesFor(false).first, 'Belbeis — Abu Naseeb');
+      expect(snap.detailLinesFor(true).first, 'بلبيس | أبو نصيب');
+      expect(snap.detailLinesFor(false).first, 'Belbeis | Abu Naseeb');
       expect(q.eligibility!.pricingSource, 'DELIVERY_ZONE');
       expect(q.delivery!.pricedByZone, isTrue);
       expect(q.delivery!.distanceMeters, isNull);
@@ -235,14 +235,14 @@ void main() {
 
   group('checkout sections', () {
     testWidgets(
-        'the address card shows the zone first ("بلبيس — أبو نصيب") and needs no map pin',
+        'the address card shows the zone first ("بلبيس | أبو نصيب") and needs no map pin',
         (tester) async {
       await tester.pumpWidget(hatlyTestApp(SingleChildScrollView(
         child: CheckoutAddressSection(
             quote: CheckoutQuote.fromJson(_zoneQuote()), onPickAddress: () {}),
       )));
       await tester.pumpAndSettle();
-      expect(find.text('بلبيس — أبو نصيب'), findsOneWidget);
+      expect(find.text('بلبيس | أبو نصيب'), findsOneWidget);
       expect(
           find.text('شارع أبو نصيب جنب جامع الكردي، منزل 15'), findsOneWidget);
       expect(find.byKey(const Key('checkout-address-error')), findsNothing);
@@ -456,12 +456,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.textContaining('22.50'), findsWidgets);
-      expect(find.text('بلبيس — أبو نصيب'), findsOneWidget);
+      expect(find.text('بلبيس | أبو نصيب'), findsOneWidget);
       expect(find.byKey(const Key('order-delivery-breakdown')), findsNothing);
     });
 
     testWidgets(
-        'the address card shows "بلبيس — أبو نصيب" then the written address, never an id',
+        'the address card shows "بلبيس | أبو نصيب" then the written address, never an id',
         (tester) async {
       tester.view.physicalSize = const Size(390 * 3, 4000 * 3);
       tester.view.devicePixelRatio = 3;
@@ -483,7 +483,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
       final card = find.byKey(const Key('order-address'));
-      expect(find.descendant(of: card, matching: find.text('بلبيس — أبو نصيب')),
+      expect(find.descendant(of: card, matching: find.text('بلبيس | أبو نصيب')),
           findsOneWidget);
       expect(
           find.descendant(

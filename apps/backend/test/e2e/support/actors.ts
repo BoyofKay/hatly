@@ -201,6 +201,8 @@ export class Scenario {
           cityAr: 'بلبيس',
           name: p.name ?? `Zone ${suffix}`,
           nameAr: p.nameAr ?? `منطقة ${suffix}`,
+          zoneName: 'Belbeis Zone',
+          zoneNameAr: 'منطقة بلبيس',
           deliveryFeeMinor: p.feeMinor ?? 1500,
         },
       }),
