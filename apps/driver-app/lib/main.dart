@@ -9,6 +9,8 @@ import 'core/localization/l10n/app_localizations.dart';
 import 'core/network/providers.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/hatly_theme.dart';
+import 'shared_widgets/driver_brand_header.dart';
+import 'features/auth/presentation/auth_state_provider.dart';
 
 /// Separate entry point from the customer app, per the client's
 /// explicit correction: two independent Flutter applications, not one
@@ -60,6 +62,13 @@ class HatlyDriverApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: HatlyTheme.light(),
       routerConfig: router,
+      // Above every authenticated route, including full-screen delivery details.
+      builder: (context, child) => ref.watch(authStateProvider).isAuthenticated
+          ? Column(children: [
+              const SafeArea(bottom: false, child: DriverBrandHeader()),
+              Expanded(child: child ?? const SizedBox.shrink()),
+            ])
+          : child ?? const SizedBox.shrink(),
       locale: ref.watch(localeProvider),
       supportedLocales: const [Locale('ar'), Locale('en')],
       localizationsDelegates: const [
