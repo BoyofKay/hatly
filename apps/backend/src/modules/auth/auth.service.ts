@@ -324,6 +324,16 @@ export class AuthService {
   }
 
   /** A driver changes their OWN password (required after a temporary one set by Operations). Same brute-force brake as sign-in. */
+  /**
+   * Driver app "Forgot password?" (round 2): records a request for Hatly operations — only for an active DRIVER account, at most one open
+   * request per account. The caller is told the same thing whatever the phone is, so the endpoint never reveals which numbers exist.
+   */
+  async requestDriverPasswordReset(phone: string): Promise<void> {
+    const user = await this.usersService.findByPhoneWithPasswordHash(phone);
+    if (!user || user.role !== Role.DRIVER || !user.isActive) return;
+    await this.usersService.recordPasswordResetRequest(user.id);
+  }
+
   /** Whether the account still has a temporary password (set by Hatly staff) that must be changed. */
   async mustChangePassword(userId: string): Promise<boolean> {
     return (await this.usersService.findById(userId))?.mustChangePassword === true;

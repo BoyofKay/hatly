@@ -87,6 +87,11 @@ export class UsersService {
    * Sets `passwordHash` for a given user id (the authenticated password CHANGE flow in AuthService, which has already
    * verified the current password). Does NOT touch `isPhoneVerified` or any other field.
    */
+  /** An open "forgot password" request for Hatly operations (one per account; a repeat keeps the first). */
+  async recordPasswordResetRequest(userId: string): Promise<void> {
+    await this.usersRepository.query(`INSERT INTO password_reset_requests (user_id) VALUES ($1) ON CONFLICT DO NOTHING`, [userId]);
+  }
+
   /** The person's OWN password change — it also ends a temporary password (must_change_password). */
   async setPasswordHash(userId: string, passwordHash: string): Promise<void> {
     await this.usersRepository.update({ id: userId }, { passwordHash, mustChangePassword: false });
