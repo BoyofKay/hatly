@@ -1,3 +1,3 @@
-ACTION=deploy
+ACTION=status
 ARG=
-# Production source: customer editable name + admin-managed driver display name + shift-scoped History; CI 45229239987 SUCCESS.
+# Read-only preflight: identify running Hatly release before enabling Google Routes.
