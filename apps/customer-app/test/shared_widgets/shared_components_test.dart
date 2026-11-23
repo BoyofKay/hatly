@@ -41,7 +41,7 @@ const _navItems = [
 void main() {
   group('HatlySearchBar', () {
     testWidgets(
-        'uses the same 12px-radius search silhouette as Explore, is ≥48px tall, and reports taps',
+        'uses the same rounded search silhouette as Explore, is ≥44px tall, and reports taps',
         (tester) async {
       var taps = 0;
       await tester.pumpWidget(hatlyTestApp(
@@ -59,7 +59,7 @@ void main() {
           decoration.borderRadius, BorderRadius.circular(HatlyRadius.searchBar));
       expect(decoration.border, isNotNull);
       expect(tester.getSize(find.byType(HatlySearchBar)).height,
-          greaterThanOrEqualTo(48));
+          greaterThanOrEqualTo(44));
 
       await tester.tap(find.byType(HatlySearchBar));
       expect(taps, 1);

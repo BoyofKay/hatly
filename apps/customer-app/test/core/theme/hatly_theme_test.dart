@@ -10,7 +10,7 @@ void main() {
       expect(HatlyRadius.chip, 8);
       expect(HatlyRadius.button, 12);
       expect(HatlyRadius.input, 12);
-      expect(HatlyRadius.searchBar, 12);
+      expect(HatlyRadius.searchBar, 22);
       expect(HatlyRadius.card, 16);
       expect(HatlyRadius.imageContainer, 16);
       expect(HatlyRadius.promoBanner, 20);

@@ -173,7 +173,7 @@ void main() {
 
     for (final width in [320.0, 360.0, 375.0, 390.0, 430.0]) {
       for (final locale in const [Locale('ar'), Locale('en')]) {
-        testWidgets('the carousel uses a compact image-first card with room for an adjacent preview (\u0024{width.toInt()} pt, \u0024{locale.languageCode})', (tester) async {
+        testWidgets('the carousel uses a full-width edge-to-edge hero (\u0024{width.toInt()} pt, \u0024{locale.languageCode})', (tester) async {
           await pump(tester, () async => [_banner('b1'), _banner('b2'), _banner('b3')], width: width, locale: locale);
           await tester.pumpAndSettle();
           final card = tester.getRect(find.byKey(const Key('home-banner-b1')));
@@ -188,7 +188,7 @@ void main() {
 
         testWidgets('the new wide hero stays within compact height bounds and preserves cover-fit', (tester) async {
       expect(bannerHeight(390), closeTo(190.24, 0.5));
-      expect(bannerHeight(320), 156); // compact minimum for narrow phones
+      expect(bannerHeight(320), closeTo(156.1, 0.2)); // full-width banner
       await pump(tester, () async => [_banner('b1')]);
       await tester.pumpAndSettle();
       final image = tester.widget<HatlySoftImage>(find.byType(HatlySoftImage));
@@ -304,7 +304,7 @@ void main() {
         expect(tester.takeException(), isNull);
         final box = tester.getSize(find.byKey(const Key('home-banner-b1')));
         expect(box.height, greaterThanOrEqualTo(120));
-        expect(box.width, lessThan(320));
+        expect(box.width, closeTo(320, 0.5)); // full bleed
       });
     }
   });

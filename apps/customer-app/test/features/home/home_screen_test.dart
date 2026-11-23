@@ -113,10 +113,10 @@ void main() {
 
     double y(Finder f) => tester.getTopLeft(f.first).dy;
     final ordered = [
-      find.text('المنزل'), // 1 location
-      find.byType(HatlySearchBar), // 2 search
-      find.byType(PromoCarousel), // 3 promo carousel
-      find.text('تسوّق حسب الفئة'), // 4 categories
+      // The address now belongs in the global banner/header, outside HomeScreen.
+      find.byType(HatlySearchBar), // search
+      find.byType(PromoCarousel), // promo carousel
+      find.text('تسوّق حسب الفئة'), // categories
       find.text('متاجر مميزة'), // featured stores (owner decision 2026-11-02)
       find.text('العروض'), // 5 offers
       find.text('الأكثر طلبًا'), // 6 most ordered

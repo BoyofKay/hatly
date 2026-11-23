@@ -151,7 +151,7 @@ void main() {
       expect(_activeIndex(tester), 0);
     });
 
-    testWidgets('the promo card uses restrained 8px corners', (tester) async {
+    testWidgets('the promo card has softly rounded bottom corners only', (tester) async {
       await tester.pumpWidget(hatlyTestApp(PromoCarousel(
           promos: _promos,
           onAction: (_) {},
@@ -160,7 +160,7 @@ void main() {
           .widgetList<Container>(find.byType(Container))
           .map((c) => c.decoration)
           .whereType<BoxDecoration>()
-          .firstWhere((d) => d.borderRadius == BorderRadius.circular(HatlyRadius.heroBanner));
+          .firstWhere((d) => d.borderRadius == const BorderRadius.vertical(bottom: Radius.circular(14)));
       expect(card.boxShadow, isNull, reason: 'calm: no shadow on the promo');
       final screen = tester.getSize(find.byType(PromoCarousel)).width;
       expect(tester.getSize(find.byType(PromoCtaButton).first).height,
