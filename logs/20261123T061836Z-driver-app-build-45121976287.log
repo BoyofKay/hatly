@@ -1,0 +1,6 @@
+### Driver app 1.0.2+11 — success
+**Debug-signed** (no keystore secrets) → install the .apk on a phone to test; Google Play will reject it.
+Push notifications: no
+APK (direct download, no zip): https://github.com/BoyofKay/hatly/releases/tag/driver-app-v1.0.2-b11-run45121976287
+79d149764892fd1885e9a4c513b6fcccb290339c3aef6e7114100ecc6b8078a5  hatly-driver-1.0.2+11.aab
+666a2335781ae377a0fb44e3ef546c71373c61618123c49123f264e1baadf66e  hatly-driver-1.0.2+11.apk
