@@ -33,6 +33,18 @@ case "$action" in
     fi
     mode="$($SUDO sed -n 's/^MAPS_PROVIDER=//p' "$PD/.env.production" | tail -1)"
     echo "MAPS_PROVIDER=${mode:-unset}"
+    step "backend public outbound IPv4 (read-only)"
+    public_ipv4="$($SUDO docker exec hatly-prod-backend-1 node -e '
+      fetch("https://api4.ipify.org", {signal: AbortSignal.timeout(8000)})
+        .then(r => {if (!r.ok) throw new Error("HTTP " + r.status); return r.text()})
+        .then(s => process.stdout.write(s.trim()))
+        .catch(() => process.exit(1));
+    ' 2>/dev/null || true)"
+    if [[ "$public_ipv4" =~ ^[0-9]{1,3}(\\.[0-9]{1,3}){3}$ ]]; then
+      echo "backend egress IPv4: $public_ipv4 (must match Google key IP restriction)"
+    else
+      echo "backend egress IPv4: unavailable"
+    fi
     ;;
 
   deploy)
