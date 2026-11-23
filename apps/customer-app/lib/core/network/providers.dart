@@ -19,6 +19,8 @@ final apiClientProvider = Provider<ApiClient>((ref) {
     // an init-time cycle with sessionControllerProvider.
     onSessionExpired: () =>
         ref.read(sessionControllerProvider.notifier).forceLogout(),
+    onPasswordChangeRequired: () =>
+        ref.read(sessionControllerProvider.notifier).requirePasswordChange(),
   );
 });
 

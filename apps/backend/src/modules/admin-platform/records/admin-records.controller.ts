@@ -125,6 +125,14 @@ export class AdminRecordsController {
     await this.records.resetPersonPassword('driver', id, dto.newPassword);
   }
 
+  /** A customer who forgot their password (no SMS reset yet): Operations set a temporary one; the app asks for a new one at sign-in. */
+  @Post('customers/:id/reset-password')
+  @HttpCode(204)
+  @RequiresPermission(Permission.MANAGE_CUSTOMERS)
+  async resetCustomerPassword(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ResetPersonPasswordDto) {
+    await this.records.resetPersonPassword('customer', id, dto.newPassword);
+  }
+
   @Post('vendor-staff/:id/reset-password')
   @HttpCode(204)
   @RequiresPermission(Permission.MANAGE_VENDOR_STAFF)

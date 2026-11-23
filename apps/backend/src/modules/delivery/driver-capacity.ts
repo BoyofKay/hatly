@@ -12,9 +12,19 @@
 export const ACTIVE_DRIVER_ORDER_STATUSES = ['ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY'];
 
 const CAPACITY_SQL = `GREATEST(1, COALESCE(d.capacity_override, (SELECT v.max_active_deliveries FROM vehicle_types v WHERE v.id = d.vehicle_type_id), 1))`;
+/**
+ * Early dispatch (owner decision 2026-11-22): an order the driver was pre-assigned to while the store prepares it counts too — the
+ * delivery carries `early_assigned_at` and the order is still Confirmed / Preparing / Ready.
+ */
+export const EARLY_ASSIGNED_ORDER_STATUSES = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY_FOR_PICKUP'];
+/** SQL condition: delivery `x` of order `o` is with its driver right now (active, or pre-assigned). Uses no parameters. */
+export const ACTIVE_DELIVERY_CONDITION = (x = 'x', o = 'o') =>
+  `(${o}.status::text IN ('ASSIGNED_TO_DRIVER','PICKED_UP','ON_THE_WAY') OR (${x}.early_assigned_at IS NOT NULL AND ${o}.status::text IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP')))`;
+
 const ACTIVE_SQL = (driverRef: string) => `(SELECT count(*) FROM deliveries x JOIN orders o ON o.id = x.order_id
    WHERE x.driver_id = ${driverRef} AND x.deleted_at IS NULL
-     AND ((o.status::text = ANY($2::text[]) AND o.id IS DISTINCT FROM $3::uuid) OR o.id = $4::uuid))`;
+     AND (((o.status::text = ANY($2::text[]) OR (x.early_assigned_at IS NOT NULL AND o.status::text IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP')))
+           AND o.id IS DISTINCT FROM $3::uuid) OR o.id = $4::uuid))`;
 
 type Db = { query: (sql: string, params?: unknown[]) => Promise<any> };
 

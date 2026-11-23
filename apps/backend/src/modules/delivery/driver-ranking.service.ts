@@ -99,7 +99,10 @@ export class DriverRankingService {
       await this.driversRepository.find({
         where: { isOnline: true, isAvailable: true, verificationStatus: 'APPROVED' },
       })
-    ).filter((d) => d.lastSeenAt != null && new Date(d.lastSeenAt).getTime() >= freshSince);
+    )
+      .filter((d) => d.lastSeenAt != null && new Date(d.lastSeenAt).getTime() >= freshSince)
+      // "Stop new orders" (2026-11-22): a driver finishing up before ending the shift receives nothing new.
+      .filter((d) => d.acceptingNewOrders !== false);
 
     const maxBicycleDistanceMeters = await this.businessConfigService.getMaxBicyclePickupDistanceMeters();
 
@@ -195,7 +198,7 @@ export class DriverRankingService {
       (await query?.call(
         this.driversRepository,
         `SELECT x.driver_id, count(*) AS n FROM deliveries x JOIN orders o ON o.id = x.order_id
-          WHERE x.driver_id = ANY($1) AND x.deleted_at IS NULL AND o.status::text IN ('ASSIGNED_TO_DRIVER','PICKED_UP','ON_THE_WAY')
+          WHERE x.driver_id = ANY($1) AND x.deleted_at IS NULL AND (o.status::text IN ('ASSIGNED_TO_DRIVER','PICKED_UP','ON_THE_WAY') OR (x.early_assigned_at IS NOT NULL AND o.status::text IN ('PENDING','CONFIRMED','PREPARING','READY_FOR_PICKUP')))
           GROUP BY x.driver_id`,
         [driverIds],
       )) ?? [];

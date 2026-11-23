@@ -128,6 +128,18 @@ function CourierClosing() {
                 </div>
               </div>
             </Card>
+            {Array.isArray(p.shifts) && p.shifts.length > 0 && (
+              <Card title={t('Shifts this closing covers', 'الورديات التي يغطيها هذا التقفيل')} testId="courier-shifts">
+                <ul className="divide-y divide-gray-100 text-sm">
+                  {p.shifts.map((s: any) => (
+                    <li key={s.id} className="flex flex-wrap justify-between gap-2 py-1.5">
+                      <span className="text-gray-600">{new Date(s.startedAt).toLocaleString()} → {s.endedAt ? new Date(s.endedAt).toLocaleString() : t('open — ends with this closing', 'مفتوحة — تنتهي بهذا التقفيل')}</span>
+                      <span className="tabular-nums font-medium">{Math.floor(s.minutes / 60)}{t('h', 'س')} {s.minutes % 60}{t('m', 'د')}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            )}
             {p.loans?.outstandingMinor > 0 && (
               <Card title={t('Loans the courier still owes', 'سلف مستحقة على المندوب')} testId="courier-loans">
                 <p className="text-sm text-gray-700">{t(`Collect ${money(p.loans.outstandingMinor)} in loans at this settlement and record the repayment. The closing amounts above do not include loans.`, `حصّل ${money(p.loans.outstandingMinor)} من السلف في هذه التسوية وسجّل السداد. مبالغ التقفيل أعلاه لا تشمل السلف.`)}</p>

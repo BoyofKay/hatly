@@ -43,11 +43,8 @@ describe('GoogleMapsProvider', () => {
     jest.restoreAllMocks();
   });
 
-  it('parses a successful Distance Matrix response as real road distance/duration', async () => {
-    mockFetchOnce({
-      status: 'OK',
-      rows: [{ elements: [{ status: 'OK', distance: { value: 4200 }, duration: { value: 720 } }] }],
-    });
+  it('parses a successful Routes API response as real road distance/duration', async () => {
+    mockFetchOnce({ routes: [{ distanceMeters: 4200, duration: '720s' }] });
     const { provider } = buildProvider();
 
     const result = await provider.distanceAndEta(from, to);
@@ -55,26 +52,26 @@ describe('GoogleMapsProvider', () => {
     expect(result).toEqual({ distanceMeters: 4200, etaSeconds: 720 });
   });
 
-  it('calls Google in driving mode with the correct coordinates', async () => {
-    mockFetchOnce({
-      status: 'OK',
-      rows: [{ elements: [{ status: 'OK', distance: { value: 100 }, duration: { value: 10 } }] }],
-    });
+  it('calls the Routes API (driving) with the correct coordinates and the key in a header', async () => {
+    mockFetchOnce({ routes: [{ distanceMeters: 100, duration: '10s' }] });
     const { provider } = buildProvider();
 
     await provider.distanceAndEta(from, to);
 
-    const calledUrl = new URL((global.fetch as jest.Mock).mock.calls[0][0]);
-    expect(calledUrl.searchParams.get('mode')).toBe('driving');
-    expect(calledUrl.searchParams.get('origins')).toBe(`${from.latitude},${from.longitude}`);
-    expect(calledUrl.searchParams.get('destinations')).toBe(`${to.latitude},${to.longitude}`);
+    const [calledUrl, init] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(calledUrl).toBe('https://routes.googleapis.com/directions/v2:computeRoutes');
+    expect(calledUrl).not.toContain('test-api-key'); // the key is a header, never in the URL
+    expect(init.method).toBe('POST');
+    expect(init.headers['X-Goog-Api-Key']).toBe('test-api-key');
+    expect(init.headers['X-Goog-FieldMask']).toBe('routes.distanceMeters,routes.duration');
+    const sent = JSON.parse(init.body);
+    expect(sent.travelMode).toBe('DRIVE');
+    expect(sent.origin.location.latLng).toEqual({ latitude: from.latitude, longitude: from.longitude });
+    expect(sent.destination.location.latLng).toEqual({ latitude: to.latitude, longitude: to.longitude });
   });
 
   it('caches a successful result and never calls fetch again for the same pair within the TTL', async () => {
-    mockFetchOnce({
-      status: 'OK',
-      rows: [{ elements: [{ status: 'OK', distance: { value: 4200 }, duration: { value: 720 } }] }],
-    });
+    mockFetchOnce({ routes: [{ distanceMeters: 4200, duration: '720s' }] });
     const { provider } = buildProvider();
 
     const first = await provider.distanceAndEta(from, to);
@@ -85,10 +82,7 @@ describe('GoogleMapsProvider', () => {
   });
 
   it('caches A->B and B->A separately — real driving distance can differ by direction', async () => {
-    mockFetchOnce({
-      status: 'OK',
-      rows: [{ elements: [{ status: 'OK', distance: { value: 4200 }, duration: { value: 720 } }] }],
-    });
+    mockFetchOnce({ routes: [{ distanceMeters: 4200, duration: '720s' }] });
     const { provider, fakeRedis } = buildProvider();
 
     await provider.distanceAndEta(from, to);
@@ -100,15 +94,15 @@ describe('GoogleMapsProvider', () => {
     expect(new Set(keys).size).toBe(2);
   });
 
-  it('fails closed (throws) on a non-OK top-level Google status — never fabricates a distance', async () => {
-    mockFetchOnce({ status: 'OVER_QUERY_LIMIT' });
+  it('fails closed (throws) on a refusal (e.g. API not enabled / quota) — never fabricates a distance', async () => {
+    mockFetchOnce({ error: { code: 403, status: 'PERMISSION_DENIED' } }, false, 403);
     const { provider } = buildProvider();
 
     await expect(provider.distanceAndEta(from, to)).rejects.toThrow();
   });
 
   it('fails closed when no route exists between the two points (ZERO_RESULTS)', async () => {
-    mockFetchOnce({ status: 'OK', rows: [{ elements: [{ status: 'ZERO_RESULTS' }] }] });
+    mockFetchOnce({}); // Routes API: no route → empty answer
     const { provider } = buildProvider();
 
     await expect(provider.distanceAndEta(from, to)).rejects.toThrow();
@@ -209,7 +203,7 @@ describe('GoogleMapsProvider', () => {
   });
 
   it('G (Group 4): a ZERO_RESULTS "no route" outcome logs at WARN, not ERROR — a valid dependency answer, not a broken dependency', async () => {
-    mockFetchOnce({ status: 'OK', rows: [{ elements: [{ status: 'ZERO_RESULTS' }] }] });
+    mockFetchOnce({}); // Routes API: no route → empty answer
     const { provider } = buildProvider();
     const warnSpy = jest.spyOn((provider as any).logger, 'warn').mockImplementation(() => undefined);
     const errorSpy = jest.spyOn((provider as any).logger, 'error').mockImplementation(() => undefined);

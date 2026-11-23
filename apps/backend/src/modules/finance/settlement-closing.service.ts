@@ -256,6 +256,16 @@ export class SettlementClosingService {
     const [prev] = await m.query(`SELECT period_end, reference FROM driver_settlement_periods WHERE driver_id = $1 AND status = 'CLOSED' AND deleted_at IS NULL ORDER BY period_end DESC LIMIT 1`, [driverId]);
     const { lines, unresolved } = await this.courierFacts(m, driverId);
     const totals = courierTotals(lines);
+    // Driver shifts (2026-11-22): the shifts this closing covers (not linked to a closing yet), with their length — the open one is ended by it.
+    const shiftRows: Array<{ id: string; started_at: Date; ended_at: Date | null }> = await m
+      .query(`SELECT id, started_at, ended_at FROM driver_shifts WHERE driver_id = $1 AND closing_period_id IS NULL ORDER BY started_at`, [driverId])
+      .catch(() => []);
+    const shifts = shiftRows.map((r) => ({
+      id: r.id,
+      startedAt: iso(r.started_at),
+      endedAt: r.ended_at ? iso(r.ended_at) : null,
+      minutes: Math.max(0, Math.round(((r.ended_at ? new Date(r.ended_at) : new Date()).getTime() - new Date(r.started_at).getTime()) / 60_000)),
+    }));
     return {
       courier: { id: driver.id, userId: driver.user_id, name: driver.full_name, commissionRateBasisPoints: driver.commission_rate_basis_points },
       previousClosing: prev ? { periodEnd: iso(prev.period_end), reference: prev.reference } : null,
@@ -264,6 +274,7 @@ export class SettlementClosingService {
       totals,
       direction: totals.netToCourierMinor >= 0 ? 'PAYOUT' : 'COLLECTION',
       loans: { outstandingMinor: loans.reduce((s, l) => s + l.outstandingMinor, 0), items: loans },
+      shifts,
       previewToken: SettlementClosingService.token(lines.map((l) => ({ id: l.orderId, net: l.netToCourierMinor }))),
     };
   }
@@ -306,6 +317,13 @@ export class SettlementClosingService {
             [...head, ...COURIER_MONEY_COLUMNS.map(([k]) => l[k])],
           );
         }
+        // Driver shifts (2026-11-22): the closing ends an open shift (the driver is off duty after it) and links every shift it covers.
+        await m.query(
+          `UPDATE driver_shifts SET ended_at = now(), ended_by = 'CLOSING', ended_by_user_id = $2, updated_at = now() WHERE driver_id = $1 AND ended_at IS NULL`,
+          [driverId, actorUserId],
+        );
+        await m.query(`UPDATE driver_shifts SET closing_period_id = $2, updated_at = now() WHERE driver_id = $1 AND closing_period_id IS NULL`, [driverId, p.id]);
+        await m.query(`UPDATE drivers SET is_online = false, accepting_new_orders = true, online_changed_at = now() WHERE id = $1 AND is_online`, [driverId]);
         const { previewToken: _t, ...rest } = preview;
         return {
           ...rest,

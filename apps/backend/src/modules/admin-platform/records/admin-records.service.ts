@@ -253,15 +253,25 @@ export class AdminRecordsService {
    * forgot theirs (there is no SMS reset yet). Every open session ends, so only the new password works from now on. 8–128 characters,
    * like the password the account was created with.
    */
-  async resetPersonPassword(kind: 'driver' | 'vendor-staff', id: string, newPassword: string): Promise<void> {
+  /**
+   * Sets a TEMPORARY password (owner decision 2026-11-23): the person is signed out everywhere and, after signing in with it, must choose
+   * a new one before anything else (users.must_change_password). `id` is the driver / vendor_staff row id, or the customer's user id.
+   */
+  async resetPersonPassword(kind: 'driver' | 'vendor-staff' | 'customer', id: string, newPassword: string): Promise<void> {
     if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
       throw new BadRequestException({ message: 'The new password must be 8–128 characters.', details: { code: 'WEAK_PASSWORD' } });
     }
-    const table = kind === 'driver' ? 'drivers' : 'vendor_staff';
-    const [row] = await this.ds.query(`SELECT user_id FROM ${table} WHERE id = $1 AND deleted_at IS NULL`, [id]);
-    if (!row) throw new NotFoundException(kind === 'driver' ? 'Driver not found.' : 'Vendor staff member not found.');
-    await this.ds.query(`UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`, [row.user_id, await bcrypt.hash(newPassword, 10)]);
-    await this.sessions.revoke(row.user_id);
+    let row: { user_id: string } | undefined;
+    if (kind === 'customer') {
+      [row] = await this.ds.query(`SELECT id AS user_id FROM users WHERE id = $1 AND role = 'CUSTOMER' AND deleted_at IS NULL`, [id]);
+      if (!row) throw new NotFoundException('Customer not found.');
+    } else {
+      const table = kind === 'driver' ? 'drivers' : 'vendor_staff';
+      [row] = await this.ds.query(`SELECT user_id FROM ${table} WHERE id = $1 AND deleted_at IS NULL`, [id]);
+      if (!row) throw new NotFoundException(kind === 'driver' ? 'Driver not found.' : 'Vendor staff member not found.');
+    }
+    await this.ds.query(`UPDATE users SET password_hash = $2, must_change_password = true, updated_at = now() WHERE id = $1`, [row!.user_id, await bcrypt.hash(newPassword, 10)]);
+    await this.sessions.revoke(row!.user_id);
   }
 
   /** Edit a store staff member (by vendor_staff row id): name, sign-in phone, and manager/operator role. */

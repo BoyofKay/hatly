@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,10 +54,49 @@ class OrdersScreen extends StatelessWidget {
   }
 }
 
-class _OrdersTab extends ConsumerWidget {
+class _OrdersTab extends ConsumerStatefulWidget {
   const _OrdersTab({required this.tab});
 
   final OrderListTab tab;
+
+  @override
+  ConsumerState<_OrdersTab> createState() => _OrdersTabState();
+}
+
+/// Bug 2026-11-23: an order could show in "Active" and "Completed" at once — the list was read once and never again. Now each tab is
+/// re-read (silently) when shown, when the app returns to the foreground, and every 30 s while the Active tab is on screen.
+class _OrdersTabState extends ConsumerState<_OrdersTab> with WidgetsBindingObserver {
+  Timer? _timer;
+
+  OrderListTab get tab => widget.tab;
+
+  void _reload() => ref.read(orderHistoryControllerProvider(tab).notifier).reload();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reload();
+    });
+    if (tab == OrderListTab.active) {
+      _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+        if (mounted) _reload();
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _reload();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   String _emptyText(AppLocalizations l10n) {
     switch (tab) {
@@ -70,7 +110,7 @@ class _OrdersTab extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final provider = orderHistoryControllerProvider(tab);
     final ordersAsync = ref.watch(provider);

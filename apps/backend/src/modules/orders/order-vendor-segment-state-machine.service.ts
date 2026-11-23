@@ -315,7 +315,8 @@ export class OrderVendorSegmentStateMachineService {
     try {
       const justBecameFullyReady = await this.orderReadinessService.checkAndAdvance(orderId);
       if (justBecameFullyReady) {
-        await this.automaticDispatchService.attemptAutomaticDispatch(orderId);
+        // Early dispatch: a driver pre-assigned while the order was prepared keeps it; otherwise dispatch as before.
+        await this.automaticDispatchService.onOrderReady(orderId);
       }
     } catch (error) {
       this.logger.error(`Readiness/dispatch after a segment change failed for order ${orderId}: ${error instanceof Error ? error.message : String(error)}`);

@@ -8,7 +8,10 @@ import '../../../../shared_widgets/availability_badge.dart';
 import '../../../../shared_widgets/hatly_rating_inline.dart';
 import '../../../auth/presentation/auth_gate.dart';
 import '../../../favorites/data/favorites_providers.dart';
+import '../../../../shared_widgets/greyscale.dart';
+import '../../domain/opening_hours.dart';
 import '../../domain/vendor.dart';
+import 'vendor_closed_dialog.dart';
 
 /// Vendor summary card used both in Home's preview row and the full
 /// Vendor List screen. Closed vendors are shown (not hidden) but
@@ -45,6 +48,11 @@ class VendorCard extends StatelessWidget {
 
     final p = context.palette;
     const logoSize = 52.0;
+    final hoursLabel = todayHoursLabel(vendor.openingHours, l10n);
+    void handleTap() => vendor.isOpen
+        ? onTap()
+        : showVendorClosedDialog(context,
+            vendorName: displayName, hoursLabel: hoursLabel, onViewMenu: onTap);
     // Image-first: the cover leads, the logo overlaps its lower edge, the heart and the offer badge sit ON the cover. Closed vendors stay
     // visible but muted (the cover only — the name and status must stay readable).
     final card = DecoratedBox(
@@ -57,15 +65,15 @@ class VendorCard extends StatelessWidget {
         type: MaterialType.transparency,
         child: InkWell(
           borderRadius: BorderRadius.circular(HatlyRadius.card),
-          onTap: onTap,
+          onTap: handleTap,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  Opacity(
-                    opacity: vendor.isOpen ? 1.0 : 0.55,
+                  Greyscale(
+                    enabled: !vendor.isOpen,
                     child: ClipRRect(
                       borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(HatlyRadius.card)),
@@ -145,6 +153,17 @@ class VendorCard extends StatelessWidget {
                           openLabel: l10n.vendorOpenNow,
                           closedLabel: l10n.vendorClosed,
                         ),
+                        if (hoursLabel != null)
+                          Row(
+                            key: Key('vendor-card-hours-${vendor.id}'),
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.access_time_rounded,
+                                  size: 15, color: p.textMuted),
+                              const SizedBox(width: 4),
+                              Text(hoursLabel, style: context.type.caption),
+                            ],
+                          ),
                       ],
                     ),
                   ],

@@ -70,6 +70,25 @@ FakeOrdersReadApi _api() => FakeOrdersReadApi(lists: {
 
 void main() {
   testWidgets(
+      'bug 2026-11-23: an order that was delivered leaves "Active" — the list is re-read when the app returns and every 30 s',
+      (tester) async {
+    final api = _api();
+    await _pump(tester, api);
+    expect(find.textContaining('HT-100501'), findsOneWidget);
+    // the order is delivered meanwhile: the server's active list no longer has it
+    api.lists[OrderListTab.active] = [api.lists[OrderListTab.active]![1]];
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('HT-100501'), findsNothing);
+    // and without leaving the app: the periodic re-read
+    api.lists[OrderListTab.active] = [];
+    await tester.pump(const Duration(seconds: 31));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('HT-100'), findsNothing);
+  });
+
+  testWidgets(
       'three tabs — ongoing · completed · cancelled — and ONLY the first is loaded up front',
       (tester) async {
     final api = _api();

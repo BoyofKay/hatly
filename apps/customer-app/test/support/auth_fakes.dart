@@ -79,6 +79,9 @@ class FakeAuthApi implements AuthApi {
   static const tokens =
       AuthTokens(accessToken: 'access-token', refreshToken: 'refresh-token');
 
+  /// What `passwordLogin` answers — set `mustChangePassword: true` to script a temporary password.
+  AuthTokens loginTokens = tokens;
+
   @override
   Future<void> deleteAccount({required String password}) async {
     calls.add('deleteAccount');
@@ -91,7 +94,7 @@ class FakeAuthApi implements AuthApi {
       {required String phone, required String password}) async {
     calls.add('passwordLogin');
     if (loginError != null) throw loginError!;
-    return tokens;
+    return loginTokens;
   }
 
   @override

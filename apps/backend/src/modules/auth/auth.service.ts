@@ -17,6 +17,8 @@ import { assertStrongStaffPassword } from '../admin-platform/staff/staff-passwor
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
+  /** True when the account signed in with a temporary password set by Hatly staff: the app must ask for a new one first. */
+  mustChangePassword?: boolean;
 }
 
 /** Mirrors the DTO's `@MinLength(8)` — the account-creation path re-checks it so no passwordless account can slip through. */
@@ -321,6 +323,30 @@ export class AuthService {
     await this.usersService.setPasswordHash(userId, await bcrypt.hash(newPassword, 10));
   }
 
+  /** A driver changes their OWN password (required after a temporary one set by Operations). Same brute-force brake as sign-in. */
+  /** Whether the account still has a temporary password (set by Hatly staff) that must be changed. */
+  async mustChangePassword(userId: string): Promise<boolean> {
+    return (await this.usersService.findById(userId))?.mustChangePassword === true;
+  }
+
+  async changeDriverPassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    const user = await this.usersService.findByIdWithPasswordHash(userId);
+    if (!user || user.role !== Role.DRIVER || !user.isActive || !user.passwordHash) throw new UnauthorizedException('Unable to update password.');
+    if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+      throw new BadRequestException({ message: 'The new password must be 8–128 characters.', details: { code: 'WEAK_PASSWORD' } });
+    }
+    await this.loginAttemptLimiter.assertAllowed(user.phone);
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      await this.loginAttemptLimiter.recordFailure(user.phone);
+      throw new ForbiddenException({ message: 'The current password is incorrect.', details: { code: 'CURRENT_PASSWORD_INVALID' } });
+    }
+    if (await bcrypt.compare(newPassword, user.passwordHash)) {
+      throw new BadRequestException({ message: 'The new password must be different from the current one.', details: { code: 'PASSWORD_UNCHANGED' } });
+    }
+    await this.loginAttemptLimiter.clear(user.phone);
+    await this.usersService.setPasswordHash(userId, await bcrypt.hash(newPassword, 10));
+  }
+
   async setCustomerPassword(userId: string, newPassword: string, currentPassword?: string): Promise<void> {
     const user = await this.usersService.findByIdWithPasswordHash(userId);
     if (!user || user.role !== Role.CUSTOMER || !user.isActive || !user.passwordHash) {
@@ -333,6 +359,9 @@ export class AuthService {
     if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
       await this.loginAttemptLimiter.recordFailure(user.phone);
       throw new ForbiddenException({ message: 'The current password is incorrect.', details: { code: 'CURRENT_PASSWORD_INVALID' } });
+    }
+    if (user.mustChangePassword && (await bcrypt.compare(newPassword, user.passwordHash))) {
+      throw new BadRequestException({ message: 'The new password must be different from the temporary one.', details: { code: 'PASSWORD_UNCHANGED' } });
     }
     await this.loginAttemptLimiter.clear(user.phone);
     await this.usersService.setPasswordHash(userId, await bcrypt.hash(newPassword, 10));
@@ -428,7 +457,9 @@ export class AuthService {
     const refreshExpiresIn = this.configService.get<string>('auth.refreshExpiresIn')!;
     const jti = presetJti ?? (await this.refreshTokenStore.issue(user.id, this.refreshTtlSeconds()));
 
-    const basePayload = { sub: user.id, role: user.role, phone: user.phone };
+    // `pwc`: signed in with a temporary password — JwtStrategy then allows only the password-change routes until it is changed.
+    const mustChangePassword = user.mustChangePassword === true;
+    const basePayload = { sub: user.id, role: user.role, phone: user.phone, ...(mustChangePassword ? { pwc: true } : {}) };
 
     const accessToken = this.jwtService.sign(basePayload, {
       secret: this.configService.get<string>('auth.accessSecret'),
@@ -445,6 +476,6 @@ export class AuthService {
       },
     );
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, ...(mustChangePassword ? { mustChangePassword: true } : {}) };
   }
 }

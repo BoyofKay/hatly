@@ -2534,4 +2534,64 @@ class AppLocalizationsEn extends AppLocalizations {
   String weightEstimateNote(String price) {
     return 'Estimated: $price — the final price is set by the actual weight when your order is prepared.';
   }
+
+  @override
+  String get vendorClosedToday => 'Closed today';
+
+  @override
+  String get vendorOpen24Hours => 'Open 24 hours';
+
+  @override
+  String vendorHoursToday(String hours) {
+    return 'Today: $hours';
+  }
+
+  @override
+  String vendorClosedDialogTitle(String name) {
+    return '$name is closed';
+  }
+
+  @override
+  String get vendorClosedDialogBody =>
+      'You can look at the menu, but orders can\'t be placed until the store opens.';
+
+  @override
+  String get vendorClosedDialogClose => 'Close';
+
+  @override
+  String get vendorClosedDialogViewMenu => 'View menu';
+
+  @override
+  String get vendorClosedBanner =>
+      'Closed now — you can browse the menu and order once the store opens.';
+
+  @override
+  String get checkoutErrorStoreClosed =>
+      'A store in your cart is closed right now. Remove its items or order when it opens.';
+
+  @override
+  String get tempPasswordTitle => 'Choose a new password';
+
+  @override
+  String get tempPasswordExplanation =>
+      'You signed in with a temporary password from Hatly. Choose your own password to continue.';
+
+  @override
+  String get tempPasswordCurrentLabel => 'Temporary password';
+
+  @override
+  String get tempPasswordConfirmLabel => 'Repeat the new password';
+
+  @override
+  String get tempPasswordSave => 'Save and continue';
+
+  @override
+  String get tempPasswordSignOut => 'Sign out';
+
+  @override
+  String get tempPasswordMismatch => 'The two new passwords do not match.';
+
+  @override
+  String get tempPasswordSameAsTemporary =>
+      'Choose a password different from the temporary one.';
 }

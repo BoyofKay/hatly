@@ -46,6 +46,8 @@ const CLEARABLE_KEYS: ReadonlySet<string> = new Set([
   BusinessConfigKey.DRIVER_PRESENCE_STALE_MINUTES, // unset = the "app silent" driver alert is off
   BusinessConfigKey.EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR, // unset = no cap; the supervisor decides
   BusinessConfigKey.DISPATCH_PREFERRED_RADIUS_METERS, // unset = 3000 m
+  BusinessConfigKey.DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES, // unset = 10 min (early dispatch)
+  BusinessConfigKey.EARLY_DISPATCH_ENABLED, // unset = off
 ]);
 
 /** Keys whose value has a known shape: a write that does not match is refused (400) instead of breaking pricing later. */
@@ -85,6 +87,14 @@ const VALUE_VALIDATORS: Partial<Record<string, { valid: (v: unknown) => boolean;
   [BusinessConfigKey.DRIVER_PRESENCE_STALE_MINUTES]: {
     valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 2 && v <= 240,
     message: 'DRIVER_PRESENCE_STALE_MINUTES must be a whole number of minutes from 2 to 240; clear it to turn the "driver app silent" alert off.',
+  },
+  [BusinessConfigKey.EARLY_DISPATCH_ENABLED]: {
+    valid: (v) => typeof v === 'boolean',
+    message: 'EARLY_DISPATCH_ENABLED must be true or false.',
+  },
+  [BusinessConfigKey.DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES]: {
+    valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 120,
+    message: 'DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES must be a whole number of minutes from 0 to 120; clear it for the 10-minute default.',
   },
   [BusinessConfigKey.DISPATCH_PREFERRED_RADIUS_METERS]: {
     valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 300 && v <= 50_000,
@@ -232,6 +242,20 @@ export class BusinessConfigService {
    * yet," which DriverRankingService interprets as "exclude bicycles
    * entirely" (fail closed), never as "no limit at all."
    */
+  /**
+   * Early dispatch (owner decision 2026-11-22, option b): a driver is attached when the store accepts, or this many minutes before the
+   * expected ready time, whichever is later. Default 10 minutes.
+   */
+  /** Early dispatch on? Off unless set (see the key's note). Needs automatic assignment on as well. */
+  async isEarlyDispatchEnabled(): Promise<boolean> {
+    return (await this.get<boolean | null>(BusinessConfigKey.EARLY_DISPATCH_ENABLED, null)) === true;
+  }
+
+  async getDispatchLeadTimeMinutes(): Promise<number> {
+    const v = await this.get<number | null>(BusinessConfigKey.DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES, null);
+    return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 120 ? v : 10;
+  }
+
   /** Owner decision 2026-11-22: the distance within which dispatch prefers the least-busy driver (default 3000 m). */
   async getDispatchPreferredRadiusMeters(): Promise<number> {
     const v = await this.get<number | null>(BusinessConfigKey.DISPATCH_PREFERRED_RADIUS_METERS, null);

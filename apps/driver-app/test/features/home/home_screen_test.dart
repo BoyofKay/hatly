@@ -165,10 +165,12 @@ Future<(FakeDriverApi, FakeLocationService, FakePollingService)> pump(WidgetTest
 void main() {
   group('active orders (2026-11-13)', () {
     test('only assigned / picked up / on the way are active — delivered, cancelled, failed, collected and released orders are not', () {
-      for (final st in ['ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY']) {
+      // Early dispatch (2026-11-22): the server returns an order still being prepared (PENDING / CONFIRMED / PREPARING) only to the driver it
+      // was pre-assigned to — so for this driver it is active.
+      for (final st in ['ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY', 'PENDING', 'CONFIRMED', 'PREPARING']) {
         expect(Delivery.activeStatuses.contains(st), isTrue, reason: st);
       }
-      for (final st in ['DELIVERED', 'CANCELLED', 'FAILED_DELIVERY', 'COLLECTED', 'READY_FOR_PICKUP', 'PENDING']) {
+      for (final st in ['DELIVERED', 'CANCELLED', 'FAILED_DELIVERY', 'COLLECTED', 'READY_FOR_PICKUP']) {
         expect(Delivery.activeStatuses.contains(st), isFalse, reason: st);
       }
     });

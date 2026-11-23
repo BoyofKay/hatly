@@ -1,3 +1,4 @@
+import '../../features/auth/presentation/screens/forced_password_change_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -43,6 +44,9 @@ import '../../features/loyalty/presentation/loyalty_screen.dart';
 ///
 /// This is the ONLY place route access is decided — individual screens never redirect themselves. (Actions on a public
 /// screen that need an account use `requireSignIn`, which only *opens* `/phone?from=...`.)
+/// Shown alone after signing in with a temporary password.
+const kChangePasswordPath = '/change-password';
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
@@ -71,6 +75,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       // authenticated
+      // A temporary password set by Hatly: nothing but "choose a new password" until it is changed (owner decision 2026-11-23).
+      final mustChange = ref.read(sessionControllerProvider).mustChangePassword;
+      if (mustChange) {
+        return path == kChangePasswordPath ? null : kChangePasswordPath;
+      }
+      if (path == kChangePasswordPath) return '/';
       if (path == kSplashPath || onAuthScreen) return from ?? '/';
       return null;
     },
@@ -97,6 +107,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               returnTo: safeReturnPath(state.uri.queryParameters['from']))),
       GoRoute(
           path: '/otp', builder: (context, state) => const OtpVerifyScreen()),
+      GoRoute(
+          path: kChangePasswordPath,
+          builder: (context, state) => const ForcedPasswordChangeScreen()),
       GoRoute(path: '/', builder: (context, state) => const CustomerShell()),
       GoRoute(
           path: '/search', builder: (context, state) => const SearchScreen()),
@@ -215,8 +228,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/checkout/transfer/:orderId',
         builder: (context, state) {
           final orderId = state.pathParameters['orderId']!;
-          final extra =
-              state.extra as ({int? totalMinor, String paymentMethodLabel, String? orderNumber})?;
+          final extra = state.extra as ({
+            int? totalMinor,
+            String paymentMethodLabel,
+            String? orderNumber
+          })?;
           return TransferInstructionsScreen(
             orderId: orderId,
             totalMinor: extra?.totalMinor,

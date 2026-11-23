@@ -71,7 +71,20 @@ const CONFIG_FIELDS: ConfigFieldDef[] = [
     help: 'Automatic assignment prefers the driver with the FEWEST active orders among drivers within this distance of the store (then the nearest). Drivers farther away are used only when nobody is this close. Empty = 3000 m. Allowed 300 to 50000.',
     clearable: true,
   },
-  { key: 'DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES', label: 'Dispatch Assignment Lead Time', type: 'integer', unit: 'minutes' },
+  {
+    key: 'EARLY_DISPATCH_ENABLED',
+    label: 'Early dispatch (driver while the store prepares)',
+    type: 'boolean',
+    help: 'ON: a driver is attached when the store accepts the order, or the lead time below before the expected ready time — whichever is later; the driver heads to the store and marks Picked up once it is ready. Needs Automatic Dispatch ON. Switch it on only after the drivers have driver app 1.0.2 (build 11) or newer.',
+  },
+  {
+    key: 'DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES',
+    label: 'Early dispatch lead time',
+    type: 'integer',
+    unit: 'minutes',
+    help: 'With early dispatch on: attach the driver this many minutes before the order is expected to be ready (never before the store accepts). Empty = 10. Allowed 0 to 120.',
+    clearable: true,
+  },
   {
     key: 'DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES',
     label: 'Driver Acknowledgement Window',

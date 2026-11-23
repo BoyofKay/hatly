@@ -41,10 +41,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final api = DriverAuthApi(
           ref.read(apiClientProvider), ref.read(tokenStorageProvider));
-      await api.login(
+      final mustChange = await api.login(
           phone: _phoneController.text.trim(),
           password: _passwordController.text);
-      ref.read(authStateProvider.notifier).setAuthenticated(true);
+      ref.read(authStateProvider.notifier).setAuthenticated(true, mustChangePassword: mustChange);
     } on DioException catch (error) {
       // The server explains in English; the driver always sees their own language.
       final status = error.response?.statusCode;

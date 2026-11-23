@@ -6,6 +6,10 @@ String statusLabel(BuildContext context, String status) {
   switch (status) {
     case 'ASSIGNED_TO_DRIVER':
       return context.t('Assigned', 'مُسند إليك');
+    case 'PENDING':
+    case 'CONFIRMED':
+    case 'PREPARING':
+      return context.t('Being prepared — head to the store', 'قيد التحضير — توجّه إلى المتجر');
     case 'PICKED_UP':
       return context.t('Picked up', 'تم الاستلام');
     case 'ON_THE_WAY':

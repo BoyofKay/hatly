@@ -11,8 +11,11 @@ enum SessionStatus {
 }
 
 class SessionState {
-  const SessionState(this.status);
+  const SessionState(this.status, {this.mustChangePassword = false});
   final SessionStatus status;
+
+  /// Signed in with a temporary password set by Hatly: the router shows only "choose a new password" until it is changed.
+  final bool mustChangePassword;
 }
 
 /// The single source of truth for "is this user logged in", read by
@@ -37,9 +40,26 @@ class SessionController extends StateNotifier<SessionState> {
     }
   }
 
-  void markAuthenticated() {
-    state = const SessionState(SessionStatus.authenticated);
+  void markAuthenticated({bool mustChangePassword = false}) {
+    state = SessionState(SessionStatus.authenticated,
+        mustChangePassword: mustChangePassword);
     _initializePushNotifications();
+  }
+
+  /// The server said the temporary password must be changed first (e.g. a session restored before it was changed).
+  void requirePasswordChange() {
+    if (state.status == SessionStatus.authenticated &&
+        !state.mustChangePassword) {
+      state = const SessionState(SessionStatus.authenticated,
+          mustChangePassword: true);
+    }
+  }
+
+  /// The customer chose their own password: the app opens normally.
+  void passwordChanged() {
+    if (state.mustChangePassword) {
+      state = const SessionState(SessionStatus.authenticated);
+    }
   }
 
   /// Customer Push Notifications (Chunk B). Fires after BOTH a fresh

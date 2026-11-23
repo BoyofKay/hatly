@@ -85,12 +85,16 @@ class OtpFlowController extends StateNotifier<OtpFlowState> {
     if (state.isSubmitting) return false;
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
-      await _ref.read(authRepositoryProvider).passwordLoginAndPersistSession(
+      final mustChange = await _ref
+          .read(authRepositoryProvider)
+          .passwordLoginAndPersistSession(
             phone: normalizedPhone,
             password: password,
           );
       state = state.copyWith(isSubmitting: false);
-      _ref.read(sessionControllerProvider.notifier).markAuthenticated();
+      _ref
+          .read(sessionControllerProvider.notifier)
+          .markAuthenticated(mustChangePassword: mustChange == true);
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(

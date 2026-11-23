@@ -25,6 +25,7 @@ final Provider<ApiClient> apiClientProvider = Provider<ApiClient>((ref) {
       ref.read(driverOnlineStateProvider.notifier).resetOnLogout();
       ref.read(authStateProvider.notifier).logout();
     },
+    onPasswordChangeRequired: () => ref.read(authStateProvider.notifier).requirePasswordChange(),
   );
 });
 

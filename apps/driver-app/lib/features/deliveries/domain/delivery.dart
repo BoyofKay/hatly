@@ -299,7 +299,11 @@ class Delivery {
 
   /// Order states in which the order still needs the driver. Everything else (delivered, cancelled, failed, collected, or released back to
   /// "waiting for a driver") is not active — whatever any vendor part's own status says (a multi-store order is one order for the driver).
-  static const activeStatuses = {'ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY'};
+  static const activeStatuses = {'ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY', 'PENDING', 'CONFIRMED', 'PREPARING'};
+
+  /// Early dispatch (2026-11-22): the driver is attached while the store still prepares the order (Confirmed / Preparing). They head to
+  /// the store; "Picked up" is offered only once the store marks the order ready.
+  bool get isBeingPrepared => orderStatus == 'PENDING' || orderStatus == 'CONFIRMED' || orderStatus == 'PREPARING';
   bool get isActive => activeStatuses.contains(orderStatus);
   final String fulfillmentType;
   final String? orderNote;
@@ -332,7 +336,7 @@ class Delivery {
   final List<DeliverySegment> segments;
 
   /// R16: an assigned order the driver has not confirmed yet — the only action offered is the acknowledgement.
-  bool get needsAcknowledgement => orderStatus == 'ASSIGNED_TO_DRIVER' && acknowledgedAt == null;
+  bool get needsAcknowledgement => (orderStatus == 'ASSIGNED_TO_DRIVER' || isBeingPrepared) && acknowledgedAt == null;
 
   /// Hatly / Wasally orders only: where to go first and where to deliver (the customer's address is then only who to contact). Null for
   /// every other order and for one placed before PD-012.

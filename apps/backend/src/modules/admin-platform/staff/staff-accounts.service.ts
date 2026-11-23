@@ -165,7 +165,8 @@ export class StaffAccountsService {
   async resetPassword(actor: StaffActor, id: string, newPassword: string): Promise<void> {
     await this.loadManageable(actor, id);
     assertStrongStaffPassword(newPassword);
-    await this.users.update({ id }, { passwordHash: await bcrypt.hash(newPassword, 10) });
+    // Temporary (owner decision 2026-11-23): they must choose their own at the next sign-in.
+    await this.users.update({ id }, { passwordHash: await bcrypt.hash(newPassword, 10), mustChangePassword: true });
     await this.sessions.revoke(id); // whoever was signed in with the old password signs in again
   }
 

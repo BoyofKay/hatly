@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { CustomerExtras } from '../../../../components/customers/CustomerExtras';
+import { ResetPasswordButton } from '../../../../components/admin/ResetPasswordButton';
+import { getMyAdminPermissions } from '../../../../lib/api/admin-me';
 import { AdminCustomerDetail, getAdminCustomerDetail } from '../../../../lib/api/admin-customers';
 import { apiErrorMessage } from '../../../../lib/api/errors';
 import { ORDER_STATUS, label } from '../../../../lib/admin/labels';
@@ -19,6 +21,13 @@ export default function CustomerDetailPage() {
   const params = useParams();
   const customerId = params.id as string;
   const [detail, setDetail] = useState<AdminCustomerDetail | null>(null);
+  // Reset password (owner request 2026-11-23) — shown to whoever may manage customers; the server checks it again.
+  const [canManage, setCanManage] = useState(false);
+  useEffect(() => {
+    getMyAdminPermissions()
+      .then((me) => setCanManage(me.role === 'SUPER_ADMIN' || me.permissions.includes('MANAGE_CUSTOMERS')))
+      .catch(() => setCanManage(false));
+  }, []);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -45,6 +54,7 @@ export default function CustomerDetailPage() {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{detail.fullName}</h1>
         <Badge tone={detail.isActive ? 'green' : 'gray'}>{detail.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge>
+        {canManage && <span className="ms-auto"><ResetPasswordButton path={`/admin/customers/${detail.id}/reset-password`} name={detail.fullName} /></span>}
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">

@@ -184,6 +184,8 @@ export class DashboardSessionController {
     const mfaEnabled = isAdmin ? await this.mfa.isEnabledFresh(user.id) : false;
     return {
       user: { id: user.id, role: user.role, phone: user.phone, fullName: user.fullName ?? null },
+      /** A temporary password set by a manager: the panel shows only "choose a new password" until it is changed. */
+      mustChangePassword: (await this.users.findById(user.id))?.mustChangePassword === true,
       csrfToken: csrfTokenFor(sid, this.config.get<string>('auth.accessSecret') ?? ''),
       mfa: { eligible: isAdmin, enabled: mfaEnabled, enrollmentRequired: isAdmin && !mfaEnabled && (this.config.get<boolean>('auth.adminMfaRequired') ?? false) },
     };

@@ -1232,5 +1232,42 @@
   "addressOpenLocationSettings": "Open location settings",
   "weightInlineLabel": "Or type the weight in kilograms",
   "weightEstimateNote": "Estimated: {price} — the final price is set by the actual weight when your order is prepared.",
-  "@weightEstimateNote": {"placeholders": {"price": {"type": "String"}}}
+  "@weightEstimateNote": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "vendorClosedToday": "Closed today",
+  "vendorOpen24Hours": "Open 24 hours",
+  "vendorHoursToday": "Today: {hours}",
+  "@vendorHoursToday": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "vendorClosedDialogTitle": "{name} is closed",
+  "@vendorClosedDialogTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "vendorClosedDialogBody": "You can look at the menu, but orders can't be placed until the store opens.",
+  "vendorClosedDialogClose": "Close",
+  "vendorClosedDialogViewMenu": "View menu",
+  "vendorClosedBanner": "Closed now — you can browse the menu and order once the store opens.",
+  "checkoutErrorStoreClosed": "A store in your cart is closed right now. Remove its items or order when it opens.",
+  "tempPasswordTitle": "Choose a new password",
+  "tempPasswordExplanation": "You signed in with a temporary password from Hatly. Choose your own password to continue.",
+  "tempPasswordCurrentLabel": "Temporary password",
+  "tempPasswordConfirmLabel": "Repeat the new password",
+  "tempPasswordSave": "Save and continue",
+  "tempPasswordSignOut": "Sign out",
+  "tempPasswordMismatch": "The two new passwords do not match.",
+  "tempPasswordSameAsTemporary": "Choose a password different from the temporary one."
 }

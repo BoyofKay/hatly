@@ -30,7 +30,7 @@ export class UsersService {
   findByPhoneWithPasswordHash(phone: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { phone },
-      select: ['id', 'phone', 'fullName', 'role', 'passwordHash', 'isActive', 'isPhoneVerified'],
+      select: ['id', 'phone', 'fullName', 'role', 'passwordHash', 'isActive', 'isPhoneVerified', 'mustChangePassword'],
     });
   }
 
@@ -38,7 +38,7 @@ export class UsersService {
   findByIdWithPasswordHash(id: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { id },
-      select: ['id', 'phone', 'fullName', 'role', 'passwordHash', 'isActive', 'isPhoneVerified'],
+      select: ['id', 'phone', 'fullName', 'role', 'passwordHash', 'isActive', 'isPhoneVerified', 'mustChangePassword'],
     });
   }
 
@@ -87,8 +87,9 @@ export class UsersService {
    * Sets `passwordHash` for a given user id (the authenticated password CHANGE flow in AuthService, which has already
    * verified the current password). Does NOT touch `isPhoneVerified` or any other field.
    */
+  /** The person's OWN password change — it also ends a temporary password (must_change_password). */
   async setPasswordHash(userId: string, passwordHash: string): Promise<void> {
-    await this.usersRepository.update({ id: userId }, { passwordHash });
+    await this.usersRepository.update({ id: userId }, { passwordHash, mustChangePassword: false });
   }
 
   /**

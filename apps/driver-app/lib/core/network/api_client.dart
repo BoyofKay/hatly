@@ -16,7 +16,7 @@ import '../storage/token_storage.dart';
 /// `/login`, so a stale/unauthorized session can never leave the driver
 /// looking at assignment/status data that isn't really theirs anymore.
 class ApiClient {
-  ApiClient({required this.baseUrl, required this.tokenStorage, this.onSessionExpired}) {
+  ApiClient({required this.baseUrl, required this.tokenStorage, this.onSessionExpired, this.onPasswordChangeRequired}) {
     _dio = Dio(BaseOptions(baseUrl: baseUrl, connectTimeout: const Duration(seconds: 10)));
 
     _dio.interceptors.add(
@@ -31,6 +31,14 @@ class ApiClient {
           handler.next(options);
         },
         onError: (error, handler) async {
+          // Signed in with a temporary password (owner decision 2026-11-23): the server refuses everything but the password change.
+          final body = error.response?.data;
+          if (error.response?.statusCode == 403 &&
+              body is Map &&
+              body['error'] is Map &&
+              ((body['error'] as Map)['details'] as Map?)?['code'] == 'PASSWORD_CHANGE_REQUIRED') {
+            onPasswordChangeRequired?.call();
+          }
           // M4 fix: a 401 FROM `/auth/refresh` itself (an invalid/expired
           // refresh token) must never re-enter `_tryRefresh()` — that call
           // goes through this SAME `_dio`/interceptor, so without this guard
@@ -53,6 +61,9 @@ class ApiClient {
   final String baseUrl;
   final TokenStorage tokenStorage;
   final void Function()? onSessionExpired;
+
+  /// Called when the server answers PASSWORD_CHANGE_REQUIRED (temporary password still in force).
+  final void Function()? onPasswordChangeRequired;
   late final Dio _dio;
 
   Dio get dio => _dio;

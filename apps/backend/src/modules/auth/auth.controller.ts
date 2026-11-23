@@ -20,6 +20,12 @@ import { CustomerPasswordRegisterDto } from './dto/customer-password-register.dt
 import { CustomerRegistrationCodeRequestDto } from './dto/customer-registration-code-request.dto';
 import { CustomerPasswordSetupDto } from './dto/customer-password-setup.dto';
 import { VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
+import { IsString, MaxLength, MinLength } from 'class-validator';
+
+class ChangeDriverPasswordDto {
+  @IsString() @MinLength(1) @MaxLength(128) currentPassword: string;
+  @IsString() @MinLength(8) @MaxLength(128) newPassword: string;
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -51,6 +57,17 @@ export class AuthController {
   async driverLogin(@Body() dto: DriverLoginDto) {
     const tokens = await this.authService.loginDriverWithPassword(dto.phone, dto.password);
     return { data: tokens };
+  }
+
+  /** The driver changes their OWN password — required right after signing in with a temporary one set by Hatly operations. */
+  @UseGuards(RolesGuard)
+  @Roles(Role.DRIVER)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('driver/password')
+  @HttpCode(HttpStatus.OK)
+  async driverChangePassword(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangeDriverPasswordDto) {
+    await this.authService.changeDriverPassword(user.id, dto.currentPassword, dto.newPassword);
+    return { message: 'Password changed.' };
   }
 
   /**
@@ -210,6 +227,6 @@ export class AuthController {
   @Get('customer/me')
   @HttpCode(HttpStatus.OK)
   async me(@CurrentUser() user: AuthenticatedUser) {
-    return { data: await this.authService.getPhoneVerificationStatus(user.id) };
+    return { data: { ...(await this.authService.getPhoneVerificationStatus(user.id)), mustChangePassword: await this.authService.mustChangePassword(user.id) } };
   }
 }

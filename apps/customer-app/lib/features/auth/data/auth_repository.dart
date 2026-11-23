@@ -14,12 +14,14 @@ class AuthRepository {
 
   /// Phone + password sign-in: persists the tokens. It does NOT mark the session authenticated — the caller (the flow
   /// controller) does that, so a registration can finish its phone-verification step first.
-  Future<void> passwordLoginAndPersistSession(
+  /// Returns true when the password was a temporary one (set by Hatly) that must be changed before anything else.
+  Future<bool> passwordLoginAndPersistSession(
       {required String phone, required String password}) async {
     final tokens =
         await _authApi.passwordLogin(phone: phone, password: password);
     await _tokenStorage.saveTokens(
         accessToken: tokens.accessToken, refreshToken: tokens.refreshToken);
+    return tokens.mustChangePassword;
   }
 
   Future<void> requestRegistrationCode({required String phone}) =>

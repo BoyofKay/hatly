@@ -37,6 +37,10 @@ export class User extends BaseEntity {
   @Column({ name: 'staff_level', type: 'varchar', length: 20, nullable: true })
   staffLevel?: 'ADMIN' | 'OPS_SUPERVISOR' | 'OPS_TEAM' | null;
 
+  /** True after Hatly staff set a temporary password: the next sign-in must choose a new one (MustChangePassword migration). */
+  @Column({ name: 'must_change_password', type: 'boolean', default: false })
+  mustChangePassword: boolean;
+
   @Column({ name: 'preferred_language', type: 'varchar', length: 5, default: 'ar' })
   preferredLanguage: 'ar' | 'en';
 }

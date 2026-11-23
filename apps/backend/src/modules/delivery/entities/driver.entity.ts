@@ -52,6 +52,10 @@ export class Driver extends BaseEntity {
   lastLocationAt?: Date | null;
 
   /** Presence (2026-11-13): the last time the driver's app called the API (written at most every 30 s). Not GPS. */
+  /** "Stop new orders" (owner decision 2026-11-22): false = finish what they carry, receive nothing new (so they can end the shift). */
+  @Column({ name: 'accepting_new_orders', type: 'boolean', default: true })
+  acceptingNewOrders: boolean;
+
   @Column({ name: 'last_seen_at', type: 'timestamptz', nullable: true })
   lastSeenAt?: Date | null;
 

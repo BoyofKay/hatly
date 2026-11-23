@@ -2506,4 +2506,63 @@ class AppLocalizationsAr extends AppLocalizations {
   String weightEstimateNote(String price) {
     return 'التقدير: $price — يُحدَّد السعر النهائي حسب الوزن الفعلي عند التجهيز.';
   }
+
+  @override
+  String get vendorClosedToday => 'مغلق اليوم';
+
+  @override
+  String get vendorOpen24Hours => 'مفتوح 24 ساعة';
+
+  @override
+  String vendorHoursToday(String hours) {
+    return 'مواعيد اليوم: $hours';
+  }
+
+  @override
+  String vendorClosedDialogTitle(String name) {
+    return '$name مغلق الآن';
+  }
+
+  @override
+  String get vendorClosedDialogBody =>
+      'يمكنك تصفّح القائمة، لكن لا يمكن الطلب حتى يفتح المتجر.';
+
+  @override
+  String get vendorClosedDialogClose => 'إغلاق';
+
+  @override
+  String get vendorClosedDialogViewMenu => 'عرض القائمة';
+
+  @override
+  String get vendorClosedBanner =>
+      'مغلق الآن — يمكنك تصفّح القائمة والطلب عند فتح المتجر.';
+
+  @override
+  String get checkoutErrorStoreClosed =>
+      'أحد المتاجر في سلتك مغلق الآن. احذف منتجاته أو اطلب عند فتحه.';
+
+  @override
+  String get tempPasswordTitle => 'اختر كلمة مرور جديدة';
+
+  @override
+  String get tempPasswordExplanation =>
+      'دخلت بكلمة مرور مؤقتة من هتلي. اختر كلمة مرور خاصة بك للمتابعة.';
+
+  @override
+  String get tempPasswordCurrentLabel => 'كلمة المرور المؤقتة';
+
+  @override
+  String get tempPasswordConfirmLabel => 'أعد كتابة كلمة المرور الجديدة';
+
+  @override
+  String get tempPasswordSave => 'حفظ ومتابعة';
+
+  @override
+  String get tempPasswordSignOut => 'تسجيل الخروج';
+
+  @override
+  String get tempPasswordMismatch => 'كلمتا المرور الجديدتان غير متطابقتين.';
+
+  @override
+  String get tempPasswordSameAsTemporary => 'اختر كلمة مرور مختلفة عن المؤقتة.';
 }

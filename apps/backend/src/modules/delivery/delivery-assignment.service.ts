@@ -264,6 +264,92 @@ export class DeliveryAssignmentService {
     }
   }
 
+  /**
+   * Early dispatch (owner decision 2026-11-22): attach the first available candidate to an order the store is still preparing
+   * (Confirmed / Preparing). The order keeps its status; the delivery carries `early_assigned_at`, the driver counts as busy and gets the
+   * usual acknowledgement window. Returns the delivery, or null when no candidate could take it (nothing changed). Never touches an order
+   * that already has a driver.
+   */
+  async assignEarly(params: { orderId: string; candidateDriverIds: string[] }): Promise<Delivery | null> {
+    for (const driverId of params.candidateDriverIds) {
+      const lockToken = await this.acquireLock(driverId);
+      if (!lockToken) continue;
+      try {
+        const result = await this.dataSource.transaction(async (manager) => {
+          const [order] = await manager.query(`SELECT id, status::text AS status FROM orders WHERE id = $1 FOR UPDATE`, [params.orderId]);
+          // The order's own status stays PENDING while the stores prepare it (it only moves on when every part is ready).
+          if (!order || !['PENDING', 'CONFIRMED', 'PREPARING'].includes(order.status)) return 'ORDER_GONE' as const;
+          const existing = await manager.findOne(Delivery, { where: { orderId: params.orderId }, lock: { mode: 'pessimistic_write' } });
+          if (existing?.driverId && existing.earlyAssignedAt) return 'ORDER_GONE' as const; // someone was attached meanwhile
+          const driver = await manager.findOne(Driver, { where: { id: driverId }, lock: { mode: 'pessimistic_write' } });
+          if (!driver || !driver.isAvailable || !driver.isOnline) return null;
+          const windowRow = await manager.findOne(BusinessConfig, { where: { key: BusinessConfigKey.DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES } });
+          const acknowledgeBy = new Date(Date.now() + resolveAcknowledgementWindowMinutes(windowRow?.value) * 60_000);
+          const fields = { driverId: driver.id, assignedAt: new Date(), acceptDeadlineAt: acknowledgeBy, acknowledgedAt: null, pickedUpAt: null, deliveredAt: null, earlyAssignedAt: new Date() };
+          const delivery = existing ? Object.assign(existing, fields) : manager.create(Delivery, { orderId: params.orderId, ...fields });
+          const saved = await manager.save(delivery);
+          await recomputeDriverAvailability(manager, [driver.id], { includeOrderId: params.orderId });
+          return { delivery: saved, driverUserId: driver.userId };
+        });
+        if (result === 'ORDER_GONE') return null;
+        if (!result) continue;
+        logBusinessEvent(this.logger, 'log', BusinessEvent.DISPATCH_DRIVER_ASSIGNED, () => this.requestContextService.getCorrelationId(), {
+          orderId: params.orderId,
+          deliveryId: result.delivery.id,
+          driverId,
+        });
+        await this.pushNotificationService.sendOrderAssignedNotification(result.driverUserId, params.orderId, result.delivery.id);
+        return result.delivery;
+      } finally {
+        await this.releaseLock(driverId, lockToken);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The order became Ready and a driver was pre-assigned while it was prepared: that pre-assignment becomes the normal assignment
+   * (READY_FOR_PICKUP → ASSIGNED_TO_DRIVER) with no new search. Keeps the driver's acknowledgement. Returns false when there was no
+   * pre-assignment (the caller then dispatches as usual).
+   */
+  async promoteEarlyAssignment(orderId: string): Promise<boolean> {
+    const result = await this.dataSource.transaction(async (manager) => {
+      const [order] = await manager.query(`SELECT id, status::text AS status FROM orders WHERE id = $1 FOR UPDATE`, [orderId]);
+      if (!order || order.status !== OrderStatus.READY_FOR_PICKUP) return null;
+      const delivery = await manager.findOne(Delivery, { where: { orderId }, lock: { mode: 'pessimistic_write' } });
+      if (!delivery?.driverId || !delivery.earlyAssignedAt) return null;
+      delivery.earlyAssignedAt = null;
+      await manager.save(delivery);
+      await manager.query(`UPDATE dispatch_alerts SET resolved_at = now(), updated_at = now() WHERE order_id = $1 AND resolved_at IS NULL AND reason IN ('NO_ELIGIBLE_DRIVER','AUTO_ASSIGN_DISABLED','ASSIGNMENT_ERROR')`, [orderId]);
+      const { afterCommit } = await this.orderStateMachine.transitionInTransaction(manager, {
+        orderId,
+        to: OrderStatus.ASSIGNED_TO_DRIVER,
+        actorRole: Role.ADMIN, // system-initiated transition
+      });
+      return afterCommit;
+    });
+    if (!result) return false;
+    await result();
+    return true;
+  }
+
+  /**
+   * Takes a pre-assignment away from a driver (they did not acknowledge in time, or Operations decided) before the order is Ready. The
+   * delivery no longer names them (so the order leaves their app) and their capacity is recomputed. `expectedDriverId` makes it a no-op if
+   * the assignment changed meanwhile. Returns true when something was released.
+   */
+  async releaseEarlyAssignment(orderId: string, expectedDriverId: string): Promise<boolean> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query(`SELECT id FROM orders WHERE id = $1 FOR UPDATE`, [orderId]);
+      const delivery = await manager.findOne(Delivery, { where: { orderId }, lock: { mode: 'pessimistic_write' } });
+      if (!delivery || !delivery.earlyAssignedAt || delivery.driverId !== expectedDriverId) return false;
+      Object.assign(delivery, { driverId: null, earlyAssignedAt: null, acceptDeadlineAt: null, acknowledgedAt: null, assignedAt: null });
+      await manager.save(delivery);
+      await recomputeDriverAvailability(manager, [expectedDriverId], { excludeOrderId: orderId });
+      return true;
+    });
+  }
+
   /** Locks the order row FIRST (this codebase's Order-before-Delivery/Driver lock order) and requires the expected status. */
   private async lockAssignableOrder(manager: EntityManager, orderId: string, expected: OrderStatus): Promise<Order> {
     const order = await manager.findOne(Order, { where: { id: orderId }, lock: { mode: 'pessimistic_write' } });

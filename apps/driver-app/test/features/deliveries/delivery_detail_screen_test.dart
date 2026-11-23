@@ -124,6 +124,17 @@ Future<FakeDriverApi> pump(WidgetTester tester, Delivery delivery) async {
 
 void main() {
   ackTests();
+  testWidgets('early dispatch: an order still being prepared shows "head to the store", can be acknowledged, and offers no Picked up yet', (tester) async {
+    final d = _codDelivery();
+    await pump(tester, Delivery(
+      id: d.id, orderId: d.orderId, orderStatus: 'PREPARING', fulfillmentType: d.fulfillmentType, paymentMethod: d.paymentMethod,
+      totalMinor: d.totalMinor, amountDueMinor: d.amountDueMinor, customerName: d.customerName, customerPhone: d.customerPhone,
+      deliveryAddress: d.deliveryAddress, segments: const [],
+    ));
+    expect(find.byKey(const Key('being-prepared-note')), findsOneWidget);
+    expect(find.text('Picked Up'), findsNothing);
+    expect(find.textContaining('head to the store'), findsWidgets);
+  });
   group('Driver Core + Dispatch Foundation milestone', () {
     testWidgets('COD: shows "Amount to collect" using amountDueMinor, distinct from Total', (tester) async {
       await pump(tester, _codDelivery(totalMinor: 10000, amountDueMinor: 4000));

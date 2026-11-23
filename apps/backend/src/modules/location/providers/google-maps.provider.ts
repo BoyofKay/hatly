@@ -29,7 +29,9 @@ function roundForCacheKey(value: number): string {
  * doc comment on distanceAndEta), never on this class or the Google
  * SDK directly.
  *
- * distanceAndEta() calls Google's Distance Matrix API in `driving`
+ * distanceAndEta() calls Google's Routes API (`computeRoutes`, DRIVE, traffic-unaware = the basic price tier) — real road distance.
+ * 2026-11-23: moved off the legacy Distance Matrix API, which Google no longer enables for NEW projects (since October 2026); the key
+ * travels in the X-Goog-Api-Key header, never in the URL. Before: `distancematrix/json` in `driving`
  * mode — real road distance, per the confirmed business decision, not
  * straight-line. Google's own status codes are surfaced as thrown
  * errors (never silently treated as "no distance" or a fabricated
@@ -76,9 +78,9 @@ export class GoogleMapsProvider implements MapProvider {
    * One provider HTTP call, bounded by MAPS_REQUEST_TIMEOUT_MS. Never logs the raw error object/message — a network-level fetch failure
    * can in principle include request internals (the URL carries the API key); a fixed category is enough.
    */
-  private async fetchBounded(url: URL): Promise<Response> {
+  private async fetchBounded(url: URL, init: RequestInit = {}): Promise<Response> {
     try {
-      return await fetch(url.toString(), { signal: AbortSignal.timeout(MAPS_REQUEST_TIMEOUT_MS) });
+      return await fetch(url.toString(), { ...init, signal: AbortSignal.timeout(MAPS_REQUEST_TIMEOUT_MS) });
     } catch (error) {
       const timedOut = (error as { name?: string })?.name === 'TimeoutError';
       this.logFailure('error', timedOut ? 'timeout' : 'unreachable');
@@ -170,44 +172,39 @@ export class GoogleMapsProvider implements MapProvider {
       throw new Error('GOOGLE_MAPS_API_KEY is not configured.');
     }
 
-    const url = new URL('https://maps.googleapis.com/maps/api/distancematrix/json');
-    url.searchParams.set('origins', `${from.latitude},${from.longitude}`);
-    url.searchParams.set('destinations', `${to.latitude},${to.longitude}`);
-    url.searchParams.set('mode', 'driving');
-    url.searchParams.set('key', this.apiKey);
-
-    const response = await this.fetchBounded(url);
+    const url = new URL('https://routes.googleapis.com/directions/v2:computeRoutes');
+    const response = await this.fetchBounded(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': this.apiKey,
+        // Only the two numbers we use — the field mask also decides the price tier (distance + duration = basic).
+        'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+      },
+      body: JSON.stringify({
+        origin: { location: { latLng: { latitude: from.latitude, longitude: from.longitude } } },
+        destination: { location: { latLng: { latitude: to.latitude, longitude: to.longitude } } },
+        travelMode: 'DRIVE',
+        routingPreference: 'TRAFFIC_UNAWARE',
+      }),
+    });
 
     if (!response.ok) {
+      // e.g. 403 when the Routes API is not enabled for the key's project or the key is restricted to other APIs/addresses.
       this.logFailure('error', `http_${response.status}`);
       throw new Error(`Maps provider returned HTTP ${response.status}.`);
     }
 
-    const body = (await response.json()) as {
-      status: string;
-      rows?: Array<{ elements?: Array<{ status: string; distance?: { value: number }; duration?: { value: number } }> }>;
-    };
-
-    if (body.status !== 'OK') {
-      this.logFailure('error', `provider_status_${body.status}`);
-      throw new Error(`Maps provider error: ${body.status}.`);
+    const body = (await response.json()) as { routes?: Array<{ distanceMeters?: number; duration?: string }> };
+    const route = body.routes?.[0];
+    const seconds = typeof route?.duration === 'string' ? Number.parseFloat(route.duration) : Number.NaN;
+    if (!route || typeof route.distanceMeters !== 'number' || !Number.isFinite(seconds)) {
+      // No drivable route between the points (the API answers `{}`) — never fabricate a distance. WARN, not ERROR: a legitimate
+      // answer from the dependency, not the dependency being broken (section 10's WARN/ERROR policy).
+      this.logFailure('warn', 'no_route_ZERO_RESULTS');
+      throw new Error('No route found between the given points (ZERO_RESULTS).');
     }
 
-    const element = body.rows?.[0]?.elements?.[0];
-    if (!element || element.status !== 'OK' || !element.distance || !element.duration) {
-      // Covers ZERO_RESULTS (no route exists between these points) and
-      // any other per-element failure — never fabricate a distance.
-      // WARN, not ERROR: this can be a legitimate answer from the
-      // dependency (no drivable route exists), not necessarily the
-      // dependency being broken — see section 10's own WARN/ERROR
-      // policy ("degraded dependency behavior" is WARN).
-      this.logFailure('warn', `no_route_${element?.status ?? 'unknown'}`);
-      throw new Error(`No route found between the given points (${element?.status ?? 'unknown'}).`);
-    }
-
-    return {
-      distanceMeters: element.distance.value,
-      etaSeconds: element.duration.value,
-    };
+    return { distanceMeters: route.distanceMeters, etaSeconds: Math.round(seconds) };
   }
 }
