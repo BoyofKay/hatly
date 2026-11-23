@@ -198,6 +198,7 @@ SQL
       if ! printf '%s' "$KEY" | $SUDO docker exec -i hatly-prod-backend-1 node -e '
         (async () => {
           const key = require("fs").readFileSync(0, "utf8").trim();
+          console.log("Credential check: Google API key ends in …" + key.slice(-4) + " (only 4-character suffix shown)");
           const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
           url.searchParams.set("latlng", "30.0444,31.2357");
           url.searchParams.set("region", "eg");
