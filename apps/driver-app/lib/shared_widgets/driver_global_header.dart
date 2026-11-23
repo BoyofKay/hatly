@@ -12,13 +12,15 @@ class DriverGlobalHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authenticated = ref.watch(authStateProvider).isAuthenticated;
     final name = authenticated ? ref.watch(driverProfileNameProvider).valueOrNull : null;
+    final trimmed = name?.trim() ?? '';
+    final initial = trimmed.isEmpty ? null : trimmed.characters.first.toUpperCase();
     return Container(
       key: const Key('driver-pinned-header'),
       padding: const EdgeInsetsDirectional.fromSTEB(14, 4, 14, 4),
       decoration: const BoxDecoration(color: Colors.white),
       child: Row(children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(9),
+          borderRadius: BorderRadius.circular(15),
           child: Image.asset(
             'assets/images/hatly-driver-icon.png',
             key: const Key('hatly-driver-logo'),
@@ -29,9 +31,16 @@ class DriverGlobalHeader extends ConsumerWidget {
           ),
         ),
         const Spacer(),
-        if (name?.trim().isNotEmpty == true)
-          Flexible(child: Text(name!, key: const Key('driver-header-name'), maxLines: 1,
-            overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF666666)))),
+        if (initial != null)
+          Semantics(
+            label: trimmed,
+            child: CircleAvatar(
+              key: const Key('driver-header-initial'),
+              radius: 20,
+              backgroundColor: const Color(0xFFFFE2CD),
+              child: Text(initial, style: const TextStyle(color: Color(0xFF9F4700), fontWeight: FontWeight.w800, fontSize: 17)),
+            ),
+          ),
       ]),
     );
   }

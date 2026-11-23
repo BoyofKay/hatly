@@ -104,7 +104,7 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
                     key: const Key('shift-card-chevron'), color: green),
                 ])),
               ),
-              if (s.allowanceOutMinor > 0)
+              if (s.allowanceOutMinor > 0 && (!s.onDuty || _expanded))
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Row(children: [
@@ -143,7 +143,7 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
                       _busy ? null : () => _run(api.end, goOnline: false),
                   child: Text(context.t('End shift', 'إنهاء الوردية')),
                 ),
-              ] else
+              ] else if (!s.onDuty)
                 FilledButton(
                   key: const Key('start-shift'),
                   onPressed:

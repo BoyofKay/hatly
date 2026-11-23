@@ -40,20 +40,20 @@ class _ShiftDurationLabelState extends ConsumerState<ShiftDurationLabel> {
     // not inflate the current-shift duration; the device only advances the
     // server duration from its own read timestamp.
     final minuteAtRead = shift.serverElapsedMinutes;
-    final passed = shift.readAt == null ? 0 : DateTime.now().difference(shift.readAt!).inMinutes;
+    final passed = shift.readAt == null ? 0 : DateTime.now().difference(shift.readAt!).inMinutes.clamp(0, 10000000);
     final minutes = (minuteAtRead == null
       ? DateTime.now().difference(shift.startedAt!).inMinutes
       : minuteAtRead + passed).clamp(0, 10000000);
     final hours = minutes ~/ 60;
     final mins = minutes % 60;
     final since = shift.startedAt!.toLocal();
-    final sinceText = '${since.hour.toString().padLeft(2, '0')}:${since.minute.toString().padLeft(2, '0')}';
+    final sinceText = '${since.day.toString().padLeft(2, '0')}/${since.month.toString().padLeft(2, '0')}/${(since.year % 100).toString().padLeft(2, '0')} ${since.hour.toString().padLeft(2, '0')}:${since.minute.toString().padLeft(2, '0')}';
     return Row(mainAxisSize: MainAxisSize.min, children: [
       const Icon(Icons.schedule_outlined, size: 16, color: Color(0xFF1B5E20)),
       const SizedBox(width: 5),
       Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart,
-        child: Text(context.t('On duty since $sinceText · $hours h $mins min',
-          'في الخدمة منذ $sinceText · مدة الوردية $hours س $mins د'),
+        child: Text(context.t('Since $sinceText · ${hours}h ${mins}m',
+          'منذ $sinceText · ${hours}س ${mins}د'),
           key: const Key('shift-duration'), maxLines: 1,
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20))))),
     ]);
