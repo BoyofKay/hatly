@@ -17,6 +17,8 @@ export interface DeliveryZone {
   deliveryFeeMinor: number;
   displayOrder: number;
   isActive: boolean;
+  parentIsActive: boolean;
+  isSelectable: boolean;
   representativeLatitude: number | null;
   representativeLongitude: number | null;
 }
@@ -78,4 +80,26 @@ export function zoneErrorMessage(err: any, fallback: string): string {
   const message = body?.error?.message ?? body?.message;
   if (Array.isArray(message)) return message.join(', ');
   return typeof message === 'string' ? message : fallback;
+}
+
+/** One atomic save for a parent zone and all its independently priced children. */
+export interface ZoneGroupSaveInput {
+  originalServiceAreaId?: string;
+  originalZoneName?: string;
+  originalZoneNameAr?: string;
+  serviceAreaId: string;
+  zoneName: string;
+  zoneNameAr: string;
+  displayOrder: number;
+  isActive: boolean;
+  neighborhoods: Array<{ id?: string; name: string; nameAr: string; deliveryFeeMinor: number; isActive: boolean }>;
+}
+
+export async function saveDeliveryZoneGroup(input: ZoneGroupSaveInput): Promise<DeliveryZone[]> {
+  const res = await apiClient.post('/admin/delivery-zones/group/save', input);
+  return res.data.data;
+}
+
+export async function removeDeliveryZoneGroup(group: {serviceAreaId:string;zoneName:string;zoneNameAr:string}): Promise<void> {
+  await apiClient.delete('/admin/delivery-zones/group', {params:group});
 }

@@ -101,6 +101,7 @@ class SavedAddress {
     this.deliveryZoneId,
     this.deliveryZone,
     this.zoneStatus = AddressZoneStatus.ok,
+    this.zoneUnavailableReason,
   });
 
   final String id;
@@ -126,6 +127,8 @@ class SavedAddress {
   final String? deliveryZoneId;
   final DeliveryZone? deliveryZone;
   final AddressZoneStatus zoneStatus;
+  /// Server-derived reason a saved manual address cannot be selected for new orders.
+  final String? zoneUnavailableReason;
 
   bool get hasPin => latitude != null && longitude != null;
 
@@ -161,6 +164,7 @@ class SavedAddress {
       deliveryZoneId: json['deliveryZoneId'] as String?,
       deliveryZone: zone is Map<String, dynamic> ? DeliveryZone.fromJson(zone) : null,
       // An older server without zones reports nothing: a zone-less address is then MISSING, never assumed OK.
+      zoneUnavailableReason: json['zoneUnavailableReason'] as String?,
       zoneStatus: json.containsKey('zoneStatus')
           ? AddressZoneStatus.fromWire(json['zoneStatus'] as String?)
           : (json['deliveryZoneId'] == null ? AddressZoneStatus.missing : AddressZoneStatus.ok),

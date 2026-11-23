@@ -47,13 +47,15 @@ export interface AddressView {
   deliveryZoneId: string | null;
   deliveryZone: DeliveryZoneSummary | null;
   zoneStatus: AddressZoneStatus;
+  /** Why an existing manual address cannot be used, without changing its historical reference. */
+  zoneUnavailableReason: 'SERVICE_AREA_INACTIVE' | 'DELIVERY_ZONE_INACTIVE' | 'NEIGHBORHOOD_INACTIVE' | 'AREA_REMOVED' | null;
 }
 
 /** Fields an update may change on a zone-less legacy address without having to choose a zone first. */
 const ZONELESS_EDITABLE_FIELDS = new Set(['isDefault', 'label']);
 
 export function isZoneServiceable(zone: DeliveryZone | null | undefined): boolean {
-  return !!zone && zone.isActive && !zone.deletedAt && zone.serviceArea?.isActive !== false;
+  return !!zone && zone.isActive && zone.parentIsActive !== false && zone.isSelectable !== false && !zone.deletedAt && zone.serviceArea?.isActive !== false;
 }
 
 /**
@@ -87,7 +89,7 @@ export class AddressesService {
    * least one active delivery zone.
    */
   async capabilities(): Promise<AddressCapabilities> {
-    const zones = await this.zonesRepository.find({ where: { isActive: true, isSelectable: true }, relations: { serviceArea: true } });
+    const zones = await this.zonesRepository.find({ where: { isActive: true, isSelectable: true, parentIsActive: true }, relations: { serviceArea: true } });
     const manualAvailable = zones.some((z) => isZoneServiceable(z));
     let reason: AddressCapabilities['gps']['reason'] = null;
     if (!this.deliveryFeeCalculation.roadDistancePricingAvailable) {
@@ -415,6 +417,11 @@ export class AddressesService {
       deliveryZone: zone ? toDeliveryZoneSummary(zone) : null,
       // A GPS address has no zone by design, so there is nothing for the customer to (re)select.
       zoneStatus: address.mode === AddressMode.GPS ? 'OK' : !address.deliveryZoneId ? 'MISSING' : isZoneServiceable(zone) ? 'OK' : 'UNAVAILABLE',
+      zoneUnavailableReason: address.mode === AddressMode.GPS || !address.deliveryZoneId || isZoneServiceable(zone)
+        ? null : !zone || zone.deletedAt || !zone.isSelectable ? 'AREA_REMOVED'
+        : zone.serviceArea?.isActive === false ? 'SERVICE_AREA_INACTIVE'
+        : zone.parentIsActive === false ? 'DELIVERY_ZONE_INACTIVE'
+        : !zone.isActive ? 'NEIGHBORHOOD_INACTIVE' : 'AREA_REMOVED',
     };
   }
 

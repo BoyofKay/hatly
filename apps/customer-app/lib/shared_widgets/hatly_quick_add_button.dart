@@ -12,7 +12,7 @@ class HatlyQuickAddButton extends StatelessWidget {
       this.quiet = false});
 
   final String tooltip;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
   /// Quieter look for dense grids: a 36px white circle with an orange line icon and a soft shadow. The
   /// touch target stays [size] (44px) — only the drawn circle is smaller.
@@ -28,14 +28,16 @@ class HatlyQuickAddButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     if (quiet) return _buildQuiet(context, p);
+    final enabled = onPressed != null;
     return Semantics(
       button: true,
+      enabled: enabled,
       label: tooltip,
       onTap: onPressed,
       excludeSemantics: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: p.accent,
+          color: enabled ? p.accent : p.surfaceSoft,
           shape: BoxShape.circle,
           boxShadow: HatlyShadows.soft(p),
         ),
@@ -48,7 +50,7 @@ class HatlyQuickAddButton extends StatelessWidget {
             child: SizedBox(
               width: size,
               height: size,
-              child: Icon(Icons.add_rounded, color: p.accentOn, size: 24),
+              child: Icon(Icons.add_rounded, color: enabled ? p.accentOn : p.textMuted, size: 24),
             ),
           ),
         ),
@@ -57,6 +59,7 @@ class HatlyQuickAddButton extends StatelessWidget {
   }
 
   Widget _buildQuiet(BuildContext context, HatlyPalette p) {
+    final enabled = onPressed != null;
     return Semantics(
       button: true,
       label: tooltip,
@@ -71,14 +74,14 @@ class HatlyQuickAddButton extends StatelessWidget {
           child: Center(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: p.surface,
+                color: enabled ? p.surface : p.surfaceSoft,
                 shape: BoxShape.circle,
                 boxShadow: HatlyShadows.soft(p),
               ),
               child: SizedBox(
                 width: quietVisualSize,
                 height: quietVisualSize,
-                child: Icon(Icons.add_rounded, color: p.accent, size: 22),
+                child: Icon(Icons.add_rounded, color: enabled ? p.accent : p.textMuted, size: 22),
               ),
             ),
           ),

@@ -1,3 +1,3 @@
 ACTION=deploy
 ARG=
-# Deploy verified bilingual neighborhood hierarchy with 15 EGP child fees; preserve existing addresses.
+# Production release: grouped bilingual Delivery Zones and closed-store cart safeguards; verified CI required.

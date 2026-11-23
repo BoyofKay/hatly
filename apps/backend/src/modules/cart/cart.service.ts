@@ -129,6 +129,13 @@ export class CartService {
         });
       }
 
+      if (!product.vendorBranch.isOpen) {
+        throw new BadRequestException({
+          message: 'This store is currently closed. You can browse its menu, but cannot add items to the cart.',
+          details: { code: 'STORE_CLOSED' },
+        });
+      }
+
       const groups = await manager.find(CartVendorGroup, { where: { cartId: cart.id } });
       let group = groups.find(
         (g) => g.groupType === CartGroupType.CATALOG && g.vendorBranchId === product.vendorBranchId,
@@ -403,6 +410,17 @@ export class CartService {
             }),
           );
         }
+      }
+
+      // A closed branch cannot receive custom cart items either, including existing cart groups.
+      const customBranch = group.vendorBranchId
+        ? await this.branchesRepository.findOne({ where: { id: group.vendorBranchId }, relations: { vendor: true } })
+        : null;
+      if (!customBranch || !customBranch.isActive || !customBranch.vendor?.isActive || !customBranch.isOpen) {
+        throw new BadRequestException({
+          message: 'This store is currently closed or unavailable. Browse its menu and order when it reopens.',
+          details: { code: customBranch?.isOpen === false ? 'STORE_CLOSED' : 'BRANCH_UNAVAILABLE' },
+        });
       }
 
       // The sector's admin setting is the rule, enforced here for EVERY route into this method (a new group or an existing one):
