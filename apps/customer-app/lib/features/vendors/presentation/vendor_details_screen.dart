@@ -153,16 +153,15 @@ class _VendorDetailsContent extends ConsumerWidget {
     return CustomScrollView(
       slivers: [
         SliverAppBar(
-          title: Text(vendorName),
-          pinned: true,
-          actions: [
-            _FavoriteHeartButton(vendorId: details.vendor.id),
-            const CartIconButton()
-          ],
+          toolbarHeight: 44,
+          pinned: false,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
         ),
         SliverToBoxAdapter(
             child: _VendorHeader(details: details, vendorName: vendorName)),
-        SliverToBoxAdapter(child: _BranchInfoSection(branch: details.branch)),
+
         // Visual UX (reference comparison): the menu search comes straight after the vendor/branch
         // info, then the menu sections, directly above the products they filter.
         const SliverToBoxAdapter(child: SizedBox(height: HatlySpacing.sm)),
@@ -275,81 +274,67 @@ class _VendorHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final p = context.palette;
-
-    const logoSize = 72.0;
-    // Image-first header: a wide cover, the logo overlapping its lower edge, then the name, the rating and the offer badge.
+    final l10n = AppLocalizations.of(context);
+    final hours = details.branch.openingHours[_BranchInfoSection._todayKey()];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          HatlySpacing.md, HatlySpacing.sm, HatlySpacing.md, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              HatlySoftImage(
-                url: details.vendor.logoUrl,
-                width: double.infinity,
-                height: 140,
-                radius: HatlyRadius.card,
-                placeholderIcon: Icons.storefront_outlined,
-                placeholderIconSize: 44,
-              ),
-              PositionedDirectional(
-                bottom: -(logoSize / 2),
-                start: HatlySpacing.md,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration:
-                      BoxDecoration(color: p.surface, shape: BoxShape.circle),
-                  child: HatlySoftImage(
-                    url: details.vendor.logoUrl,
-                    width: logoSize,
-                    height: logoSize,
-                    circular: true,
-                    placeholderIcon: Icons.store_outlined,
-                    placeholderIconSize: 30,
-                  ),
-                ),
-              ),
-            ],
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(HatlyRadius.promoBanner),
+          child: HatlySoftImage(
+            url: details.vendor.coverImageUrl ?? details.vendor.logoUrl,
+            width: double.infinity,
+            height: 174,
+            radius: 0,
+            placeholderIcon: Icons.storefront_outlined,
           ),
-          const SizedBox(height: logoSize / 2 + HatlySpacing.sm),
-          Wrap(
-            spacing: HatlySpacing.sm,
-            runSpacing: HatlySpacing.xs,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(vendorName, style: Theme.of(context).textTheme.titleLarge),
-              if (details.hasPromotion)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: HatlySpacing.sm, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: HatlyColors.primaryOrange,
-                    borderRadius: BorderRadius.circular(HatlyRadius.chip),
-                  ),
-                  child: Text(
-                    l10n.promotionBadge,
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelLarge
-                        ?.copyWith(color: p.accentOn),
-                  ),
-                ),
-            ],
+        ),
+        const SizedBox(height: 12),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          HatlySoftImage(
+            url: details.vendor.logoUrl,
+            width: 66,
+            height: 66,
+            circular: true,
+            placeholderIcon: Icons.store_rounded,
           ),
-          if (details.ratingCount > 0) ...[
-            const SizedBox(height: HatlySpacing.xs),
-            HatlyRatingInline(
-                key: const Key('vendor-details-rating'),
-                average: details.ratingAverage,
-                count: details.ratingCount),
-          ],
-        ],
-      ),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(vendorName,
+                maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
+              _FavoriteHeartButton(vendorId: details.vendor.id),
+            ]),
+            Row(children: [
+              Icon(Icons.location_on_outlined, color: p.textMuted, size: 16),
+              const SizedBox(width: 4),
+              Expanded(child: Text(details.branch.address, maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: context.type.small.copyWith(color: p.textMuted))),
+            ]),
+            const SizedBox(height: 5),
+            Wrap(spacing: 10, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              AvailabilityBadge(
+                isOpen: details.branch.isOpen,
+                openLabel: l10n.vendorOpenNow,
+                closedLabel: l10n.vendorClosed),
+              if (hours != null) Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.access_time_rounded, size: 14, color: p.textMuted),
+                const SizedBox(width: 4),
+                LtrText('${hours.open}–${hours.close}', style: context.type.small.copyWith(color: p.textMuted)),
+              ]),
+            ]),
+          ])),
+        ]),
+        if (details.ratingCount > 0)
+          Padding(padding: const EdgeInsetsDirectional.only(top: 8),
+            child: HatlyRatingInline(
+              key: const Key('vendor-details-rating'),
+              average: details.ratingAverage,
+              count: details.ratingCount)),
+      ]),
     );
   }
 }
