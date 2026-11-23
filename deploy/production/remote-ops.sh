@@ -201,7 +201,18 @@ SQL
             }),
             signal: AbortSignal.timeout(15000)
           });
-          if (!response.ok) throw new Error("Routes HTTP " + response.status);
+          if (!response.ok) {
+            const errorPayload = await response.json().catch(() => ({}));
+            const errorInfo = errorPayload?.error || {};
+            const reasons = (errorInfo.details || []).flatMap(x => x?.reason ? [x.reason] : x?.metadata?.reason ? [x.metadata.reason] : []);
+            // Google sometimes explains 400 errors only in 'message'. Strip the actual key and any
+            // key-shaped string; show at most 220 chars, never a URL or unredacted provider payload.
+            const safeMessage = String(errorInfo.message || "").replaceAll(key, "[REDACTED]")
+              .replace(/AIza[0-9A-Za-z_-]+/g, "[REDACTED]")
+              .replace(/https?:\\/\\/\\S+/g, "[URL]").slice(0, 220);
+            throw new Error("Routes HTTP " + response.status + " " + String(errorInfo.status || "unknown") +
+              " reason=" + reasons.join(",").slice(0, 80) + " message=" + safeMessage);
+          }
           const body = await response.json();
           const route = body.routes?.[0];
           if (!Number.isFinite(route?.distanceMeters) || !Number.isFinite(Number.parseFloat(route?.duration)))
