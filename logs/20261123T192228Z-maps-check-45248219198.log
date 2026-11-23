@@ -1,0 +1,6 @@
+action=maps-check arg= commit=8aa62a35ab22c4f96de2a79e0822c84640b4f2fd run=45248219198 started=2026-11-23T19:22:22Z
+
+==== Google Routes + Geocoding preflight from the live backend container (no secret printed)  (19:22:27 UTC)
+FAIL Google Maps preflight: Routes HTTP 403 PERMISSION_DENIED reason=ACCESS_DENIED message=Permission denied on the service.
+REFUSED: provider validation failed — production settings unchanged
+job status: failure
