@@ -7,6 +7,7 @@ import '../../../shared_widgets/filter_action_button.dart';
 import '../../../shared_widgets/hatly_loading_view.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/hatly_soft_image.dart';
+import '../../../shared_widgets/store_cover_image.dart';
 import '../../../shared_widgets/hatly_rating_inline.dart';
 import '../../../shared_widgets/availability_badge.dart';
 import '../../../shared_widgets/cart_summary_bar.dart';
@@ -339,13 +340,12 @@ class _VendorHeader extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              HatlySoftImage(
-                url: details.vendor.coverImageUrl ?? details.vendor.logoUrl,
+              StoreCoverImage(
+                coverUrl: details.vendor.coverImageUrl,
+                logoUrl: details.vendor.logoUrl,
                 width: double.infinity,
                 height: 140,
                 radius: HatlyRadius.card,
-                placeholderIcon: Icons.storefront_outlined,
-                placeholderIconSize: 44,
               ),
               PositionedDirectional(
                 bottom: -(logoSize / 2),
