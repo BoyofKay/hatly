@@ -40,7 +40,7 @@ case "$action" in
         .then(s => process.stdout.write(s.trim()))
         .catch(() => process.exit(1));
     ' 2>/dev/null || true)"
-    if [[ "$public_ipv4" =~ ^[0-9]{1,3}(\\.[0-9]{1,3}){3}$ ]]; then
+    if [[ "$public_ipv4" =~ ^[0-9]{1,3}([.][0-9]{1,3}){3}$ ]]; then
       echo "backend egress IPv4: $public_ipv4 (must match Google key IP restriction)"
     else
       echo "backend egress IPv4: unavailable"
