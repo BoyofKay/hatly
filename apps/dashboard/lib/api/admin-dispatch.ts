@@ -66,6 +66,11 @@ export async function createDriver(input: CreateDriverInput): Promise<AdminDrive
  * driver explicitly, since that's the actual dispatch decision an
  * Admin is making here, but the API itself supports both.
  */
+/** Only Admin may change a driver's account display name. */
+export async function setDriverName(driverId: string, fullName: string): Promise<AdminDriver> {
+  return (await apiClient.patch(`/admin/drivers/${driverId}/name`, { fullName })).data.data;
+}
+
 export async function assignDriver(orderId: string, driverId: string): Promise<void> {
   await apiClient.post(`/admin/orders/${orderId}/assign-driver`, { driverId });
 }
