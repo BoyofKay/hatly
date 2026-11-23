@@ -106,7 +106,11 @@ class HatlyCustomerApp extends ConsumerWidget {
       routerConfig: router,
       builder: (context, child) => Column(children: [
         SafeArea(bottom: false, child: CustomerGlobalHeader(router: router)),
-        Expanded(child: child ?? const SizedBox.shrink()),
+        Expanded(child: MediaQuery.removePadding(
+          context: context,
+          removeTop: true,
+          child: child ?? const SizedBox.shrink(),
+        )),
       ]),
 
       // Arabic is primary (spec section 4/19) and the default; the customer
