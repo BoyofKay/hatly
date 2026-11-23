@@ -98,7 +98,7 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
                   Icon(s.onDuty ? Icons.badge : Icons.badge_outlined,
                     color: s.onDuty ? green : Colors.grey),
                   const SizedBox(width: 8),
-                  Expanded(child: s.onDuty ? const ShiftDurationLabel() : Text(context.t('Off duty', 'خارج الخدمة'),
+                  Expanded(child: s.onDuty ? ShiftDurationLabel(state: s) : Text(context.t('Off duty', 'خارج الخدمة'),
                     style: const TextStyle(fontWeight: FontWeight.w800))),
                   if (s.onDuty) Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                     key: const Key('shift-card-chevron'), color: green),
