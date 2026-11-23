@@ -16,7 +16,6 @@ class ProfileScreen extends ConsumerWidget {
     final name = ref.watch(driverProfileNameProvider);
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(title: Text(context.t('Profile', 'حسابي')), backgroundColor: Colors.white, surfaceTintColor: Colors.transparent),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
