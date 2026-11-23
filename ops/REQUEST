@@ -1,3 +1,3 @@
 ACTION=maps-check
 ARG=
-# Read-only provider preflight. Do not switch MAPS_PROVIDER or restart apps.
+# Validate both Google APIs from the real production backend, key held in Actions secret; no restart.
