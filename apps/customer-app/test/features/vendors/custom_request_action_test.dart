@@ -33,7 +33,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('vendor-custom-request-bubble')), findsOneWidget);
-    expect(find.text('Request item'), findsOneWidget);
+    expect(find.text('Hatly Service'), findsOneWidget);
     await tester.tap(find.byKey(const Key('vendor-custom-request-bubble')));
     await tester.pumpAndSettle();
     expect(find.text("Request an item that isn't listed"), findsOneWidget);
