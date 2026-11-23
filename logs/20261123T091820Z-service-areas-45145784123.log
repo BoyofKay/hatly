@@ -1,0 +1,70 @@
+action=service-areas arg= commit=d2e9380825698981c46d0311232c5fb214a248fb run=45145784123 started=2026-11-23T09:18:18Z
+== service areas
+     name     | is_active |   lat    |   lng    | radius_meters 
+--------------+-----------+----------+----------+---------------
+ Belbies City | t         | 30.41966 | 31.56188 |         13000
+(1 row)
+
+== delivery zones
+               zone_id                |       zone_en        |       zone_ar       |                                                                                                                                                                                                  existing_neighborhoods_ar                                                                                                                                                                                                  | is_active |       fee_egp       | service_area | linked_addresses 
+--------------------------------------+----------------------+---------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-----------+---------------------+--------------+------------------
+ c169f0e8-73c7-4439-8691-6cec4f99bf0c | Belbeis City         | مدينة بلبيس         | ["حي الزهور", "حي النادي", "حي علوان", "المنطقة الصناعية", "حي أبو نصيب", "حي سعدون", "حي المنشية", "حي المركز", "حي السوق القديم", "حي السوق", "حي المركز الطبي", "حي المحطة", "حي الساحة", "حي الكلية الجوية", "حي المطحن", "حي الثانوي العسكرية", "حي المساكن الجديدة", "حي المحكمة القديمة", "حي المحكمة الجديدة", "وسط البلد", "حي المتاجر الشعبية", "الشارع الجديد", "الشارع القديم", "حي المظلوم", "حي رب العالمين"] | t         | 15.0000000000000000 | Belbies City |                0
+ 53f4209b-947f-4f9a-b54b-18a7f156e056 | Kafr Ayoub Soliman   | كفر أيوب سليمان     | ["كفر أيوب سليمان", "الكتيبة", "السعادات", "بساتين سراج الدين", "الطحاوية"]                                                                                                                                                                                                                                                                                                                                                 | t         | 15.0000000000000000 | Belbies City |                0
+ f8ecb605-4622-4942-8703-fd367a145853 | Kafr Ibrahim El-Aydy | كفر إبراهيم العايدي | ["الكفر القديم", "كفر إبراهيم العايدي", "كفر بني عليم", "منية سنتا"]                                                                                                                                                                                                                                                                                                                                                        | t         | 15.0000000000000000 | Belbies City |                0
+ f836bd90-eee8-4152-9d62-7e07bb990f70 | El-Balashon          | البلاشون            | ["البلاشون", "ميت جابر", "بني صالح", "قرملة", "منشأة السلام", "كفر مسعود حجازي", "ميت معلا", "كفر حفنا"]                                                                                                                                                                                                                                                                                                                    | t         | 15.0000000000000000 | Belbies City |                0
+ 0af89b9b-2e4e-46c2-ace3-cab5bf86ddde | Awlad Seif           | أولاد سيف           | ["أولاد سيف", "أولاد مهنا", "ميت ربيعة البيضا", "نوبة الدهاشنة", "كفر الشيخ عيسى", "المنشية", "الروضة", "العرايشية", "حوض الندى"]                                                                                                                                                                                                                                                                                           | t         | 15.0000000000000000 | Belbies City |                0
+ 88014abd-dba1-4675-8095-a3d2cf685f43 | El-Adleya            | العدلية             | ["العدلية", "ميت حمل", "الشغانبة", "ميت حبيب", "كفر أكياد", "سندنهور", "قهلة الجبلة", "كفر العرب"]                                                                                                                                                                                                                                                                                                                          | t         | 15.0000000000000000 | Belbies City |                0
+ ca434d9f-ded6-477d-b747-286482146b0e | Ghita                | غيتة                | ["غيتة", "السلام", "تل روزن", "الشولية"]                                                                                                                                                                                                                                                                                                                                                                                    | t         | 15.0000000000000000 | Belbies City |                0
+ bd72b93d-e8b7-49aa-b305-65d2e9089ac0 | El-Zawamel           | الزوامل             | ["الزوامل", "بساتين الإسماعيلية", "منية سلمنت"]                                                                                                                                                                                                                                                                                                                                                                             | t         | 15.0000000000000000 | Belbies City |                0
+ 0d0fce6d-991e-40a6-a40f-a29ad33e070e | Anshas El-Raml       | أنشاص الرمل         | ["أنشاص الرمل", "سلمنت", "بير عمارة", "السعيدية"]                                                                                                                                                                                                                                                                                                                                                                           | t         | 15.0000000000000000 | Belbies City |                0
+ ec0179bc-a86f-4b86-8760-ce11d0353ff4 | Shubra El-Nakhla     | شبرا النخلة         | ["شبرا النخلة", "حفنا", "الجوسق", "العبسي"]                                                                                                                                                                                                                                                                                                                                                                                 | t         | 15.0000000000000000 | Belbies City |                0
+ 3ecae26e-74a9-4e70-a8fe-dee39b677465 | Unlisted Zone        | نطاق غير موجود      | ["منطقة توصيل غير مدرجة"]                                                                                                                                                                                                                                                                                                                                                                                                   | t         | 15.0000000000000000 | Belbies City |               13
+(11 rows)
+
+== active store branches: delivery on? in which service area?
+          store          |    branch     | is_active | is_open | delivery_enabled | pickup_enabled | service_area 
+-------------------------+---------------+-----------+---------+------------------+----------------+--------------
+ Abu Aly Grills          | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Ahl Al Dahabi Bakery | الفرع الرئيسي | t         | t       | t                | f              | Belbies City
+ Al Amal Pharmacy        | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Amana Minimarket     | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Baraka Greengrocer   | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Fayrouz Sweets       | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Gomhoria Grocery     | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Hayah Supermarket    | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Noor Pharmacy        | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Saada Fruit Shop     | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Sharq Pharmacy       | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Al Shifa Pharmacy       | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Belbeis Supermarket     | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Care Plus Pharmacy      | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Delta Mart              | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Family Corner Grocery   | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Garden Fresh            | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Sharqia Fruits          | الفرع الرئيسي | t         | t       | t                | t              | Belbies City
+ Tarweqa                 | Tarweqa       | t         | t       | t                | t              | Belbies City
+ Test                    | Branch Test 1 | t         | t       | t                | f              | Belbies City
+(20 rows)
+
+== the address(es) matching the checkout screenshot (settings only)
+      saved       | is_active |  mode  | has_zone | zone_active | has_pin |  lat3  |  lng3  
+------------------+-----------+--------+----------+-------------+---------+--------+--------
+ 2026-10-28 19:16 | f         | legacy | t        | true        | t       | 24.776 | 46.617
+(1 row)
+
+== latest saved addresses vs active areas (km from centre / radius km)
+      saved       |  mode  | has_zone | has_pin |     area     | km_from_centre | radius_km 
+------------------+--------+----------+---------+--------------+----------------+-----------
+ 2026-11-23 04:50 | MANUAL | t        | f       |              |           0.00 |          
+ 2026-11-14 17:05 | MANUAL | t        | f       |              |           0.00 |          
+ 2026-11-12 19:00 | MANUAL | t        | f       |              |           0.00 |          
+ 2026-11-02 01:05 | MANUAL | t        | f       |              |           0.00 |          
+ 2026-11-01 13:41 | MANUAL | t        | f       |              |           0.00 |          
+ 2026-10-31 19:54 | legacy | t        | f       |              |           0.00 |          
+ 2026-10-30 21:05 | legacy | t        | t       | Belbies City |           0.73 |     13.00
+ 2026-10-30 11:41 | legacy | t        | f       |              |           0.00 |          
+ 2026-10-28 19:27 | legacy | t        | t       | Belbies City |           0.73 |     13.00
+ 2026-10-28 19:20 | MANUAL | t        | f       |              |           0.00 |          
+(10 rows)
+
+job status: success
