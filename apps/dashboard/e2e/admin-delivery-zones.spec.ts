@@ -18,6 +18,7 @@ async function openPage(page: Page) {
 async function createZone(page: Page, opts: { name: string; nameAr: string; fee: string }) {
   await page.getByTestId('zone-new').click();
   const form = page.getByTestId('zone-form');
+  await form.getByTestId('zone-advanced-toggle').click();
   await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
   await form.getByTestId('zone-city').fill('Belbeis');
   await form.getByTestId('zone-city-ar').fill('بلبيس');
@@ -68,6 +69,7 @@ test.describe('Admin — Delivery Zones', () => {
     await row.getByTestId('zone-edit').click();
     const form = page.getByTestId('zone-form');
     await form.getByTestId('zone-name').fill(`PW Zone ${id} edited`);
+    await form.getByTestId('zone-advanced-toggle').click();
     await form.getByTestId('zone-lat').fill('30.41');
     await form.getByTestId('zone-lng').fill('31.55');
     await form.getByRole('button', { name: 'Save changes' }).click();
@@ -100,7 +102,8 @@ test.describe('Admin — Delivery Zones', () => {
     // With a single service area it is preselected; the first missing required field is then the city.
     await form.getByRole('button', { name: 'Add neighborhood / village' }).click();
     await expect(page.getByTestId('zone-form-error')).toHaveText('City (EN) is required.');
-    await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
+    await form.getByTestId('zone-advanced-toggle').click();
+  await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
     await form.getByTestId('zone-city').fill('Belbeis');
     await form.getByTestId('zone-city-ar').fill('بلبيس');
     await form.getByTestId('parent-zone-name').fill('Belbeis Zone');
@@ -125,7 +128,8 @@ test.describe('Admin — Delivery Zones', () => {
     try {
       await page.getByTestId('zone-new').click();
       const form = page.getByTestId('zone-form');
-      await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
+      await form.getByTestId('zone-advanced-toggle').click();
+  await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
       await form.getByTestId('zone-city').fill('Belbeis');
       await form.getByTestId('zone-city-ar').fill('بلبيس');
       await form.getByTestId('parent-zone-name').fill('Belbeis Zone');
@@ -147,7 +151,8 @@ test.describe('Admin — Delivery Zones', () => {
     await openPage(page);
     await page.getByTestId('zone-new').click();
     const form = page.getByTestId('zone-form');
-    await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
+    await form.getByTestId('zone-advanced-toggle').click();
+  await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
     await form.getByTestId('zone-city').fill('Belbeis');
     await form.getByTestId('zone-city-ar').fill('بلبيس');
     await form.getByTestId('parent-zone-name').fill('Belbeis Zone');
