@@ -453,6 +453,19 @@ export class AuthService {
    * instruction that cannot be followed. `phoneVerificationAvailable` says nothing about whether the phone IS verified: with OTP
    * off an unverified phone simply stays unverified.
    */
+  /** Profile names are read from the account, never inferred from an access-token or phone-local cache. */
+  async getCustomerName(userId: string): Promise<string> {
+    const user = await this.usersService.findById(userId);
+    if (!user || user.role !== Role.CUSTOMER || !user.isActive) {
+      throw new UnauthorizedException('Customer account unavailable.');
+    }
+    return user.fullName;
+  }
+
+  async updateCustomerName(userId: string, fullName: string): Promise<string> {
+    return this.usersService.updateCustomerName(userId, fullName.trim());
+  }
+
   async getPhoneVerificationStatus(userId: string): Promise<{ isPhoneVerified: boolean; phoneVerificationAvailable: boolean }> {
     const isPhoneVerified = await this.getIsPhoneVerified(userId);
     return { isPhoneVerified, phoneVerificationAvailable: await this.businessConfigService.isCustomerOtpEnabled() };
