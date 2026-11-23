@@ -3,6 +3,16 @@
 // (COD and electronic orders kept apart). Fields added on 2026-11-13 are optional, so an older backend never crashes the app, and periods
 // closed before then carry no breakdown (shown as stored, marked legacy).
 
+/// Shift elapsed time is presentation-only; monetary values remain server authoritative.
+String shiftDurationLabel(DateTime? start, {required bool arabic, DateTime? end}) {
+  if (start == null) return arabic ? 'لم تبدأ بعد' : 'Not started yet';
+  final duration = (end ?? DateTime.now()).difference(start);
+  final minutes = duration.isNegative ? 0 : duration.inMinutes;
+  final hours = minutes ~/ 60;
+  final remaining = minutes % 60;
+  return arabic ? '${hours} س ${remaining} د' : '${hours}h ${remaining}m';
+}
+
 int _i(dynamic v) => (v as num?)?.toInt() ?? 0;
 
 /// The money parts of one order or one period, as the backend computed them (one value each — never combined).
