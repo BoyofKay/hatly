@@ -115,8 +115,16 @@ async function main(): Promise<void> {
         old.isSelectable = false;
         await zones.save(old);
       }
+      // Normalize EVERY selectable, already-classified second-level row to the
+      // owner's initial flat fee, including pre-existing individual children.
+      // This changes future quotes, never frozen order fee breakdowns.
+      await manager.query(
+        'UPDATE delivery_zones SET delivery_fee_minor = $1, updated_at = now() ' +
+        'WHERE zone_name IS NOT NULL AND is_selectable = true AND deleted_at IS NULL',
+        [INITIAL_CHILD_FEE_MINOR],
+      );
     });
-    console.log('Applied atomically. New child and classified single-row fees set to 15 EGP.');
+    console.log('Applied atomically. All selectable, classified second levels now start at 15.00 EGP.');
     console.log('Original combined names, source IDs and address links preserved; frozen order prices unchanged.');
   } finally {
     await AppDataSource.destroy();
