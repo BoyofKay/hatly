@@ -53,7 +53,7 @@ export interface AddressView {
 const ZONELESS_EDITABLE_FIELDS = new Set(['isDefault', 'label']);
 
 export function isZoneServiceable(zone: DeliveryZone | null | undefined): boolean {
-  return !!zone && zone.isActive && zone.parentIsActive && zone.isSelectable && !zone.deletedAt && zone.serviceArea?.isActive !== false;
+  return !!zone && zone.isActive && zone.parentIsActive !== false && zone.isSelectable !== false && !zone.deletedAt && zone.serviceArea?.isActive !== false;
 }
 
 /**
