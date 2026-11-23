@@ -26,8 +26,9 @@ class HatlySearchField extends StatelessWidget {
     return Material(
       color: p.surfaceSoft,
       borderRadius: BorderRadius.circular(HatlyRadius.searchBar),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 48),
+      child: Container(
+        decoration: BoxDecoration(border: Border.all(color: p.border.withValues(alpha: .55)), borderRadius: BorderRadius.circular(HatlyRadius.searchBar)),
+        constraints: const BoxConstraints(minHeight: 52),
         child: Row(
           children: [
             Padding(
