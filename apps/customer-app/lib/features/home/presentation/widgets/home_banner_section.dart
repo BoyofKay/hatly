@@ -127,6 +127,8 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
               child: LoopingPager(
                 count: banners.length,
                 autoPlayInterval: widget.autoRotateInterval,
+                autoPlayGlide: const Duration(milliseconds: 900),
+                autoPlayCurve: Curves.easeInOutCubic,
                 itemBuilder: (context, index) {
                   final banner = banners[index];
                   final title = banner.displayTitle(arabic);
