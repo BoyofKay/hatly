@@ -2,14 +2,16 @@ import { apiClient } from './client';
 
 /** PD-009 — a Delivery Zone as the admin API returns it. Fees are integer minor units. */
 export interface DeliveryZone {
-  /** Villages / neighbourhoods inside the zone (2026-11-23). */
-  areas?: string[];
   id: string;
   serviceAreaId: string;
   governorate: string;
   governorateAr: string;
   city: string;
   cityAr: string;
+  /** Parent delivery zone, null on unclassified pre-migration records. */
+  zoneName: string | null;
+  zoneNameAr: string | null;
+  /** Exactly one priced neighborhood/village. */
   name: string;
   nameAr: string;
   deliveryFeeMinor: number;
@@ -20,12 +22,13 @@ export interface DeliveryZone {
 }
 
 export interface DeliveryZoneDetailsInput {
-  areas?: string[];
   serviceAreaId: string;
   governorate: string;
   governorateAr: string;
   city: string;
   cityAr: string;
+  zoneName: string;
+  zoneNameAr: string;
   name: string;
   nameAr: string;
   displayOrder: number;
@@ -71,7 +74,7 @@ export function zoneErrorMessage(err: any, fallback: string): string {
   const status = err?.response?.status;
   const body = err?.response?.data;
   if (status === 403) return 'You do not have permission for this action.';
-  if (status === 409) return 'A zone with this name already exists in this service area.';
+  if (status === 409) return 'A neighborhood/village with this name already exists in this delivery zone.';
   const message = body?.error?.message ?? body?.message;
   if (Array.isArray(message)) return message.join(', ');
   return typeof message === 'string' ? message : fallback;

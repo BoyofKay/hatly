@@ -42,13 +42,24 @@ export class DeliveryZone extends BaseEntity {
   @Column({ name: 'name_ar', type: 'varchar', length: 150 })
   nameAr: string;
 
+  /** Parent Delivery Zone; NULL means legacy row pending explicit classification. */
+  @Column({ name: 'zone_name', type: 'varchar', length: 150, nullable: true })
+  zoneName: string | null;
+
+  @Column({ name: 'zone_name_ar', type: 'varchar', length: 150, nullable: true })
+  zoneNameAr: string | null;
+
   /** Integer minor units (piastres). The V1 base delivery fee for an address in this zone. */
   @Column({ name: 'delivery_fee_minor', type: 'bigint' })
   deliveryFeeMinor: number;
 
-  /** Villages / neighbourhoods inside the zone (owner decision 2026-11-23) — the customer picks one; the fee is the zone's. */
+  /** Legacy unmodified Arabic area array. Parent records stay in DB for old addresses. */
   @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
   areas: string[];
+
+  /** Hides superseded combined legacy names from new selections without invalidating old saved addresses. */
+  @Column({ name: 'is_selectable', type: 'boolean', default: true })
+  isSelectable: boolean;
 
   @Column({ name: 'display_order', type: 'int', default: 0 })
   displayOrder: number;
@@ -67,6 +78,9 @@ export class DeliveryZone extends BaseEntity {
 /** What a customer (and an order snapshot) may know about a zone: names and its base fee. Never internal admin metadata. */
 export interface DeliveryZoneSummary {
   id: string;
+  /** Parent zone title. Missing on legacy records that have not yet been classified. */
+  zoneName?: string | null;
+  zoneNameAr?: string | null;
   name: string;
   nameAr: string;
   city: string;
@@ -78,6 +92,8 @@ export interface DeliveryZoneSummary {
 export function toDeliveryZoneSummary(zone: DeliveryZone): DeliveryZoneSummary {
   return {
     id: zone.id,
+    ...(zone.zoneName ? { zoneName: zone.zoneName } : {}),
+    ...(zone.zoneNameAr ? { zoneNameAr: zone.zoneNameAr } : {}),
     name: zone.name,
     nameAr: zone.nameAr,
     city: zone.city,

@@ -87,7 +87,7 @@ export class AddressesService {
    * least one active delivery zone.
    */
   async capabilities(): Promise<AddressCapabilities> {
-    const zones = await this.zonesRepository.find({ where: { isActive: true }, relations: { serviceArea: true } });
+    const zones = await this.zonesRepository.find({ where: { isActive: true, isSelectable: true }, relations: { serviceArea: true } });
     const manualAvailable = zones.some((z) => isZoneServiceable(z));
     let reason: AddressCapabilities['gps']['reason'] = null;
     if (!this.deliveryFeeCalculation.roadDistancePricingAvailable) {
@@ -420,7 +420,7 @@ export class AddressesService {
 
   private async requireActiveZone(id: string): Promise<DeliveryZone> {
     const zone = await this.zonesRepository.findOne({ where: { id }, relations: { serviceArea: true } });
-    if (!isZoneServiceable(zone)) {
+    if (!isZoneServiceable(zone) || zone?.isSelectable === false) {
       throw new BadRequestException({
         message: 'This delivery area is not available. Please choose another one.',
         details: { code: 'DELIVERY_ZONE_UNAVAILABLE', field: 'deliveryZoneId' },
