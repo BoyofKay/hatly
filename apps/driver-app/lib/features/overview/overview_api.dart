@@ -199,6 +199,12 @@ class OverviewApi {
   Future<PreviousEarnings> previousEarnings({String? from, String? to, String? status}) async =>
       PreviousEarnings.fromJson(await _get('/driver/earnings/overview', {'tab': 'previous', 'from': from, 'to': to, 'status': status}));
 
+  /** Read-only name, changed only by Operations through the Admin Panel. */
+  Future<String> driverProfileName() async {
+    final r = await _get('/driver/profile', {});
+    return r['fullName'] as String? ?? '';
+  }
+
   /// "Forgot password?" — asks Hatly operations for a temporary password. The server answers the same for any phone.
   Future<void> requestPasswordReset(String phone) async {
     await _client.dio.post('/auth/password-reset/request', data: {'phone': phone});
@@ -213,3 +219,7 @@ class OverviewApi {
 }
 
 final overviewApiProvider = Provider<OverviewApi>((ref) => OverviewApi(ref.watch(apiClientProvider)));
+
+/// Re-read on navigation/session changes; never store the driver's name separately on this device.
+final driverProfileNameProvider = FutureProvider.autoDispose<String>((ref) =>
+    ref.watch(overviewApiProvider).driverProfileName());
