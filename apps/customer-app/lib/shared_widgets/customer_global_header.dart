@@ -32,7 +32,7 @@ class CustomerGlobalHeader extends ConsumerWidget {
           child: Text('Hatly', style: context.type.title.copyWith(fontWeight: FontWeight.w800),
             maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
-        const NotificationBell(),
+        NotificationBell(router: router),
         IconButton(
           key: const Key('customer-header-favorites'),
           tooltip: l10n.homeFavoritesShortcut,
