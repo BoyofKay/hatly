@@ -76,5 +76,22 @@ class AuthRepository {
     return token != null;
   }
 
-  Future<String?> getDisplayName() => _tokenStorage.displayName;
+  /// Always try the server first, including on login/restore; use cached registration name only when offline.
+  Future<String?> getDisplayName() async {
+    try {
+      final name = await _authApi.getCurrentFullName();
+      if (name != null && name.trim().isNotEmpty) {
+        await _tokenStorage.saveDisplayName(name);
+        return name;
+      }
+    } catch (_) {
+      // Preserve the offline/profile fallback; it is never an authority for changing identities.
+    }
+    return _tokenStorage.displayName;
+  }
+
+  Future<void> updateDisplayName(String fullName) async {
+    final saved = await _authApi.updateFullName(fullName);
+    await _tokenStorage.saveDisplayName(saved);
+  }
 }
