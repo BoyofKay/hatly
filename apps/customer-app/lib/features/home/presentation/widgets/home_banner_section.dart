@@ -135,7 +135,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                   final title = banner.displayTitle(arabic);
                   return Padding(
                     // Full-width page; the card is inset by exactly the page margin, so it lines up with the content below.
-                    padding: const EdgeInsets.symmetric(
+                    padding: EdgeInsets.symmetric(
                         horizontal: banners.length == 1 ? kHeroBannerSideMargin : 5, vertical: 6),
                     child: Semantics(
                       button: banner.isTappable,
