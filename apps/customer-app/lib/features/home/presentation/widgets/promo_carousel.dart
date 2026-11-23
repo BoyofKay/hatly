@@ -83,7 +83,7 @@ class _PromoCarouselState extends State<PromoCarousel> {
                 autoPlayGlide: const Duration(milliseconds: 900),
                 autoPlayCurve: Curves.easeInOutCubic,
                 itemBuilder: (context, index) => Padding(
-                  padding: const EdgeInsets.symmetric(
+                  padding: EdgeInsets.symmetric(
                       horizontal: promos.length == 1 ? kHeroBannerSideMargin : 5),
                   child: _PromoCard(
                       promo: promos[index],
