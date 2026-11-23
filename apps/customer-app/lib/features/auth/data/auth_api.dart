@@ -104,6 +104,31 @@ class AuthApi {
     );
   }
 
+  /// Request-based "Forgot password?" (owner decision 2026-11-23): asks Hatly operations for a temporary password. Same answer for any
+  /// phone (never reveals accounts).
+  Future<void> requestPasswordReset({required String phone}) {
+    return _client.request(
+      (dio) => dio.post('/auth/password-reset/request', data: {'phone': phone}),
+      (_) {},
+    );
+  }
+
+  /// Completes it with the temporary password Hatly gave and a new password. Refusals: TEMP_PASSWORD_INVALID (with
+  /// `attemptsLeft`), TEMP_PASSWORD_EXPIRED, TEMP_PASSWORD_LOCKED, WEAK_PASSWORD, PASSWORD_UNCHANGED.
+  Future<void> completePasswordReset(
+      {required String phone,
+      required String tempPassword,
+      required String newPassword}) {
+    return _client.request(
+      (dio) => dio.post('/auth/password-reset/complete', data: {
+        'phone': phone,
+        'tempPassword': tempPassword,
+        'newPassword': newPassword,
+      }),
+      (_) {},
+    );
+  }
+
   /// Deletes the signed-in customer's own account (store policy). The backend re-checks the password and refuses with
   /// `ACCOUNT_HAS_ACTIVE_ORDERS` / `ACCOUNT_HAS_WALLET_BALANCE` (409) or `PASSWORD_INVALID` (403).
   Future<void> deleteAccount({required String password}) {

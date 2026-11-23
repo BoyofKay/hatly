@@ -8,6 +8,9 @@ class _FakeOverview implements OverviewApi {
   final resetRequests = <String>[];
   @override
   Future<void> requestPasswordReset(String phone) async => resetRequests.add(phone);
+  final completions = <String>[];
+  @override
+  Future<void> completePasswordReset(String phone, String tempPassword, String newPassword) async => completions.add('$phone|$tempPassword|$newPassword');
   @override
   dynamic noSuchMethod(Invocation i) => throw UnimplementedError();
 }
@@ -38,7 +41,7 @@ void main() {
     expect(obscured(tester), isTrue);
   });
 
-  testWidgets('"Forgot password?" sends a request to Operations with the phone typed', (tester) async {
+  testWidgets('"Forgot password?": request, then the temporary password + a new one on the same screen', (tester) async {
     final api = _FakeOverview();
     tester.view.physicalSize = const Size(390, 1200);
     tester.view.devicePixelRatio = 1;
@@ -47,14 +50,20 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('forgot-password')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('temporary password'), findsOneWidget);
+    expect(find.byKey(const Key('forgot-explain')), findsOneWidget);
     await tester.enterText(find.byKey(const Key('forgot-phone')), '+201000000123');
     await tester.tap(find.byKey(const Key('forgot-send')));
     await tester.pumpAndSettle();
     expect(api.resetRequests, ['+201000000123']);
-    expect(find.byKey(const Key('forgot-sent')), findsOneWidget);
-    await tester.tap(find.text('OK'));
+    await tester.enterText(find.byKey(const Key('forgot-temp')), 'abcd-2345x');
+    await tester.enterText(find.byKey(const Key('forgot-new')), 'driver-own-1');
+    await tester.enterText(find.byKey(const Key('forgot-confirm')), 'driver-own-1');
+    await tester.tap(find.byKey(const Key('forgot-complete')));
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(api.completions, ['+201000000123|abcd-2345x|driver-own-1']);
+    expect(find.byKey(const Key('forgot-done')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('forgot-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('forgot-password')), findsOneWidget); // back on sign-in
   });
 }

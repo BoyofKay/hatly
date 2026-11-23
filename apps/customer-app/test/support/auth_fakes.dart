@@ -76,6 +76,20 @@ class FakeAuthApi implements AuthApi {
   final deleteAccountCalls = <String>[];
   ApiException? deleteAccountError;
 
+  /// Request-based forgot password (2026-11-23): what was sent, and the refusal the scripted backend answers `complete` with.
+  final resetRequests = <String>[];
+  final resetCompletions = <Map<String, String>>[];
+  ApiException? completeResetError;
+
+  @override
+  Future<void> requestPasswordReset({required String phone}) async => resetRequests.add(phone);
+
+  @override
+  Future<void> completePasswordReset({required String phone, required String tempPassword, required String newPassword}) async {
+    resetCompletions.add({'phone': phone, 'temp': tempPassword, 'new': newPassword});
+    if (completeResetError != null) throw completeResetError!;
+  }
+
   static const tokens =
       AuthTokens(accessToken: 'access-token', refreshToken: 'refresh-token');
 

@@ -10,6 +10,7 @@ import '../auth_gate.dart';
 import '../otp_flow_controller.dart';
 import '../widgets/auth_error_notice.dart';
 import '../widgets/egypt_phone_field.dart';
+import 'forgot_password_screen.dart';
 import '../../../../shared_widgets/hatly_logo.dart';
 
 enum _EntryForm { login, register }
@@ -159,20 +160,32 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                       ),
                     ],
                     const SizedBox(height: HatlySpacing.sm),
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: TextButton(
-                        onPressed: flowState.isSubmitting
-                            ? null
-                            : () => _switchTo(_form == _EntryForm.login
-                                ? _EntryForm.register
-                                : _EntryForm.login),
-                        child: Text(
-                          _form == _EntryForm.login
-                              ? l10n.passwordCreateAccountInstead
-                              : l10n.passwordHaveAccountInstead,
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        TextButton(
+                          onPressed: flowState.isSubmitting
+                              ? null
+                              : () => _switchTo(_form == _EntryForm.login
+                                  ? _EntryForm.register
+                                  : _EntryForm.login),
+                          child: Text(
+                            _form == _EntryForm.login
+                                ? l10n.passwordCreateAccountInstead
+                                : l10n.passwordHaveAccountInstead,
+                          ),
                         ),
-                      ),
+                        if (_form == _EntryForm.login)
+                          TextButton(
+                            key: const Key('forgot-password-link'),
+                            onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                    builder: (_) => ForgotPasswordScreen(
+                                        initialPhone: _phoneController.text))),
+                            child: Text(l10n.forgotPasswordLink),
+                          ),
+                      ],
                     ),
                     if (displayedError != null) ...[
                       const SizedBox(height: HatlySpacing.md),

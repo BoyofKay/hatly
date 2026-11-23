@@ -2594,4 +2594,61 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tempPasswordSameAsTemporary =>
       'Choose a password different from the temporary one.';
+
+  @override
+  String get forgotPasswordLink => 'Forgot password?';
+
+  @override
+  String get forgotTitle => 'Forgot your password?';
+
+  @override
+  String get forgotExplain =>
+      'Send a request to Hatly. We will call you to check it is you and give you a temporary password (valid 60 minutes).';
+
+  @override
+  String get forgotSend => 'Send request';
+
+  @override
+  String get forgotHaveTemp => 'I already have a temporary password';
+
+  @override
+  String get forgotSent =>
+      'Request sent. When Hatly gives you a temporary password, type it here with your new password.';
+
+  @override
+  String get forgotTempLabel => 'Temporary password';
+
+  @override
+  String get forgotNewLabel => 'New password';
+
+  @override
+  String get forgotConfirmLabel => 'Repeat the new password';
+
+  @override
+  String get forgotChange => 'Change password';
+
+  @override
+  String get forgotDone => 'Your password was changed. Sign in with it now.';
+
+  @override
+  String get forgotBackToSignIn => 'Back to sign in';
+
+  @override
+  String get forgotCancel => 'Cancel — I remember my password';
+
+  @override
+  String get forgotTempInvalid =>
+      'The temporary password is not correct (or not given yet).';
+
+  @override
+  String forgotTriesLeft(String n) {
+    return '$n tries left.';
+  }
+
+  @override
+  String get forgotExpired =>
+      'The temporary password has expired. Send a new request.';
+
+  @override
+  String get forgotLocked => 'Too many wrong tries. Send a new request.';
 }

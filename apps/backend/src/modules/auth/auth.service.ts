@@ -330,7 +330,7 @@ export class AuthService {
    */
   async requestDriverPasswordReset(phone: string): Promise<void> {
     const user = await this.usersService.findByPhoneWithPasswordHash(phone);
-    if (!user || user.role !== Role.DRIVER || !user.isActive) return;
+    if (!user || !user.isActive) return; // 2026-11-23: every user type may ask (request-based reset)
     await this.usersService.recordPasswordResetRequest(user.id);
   }
 
