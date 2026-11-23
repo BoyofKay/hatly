@@ -32,14 +32,14 @@ For combined names, prepare an explicitly approved mapping file. Example (names 
     "zoneName": "Parent zone EN",
     "zoneNameAr": "المنطقة الرئيسية",
     "children": [
-      {"name": "Child A", "nameAr": "قرية أ", "deliveryFeeMinor": 1500},
-      {"name": "Child B", "nameAr": "قرية ب", "deliveryFeeMinor": 1800}
+      {"name": "Child A", "nameAr": "قرية أ"},
+      {"name": "Child B", "nameAr": "قرية ب"}
     ]
   }
 ]
 ```
 
-Each child must have an independently approved **fee in integer minor units (piastres)**. Matching English/Arabic values by their delimiter positions is not permitted. Review all combined names, existing fees, and any address links before applying.
+**Fee decision (2026-11-23): all newly created or reconciled individual neighborhoods/villages start at 15 EGP (1500 piastres)**. Admin may change each fee afterward. The reconciliation script overrides any fee amounts in the mapping file and starts all child records at 1500 minor units. Existing combined source rows preserve their original current fees to avoid changing old saved-address pricing and frozen order snapshots. Matching English/Arabic values by their delimiter positions is not permitted. Review all combined names, existing fees, and any address links before applying.
 
 Only after reconciliation review and a backup, use an **exact** target database allow-list:
 
@@ -52,7 +52,7 @@ npm run delivery:neighborhood-reconcile
 
 Use the actual database name, **not** `hatly_dev` unless it really is that database. Do not copy the example mapping into live data.
 
-The operation uses one database transaction and checks the original source record's exact bilingual text and status. For a single existing child with matching names and fee, it adds only the parent names. For a combined record, it creates one row per reviewed child, preserves the old record and all existing address/fee history, and marks only that old combined record `is_selectable = false` so new customers cannot choose a combined label.
+The operation uses one database transaction and checks the original source record's exact bilingual text and status. For a single existing child with matching names, it adds the parent names and sets its editable current fee to 15.00 EGP. For a combined record, it creates one row per reviewed child, preserves the old record and all existing address/fee history, and marks only that old combined record `is_selectable = false` so new customers cannot choose a combined label.
 
 **Existing saved addresses that reference a previously combined record remain linked to it.** They retain their historical label and fee until their owners explicitly select a precise new child. Never infer which child was meant from street text, and never silently reassign these addresses. The deployment should be considered *not fully reconciled* until all existing combined records are reviewed.
 
