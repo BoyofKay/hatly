@@ -101,6 +101,7 @@ class _Content extends StatelessWidget {
         const SizedBox(height: HatlySpacing.lg),
         HatlySection(
           title: l10n.orderTimelineTitle,
+          icon: Icons.timeline_rounded,
           child: HatlySurface(
               child: OrderTimelineView(entries: tracking.timeline)),
         ),
@@ -108,6 +109,7 @@ class _Content extends StatelessWidget {
           const SizedBox(height: HatlySpacing.lg),
           HatlySection(
             title: l10n.orderVendorsLabel,
+          icon: Icons.storefront_outlined,
             child: Column(
               children: [
                 for (final segment in tracking.segments)
