@@ -63,6 +63,14 @@ export class DeliveryZonesService {
       await this.assertServiceArea(dto.serviceAreaId);
       zone.serviceAreaId = dto.serviceAreaId;
     }
+    // Legacy rows have no parent. A partial parent update would violate
+    // the DB's bilingual-pair invariant, so return a clear validation error.
+    if ((dto.zoneName !== undefined) !== (dto.zoneNameAr !== undefined)) {
+      throw new BadRequestException({
+        message: 'Provide both English and Arabic parent delivery-zone names together.',
+        details: { code: 'DELIVERY_ZONE_BILINGUAL_PARENT_REQUIRED' },
+      });
+    }
     for (const key of ['governorate', 'governorateAr', 'city', 'cityAr', 'name', 'nameAr', 'zoneName', 'zoneNameAr'] as const) {
       if (dto[key] !== undefined) zone[key] = dto[key]!.trim();
     }
