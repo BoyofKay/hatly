@@ -7,6 +7,9 @@ import { CreateDeliveryZoneDto } from './dto/create-delivery-zone.dto';
 import { UpdateDeliveryZoneDto } from './dto/update-delivery-zone.dto';
 
 /** Admin management + customer listing of Delivery Zones (PD-009). Deactivation, never deletion. */
+/** Trimmed, non-empty, without duplicates, in the given order. */
+const cleanAreas = (list?: string[]): string[] => [...new Set((list ?? []).map((a) => a.trim()).filter(Boolean))];
+
 @Injectable()
 export class DeliveryZonesService {
   constructor(
@@ -48,6 +51,7 @@ export class DeliveryZonesService {
         nameAr: dto.nameAr.trim(),
         deliveryFeeMinor: dto.deliveryFeeMinor,
         displayOrder: dto.displayOrder ?? 0,
+        areas: cleanAreas(dto.areas),
         isActive: true,
         representativeLatitude: point.latitude,
         representativeLongitude: point.longitude,
@@ -65,6 +69,7 @@ export class DeliveryZonesService {
       if (dto[key] !== undefined) zone[key] = dto[key]!.trim();
     }
     if (dto.displayOrder !== undefined) zone.displayOrder = dto.displayOrder;
+    if (dto.areas !== undefined) zone.areas = cleanAreas(dto.areas);
     if (dto.representativeLatitude !== undefined || dto.representativeLongitude !== undefined) {
       const point = this.point(dto.representativeLatitude, dto.representativeLongitude);
       zone.representativeLatitude = point.latitude;

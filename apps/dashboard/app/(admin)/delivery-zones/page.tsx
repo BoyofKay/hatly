@@ -37,6 +37,8 @@ interface FormState {
   name: string;
   nameAr: string;
   displayOrder: string;
+  /** One village / neighbourhood per line. */
+  areas: string;
   fee: string;
   lat: string;
   lng: string;
@@ -51,6 +53,7 @@ const EMPTY_FORM: FormState = {
   name: '',
   nameAr: '',
   displayOrder: '0',
+  areas: '',
   fee: '',
   lat: '',
   lng: '',
@@ -106,6 +109,7 @@ function validateZoneForm(form: FormState, opts: { requireFee: boolean }): Valid
       name: form.name.trim(),
       nameAr: form.nameAr.trim(),
       displayOrder,
+      areas: form.areas.split('\n').map((a) => a.trim()).filter(Boolean),
       representativeLatitude,
       representativeLongitude,
     },
@@ -122,6 +126,7 @@ function toForm(zone: DeliveryZone): FormState {
     name: zone.name,
     nameAr: zone.nameAr,
     displayOrder: String(zone.displayOrder),
+    areas: (zone.areas ?? []).join('\n'),
     fee: formatMinor(zone.deliveryFeeMinor),
     lat: zone.representativeLatitude == null ? '' : String(zone.representativeLatitude),
     lng: zone.representativeLongitude == null ? '' : String(zone.representativeLongitude),
@@ -199,6 +204,12 @@ function ZoneForm({
         <Field label="Zone name (EN)" value={form.name} onChange={set('name')} testId="zone-name" placeholder="Abu Naseeb" />
         <Field label="Zone name (AR)" value={form.nameAr} onChange={set('nameAr')} testId="zone-name-ar" dir="rtl" placeholder="أبو نصيب" />
         <Field label="Display order" value={form.displayOrder} onChange={set('displayOrder')} testId="zone-display-order" />
+        <label className="block text-sm sm:col-span-2">
+          <span className="font-medium text-gray-700">Villages / neighbourhoods — القرى / الأحياء (one per line)</span>
+          <textarea dir="rtl" rows={6} value={form.areas} onChange={(e) => set('areas')(e.target.value)} data-testid="zone-areas"
+            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder={'حي الزهور\nحي النادي'} />
+          <span className="text-xs text-gray-500">The customer picks one of these in their address; the fee is the zone&apos;s.</span>
+        </label>
         {showFee && <Field label="Delivery fee (EGP)" value={form.fee} onChange={set('fee')} testId="zone-fee" placeholder="15.00" />}
       </div>
       {/* The optional representative point (lat/lng) is not used by pricing, coverage or dispatch, so it is hidden (owner decision
@@ -437,6 +448,7 @@ export default function DeliveryZonesPage() {
                         {z.nameAr}
                       </div>
                       <div className="text-xs text-gray-500">{z.name}</div>
+                      {(z.areas?.length ?? 0) > 0 && <div className="text-xs text-gray-500" dir="rtl" title={z.areas!.join('، ')}>{z.areas!.length} قرية/حي</div>}
                     </td>
                     <td className="px-3 py-2">
                       <div dir="rtl">

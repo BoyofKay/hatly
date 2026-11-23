@@ -51,6 +51,13 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
   String? _governorate;
   String? _city;
   String? _zoneId;
+
+  /// The village / neighbourhood inside the zone (when the zone lists them). Saved at the start of the landmark line.
+  String? _village;
+  bool _showVillageError = false;
+
+  /// Filled by the zone list once loaded (the villages of the chosen zone).
+  List<String> _selectedZoneAreas = const [];
   bool _zoneInitialized = false;
 
   /// True once the customer discarded the saved area (changed method): an edited address's old zone is then not preselected again.
@@ -245,6 +252,11 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
       );
     } else {
       if (_zoneId == null || _line1.text.trim().isEmpty) return;
+      final zoneAreas = _selectedZoneAreas;
+      if (zoneAreas.isNotEmpty && _village == null) {
+        setState(() => _showVillageError = true);
+        return;
+      }
       input = AddressInput.manual(
         label: _label.text,
         line1: _line1.text.trim(),
@@ -253,7 +265,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
         buildingNumber: _building.text,
         floor: _floor.text,
         apartment: _apartment.text,
-        landmark: _landmark.text,
+        landmark: _village == null ? _landmark.text : [_village!, if (_landmark.text.trim().isNotEmpty) _landmark.text.trim()].join(' · '),
         isDefault: _isDefault ? true : null,
         includeMode: includeMode,
       );
@@ -349,6 +361,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           for (final z in areaZones) {
             if (z.id == _zoneId) selected = z;
           }
+          _selectedZoneAreas = selected?.areas ?? const [];
           final zoneMissing = _showErrors && _zoneId == null;
 
           return Column(
@@ -420,9 +433,21 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 ],
                 onChanged: (v) => setState(() {
                   _zoneId = v;
+                  _village = null;
                   _zoneAutoSelected = false;
                 }),
               ),
+              if (selected != null && selected.areas.isNotEmpty) ...[
+                const SizedBox(height: HatlySpacing.sm),
+                _dropdown<String>(
+                  key: ValueKey('address-village-${selected.id}'),
+                  label: l10n.addressVillageLabel,
+                  value: selected.areas.contains(_village) ? _village : null,
+                  errorText: _showVillageError && _village == null ? l10n.addressVillageRequired : null,
+                  items: [for (final a in selected.areas) DropdownMenuItem(value: a, child: Text(a))],
+                  onChanged: (v) => setState(() => _village = v),
+                ),
+              ],
               if (_city != null && areaZones.isEmpty) ...[
                 const SizedBox(height: HatlySpacing.sm),
                 Text(l10n.addressCityNoZones,

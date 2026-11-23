@@ -2622,4 +2622,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get forgotLocked => 'محاولات خاطئة كثيرة. أرسل طلبًا جديدًا.';
+
+  @override
+  String get addressVillageLabel => 'القرية / الحي';
+
+  @override
+  String get addressVillageRequired => 'اختر قريتك أو حيّك';
 }

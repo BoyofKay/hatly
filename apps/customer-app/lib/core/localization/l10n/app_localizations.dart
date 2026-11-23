@@ -4699,6 +4699,18 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'محاولات خاطئة كثيرة. أرسل طلبًا جديدًا.'**
   String get forgotLocked;
+
+  /// No description provided for @addressVillageLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'القرية / الحي'**
+  String get addressVillageLabel;
+
+  /// No description provided for @addressVillageRequired.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر قريتك أو حيّك'**
+  String get addressVillageRequired;
 }
 
 class _AppLocalizationsDelegate

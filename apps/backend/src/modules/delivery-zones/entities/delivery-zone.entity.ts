@@ -46,6 +46,10 @@ export class DeliveryZone extends BaseEntity {
   @Column({ name: 'delivery_fee_minor', type: 'bigint' })
   deliveryFeeMinor: number;
 
+  /** Villages / neighbourhoods inside the zone (owner decision 2026-11-23) — the customer picks one; the fee is the zone's. */
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  areas: string[];
+
   @Column({ name: 'display_order', type: 'int', default: 0 })
   displayOrder: number;
 

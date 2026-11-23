@@ -1293,5 +1293,7 @@
         "type": "String"
       }
     }
-  }
+  },
+  "addressVillageLabel": "Village / neighbourhood",
+  "addressVillageRequired": "Choose your village or neighbourhood"
 }
