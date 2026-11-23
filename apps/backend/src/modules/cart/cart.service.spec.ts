@@ -177,7 +177,7 @@ function makeProduct(id: string, vendorBranchId: string) {
     isAvailable: true,
     deletedAt: null,
     options: [],
-    vendorBranch: { id: vendorBranchId, isActive: true, vendor: { isActive: true } },
+    vendorBranch: { id: vendorBranchId, isActive: true, isOpen: true, vendor: { isActive: true } },
     vendorBranchId,
   };
 }
@@ -190,6 +190,7 @@ function makeBranch(id: string, sector: { isActive: boolean; customRequestsEnabl
 describe('CartService', () => {
   it('rejects adding a product to a closed store while retaining menu visibility', async () => {
     const product = makeProduct('p1', 'branch-1');
+    product.vendorBranch.isOpen = false;
     const branch = { ...makeBranch('branch-1'), isOpen: false };
     const { service } = buildHarness([product], [branch]);
     await expect(service.addItem('customer-1', { productId: 'p1', quantity: 1 })).rejects.toMatchObject({
