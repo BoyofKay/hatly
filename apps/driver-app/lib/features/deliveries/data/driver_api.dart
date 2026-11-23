@@ -35,6 +35,12 @@ class DriverApi {
 
   /// The online switch as the SERVER holds it (2026-11-15), so the app shows the truth after it was closed and reopened. `null` when it
   /// cannot be read (an older backend without the endpoint, or no network) — the caller then keeps what it shows.
+  /** The driver's display name is managed by Admin, never edited from this app. */
+  Future<String?> getProfileName() async {
+    final response = await retryTransient(() => _apiClient.dio.get('/driver/profile'));
+    return (response.data['data'] as Map<String, dynamic>?)?['fullName'] as String?;
+  }
+
   Future<bool?> getOnlineStatus() async {
     try {
       final response = await _apiClient.dio.get('/driver/online-status');
