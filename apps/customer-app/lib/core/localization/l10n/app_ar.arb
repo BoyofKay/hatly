@@ -1309,5 +1309,15 @@
     }
   },
   "addressVillageLabel": "القرية / الحي",
-  "addressVillageRequired": "اختر قريتك أو حيّك"
+  "addressVillageRequired": "اختر قريتك أو حيّك",
+  "homeDeliverTo": "التوصيل إلى",
+  "profileSettings": "الإعدادات",
+  "settingsLanguage": "اللغة",
+  "languageArabic": "العربية",
+  "languageEnglish": "English",
+  "settingsPasswordSection": "كلمة المرور والأمان",
+  "settingsAccountSection": "الحساب",
+  "settingsAppSection": "التطبيق",
+  "searchFilterVendors": "متاجر",
+  "searchFilterProducts": "منتجات"
 }
