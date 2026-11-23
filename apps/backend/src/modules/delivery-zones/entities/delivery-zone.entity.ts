@@ -88,8 +88,8 @@ export interface DeliveryZoneSummary {
 export function toDeliveryZoneSummary(zone: DeliveryZone): DeliveryZoneSummary {
   return {
     id: zone.id,
-    zoneName: zone.zoneName ?? null,
-    zoneNameAr: zone.zoneNameAr ?? null,
+    ...(zone.zoneName ? { zoneName: zone.zoneName } : {}),
+    ...(zone.zoneNameAr ? { zoneNameAr: zone.zoneNameAr } : {}),
     name: zone.name,
     nameAr: zone.nameAr,
     city: zone.city,
