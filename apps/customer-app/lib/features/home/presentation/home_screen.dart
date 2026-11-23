@@ -54,7 +54,13 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       bottomNavigationBar: const CartSummaryBar(),
       body: SafeArea(
-        child: RefreshIndicator(
+        child: Column(children: [
+          // A continuous Home header: location and search stay in place while the feed scrolls.
+          const HomeLocationBar(),
+          const SizedBox(height: HatlySpacing.sm),
+          const HomeSearchEntry(),
+          const SizedBox(height: HatlySpacing.sm),
+          Expanded(child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(homeCategoriesProvider);
             ref.invalidate(homeBannersProvider);
@@ -72,13 +78,8 @@ class HomeScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.only(bottom: HatlySpacing.lg),
             children: [
-              // 1. Location
-              const HomeLocationBar(),
               const PhoneVerificationBanner(),
               const SizedBox(height: HatlySpacing.sm),
-              // 2. Global search
-              const HomeSearchEntry(),
-              const SizedBox(height: HatlySpacing.md),
               // 3. Rotating promo carousel — INDEPENDENT of the product rows below: its own request starts with the screen, and a slow
               // or failed product load can never hold it back. Admin banners when there are any, otherwise the offer-derived promos
               // (available once the snapshot is); nothing → no space.
@@ -180,8 +181,8 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
             ],
-          ),
-        ),
+          ))),
+        ]),
       ),
     );
   }

@@ -189,16 +189,13 @@ class _VendorDetailsContent extends ConsumerWidget {
       child: CustomScrollView(
         slivers: [
           SliverAppBar(
-            title: Text(vendorName),
-            pinned: true,
-            actions: [
-              _FavoriteHeartButton(vendorId: details.vendor.id),
-              const CartIconButton()
-            ],
+            toolbarHeight: 44,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
           ),
           SliverToBoxAdapter(
               child: _VendorHeader(details: details, vendorName: vendorName)),
-          SliverToBoxAdapter(child: _BranchInfoSection(branch: details.branch)),
           if (!details.branch.isOpen)
             const SliverToBoxAdapter(child: _ClosedBanner()),
           // Visual UX (reference comparison): the menu search comes straight after the vendor/branch
@@ -320,86 +317,47 @@ class _VendorDetailsContent extends ConsumerWidget {
 
 class _VendorHeader extends StatelessWidget {
   const _VendorHeader({required this.details, required this.vendorName});
-
   final VendorDetails details;
   final String vendorName;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final p = context.palette;
-
-    const logoSize = 72.0;
-    // Image-first header: a wide cover, the logo overlapping its lower edge, then the name, the rating and the offer badge.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          HatlySpacing.md, HatlySpacing.sm, HatlySpacing.md, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              StoreCoverImage(
-                coverUrl: details.vendor.coverImageUrl,
-                logoUrl: details.vendor.logoUrl,
-                width: double.infinity,
-                height: 140,
-                radius: HatlyRadius.card,
-              ),
-              PositionedDirectional(
-                bottom: -(logoSize / 2),
-                start: HatlySpacing.md,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration:
-                      BoxDecoration(color: p.surface, shape: BoxShape.circle),
-                  child: HatlySoftImage(
-                    url: details.vendor.logoUrl,
-                    width: logoSize,
-                    height: logoSize,
-                    circular: true,
-                    placeholderIcon: Icons.store_outlined,
-                    placeholderIconSize: 30,
-                  ),
-                ),
-              ),
-            ],
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 16, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(HatlyRadius.promoBanner),
+          child: StoreCoverImage(
+            coverUrl: details.vendor.coverImageUrl,
+            logoUrl: details.vendor.logoUrl,
+            width: double.infinity,
+            height: 178,
+            radius: 0,
           ),
-          const SizedBox(height: logoSize / 2 + HatlySpacing.sm),
-          Wrap(
-            spacing: HatlySpacing.sm,
-            runSpacing: HatlySpacing.xs,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(vendorName, style: Theme.of(context).textTheme.titleLarge),
-              if (details.hasPromotion)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: HatlySpacing.sm, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: HatlyColors.primaryOrange,
-                    borderRadius: BorderRadius.circular(HatlyRadius.chip),
-                  ),
-                  child: Text(
-                    l10n.promotionBadge,
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelLarge
-                        ?.copyWith(color: p.accentOn),
-                  ),
-                ),
-            ],
-          ),
-          if (details.ratingCount > 0) ...[
-            const SizedBox(height: HatlySpacing.xs),
-            HatlyRatingInline(
+        ),
+        const SizedBox(height: HatlySpacing.sm),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          HatlySoftImage(url: details.vendor.logoUrl, width: 72, height: 72,
+            circular: true, placeholderIcon: Icons.store_outlined),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(vendorName, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
+              _FavoriteHeartButton(vendorId: details.vendor.id),
+            ]),
+            _BranchInfoSection(branch: details.branch),
+            if (details.ratingCount > 0) Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: HatlyRatingInline(
                 key: const Key('vendor-details-rating'),
                 average: details.ratingAverage,
                 count: details.ratingCount),
-          ],
-        ],
-      ),
+            ),
+          ])),
+        ]),
+      ]),
     );
   }
 }
@@ -419,17 +377,12 @@ class _BranchInfoSection extends StatelessWidget {
     final hoursLabel = todayHoursLabel(branch.openingHours, l10n);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(
-          HatlySpacing.md, HatlySpacing.md, HatlySpacing.md, 0),
-      padding: const EdgeInsets.all(HatlySpacing.ms),
+      margin: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(vertical: 3),
       // Polish pass: was `HatlyColors.background`/`HatlyColors.textMuted`
       // (fixed light-mode constants) — this container stayed a bright
       // off-white box on a dark screen in Dark Mode. `p.surfaceSoft`/
       // `p.textMuted` are the theme-aware equivalents.
-      decoration: BoxDecoration(
-          color: p.surface,
-          border: Border.all(color: p.border),
-          borderRadius: BorderRadius.circular(HatlyRadius.card)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

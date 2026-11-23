@@ -47,7 +47,6 @@ class FavoritesScreen extends ConsumerWidget {
     final favoritesAsync = ref.watch(favoritesControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.favorites)),
       body: favoritesAsync.when(
         loading: () => const HatlyLoadingView(),
         error: (error, stackTrace) => HatlyStateView(

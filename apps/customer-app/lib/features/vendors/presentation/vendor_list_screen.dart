@@ -6,6 +6,8 @@ import '../../../core/theme/hatly_theme.dart';
 import '../../../shared_widgets/filter_action_button.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/hatly_text_field.dart';
+import '../../../shared_widgets/hatly_soft_image.dart';
+import '../../sectors/data/sectors_providers.dart';
 import '../../../shared_widgets/sort_menu_button.dart';
 import '../data/vendor_providers.dart';
 import '../domain/vendor_filters.dart';
@@ -53,6 +55,9 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
     final l10n = AppLocalizations.of(context);
     final title = widget.categoryName ?? l10n.vendorsNearYou;
     final sectorId = widget.category;
+    final sectors = ref.watch(sectorsProvider).valueOrNull ?? const [];
+    final match = sectors.where((s) => s.id == sectorId);
+    final bannerUrl = match.isEmpty ? null : match.first.bannerUrl;
 
     // No sector to scope a paginated/sortable/searchable query to —
     // falls back to the original simple unfiltered preview shape
@@ -83,7 +88,7 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
     final vendorsAsync = ref.watch(vendorListControllerProvider(key));
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(toolbarHeight: 44, backgroundColor: Theme.of(context).scaffoldBackgroundColor, surfaceTintColor: Colors.transparent, elevation: 0),
       // Sector pages always offer the standalone Hatly purchase service,
       // including when no vendors are returned. Not linked to any store.
       bottomNavigationBar: const SafeArea(
@@ -95,6 +100,17 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
       ),
       body: Column(
         children: [
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), child: ClipRRect(
+            borderRadius: BorderRadius.circular(20), child: SizedBox(height: 132, width: double.infinity,
+              child: Stack(fit: StackFit.expand, children: [
+                if (bannerUrl == null) ColoredBox(color: context.palette.accentSoft)
+                else HatlySoftImage(url: bannerUrl, width: double.infinity, height: 132, radius: 0, placeholderIcon: Icons.storefront_outlined),
+                if (bannerUrl != null) const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0x88000000)]))),
+                PositionedDirectional(start: 16, end: 16, bottom: 14, child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: bannerUrl == null ? context.palette.textPrimary : Colors.white))),
+              ]),
+            ),
+          )),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: HatlySpacing.sm),
             child: SubcategoryChipRow(

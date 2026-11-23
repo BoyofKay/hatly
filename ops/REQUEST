@@ -1,3 +1,3 @@
-ACTION=maps-check
+ACTION=deploy
 ARG=
-# Server-side only, unrelated to signed/unsigned Android builds. Retry after restriction propagation.
+# Hatly profile/branding/shift/favorites/sector-banner release candidate; gated backup + restore drill + migration + smoke.

@@ -257,6 +257,7 @@ export class MediaService {
       `SELECT 'vendor' AS type, id, name AS label, 'logo' AS field FROM vendors WHERE (logo_media_asset_id = $1 OR logo_url = ANY($2)) AND deleted_at IS NULL
        UNION ALL SELECT 'branch_cover', id, name, 'cover' FROM vendor_branches WHERE cover_media_asset_id = $1 AND deleted_at IS NULL
        UNION ALL SELECT 'sector', id, name, 'image' FROM marketplace_sectors WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL
+       UNION ALL SELECT 'sector', id, name, 'banner' FROM marketplace_sectors WHERE banner_url = ANY($2) AND deleted_at IS NULL
        UNION ALL SELECT 'subcategory', id, name, 'image' FROM marketplace_subcategories WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL
        UNION ALL SELECT 'banner', id, title, 'image' FROM home_banners WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL
        UNION ALL SELECT 'product', id, name, 'primary image' FROM products WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL

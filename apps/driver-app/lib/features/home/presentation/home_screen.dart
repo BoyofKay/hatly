@@ -84,11 +84,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: Text(context.t('Hatly Driver', 'سائق هاتلي')),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-      ),
       body: Column(
         children: [
           // Driver shifts (2026-11-22): the shift card replaces the online switch when the server has shifts; otherwise the switch below.

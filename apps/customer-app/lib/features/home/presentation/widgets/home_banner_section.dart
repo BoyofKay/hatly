@@ -14,12 +14,12 @@ import 'promo_carousel.dart';
 
 /// The hero banner is the biggest thing on Home: banner images are wide (2 : 1, 1200×600 recommended) and are shown cover-cropped in a
 /// taller card (about 1.7 : 1) so the promotion is prominent on a phone, within a sane range so a tablet does not get a giant one.
-const double kBannerAspect = 1.7;
+const double kBannerAspect = 2.05;
 
 double bannerHeight(double availableWidth) {
   // The card spans the content width (page margin on both sides); the height follows the card, as before (~210 pt on a 390 pt phone).
   final cardWidth = heroBannerCardWidth(availableWidth);
-  return (cardWidth / kBannerAspect).clamp(190.0, 330.0);
+  return (cardWidth / kBannerAspect).clamp(156.0, 272.0);
 }
 
 /// The hero slot at the top of Home. Admin banners win when there are any; otherwise the offer-derived promos (the previous
@@ -126,6 +126,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
               // Endless in both directions; auto-play always glides forward (see LoopingPager).
               child: LoopingPager(
                 count: banners.length,
+                viewportFraction: banners.length == 1 ? 1.0 : .90,
                 autoPlayInterval: widget.autoRotateInterval,
                 autoPlayGlide: const Duration(milliseconds: 900),
                 autoPlayCurve: Curves.easeInOutCubic,
@@ -134,8 +135,8 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                   final title = banner.displayTitle(arabic);
                   return Padding(
                     // Full-width page; the card is inset by exactly the page margin, so it lines up with the content below.
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: kHeroBannerSideMargin, vertical: 6),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: banners.length == 1 ? kHeroBannerSideMargin : 5, vertical: 6),
                     child: Semantics(
                       button: banner.isTappable,
                       label: title,

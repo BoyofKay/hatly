@@ -32,7 +32,7 @@ class OrdersScreen extends StatelessWidget {
       length: OrderListTab.values.length,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(l10n.orders),
+          toolbarHeight: 0,
           bottom: TabBar(
             key: const Key('orders-tabs'),
             tabs: [
