@@ -53,7 +53,7 @@ export interface AddressView {
 const ZONELESS_EDITABLE_FIELDS = new Set(['isDefault', 'label']);
 
 export function isZoneServiceable(zone: DeliveryZone | null | undefined): boolean {
-  return !!zone && zone.isActive && !zone.deletedAt && zone.serviceArea?.isActive !== false;
+  return !!zone && zone.isActive && zone.parentIsActive && zone.isSelectable && !zone.deletedAt && zone.serviceArea?.isActive !== false;
 }
 
 /**
@@ -87,7 +87,7 @@ export class AddressesService {
    * least one active delivery zone.
    */
   async capabilities(): Promise<AddressCapabilities> {
-    const zones = await this.zonesRepository.find({ where: { isActive: true, isSelectable: true }, relations: { serviceArea: true } });
+    const zones = await this.zonesRepository.find({ where: { isActive: true, isSelectable: true, parentIsActive: true }, relations: { serviceArea: true } });
     const manualAvailable = zones.some((z) => isZoneServiceable(z));
     let reason: AddressCapabilities['gps']['reason'] = null;
     if (!this.deliveryFeeCalculation.roadDistancePricingAvailable) {
