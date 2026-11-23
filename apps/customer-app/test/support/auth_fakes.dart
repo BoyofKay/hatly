@@ -79,6 +79,17 @@ class FakeAuthApi implements AuthApi {
   static const tokens =
       AuthTokens(accessToken: 'access-token', refreshToken: 'refresh-token');
 
+  String? profileName = 'Test Customer';
+
+  @override
+  Future<String?> getCurrentFullName() async => profileName;
+
+  @override
+  Future<String> updateFullName(String fullName) async {
+    profileName = fullName.trim();
+    return profileName!;
+  }
+
   @override
   Future<void> deleteAccount({required String password}) async {
     calls.add('deleteAccount');
