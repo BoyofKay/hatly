@@ -54,7 +54,9 @@ void main() {
   testWidgets('on duty: since when, the "take new orders" switch, and "End shift"', (tester) async {
     final api = _FakeShiftApi();
     await _pump(tester, _state(), api);
-    expect(find.textContaining('On duty since 09:05'), findsOneWidget);
+    expect(find.textContaining('09:05'), findsOneWidget);
+    expect(find.byKey(const Key('start-shift')), findsNothing);
+    expect(find.byKey(const Key('end-shift')), findsNothing);
     await tester.tap(find.byKey(const Key('shift-card-toggle')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('accepting-switch')));
@@ -86,9 +88,10 @@ void main() {
   testWidgets('daily allowance: shown on the card; End shift refused with the reason', (tester) async {
     final api = _FakeShiftApi(refuseEndWith: 'SHIFT_ALLOWANCE_OUT');
     await _pump(tester, _state(allowance: 50000), api);
-    expect(find.textContaining('500.00 EGP'), findsOneWidget);
+    expect(find.byKey(const Key('shift-allowance')), findsNothing);
     await tester.tap(find.byKey(const Key('shift-card-toggle')));
     await tester.pumpAndSettle();
+    expect(find.textContaining('500.00 EGP'), findsOneWidget);
     await tester.tap(find.byKey(const Key('end-shift')));
     await tester.pumpAndSettle();
     expect(find.textContaining('Return it at the office'), findsOneWidget);
