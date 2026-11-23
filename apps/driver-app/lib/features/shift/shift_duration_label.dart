@@ -7,7 +7,8 @@ import 'shift_api.dart';
 /// Live elapsed shift time; based exclusively on the server's current shift
 /// start timestamp, not today's date or any inferred clock-in.
 class ShiftDurationLabel extends ConsumerStatefulWidget {
-  const ShiftDurationLabel({super.key});
+  const ShiftDurationLabel({super.key, this.state});
+  final ShiftState? state;
   @override
   ConsumerState<ShiftDurationLabel> createState() => _ShiftDurationLabelState();
 }
@@ -31,7 +32,7 @@ class _ShiftDurationLabelState extends ConsumerState<ShiftDurationLabel> {
 
   @override
   Widget build(BuildContext context) {
-    final shift = ref.watch(shiftStateProvider).valueOrNull;
+    final shift = widget.state ?? ref.watch(shiftStateProvider).valueOrNull;
     if (shift == null || !shift.onDuty || shift.startedAt == null) {
       return const SizedBox.shrink();
     }
