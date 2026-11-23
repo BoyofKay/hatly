@@ -4,6 +4,7 @@ import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../../shared_widgets/hatly_badge.dart';
 import '../../../../shared_widgets/hatly_soft_image.dart';
+import '../../../../shared_widgets/store_cover_image.dart';
 import '../../../../shared_widgets/availability_badge.dart';
 import '../../../../shared_widgets/hatly_rating_inline.dart';
 import '../../../auth/presentation/auth_gate.dart';
@@ -78,11 +79,10 @@ class VendorCard extends StatelessWidget {
                     children: [
                       Greyscale(
                         enabled: !vendor.isOpen,
-                        child: HatlySoftImage(
-                          url: vendor.coverImageUrl ?? vendor.logoUrl,
+                        child: StoreCoverImage(
+                          coverUrl: vendor.coverImageUrl,
+                          logoUrl: vendor.logoUrl,
                           width: 92, height: 92, radius: 14,
-                          placeholderIcon: Icons.storefront_outlined,
-                          placeholderIconSize: 34,
                         ),
                       ),
                       if (vendor.coverImageUrl != null &&
