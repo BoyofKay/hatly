@@ -439,7 +439,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
               ),
               const SizedBox(height: HatlySpacing.ms),
               _dropdown<String>(
-                key: ValueKey('address-neighborhood-$_governorate-$_city-$_parentZoneAr'),
+                key: ValueKey('address-zone-$_governorate-$_city-$_parentZoneAr'),
                 label: arabic ? 'الحي / القرية' : 'Neighborhood / Village',
                 value: _zoneId,
                 errorText: zoneMissing ? l10n.addressZoneRequired : null,
