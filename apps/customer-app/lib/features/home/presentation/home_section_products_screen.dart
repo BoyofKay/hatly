@@ -7,7 +7,7 @@ import '../../../shared_widgets/hatly_badge.dart';
 import '../../../shared_widgets/hatly_loading_view.dart';
 import '../../../shared_widgets/hatly_soft_image.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
-import '../../products/presentation/widgets/product_card.dart';
+import '../../products/presentation/widgets/product_grid_card.dart';
 import '../data/home_banners_providers.dart';
 import '../data/home_providers.dart';
 import '../domain/home_banner.dart';
@@ -71,14 +71,7 @@ class HomeSectionProductsScreen extends ConsumerWidget {
                 ],
               );
             }
-            return LayoutBuilder(builder: (context, constraints) {
-              const gap = HatlySpacing.md;
-              final columns = constraints.maxWidth >= 600 ? 3 : 2;
-              final width = (constraints.maxWidth -
-                      HatlySpacing.screenPadding * 2 -
-                      gap * (columns - 1)) /
-                  columns;
-              return RefreshIndicator(
+            return RefreshIndicator(
                 onRefresh: () async {
                   ref.invalidate(homeSectionProductsProvider(kind));
                   await ref
@@ -97,22 +90,17 @@ class HomeSectionProductsScreen extends ConsumerWidget {
                         _OfferBannerCard(banner: banner),
                         const SizedBox(height: HatlySpacing.md),
                       ],
-                      Wrap(
-                        spacing: gap,
-                        runSpacing: gap,
+                      TwoColumnRows(
                         children: [
                           for (final entry in entries)
-                            ProductCard(
-                              key: Key(
-                                  'home-section-product-${entry.product.id}'),
+                            ProductGridCard(
+                              key: Key('home-section-product-${entry.product.id}'),
                               product: entry.product,
-                              width: width,
                               extraBadge: entry.tag == HomeProductTag.newItem
-                                  ? HatlyBadgeKind.newItem
-                                  : null,
-                              elevated: false,
-                              onTap: () =>
-                                  context.push(productRoute(entry.product.id)),
+                                  ? HatlyBadgeKind.newItem : null,
+                              onTap: () => context.push(productRoute(entry.product.id)),
+                              onQuickAdd: () => handleQuickAdd(
+                                context, ref, entry.product.id),
                             ),
                         ],
                       ),
@@ -120,7 +108,6 @@ class HomeSectionProductsScreen extends ConsumerWidget {
                   ),
                 ),
               );
-            });
           },
         ),
       ),

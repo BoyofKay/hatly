@@ -18,11 +18,12 @@ import 'product_list_tile.dart';
 /// with options always go through the product page.
 class ProductGridCard extends StatelessWidget {
   const ProductGridCard(
-      {super.key, required this.product, required this.onTap, this.onQuickAdd});
+      {super.key, required this.product, required this.onTap, this.onQuickAdd, this.extraBadge});
 
   final Product product;
   final VoidCallback onTap;
   final VoidCallback? onQuickAdd;
+  final HatlyBadgeKind? extraBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +50,13 @@ class ProductGridCard extends StatelessWidget {
           offer.isFlashSale ? HatlyBadgeKind.flashSale : HatlyBadgeKind.offer;
       badgeLabel = offer.isFlashSale ? l10n.badgeFlashSale : l10n.badgeOffer;
     }
-    final showAdd = onQuickAdd != null && ProductListTile.canQuickAdd(product);
+    final closedStore = product.vendor?.isOpen == false;
+    if (badgeKind == null && extraBadge != null) {
+      badgeKind = extraBadge;
+      badgeLabel = l10n.badgeNew;
+    }
+    final showAdd = onQuickAdd != null && product.isAvailable &&
+        ProductListTile.canQuickAdd(product);
 
     return Opacity(
       opacity: product.isAvailable ? 1 : 0.6,
@@ -95,7 +102,7 @@ class ProductGridCard extends StatelessWidget {
                           child: HatlyQuickAddButton(
                             key: Key('product-quick-add-${product.id}'),
                             tooltip: l10n.promoCtaProduct,
-                            onPressed: onQuickAdd!,
+                            onPressed: closedStore ? null : onQuickAdd,
                           ),
                         ),
                     ],
