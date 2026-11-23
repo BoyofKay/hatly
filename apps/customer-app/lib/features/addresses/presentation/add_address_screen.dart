@@ -125,8 +125,12 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     }
     _governorate = current.governorateAr;
     _city = current.cityAr;
-    _parentZoneAr = current.parentZoneKey;
-    if (zones.any((z) => z.id == current.id)) _zoneId = current.id;
+    // A legacy combined parent can be hidden after safe migration while
+    // existing addresses still refer to its original ID. Never put a missing
+    // dropdown value into Flutter (which would assert and crash the editor).
+    final currentIsSelectable = zones.any((z) => z.id == current.id);
+    _parentZoneAr = currentIsSelectable ? current.parentZoneKey : null;
+    if (currentIsSelectable) _zoneId = current.id;
   }
 
   /// Data-driven, never hardcoded: when the backend offers exactly ONE governorate / city / active zone for the current
@@ -365,7 +369,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (existing != null && existing.needsZoneSelection && _zoneId == null) ...[
+              if (existing != null && _zoneId == null) ...[
                 HatlySurface(
                   key: const Key('address-zone-banner'),
                   borderColor: p.urgent,
