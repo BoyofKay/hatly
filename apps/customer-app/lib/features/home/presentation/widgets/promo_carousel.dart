@@ -15,7 +15,7 @@ import 'promo_cta_button.dart';
 /// promo. It is presentation-only: [onAction] decides what a CTA does.
 /// The hero banner's proportions: each card is about 1.6 : 1 (it used to be ~2 : 1, a thin strip), within a sane range so a
 /// tablet does not get a giant banner and a small phone still gets a full-size one.
-const double kPromoBannerAspect = 1.5;
+const double kPromoBannerAspect = 2.05;
 /// Each banner page spans the FULL width and insets its card by the page margin, so the card's edges line up with the rest of the Home
 /// content (owner, 2026-11-13: the former 0.92 viewport made a narrower, centred card with neighbours peeking in at both sides).
 const double kHeroBannerSideMargin = HatlySpacing.screenPadding;
@@ -23,8 +23,8 @@ const double kHeroBannerSideMargin = HatlySpacing.screenPadding;
 /// Width of the banner card on a screen [availableWidth] wide: the content width between the two page margins.
 double heroBannerCardWidth(double availableWidth) =>
     availableWidth - 2 * kHeroBannerSideMargin;
-const double kPromoBannerMinHeight = 210;
-const double kPromoBannerMaxHeight = 320;
+const double kPromoBannerMinHeight = 156;
+const double kPromoBannerMaxHeight = 272;
 
 double promoBannerHeight(double availableWidth) {
   final cardWidth = heroBannerCardWidth(availableWidth);
@@ -78,12 +78,13 @@ class _PromoCarouselState extends State<PromoCarousel> {
               // Endless in both directions; auto-play always glides forward (see LoopingPager).
               child: LoopingPager(
                 count: promos.length,
+                viewportFraction: promos.length == 1 ? 1.0 : .94,
                 autoPlayInterval: widget.autoRotateInterval,
                 autoPlayGlide: const Duration(milliseconds: 900),
                 autoPlayCurve: Curves.easeInOutCubic,
                 itemBuilder: (context, index) => Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: kHeroBannerSideMargin),
+                      horizontal: 5),
                   child: _PromoCard(
                       promo: promos[index],
                       onAction: () => widget.onAction(promos[index])),
