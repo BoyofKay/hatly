@@ -54,3 +54,11 @@ No user-initiated request for Google Maps live tracking was made. Do not build i
 ## Live Google validation result (2026-11-23 19:02 UTC)
 
 After the repository secret was added, Production Ops `maps-check` run `45244749365` reached Google Routes from the live backend but was refused: `HTTP 400 INVALID_ARGUMENT`, reason `API_KEY_INVALID`. This indicates the secret value is not a valid Google API key (or the key has been deleted/invalidated), **not** an IP restriction error. `MAPS_PROVIDER` remained `none` and no backend restart was made. Owner action: copy the actual key **value** (not display name or key ID) from the Hatly Google Cloud project and **Update** existing GitHub Actions `PROD_GOOGLE_MAPS_API_KEY` secret. Run `maps-check` again before `maps-on`; do not enable Maps after a failed preflight. No key material is recorded in logs or this document.
+
+## 2026-11-23 follow-up — restricted IP mismatch (confirmed by read-only status)
+
+- Corrected GitHub secret is now accepted as a key, but preflight run **45248219198** failed with `Routes HTTP 403 PERMISSION_DENIED reason=ACCESS_DENIED`. Maps remains disabled.
+- Read-only Production Ops status run **45248423794** executed inside the **live backend container** and verified outbound IPv4: **`152.228.240.4`**. Running release is still `20261123T174407Z-bafe081b4e55`, `MAPS_PROVIDER=none`, services healthy.
+- User previously configured `151.254.63.33` in the Google Cloud key's IP restriction. This mismatches the server's confirmed outbound IP; likely reason for 403.
+- **Required owner action:** In Google Cloud Credentials edit the existing key's **application restriction** to `152.228.240.4`; keep Routes and Geocoding as the only allowed APIs and retain GitHub secret unchanged. Allow restrictions to propagate.
+- **After owner changes restriction:** Repeat `ACTION=maps-check`; only if that passes use `ACTION=maps-on` and verify live container mode/health. Never bypass the IP restriction or activate after a failed check.
