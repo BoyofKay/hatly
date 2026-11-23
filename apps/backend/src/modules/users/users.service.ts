@@ -42,6 +42,10 @@ export class UsersService {
     });
   }
 
+  async setFullName(userId: string, fullName: string): Promise<void> {
+    await this.usersRepository.update({ id: userId }, { fullName: fullName.trim().replace(/\s+/g, ' ') });
+  }
+
   findById(id: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { id } });
   }

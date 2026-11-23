@@ -395,9 +395,19 @@ export class AuthService {
    * instruction that cannot be followed. `phoneVerificationAvailable` says nothing about whether the phone IS verified: with OTP
    * off an unverified phone simply stays unverified.
    */
-  async getPhoneVerificationStatus(userId: string): Promise<{ isPhoneVerified: boolean; phoneVerificationAvailable: boolean }> {
-    const isPhoneVerified = await this.getIsPhoneVerified(userId);
-    return { isPhoneVerified, phoneVerificationAvailable: await this.businessConfigService.isCustomerOtpEnabled() };
+  async getPhoneVerificationStatus(userId: string): Promise<{ isPhoneVerified: boolean; phoneVerificationAvailable: boolean; fullName: string }> {
+    const user = await this.usersService.findById(userId);
+    if (!user || user.role !== Role.CUSTOMER) throw new UnauthorizedException();
+    return { isPhoneVerified: user.isPhoneVerified, phoneVerificationAvailable: await this.businessConfigService.isCustomerOtpEnabled(), fullName: user.fullName };
+  }
+
+  /** The authenticated customer's own name; no account id, phone or password write. */
+  async updateCustomerFullName(userId: string, name: string): Promise<string> {
+    const user = await this.usersService.findById(userId);
+    if (!user || user.role !== Role.CUSTOMER) throw new UnauthorizedException();
+    const fullName = name.trim().replace(/\s+/g, ' ');
+    await this.usersService.setFullName(userId, fullName);
+    return fullName;
   }
 
   private refreshTtlSeconds(): number {

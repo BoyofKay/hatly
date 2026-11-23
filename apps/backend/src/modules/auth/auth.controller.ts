@@ -20,6 +20,7 @@ import { CustomerPasswordRegisterDto } from './dto/customer-password-register.dt
 import { CustomerRegistrationCodeRequestDto } from './dto/customer-registration-code-request.dto';
 import { CustomerPasswordSetupDto } from './dto/customer-password-setup.dto';
 import { VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
+import { UpdateFullNameDto } from '../users/dto/update-full-name.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -211,5 +212,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async me(@CurrentUser() user: AuthenticatedUser) {
     return { data: await this.authService.getPhoneVerificationStatus(user.id) };
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(Role.CUSTOMER)
+  @Patch('customer/name')
+  async updateCustomerName(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateFullNameDto) {
+    return { data: { fullName: await this.authService.updateCustomerFullName(user.id, dto.fullName) } };
   }
 }
