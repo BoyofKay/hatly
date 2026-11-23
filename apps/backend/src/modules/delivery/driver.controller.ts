@@ -51,6 +51,12 @@ export class DriverController {
     private readonly driverOverviewService: DriverOverviewService,
   ) {}
 
+  /** Read-only display name; only the Admin Panel may edit a driver's name. */
+  @Get('profile')
+  async profile(@CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.driverProfileService.getProfileName(user.id) };
+  }
+
   /** Shift (owner decision 2026-11-22): on/off duty, the open shift, and whether the driver may end it now (and why not). */
   @Get('shift')
   async shift(@CurrentUser() user: AuthenticatedUser) {
