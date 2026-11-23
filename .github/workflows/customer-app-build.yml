@@ -78,11 +78,28 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/out/hatly-customer-$V.apk"
           (cd "$RUNNER_TEMP/out" && sha256sum * > SHA256SUMS && ls -l && cat SHA256SUMS)
 
+      # The Play Store bundle (.aab) as a normal artifact (GitHub always zips artifacts).
       - uses: actions/upload-artifact@v4
         with:
-          name: customer-app-${{ steps.build.outputs.version }}
-          path: ${{ runner.temp }}/out/
+          name: customer-app-${{ steps.build.outputs.version }}-aab
+          path: |
+            ${{ runner.temp }}/out/*.aab
+            ${{ runner.temp }}/out/SHA256SUMS
           retention-days: 30
+
+      # Owner request 2026-11-23: the phone install file must NOT be inside a zip (phone file managers block installing from zips).
+      # It is attached to a GitHub pre-release instead, where it downloads as a plain .apk (Releases page, or the link in the summary).
+      - name: APK as a direct download (GitHub release)
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.build.outputs.version }}
+        run: |
+          TAG="customer-app-v${V//+/-b}-run$GITHUB_RUN_ID"
+          gh release create "$TAG" "$RUNNER_TEMP"/out/*.apk --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+            --title "Customer app $V (install file)" \
+            --notes "Android install file (.apk) for the customer app $V. Open this page on the phone, tap the .apk under Assets, then install. Build run $GITHUB_RUN_ID."
+          echo "url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Summary + record
         if: always()
@@ -92,6 +109,7 @@ jobs:
             echo "### Customer app ${{ steps.build.outputs.version }} — ${{ job.status }}"
             if [ "${{ steps.sign.outputs.signed }}" = yes ]; then echo "Signed with the **upload key** → the .aab can go to Google Play."; else echo "**Debug-signed** (no keystore secrets) → install the .apk on a phone to test; Google Play will reject it."; fi
             echo "Push notifications: ${{ steps.sign.outputs.push }}"
+            echo "APK (direct download, no zip): ${{ steps.release.outputs.url }}"
           } | tee -a "$GITHUB_STEP_SUMMARY" > "$RUNNER_TEMP/rec.txt"
           cat "$RUNNER_TEMP/out/SHA256SUMS" >> "$RUNNER_TEMP/rec.txt" 2>/dev/null || true
           git config user.name "hatly-ops"; git config user.email "ops@users.noreply.github.com"
