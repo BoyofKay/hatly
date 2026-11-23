@@ -6,6 +6,7 @@ import '../../deliveries/domain/delivery.dart';
 import '../../deliveries/presentation/status_labels.dart';
 import '../../../core/localization/bilingual.dart';
 import '../../../core/utils/money.dart';
+import '../../earnings/domain/earnings.dart';
 import '../../../shared_widgets/driver_ui.dart';
 
 /// Real Driver Home — online/offline toggle (wired to the real
@@ -76,6 +77,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final deliveriesAsync = ref.watch(deliveriesProvider);
     final isOnline = onlineAsync.valueOrNull ?? false;
     // Money is secondary here: if it cannot be read the orders still work, so a failure is simply "no figure".
+    final shift = ref.watch(earningsProvider).valueOrNull?.open;
     final deliveredToday = ref.watch(earningsProvider).valueOrNull?.deliveredToday;
     final orange = Theme.of(context).colorScheme.primary;
 
@@ -138,6 +140,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 const SizedBox(width: 10),
                 KpiTile(label: context.t('Delivered today', 'سُلّم اليوم'), value: deliveredToday == null ? '—' : '$deliveredToday'),
               ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text('${context.t('Current shift', 'الوردية الحالية')}: ${shiftDurationLabel(shift?.periodStart, arabic: context.isArabic)}', key: const Key('orders-shift-duration'), style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
           ),
           Expanded(
