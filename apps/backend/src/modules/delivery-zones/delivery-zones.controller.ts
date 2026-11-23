@@ -19,6 +19,8 @@ export class DeliveryZonesController {
     return {
       data: zones.map((z) => ({
         id: z.id,
+        zoneName: z.zoneName,
+        zoneNameAr: z.zoneNameAr,
         name: z.name,
         nameAr: z.nameAr,
         city: z.city,
