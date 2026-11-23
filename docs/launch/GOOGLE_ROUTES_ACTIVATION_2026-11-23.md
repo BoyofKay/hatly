@@ -50,3 +50,7 @@ Rollback is **ACTION=maps-off** using the same Production Ops workflow; the exis
 - `.github/workflows/ci.yml` — syntax-checks production operations scripts.
 
 No user-initiated request for Google Maps live tracking was made. Do not build it.
+
+## Live Google validation result (2026-11-23 19:02 UTC)
+
+After the repository secret was added, Production Ops `maps-check` run `45244749365` reached Google Routes from the live backend but was refused: `HTTP 400 INVALID_ARGUMENT`, reason `API_KEY_INVALID`. This indicates the secret value is not a valid Google API key (or the key has been deleted/invalidated), **not** an IP restriction error. `MAPS_PROVIDER` remained `none` and no backend restart was made. Owner action: copy the actual key **value** (not display name or key ID) from the Hatly Google Cloud project and **Update** existing GitHub Actions `PROD_GOOGLE_MAPS_API_KEY` secret. Run `maps-check` again before `maps-on`; do not enable Maps after a failed preflight. No key material is recorded in logs or this document.
