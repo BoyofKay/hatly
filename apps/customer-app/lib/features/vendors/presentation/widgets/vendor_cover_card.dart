@@ -3,6 +3,7 @@ import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../../shared_widgets/hatly_badge.dart';
 import '../../../../shared_widgets/hatly_soft_image.dart';
+import '../../../../shared_widgets/store_cover_image.dart';
 import '../../../../shared_widgets/ltr_text.dart';
 import '../../../../shared_widgets/greyscale.dart';
 import '../../domain/opening_hours.dart';
@@ -82,12 +83,12 @@ class VendorCoverCard extends StatelessWidget {
                   children: [
                     Greyscale(
                       enabled: !vendor.isOpen,
-                      child: HatlySoftImage(
-                        url: vendor.coverImageUrl,
+                      child: StoreCoverImage(
+                        coverUrl: vendor.coverImageUrl,
+                        logoUrl: vendor.logoUrl,
                         width: double.infinity,
                         height: coverHeight,
                         radius: HatlyRadius.card,
-                        placeholderIcon: Icons.storefront_outlined,
                       ),
                     ),
                     if (vendor.hasPromotion)
