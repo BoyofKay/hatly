@@ -32,7 +32,8 @@ class CustomRequestAction extends ConsumerWidget {
   /// Test hook — same pattern as HatlyServiceScreen's own
   /// `pickImageOverride`; lets a test control image-pick timing without
   /// touching the real OS picker. Always null in production.
-  f
+  final Future<XFile?> Function()? pickImageOverride;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -97,10 +98,6 @@ class CustomRequestAction extends ConsumerWidget {
           key: const Key('custom-request-hint'),
           textAlign: TextAlign.center,
           style: context.type.caption.copyWith(color: p.textMuted)),
-      ],
-    );
-  }
-n.copyWith(color: p.textMuted)),
       ],
     );
   }
