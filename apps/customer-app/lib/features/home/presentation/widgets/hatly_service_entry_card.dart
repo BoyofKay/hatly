@@ -55,15 +55,19 @@ class HatlyServiceEntryCard extends StatelessWidget {
                     Text(l10n.hatlyServiceEntrySubtitle, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, height: 1.5, fontSize: 13.5)),
                     const SizedBox(height: 17),
                     Row(children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Text(ar ? 'اطلب من أي مكان' : 'Request from any place', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, fontSize: 12)),
-                          const SizedBox(width: 5),
-                          Icon(ar ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded, size: 17, color: p.accent),
-                        ]),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                          child: Text(ar ? 'اطلب من أي مكان' : 'Request from any place',
+                            softWrap: true,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, fontSize: 12)),
+                        ),
                       ),
+                      const SizedBox(width: 10),
+                      Icon(ar ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded, size: 24, color: Colors.white),
                       const Spacer(),
                       const Icon(Icons.delivery_dining_rounded, color: Colors.white, size: 30),
                     ]),
