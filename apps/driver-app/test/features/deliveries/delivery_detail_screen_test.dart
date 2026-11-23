@@ -14,6 +14,8 @@ import 'package:hatly_driver/features/deliveries/presentation/delivery_detail_sc
 class FakeDriverApi implements DriverApi {
   @override
   Future<bool?> getOnlineStatus() async => null;
+  @override
+  Future<String?> getProfileName() async => 'Test driver';
   FakeDriverApi(this._delivery);
 
   Delivery _delivery;
@@ -43,7 +45,7 @@ class FakeDriverApi implements DriverApi {
   Future<DriverEarnings> getEarnings() async => throw UnimplementedError();
 
   @override
-  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20}) async => throw UnimplementedError();
+  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20, String? scope}) async => throw UnimplementedError();
 
   @override
   Future<T> retryTransient<T>(Future<T> Function() op, {int attempts = 3, Duration pause = const Duration(milliseconds: 800)}) => op();
