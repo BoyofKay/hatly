@@ -184,10 +184,19 @@ function makeProduct(id: string, vendorBranchId: string) {
 
 /** `sector`: the branch's marketplace sector — by default one whose admin setting allows custom requests (most tests are about other things). */
 function makeBranch(id: string, sector: { isActive: boolean; customRequestsEnabled: boolean } | null = { isActive: true, customRequestsEnabled: true }) {
-  return { id, isActive: true, pickupEnabled: true, vendor: { name: `Vendor ${id}`, isActive: true }, marketplaceSector: sector };
+  return { id, isActive: true, isOpen: true, pickupEnabled: true, vendor: { name: `Vendor ${id}`, isActive: true }, marketplaceSector: sector };
 }
 
 describe('CartService', () => {
+  it('rejects adding a product to a closed store while retaining menu visibility', async () => {
+    const product = makeProduct('p1', 'branch-1');
+    const branch = { ...makeBranch('branch-1'), isOpen: false };
+    const { service } = buildHarness([product], [branch]);
+    await expect(service.addItem('customer-1', { productId: 'p1', quantity: 1 })).rejects.toMatchObject({
+      response: { details: { code: 'STORE_CLOSED' } },
+    });
+  });
+
   it('rejects a 4th distinct vendor with MAX_VENDOR_GROUPS_EXCEEDED', async () => {
     const products = [1, 2, 3, 4].map((n) => makeProduct(`p${n}`, `branch-${n}`));
     const branches = [1, 2, 3, 4].map((n) => makeBranch(`branch-${n}`));
