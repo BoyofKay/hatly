@@ -355,6 +355,31 @@ export default function DeliveryZonesPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  /** UTF-8 CSV for reviewing ALL locality names, including multi-name legacy records.
+   * No database mutation; the operator can share this file for accurate bilingual translation.
+   */
+  function exportLocalityInventory() {
+    if (!zones?.length) return;
+    const columns = [
+      'id', 'serviceAreaId', 'zoneNameAr', 'zoneName', 'nameAr', 'name',
+      'governorateAr', 'governorate', 'cityAr', 'city',
+      'deliveryFeeMinor', 'isActive', 'isSelectable',
+    ] as const;
+    const cell = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const csv = [
+      columns.join(','),
+      ...zones.map((zone) => columns.map((key) => cell(zone[key as keyof DeliveryZone])).join(',')),
+    ].join('\r\n');
+    const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'hatly-neighborhoods-translation-inventory.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
   async function toggle(zone: DeliveryZone) {
     setError(null);
     try {
@@ -407,6 +432,14 @@ export default function DeliveryZonesPage() {
         />
       )}
 
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button type="button" data-testid="export-neighborhood-inventory" disabled={!zones?.length}
+          onClick={exportLocalityInventory}
+          className="min-h-[44px] rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-800 disabled:opacity-40">
+          {tl('Export Arabic / English neighborhoods (CSV)', 'تصدير الأحياء والقرى بالعربية والإنجليزية (CSV)')}
+        </button>
+        <span className="text-xs text-gray-500">{tl('Read-only, includes legacy combined entries for translation review.', 'للمراجعة فقط، ويتضمن السجلات القديمة المجمعة للتحقق من الترجمة.')}</span>
+      </div>
       <div className="mt-4 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600">
         One row = one neighborhood/village, with one Arabic name, one English name and its own delivery fee.
         Existing delivery zones can contain multiple separately priced neighborhoods.
