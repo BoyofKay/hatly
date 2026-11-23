@@ -27,7 +27,7 @@ import '../../domain/product.dart';
 /// was aligned to theme tokens.
 class ProductListTile extends StatelessWidget {
   const ProductListTile(
-      {super.key, required this.product, required this.onTap, this.onQuickAdd});
+      {super.key, required this.product, required this.onTap, this.onQuickAdd, this.orderingDisabled = false});
 
   final Product product;
   final VoidCallback onTap;
@@ -37,6 +37,8 @@ class ProductListTile extends StatelessWidget {
   /// page (weight / option choice); the caller's handler still hands off to the
   /// product page if the backend asks for a choice anyway.
   final VoidCallback? onQuickAdd;
+  /// Browse a closed store, but show its quick-add affordance disabled.
+  final bool orderingDisabled;
 
   static bool canQuickAdd(Product product) =>
       product.isAvailable && !product.isWeighted && product.options.isEmpty;
@@ -211,12 +213,12 @@ class ProductListTile extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (onQuickAdd != null && canQuickAdd(product)) ...[
+                    if ((onQuickAdd != null || orderingDisabled) && canQuickAdd(product)) ...[
                       const SizedBox(width: HatlySpacing.sm),
                       HatlyQuickAddButton(
                         key: Key('product-quick-add-${product.id}'),
                         tooltip: l10n.promoCtaProduct,
-                        onPressed: onQuickAdd!,
+                        onPressed: orderingDisabled ? null : onQuickAdd,
                         quiet: true,
                       ),
                     ],
