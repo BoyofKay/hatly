@@ -55,6 +55,10 @@ export class MarketplaceSector extends BaseEntity {
   @Column({ name: 'image_url', type: 'varchar', length: 500, nullable: true })
   imageUrl?: string | null;
 
+  /** Independent wide hero asset; category tile remains imageUrl. */
+  @Column({ name: 'banner_url', type: 'varchar', length: 500, nullable: true })
+  bannerUrl?: string | null;
+
   /**
    * Admin-managed: may a customer send a free-text / photo "custom request" ("لا تجد ما تبحث عنه؟") to a vendor of this sector,
    * to be priced by the vendor? OFF by default — it only makes sense where a vendor can source an item that is not on the menu

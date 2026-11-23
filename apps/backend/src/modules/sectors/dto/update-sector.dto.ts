@@ -31,6 +31,12 @@ export class UpdateSectorDto {
   @MaxLength(500)
   imageUrl?: string;
 
+  /** Wide sector hero banner, independent of the square sector icon. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  bannerUrl?: string | null;
+
   /** May customers send custom (free-text / photo) requests to vendors of this sector? */
   @IsOptional()
   @IsBoolean()

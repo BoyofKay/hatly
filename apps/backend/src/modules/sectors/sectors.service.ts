@@ -32,6 +32,7 @@ export class SectorsService {
         sortOrder: dto.sortOrder ?? 0,
         isActive: dto.isActive ?? true,
         imageUrl: dto.imageUrl ?? null,
+        bannerUrl: dto.bannerUrl ?? null,
         customRequestsEnabled: dto.customRequestsEnabled ?? false,
       }),
     );
@@ -69,6 +70,7 @@ export class SectorsService {
     if (dto.nameAr !== undefined) sector.nameAr = dto.nameAr;
     if (dto.sortOrder !== undefined) sector.sortOrder = dto.sortOrder;
     if (dto.imageUrl !== undefined) sector.imageUrl = dto.imageUrl;
+    if (dto.bannerUrl !== undefined) sector.bannerUrl = dto.bannerUrl;
     if (dto.customRequestsEnabled !== undefined) sector.customRequestsEnabled = dto.customRequestsEnabled;
     return this.sectorsRepository.save(sector);
   }

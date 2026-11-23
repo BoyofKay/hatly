@@ -12,6 +12,7 @@ class MarketplaceSector {
     required this.slug,
     required this.sortOrder,
     this.imageUrl,
+    this.bannerUrl,
   });
 
   final String id;
@@ -28,6 +29,8 @@ class MarketplaceSector {
   /// Optional category photo (Image Tile). Not returned by the backend yet;
   /// read defensively so it lights up as soon as it is.
   final String? imageUrl;
+  /// Independent, Admin-configured wide hero (nullable for old sectors).
+  final String? bannerUrl;
 
   factory MarketplaceSector.fromJson(Map<String, dynamic> json) {
     return MarketplaceSector(
@@ -37,6 +40,7 @@ class MarketplaceSector {
       slug: json['slug'] as String,
       sortOrder: json['sortOrder'] as int,
       imageUrl: json['imageUrl'] as String?,
+      bannerUrl: json['bannerUrl'] as String?,
     );
   }
 }
