@@ -1,0 +1,3 @@
+Choose your delivery zone, then your neighborhood or village.
+Delivery fees now depend on the selected neighborhood or village.
+Addresses display as Zone | Neighborhood/Village.
