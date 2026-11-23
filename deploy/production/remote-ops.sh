@@ -263,6 +263,16 @@ SQL
       "$PD/current/deploy/production/prod.sh" apps || true
       exit 1
     fi
+    expected_mode=none
+    [ "$action" = maps-on ] && expected_mode=google
+    actual_mode="$($SUDO docker exec hatly-prod-backend-1 node -e 'process.stdout.write(process.env.MAPS_PROVIDER || "")')"
+    if [ "$actual_mode" != "$expected_mode" ]; then
+      echo "MAPS MODE MISMATCH: the running backend did not load the requested setting — restoring previous environment"
+      $SUDO cp -p "$BAK" "$ENVF"
+      "$PD/current/deploy/production/prod.sh" apps || true
+      exit 1
+    fi
+    echo "PASS live backend MAPS_PROVIDER=$actual_mode"
     "$PD/current/deploy/production/prod.sh" status
     ;;
   *) echo "unknown action $action"; exit 2;;
