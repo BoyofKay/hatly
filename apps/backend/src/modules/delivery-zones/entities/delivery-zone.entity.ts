@@ -67,6 +67,10 @@ export class DeliveryZone extends BaseEntity {
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
 
+  /** Parent status is independent of each child's active status. */
+  @Column({ name: 'parent_is_active', type: 'boolean', default: true })
+  parentIsActive: boolean;
+
   /** Metadata only — never a pricing/serviceability input. Both null or both set. */
   @Column({ name: 'representative_latitude', type: 'double precision', nullable: true })
   representativeLatitude?: number | null;
