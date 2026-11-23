@@ -70,18 +70,26 @@ export class DriverOverviewService {
     const page = Math.max(1, Number(q.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(q.limit) || 20));
     const lastEnd = await this.lastClosingEnd(driver.id);
+    // Membership is by an actual open shift. A finished order immediately
+    // moves to Previous when the shift ends (even if office closing is later).
+    const [openShift] = await this.ds.query(
+      'SELECT started_at FROM driver_shifts WHERE driver_id = $1 AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1',
+      [driver.id],
+    );
+    const openShiftStart = openShift?.started_at ? new Date(openShift.started_at).toISOString() : null;
     const range = tab === 'previous' ? this.range(q) : null;
 
-    const params: unknown[] = [driver.id, lastEnd];
+    const params: unknown[] = [driver.id, lastEnd, openShiftStart];
     const at = `coalesce(d.delivered_at, o.updated_at)`;
     const settled = `EXISTS (SELECT 1 FROM driver_settlement_period_orders so WHERE so.order_id = o.id)`;
     const active = `o.status::text NOT IN ('DELIVERED','CANCELLED','FAILED_DELIVERY','RETURNED')`;
-    // Today: still with him, or finished since his last closing and not settled. Previous: everything else (settled, or finished before it).
-    const todaySet = `(${active} OR (NOT ${settled} AND ($2::timestamptz IS NULL OR ${at} > $2::timestamptz OR o.status::text = 'DELIVERED')))`;
+    // Keep active orders visible even after a supervisor force-end (safety).
+    // Finished orders belong to Current only while their shift is still open.
+    const todaySet = `(${active} OR (NOT ${settled} AND $3::timestamptz IS NOT NULL AND ${at} >= $3::timestamptz))`;
     const where = [`d.driver_id = $1`, `d.deleted_at IS NULL`, `o.deleted_at IS NULL`, tab === 'today' ? todaySet : `NOT ${todaySet}`];
     if (range) {
       params.push(range.from, range.to);
-      where.push(`(${at} AT TIME ZONE '${CAIRO}')::date BETWEEN $3::date AND $4::date`);
+      where.push(`(${at} AT TIME ZONE '${CAIRO}')::date BETWEEN $4::date AND $5::date`);
     }
     if (status) {
       const map: Record<OrderStatusFilter, string> = {
@@ -112,10 +120,10 @@ export class DriverOverviewService {
 
     // KPIs over the whole window (not the page), ignoring search/status so the numbers describe the shift / the range.
     const kWhere = [`d.driver_id = $1`, `d.deleted_at IS NULL`, `o.deleted_at IS NULL`, tab === 'today' ? todaySet : `NOT ${todaySet}`];
-    const kParams: unknown[] = [driver.id, lastEnd];
+    const kParams: unknown[] = [driver.id, lastEnd, openShiftStart];
     if (range) {
       kParams.push(range.from, range.to);
-      kWhere.push(`(${at} AT TIME ZONE '${CAIRO}')::date BETWEEN $3::date AND $4::date`);
+      kWhere.push(`(${at} AT TIME ZONE '${CAIRO}')::date BETWEEN $4::date AND $5::date`);
     }
     const [k] = await this.ds.query(
       `SELECT count(*) FILTER (WHERE o.status::text = 'DELIVERED')::int AS completed,
@@ -126,7 +134,7 @@ export class DriverOverviewService {
     );
     const ignoredWindow = range
       ? { sql: `(a.created_at AT TIME ZONE '${CAIRO}')::date BETWEEN $2::date AND $3::date`, params: [driver.id, range.from, range.to] }
-      : { sql: `($2::timestamptz IS NULL OR a.created_at > $2::timestamptz)`, params: [driver.id, lastEnd] };
+      : { sql: `($2::timestamptz IS NOT NULL AND a.created_at >= $2::timestamptz)`, params: [driver.id, openShiftStart] };
     const [ig] = await this.ds.query(
       `SELECT count(DISTINCT a.order_id)::int AS n FROM dispatch_attempts a WHERE a.driver_id = $1 AND a.outcome = 'ACKNOWLEDGEMENT_OVERDUE' AND ${ignoredWindow.sql}`,
       ignoredWindow.params,
