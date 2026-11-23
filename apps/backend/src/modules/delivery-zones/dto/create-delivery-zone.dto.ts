@@ -32,25 +32,25 @@ export class CreateDeliveryZoneDto {
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
-  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter a single name, not a list.' })
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter a single name, not a list.' })
   zoneName: string;
 
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
-  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter a single name, not a list.' })
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter a single name, not a list.' })
   zoneNameAr: string;
 
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
-  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter one neighborhood/village per record.' })
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter one neighborhood/village per record.' })
   name: string;
 
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
-  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter one neighborhood/village per record.' })
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter one neighborhood/village per record.' })
   nameAr: string;
 
   /** Integer minor units. 0 is allowed (a free-delivery zone is a real business choice). */
