@@ -1,7 +1,7 @@
 name: hatly_driver
 description: Hatly driver application — accept deliveries, navigate, track earnings.
 publish_to: "none"
-version: 1.0.2+11
+version: 1.0.3+12
 
 environment:
   sdk: ">=3.4.0 <4.0.0"

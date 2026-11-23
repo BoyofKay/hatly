@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hatly_driver/features/shift/shift_api.dart';
 import 'package:hatly_driver/features/shift/shift_card.dart';
 
-ShiftState _state({bool onDuty = true, bool accepting = true, int active = 0, int unsettled = 0}) => ShiftState(
+ShiftState _state({bool onDuty = true, bool accepting = true, int active = 0, int unsettled = 0, int allowance = 0}) => ShiftState(
       onDuty: onDuty,
       acceptingNewOrders: accepting,
       startedAt: onDuty ? DateTime(2026, 11, 22, 9, 5) : null,
@@ -12,6 +12,7 @@ ShiftState _state({bool onDuty = true, bool accepting = true, int active = 0, in
       endBlockedReason: active > 0 ? 'HAS_ACTIVE_ORDERS' : unsettled > 0 ? 'NOT_SETTLED' : null,
       activeOrders: active,
       unsettledOrders: unsettled,
+      allowanceOutMinor: allowance,
     );
 
 class _FakeShiftApi implements ShiftApi {
@@ -74,5 +75,14 @@ void main() {
     await tester.tap(find.byKey(const Key('end-shift')));
     await tester.pumpAndSettle();
     expect(find.textContaining('at the office'), findsOneWidget);
+  });
+
+  testWidgets('daily allowance: shown on the card; End shift refused with the reason', (tester) async {
+    final api = _FakeShiftApi(refuseEndWith: 'SHIFT_ALLOWANCE_OUT');
+    await _pump(tester, _state(allowance: 50000), api);
+    expect(find.textContaining('500.00 EGP'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('end-shift')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Return it at the office'), findsOneWidget);
   });
 }

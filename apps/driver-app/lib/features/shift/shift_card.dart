@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/localization/bilingual.dart';
 import '../deliveries/data/driver_providers.dart';
+import '../../core/utils/money.dart';
 import 'shift_api.dart';
 
 /// Driver shifts (owner decision 2026-11-22): replaces the online switch. Off duty → "Start shift". On duty → since when, a
@@ -31,6 +32,11 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
         return context.t(
             'You have ${s.unsettledOrders} delivered order(s) not settled yet. End your shift at the office with the shift closing.',
             'لديك ${s.unsettledOrders} طلب مُسلَّم لم تتم تسويته بعد. أنهِ ورديتك في المكتب مع تقفيل الوردية.');
+      case 'SHIFT_ALLOWANCE_OUT':
+      case 'ALLOWANCE_OUT':
+        return context.t(
+            'You still hold the daily allowance (${formatMinor(s.allowanceOutMinor)}). Return it at the office to end your shift.',
+            'معك العهدة اليومية (${formatMinor(s.allowanceOutMinor, arabic: true)}). سلّمها في المكتب لإنهاء ورديتك.');
       case 'DRIVER_NOT_APPROVED':
         return context.t(
             'Your account is not approved yet. Contact Hatly operations.',
@@ -102,6 +108,22 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
                   ),
                 ),
               ]),
+              if (s.allowanceOutMinor > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(children: [
+                    const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Color(0xFF8D6E00)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        context.t('Daily allowance with you: ${formatMinor(s.allowanceOutMinor)} — return it at the end of the shift',
+                            'العهدة اليومية معك: ${formatMinor(s.allowanceOutMinor, arabic: true)} — تُرد في نهاية الوردية'),
+                        key: const Key('shift-allowance'),
+                        style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF8D6E00)),
+                      ),
+                    ),
+                  ]),
+                ),
               if (s.onDuty) ...[
                 SwitchListTile(
                   key: const Key('accepting-switch'),

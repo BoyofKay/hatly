@@ -1,3 +1,5 @@
+import { DriverAllowanceService } from './driver-allowance.service';
+import { AdminDriverAllowancesController } from './admin-driver-allowances.controller';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FinancialEvent } from './entities/financial-event.entity';
@@ -54,7 +56,7 @@ import { DeliveryFeeCalculationModule } from '../delivery-fee/delivery-fee-calcu
     BusinessConfigModule,
     DeliveryFeeCalculationModule,
   ],
-  controllers: [AdminEmployeeLoansController, AdminCommissionConfigController, AdminSettlementController],
+  controllers: [AdminEmployeeLoansController, AdminCommissionConfigController, AdminSettlementController, AdminDriverAllowancesController],
   providers: [
     FinancialEventService,
     OrderFinancialEventsService,
@@ -62,7 +64,8 @@ import { DeliveryFeeCalculationModule } from '../delivery-fee/delivery-fee-calcu
     EmployeeLoanService,
     SettlementService,
     SettlementClosingService,
+    DriverAllowanceService,
   ],
-  exports: [SettlementClosingService, FinancialEventService, OrderFinancialEventsService, HatlyServicePricingService, EmployeeLoanService],
+  exports: [DriverAllowanceService, SettlementClosingService, FinancialEventService, OrderFinancialEventsService, HatlyServicePricingService, EmployeeLoanService],
 })
 export class FinanceModule {}

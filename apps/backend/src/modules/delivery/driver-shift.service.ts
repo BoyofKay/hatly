@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { SettlementClosingService } from '../finance/settlement-closing.service';
+import { DriverAllowanceService } from '../finance/driver-allowance.service';
 import { DriverAuthorizationService } from './driver-authorization.service';
 import { ACTIVE_DELIVERY_CONDITION, recomputeDriverAvailability } from './driver-capacity';
 
@@ -21,7 +22,9 @@ export interface ShiftState {
   acceptingNewOrders: boolean;
   shift: ShiftView | null;
   /** Can the driver end the shift themselves right now, and if not, why (shown in the app). */
-  canEnd: { ok: boolean; reason: 'HAS_ACTIVE_ORDERS' | 'NOT_SETTLED' | 'NO_OPEN_SHIFT' | null; activeOrders: number; unsettledOrders: number };
+  canEnd: { ok: boolean; reason: 'HAS_ACTIVE_ORDERS' | 'NOT_SETTLED' | 'ALLOWANCE_OUT' | 'NO_OPEN_SHIFT' | null; activeOrders: number; unsettledOrders: number };
+  /** Daily driver allowance he holds (cash for paying stores) — must be returned before the shift ends. */
+  allowanceOutMinor: number;
   longShift: boolean;
 }
 
@@ -64,13 +67,23 @@ export class DriverShiftService {
     const [open] = await this.ds.query(`SELECT * FROM driver_shifts WHERE driver_id = $1 AND ended_at IS NULL`, [driverId]);
     const activeOrders = await this.activeOrders(driverId);
     const unsettledOrders = await this.unsettledOrders(driverId);
+    const allowanceOutMinor = await DriverAllowanceService.outstandingMinor(this.ds, driverId);
     const shift = open ? view(open) : null;
-    const reason = !shift ? 'NO_OPEN_SHIFT' : activeOrders > 0 ? 'HAS_ACTIVE_ORDERS' : unsettledOrders > 0 ? 'NOT_SETTLED' : null;
+    const reason = !shift
+      ? 'NO_OPEN_SHIFT'
+      : activeOrders > 0
+        ? 'HAS_ACTIVE_ORDERS'
+        : unsettledOrders > 0
+          ? 'NOT_SETTLED'
+          : allowanceOutMinor > 0
+            ? 'ALLOWANCE_OUT'
+            : null;
     return {
       onDuty: Boolean(shift) && d.is_online === true,
       acceptingNewOrders: d.accepting_new_orders !== false,
       shift,
       canEnd: { ok: reason === null, reason, activeOrders, unsettledOrders },
+      allowanceOutMinor,
       longShift: Boolean(shift && shift.minutes >= LONG_SHIFT_HOURS * 60),
     };
   }
@@ -112,6 +125,12 @@ export class DriverShiftService {
       throw new ConflictException({
         message: `You have ${s.canEnd.unsettledOrders} delivered order(s) not settled yet. End your shift at the office with the shift closing.`,
         details: { code: 'SHIFT_NOT_SETTLED', unsettledOrders: s.canEnd.unsettledOrders },
+      });
+    }
+    if (s.canEnd.reason === 'ALLOWANCE_OUT') {
+      throw new ConflictException({
+        message: `You still hold the daily allowance (${(s.allowanceOutMinor / 100).toFixed(2)} EGP). Return it at the office to end your shift.`,
+        details: { code: 'SHIFT_ALLOWANCE_OUT', allowanceOutMinor: s.allowanceOutMinor },
       });
     }
     await this.closeShift(driver.id, 'DRIVER', userId);

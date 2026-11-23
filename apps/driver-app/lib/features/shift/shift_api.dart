@@ -13,6 +13,7 @@ class ShiftState {
     required this.endBlockedReason,
     required this.activeOrders,
     required this.unsettledOrders,
+    this.allowanceOutMinor = 0,
   });
 
   final bool onDuty;
@@ -24,6 +25,9 @@ class ShiftState {
   final String? endBlockedReason;
   final int activeOrders;
   final int unsettledOrders;
+
+  /// Daily allowance (cash from Hatly for paying stores) he holds — returned at the office before the shift can end.
+  final int allowanceOutMinor;
 
   factory ShiftState.fromJson(Map<String, dynamic> j) {
     final shift = j['shift'] as Map<String, dynamic>?;
@@ -38,6 +42,7 @@ class ShiftState {
       endBlockedReason: canEnd['reason'] as String?,
       activeOrders: (canEnd['activeOrders'] as num?)?.toInt() ?? 0,
       unsettledOrders: (canEnd['unsettledOrders'] as num?)?.toInt() ?? 0,
+      allowanceOutMinor: (j['allowanceOutMinor'] as num?)?.toInt() ?? 0,
     );
   }
 }
