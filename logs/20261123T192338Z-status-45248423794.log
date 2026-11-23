@@ -1,0 +1,40 @@
+action=status arg= commit=980ce88cdf47abb3bd95389273aa26b3182caaac run=45248423794 started=2026-11-23T19:23:32Z
+
+==== current release  (19:23:34 UTC)
+20261123T174407Z-bafe081b4e55
+
+==== status  (19:23:34 UTC)
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED       STATUS                 PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261123T174407Z-bafe081b4e55     "docker-entrypoint.s…"   prod-backend     2 hours ago   Up 2 hours (healthy)   3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261123T174407Z-bafe081b4e55   "docker-entrypoint.s…"   prod-dashboard   2 hours ago   Up 2 hours (healthy)   3001/tcp
+hatly-prod-postgres-1    postgres:16-alpine                                   "docker-entrypoint.s…"   postgres         4 weeks ago   Up 13 days (healthy)   5432/tcp
+hatly-prod-redis-1       redis:7-alpine                                       "docker-entrypoint.s…"   redis            4 weeks ago   Up 13 days (healthy)   6379/tcp
+{"data":{"status":"ok","checks":{"database":"up","redis":"up"}}}
+dashboard /privacy 200
+
+==== migrations  (19:23:35 UTC)
+ Container hatly-prod-prod-backend-run-0bf1d27614c3 Creating 
+ Container hatly-prod-prod-backend-run-0bf1d27614c3 Created 
+ Container hatly-prod-prod-backend-run-5bf6128e5322 Creating 
+ Container hatly-prod-prod-backend-run-5bf6128e5322 Created 
+[X] 91 PasswordResetRequests1700009000000
+[X] 92 PasswordResetSelfComplete1700009100000
+[X] 93 DeliveryZoneAreas1700009200000
+[X] 94 DeliveryZoneNeighborhoods1700009300000
+[X] 95 DeliveryZoneParentStatus1700009400000
+
+==== releases on disk  (19:23:36 UTC)
+20261123T174407Z-bafe081b4e55
+20261123T105540Z-9c92dbcf1160
+20261123T095541Z-df5dfdbe7069
+
+==== disk  (19:23:36 UTC)
+/dev/sda1        96G   19G   78G  20% /
+
+==== Google Routes readiness (read-only; no key printed)  (19:23:36 UTC)
+deployed Maps backend: Routes API computeRoutes
+MAPS_PROVIDER=none
+
+==== backend public outbound IPv4 (read-only)  (19:23:36 UTC)
+backend egress IPv4: 152.228.240.4 (must match Google key IP restriction)
+job status: success
