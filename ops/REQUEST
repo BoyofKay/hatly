@@ -1,3 +1,3 @@
 ACTION=maps-check
 ARG=
-# Recheck Routes and Geocoding from the backend before enabling Maps. 2026-11-23.
+# Diagnose Google authorization: Geocoding first, then Routes; no production switch.
