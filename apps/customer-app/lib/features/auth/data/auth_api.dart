@@ -137,6 +137,21 @@ class AuthApi {
     );
   }
 
+  /** Profile values are always read from the authenticated backend user record. */
+  Future<String?> getCurrentFullName() {
+    return _client.request(
+      (dio) => dio.get('/auth/customer/me'),
+      (data) => (data['data'] as Map<String, dynamic>)['fullName'] as String?,
+    );
+  }
+
+  Future<String> updateFullName(String fullName) {
+    return _client.request(
+      (dio) => dio.patch('/auth/customer/name', data: { 'fullName': fullName }),
+      (data) => (data['data'] as Map<String, dynamic>)['fullName'] as String,
+    );
+  }
+
   Future<void> logout() {
     return _client.request((dio) => dio.post('/auth/logout'), (_) => null);
   }
