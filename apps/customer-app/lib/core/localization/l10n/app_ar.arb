@@ -172,7 +172,7 @@
       }
     }
   },
-  "customRequestEntryPoint": "لم تجد ما تبحث عنه؟",
+  "customRequestEntryPoint": "خدمة هاتلي",
   "customRequestSheetTitle": "اطلب صنفًا غير موجود في القائمة",
   "customRequestSheetSubtitle": "صف ما تحتاجه و/أو أضف صورة. سيُضاف إلى سلتك ويصل إلى المتجر مع طلبك، ويؤكد المتجر توفر الصنف ويحدد سعره، وسيظهر لك المبلغ النهائي بعد ذلك.",
   "customRequestTextHint": "مثال: بانادول إكسترا 500 مجم، أي نوع متاح",
@@ -747,8 +747,8 @@
   "addressLocationPermissionPermanentlyDenied": "إذن الموقع مرفوض بشكل دائم. فعّله من إعدادات التطبيق على جهازك.",
   "addressLocationPositionUnavailable": "تعذّر تحديد موقعك الحالي. حاول مرة أخرى أو أدخل عنوانك يدويًا.",
   "addressOpenSettings": "فتح إعدادات التطبيق",
-  "hatlyServiceEntryTitle": "خدمة هاتلي",
-  "hatlyServiceEntrySubtitle": "محتاج حاجة من مكان مش موجود عندنا؟ اطلبها من هاتلي.",
+  "hatlyServiceEntryTitle": "ملقتش المحل اللي بتدور عليه؟",
+  "hatlyServiceEntrySubtitle": "ولا يهمك! مع خدمة هاتلي، اطلب اللي محتاجه من أي مكان، وإحنا نجيبهولك.",
   "hatlyServiceScreenTitle": "خدمة هاتلي",
   "hatlyServiceTypeSectionTitle": "محتاج إيه؟",
   "hatlyServiceTypeBuyFromPlace": "هاتلي من مكان",
