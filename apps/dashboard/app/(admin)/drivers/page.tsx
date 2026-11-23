@@ -8,6 +8,7 @@ import {
   listDriverVehicleTypes,
   listDrivers,
   setDriverVehicleType,
+  setDriverName,
   setDriverVerification,
 } from '../../../lib/api/admin-dispatch';
 import { apiErrorMessage } from '../../../lib/api/errors';
@@ -49,6 +50,9 @@ function AdminDriversScreen() {
   // A driver's settings (commission · orders at once · vehicle) open on demand, so the list stays a list; one search result opens by itself.
   const [editing, setEditing] = useState<Record<string, boolean>>({});
 
+  const [nameDrafts, setNameDrafts] = useState<Record<string, string>>({});
+  const [nameSaving, setNameSaving] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<Record<string, string>>({});
   const [createOpen, setCreateOpen] = useState(false);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -138,6 +142,21 @@ function AdminDriversScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  async function saveDriverName(driver: AdminDriver) {
+    const fullName = (nameDrafts[driver.id] ?? driver.fullName).trim();
+    if (fullName.length < 2 || fullName.length > 150 || nameSaving) return;
+    setNameSaving(driver.id);
+    setNameError((prev) => ({ ...prev, [driver.id]: '' }));
+    try {
+      await setDriverName(driver.id, fullName);
+      setNameDrafts((prev) => { const next = { ...prev }; delete next[driver.id]; return next; });
+      await refresh();
+      toast.push('success', tl('Driver name updated', 'تم تحديث اسم المندوب'));
+    } catch (err: any) {
+      setNameError((prev) => ({ ...prev, [driver.id]: apiErrorMessage(err, tl('Could not update name', 'تعذر تحديث الاسم')) }));
+    } finally { setNameSaving(null); }
   }
 
   /** Approving / rejecting changes dispatch eligibility, so it is confirmed first; the list is re-read from the server afterwards. */
@@ -301,6 +320,16 @@ function AdminDriversScreen() {
                     );
                   })()}
 
+                  {(editing[d.id] ?? visible.length === 1) && (
+                    <div className="border-t border-gray-100 pt-3" data-testid="driver-name-editor">
+                      <label htmlFor={`driver-name-${d.id}`} className="mb-1 block text-xs font-medium text-gray-700">{tl('Driver name', 'اسم المندوب')}</label>
+                      <div className="flex gap-2">
+                        <input id={`driver-name-${d.id}`} data-testid="driver-name-input" className={`${inputCls} min-w-0 flex-1`} maxLength={150} minLength={2} value={nameDrafts[d.id] ?? d.fullName} onChange={(e) => setNameDrafts((prev) => ({ ...prev, [d.id]: e.target.value }))} />
+                        <Button onClick={() => void saveDriverName(d)} loading={nameSaving === d.id} disabled={nameSaving !== null || (nameDrafts[d.id] ?? d.fullName).trim().length < 2 || (nameDrafts[d.id] ?? d.fullName).trim() === d.fullName}>{tl('Save name', 'حفظ الاسم')}</Button>
+                      </div>
+                      {nameError[d.id] && <p role="alert" className="mt-1 text-xs text-red-700">{nameError[d.id]}</p>}
+                    </div>
+                  )}
                   {(editing[d.id] ?? visible.length === 1) && <DriverCommissionEditor driverId={d.id} basisPoints={d.commissionRateBasisPoints} onSaved={refresh} />}
                   {(editing[d.id] ?? visible.length === 1) && <DriverCapacityEditor driverId={d.id} />}
 
