@@ -13,24 +13,23 @@ class DriverBrandHeader extends ConsumerWidget {
     final name = ref.watch(driverProfileNameProvider).valueOrNull;
     return Material(
       color: Colors.white,
-      elevation: 1,
+      elevation: 0,
       child: Container(
         key: const Key('driver-global-brand-header'),
-        height: 58,
+        height: 60,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.asset('assets/images/hatly-driver-logo.png', width: 42, height: 42, fit: BoxFit.contain),
+            child: Image.asset('assets/images/hatly-driver-logo.png', width: 54, height: 54, fit: BoxFit.contain),
           ),
           const SizedBox(width: 10),
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(context.t('Hatly Driver', 'هاتلي للمندوب'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
               if (name != null && name.trim().isNotEmpty)
-                Text(name, key: const Key('driver-display-name'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Color(0xFF666666))),
+                Text(name, key: const Key('driver-display-name'), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF666666))),
             ],
           )),
         ]),
