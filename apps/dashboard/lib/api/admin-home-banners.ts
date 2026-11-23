@@ -13,6 +13,7 @@ export interface HomeBanner {
   imageUrl: string | null;
   actionType: BannerActionType;
   actionTargetId: string | null;
+  sectorId?: string | null;
   sortOrder: number;
   isActive: boolean;
   startsAt: string | null;
@@ -25,6 +26,7 @@ export interface CreateHomeBannerInput {
   titleAr?: string;
   actionType?: BannerActionType;
   actionTargetId?: string;
+  sectorId?: string;
   sortOrder?: number;
   startsAt?: string;
   endsAt?: string;
@@ -36,6 +38,7 @@ export interface UpdateHomeBannerInput {
   titleAr?: string | null;
   actionType?: BannerActionType;
   actionTargetId?: string | null;
+  sectorId?: string | null;
   sortOrder?: number;
   startsAt?: string | null;
   endsAt?: string | null;

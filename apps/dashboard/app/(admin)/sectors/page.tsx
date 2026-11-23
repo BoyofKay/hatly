@@ -6,7 +6,7 @@ import { MediaPicker } from '../../../components/media/MediaPicker';
 import { resolveMediaUrl } from '../../../lib/media-url';
 
 import { useEffect, useState } from 'react';
-import { AdminSector, MANAGE_MARKETPLACE_SECTORS, createSector, listAdminSectors, setSectorActive, setSectorCustomRequests, setSectorBanner } from '../../../lib/api/admin-sectors';
+import { AdminSector, MANAGE_MARKETPLACE_SECTORS, createSector, listAdminSectors, setSectorActive, setSectorCustomRequests, setSectorBanner, setSectorAccentColor } from '../../../lib/api/admin-sectors';
 import { EMPTY_SECTOR_FORM, SectorFormState, buildCreateSectorBody, suggestSlug } from '../../../lib/sectors/sector-form';
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { useAdminPermission } from '../../../lib/auth/use-admin-permission';
@@ -98,6 +98,16 @@ export default function SectorsPage() {
     finally { setBusyId(null); }
   }
 
+  async function updateAccent(sector: AdminSector, color: string) {
+    if (!canManage || busyId) return;
+    setBusyId(sector.id); setError(null);
+    try {
+      const updated = await setSectorAccentColor(sector.id, color);
+      setSectors((all) => (all ?? []).map((s) => s.id === updated.id ? updated : s));
+    } catch (err) { setError(apiErrorMessage(err, t('Could not update sector color.', 'تعذر تحديث لون القطاع.'))); }
+    finally { setBusyId(null); }
+  }
+
   async function toggleActive(sector: AdminSector) {
     if (busyId) return;
     setBusyId(sector.id);
@@ -182,6 +192,7 @@ export default function SectorsPage() {
                   <th className="px-3 py-2 text-start font-medium">{t('Sector', 'القطاع')}</th>
                   <th className="px-3 py-2 text-start font-medium">{t('Slug', 'المعرّف')}</th>
                   <th className="px-3 py-2 text-start font-medium">{t('Banner', 'البانر')}</th>
+                  <th className="px-3 py-2 text-start font-medium">{t('Theme color', 'لون القطاع')}</th>
                   <th className="px-3 py-2 text-start font-medium">{t('Status', 'الحالة')}</th>
                   <th className="px-3 py-2 text-start font-medium" />
                   <th className="px-3 py-2 text-start font-medium">{t('Custom requests', 'الطلبات المخصصة')}</th>
@@ -198,6 +209,11 @@ export default function SectorsPage() {
                       <button type="button" disabled={!canManage || !!busyId} className="rounded border px-2 py-2 text-xs text-hatly-orangeDark disabled:opacity-40" onClick={() => setBannerSector(s)}>{t('Choose', 'اختيار')}</button>
                       {s.bannerUrl && <button type="button" disabled={!canManage || !!busyId} className="text-xs text-red-600 disabled:opacity-40" onClick={() => void updateBanner(s, null)}>{t('Remove', 'إزالة')}</button>}
                     </div></td>
+                    <td className="px-3 py-2">
+                      <input aria-label={t('Sector theme color', 'لون القطاع')} type="color"
+                        value={s.accentColor ?? '#FF7A1A'} disabled={!canManage || !!busyId}
+                        onChange={(e) => void updateAccent(s, e.target.value)} />
+                    </td>
                     <td className="px-3 py-2"><Badge tone={s.isActive ? 'green' : 'gray'}>{s.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge></td>
                     <td className="px-3 py-2"><button data-testid={`sector-active-toggle-${s.id}`} disabled={!canManage || busyId === s.id} onClick={() => toggleActive(s)} className="min-h-[36px] text-xs font-medium text-hatly-orangeDark hover:underline disabled:opacity-40">{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</button>{canManage && <span className="ms-3 inline-flex gap-2"><Button size="sm" onClick={() => setEditing(s)}>{t('Edit', 'تعديل')}</Button><DeleteRecordButton path={`/admin/sectors/${s.id}`} name={s.name} what={['Section', 'القسم']} consequence={['Only a section with no stores can be deleted: move its stores to another section first.', 'يمكن حذف القسم الذي لا يحتوي متاجر فقط: انقل متاجره أولًا.']} onDeleted={refresh} /></span>}</td>
                     <td className="px-3 py-2"><Switch s={s} testId={`sector-custom-requests-${s.id}`} /></td>
@@ -213,6 +229,11 @@ export default function SectorsPage() {
                   <RecordPhoto entity="sector" entityId={s.id} imageUrl={s.imageUrl} purpose="SECTOR_IMAGE" canEdit={canManage} onChanged={refresh} />
                   <div className="min-w-0 flex-1"><p className="font-semibold text-gray-900">{s.name}</p>{s.nameAr && <p className="text-sm text-gray-500" dir="rtl">{s.nameAr}</p>}<p className="text-xs text-gray-400" dir="ltr">{s.slug}</p></div>
                   <Badge tone={s.isActive ? 'green' : 'gray'}>{s.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge>
+                </div>
+                <div className="mt-3 flex items-center gap-3 border-t border-gray-100 pt-2">
+                  <label className="text-xs text-gray-600">{t('Theme color', 'لون القطاع')}</label>
+                  <input type="color" aria-label={t('Sector theme color', 'لون القطاع')} value={s.accentColor ?? '#FF7A1A'}
+                    disabled={!canManage || !!busyId} onChange={(e) => void updateAccent(s, e.target.value)} />
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
                   <button type="button" disabled={!canManage || !!busyId} className="text-xs text-hatly-orangeDark" onClick={() => setBannerSector(s)}>{s.bannerUrl ? t('Change banner', 'تغيير البانر') : t('Add banner', 'إضافة بانر')}</button>

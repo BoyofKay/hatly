@@ -9,6 +9,8 @@ export interface BannerFormState {
   productId: string;
   branchId: string;
   sectorId: string;
+  /** Visual sector association, independent of destination. */
+  linkedSectorId?: string;
   sortOrder: string;
   /** `datetime-local` values: `YYYY-MM-DDTHH:mm` in the admin's own time zone, or empty. */
   startsAt: string;
@@ -22,6 +24,7 @@ export const EMPTY_BANNER_FORM: BannerFormState = {
   productId: '',
   branchId: '',
   sectorId: '',
+  linkedSectorId: '',
   sortOrder: '0',
   startsAt: '',
   endsAt: '',
@@ -82,6 +85,7 @@ export function buildCreateBody(f: BannerFormState): BannerValidation<CreateHome
   const body: CreateHomeBannerInput = { title, sortOrder, actionType: f.actionType };
   if (f.titleAr.trim()) body.titleAr = f.titleAr.trim();
   if (f.actionType !== 'NONE') body.actionTargetId = target;
+  if (f.linkedSectorId?.trim()) body.sectorId = f.linkedSectorId.trim();
   if (startsAt) body.startsAt = startsAt;
   if (endsAt) body.endsAt = endsAt;
   return { ok: true, body };
@@ -99,6 +103,7 @@ export function buildUpdateBody(f: BannerFormState): BannerValidation<UpdateHome
       titleAr: f.titleAr.trim() ? f.titleAr.trim() : null,
       actionType: f.actionType,
       actionTargetId: f.actionType === 'NONE' ? null : target,
+      sectorId: f.linkedSectorId?.trim() || null,
       sortOrder,
       startsAt,
       endsAt,

@@ -56,6 +56,7 @@ function toForm(b: HomeBanner): BannerFormState {
     productId: b.actionType === 'PRODUCT' ? (b.actionTargetId ?? '') : '',
     branchId: b.actionType === 'VENDOR' ? (b.actionTargetId ?? '') : '',
     sectorId: b.actionType === 'SECTOR' ? (b.actionTargetId ?? '') : '',
+    linkedSectorId: b.sectorId ?? (b.actionType === 'SECTOR' ? (b.actionTargetId ?? '') : ''),
     sortOrder: String(b.sortOrder),
     startsAt: isoToLocalInput(b.startsAt),
     endsAt: isoToLocalInput(b.endsAt),
@@ -157,6 +158,15 @@ function BannerForm({
         <Field label="Display order (lowest first)" value={form.sortOrder} onChange={set('sortOrder')} testId="banner-sort-order" />
       </div>
 
+      <label className="block text-sm">
+        <span className="font-medium">Promotion's sector (controls header color, independent of tap destination)</span>
+        <select data-testid="banner-theme-sector" value={form.linkedSectorId ?? ''}
+          onChange={(e) => set('linkedSectorId')(e.target.value)}
+          className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white text-sm">
+          <option value="">Legacy / neutral tint</option>
+          {sectors.filter((s) => s.isActive).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </label>
       {form.actionType === 'SECTOR' && (
         <label className="block text-sm">
           <span className="font-medium">Sector</span>

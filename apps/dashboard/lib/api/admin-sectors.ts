@@ -13,10 +13,15 @@ export interface AdminSector {
   /** May customers send a free-text / photo custom request ("لا تجد ما تبحث عنه؟") to vendors of this sector? Off by default. */
   customRequestsEnabled: boolean;
   bannerUrl?: string | null;
+  accentColor?: string | null;
 }
 
 export async function setSectorBanner(id: string, bannerUrl: string | null): Promise<AdminSector> {
   return (await apiClient.patch(`/admin/sectors/${id}`, { bannerUrl })).data.data;
+}
+
+export async function setSectorAccentColor(id: string, accentColor: string): Promise<AdminSector> {
+  return (await apiClient.patch(`/admin/sectors/${id}`, { accentColor })).data.data;
 }
 
 export const MANAGE_MARKETPLACE_SECTORS = 'MANAGE_MARKETPLACE_SECTORS';
