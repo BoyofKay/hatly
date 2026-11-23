@@ -65,6 +65,12 @@ Future<_Repo> _pump(WidgetTester tester, SavedAddress? address) async {
 }
 
 void main() {
+  testWidgets('sector page keeps Hatly Service visible even when no stores exist', (tester) async {
+    await _pump(tester, null); // Fake sector contains zero vendors.
+    expect(find.byKey(const Key('sector-hatly-service-entry')), findsOneWidget);
+    expect(find.text('Hatly Service'), findsOneWidget);
+  });
+
   testWidgets('a manual address (zone, no coordinates) sends its delivery zone and no coordinates', (tester) async {
     final repo = await _pump(
       tester,
