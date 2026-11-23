@@ -63,7 +63,11 @@ class HatlyDriverApp extends ConsumerWidget {
       routerConfig: router,
       builder: (context, child) => Column(children: [
         const SafeArea(bottom: false, child: DriverGlobalHeader()),
-        Expanded(child: child ?? const SizedBox.shrink()),
+        Expanded(child: MediaQuery.removePadding(
+          context: context,
+          removeTop: true,
+          child: child ?? const SizedBox.shrink(),
+        )),
       ]),
       locale: ref.watch(localeProvider),
       supportedLocales: const [Locale('ar'), Locale('en')],
