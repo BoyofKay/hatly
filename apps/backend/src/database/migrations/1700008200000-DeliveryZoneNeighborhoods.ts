@@ -19,7 +19,8 @@ export class DeliveryZoneNeighborhoods1700008200000 implements MigrationInterfac
     await queryRunner.query(`
       ALTER TABLE "delivery_zones"
         ADD COLUMN "zone_name" varchar(150),
-        ADD COLUMN "zone_name_ar" varchar(150);
+        ADD COLUMN "zone_name_ar" varchar(150),
+        ADD COLUMN "is_selectable" boolean NOT NULL DEFAULT true;
       ALTER TABLE "delivery_zones" ADD CONSTRAINT "chk_delivery_zones_parent_pair"
         CHECK (
           ("zone_name" IS NULL AND "zone_name_ar" IS NULL)
@@ -46,7 +47,7 @@ export class DeliveryZoneNeighborhoods1700008200000 implements MigrationInterfac
     // Removing these columns would erase delivery-zone hierarchy entered after
     // this migration. Refuse data loss rather than silently destroying it.
     const [{ count }] = await queryRunner.query(
-      `SELECT count(*)::int AS count FROM "delivery_zones" WHERE "zone_name" IS NOT NULL`,
+      `SELECT count(*)::int AS count FROM "delivery_zones" WHERE "zone_name" IS NOT NULL OR "is_selectable" IS NOT TRUE`,
     );
     if (Number(count) > 0) throw new Error('Cannot roll back: delivery-zone parent names exist; export and migrate them first.');
     await queryRunner.query(`
@@ -58,7 +59,7 @@ export class DeliveryZoneNeighborhoods1700008200000 implements MigrationInterfac
       CREATE UNIQUE INDEX "UQ_delivery_zones_area_name"
         ON "delivery_zones" ("service_area_id", lower("name")) WHERE "deleted_at" IS NULL;
       ALTER TABLE "delivery_zones" DROP CONSTRAINT IF EXISTS "chk_delivery_zones_parent_pair";
-      ALTER TABLE "delivery_zones" DROP COLUMN IF EXISTS "zone_name_ar", DROP COLUMN IF EXISTS "zone_name";
+      ALTER TABLE "delivery_zones" DROP COLUMN IF EXISTS "zone_name_ar", DROP COLUMN IF EXISTS "zone_name", DROP COLUMN IF EXISTS "is_selectable";
     `);
   }
 }
