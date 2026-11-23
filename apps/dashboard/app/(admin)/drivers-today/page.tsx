@@ -26,6 +26,7 @@ export default function DriversTodayPage() {
   const [all, setAll] = useState(false);
   const [q, setQ] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [panel, setPanel] = useState<'close' | 'allowance'>('close');
 
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -34,6 +35,7 @@ export default function DriversTodayPage() {
   const sums = useMemo(() => {
     let collect = 0, pay = 0, orders = 0;
     for (const r of today.data ?? []) {
+      collect += r.allowanceOutMinor ?? 0; // daily allowance: cash the courier must hand back
       const net = r.open.netToCourierMinor as number;
       if (net < 0) collect += -net; else pay += net;
       orders += r.open.orders;
@@ -95,6 +97,12 @@ export default function DriversTodayPage() {
                   ) : <p className="text-xs text-gray-400">{t('Nothing to close', 'لا شيء للتقفيل')}</p>}
                   {r.open.held > 0 && <p className="text-xs text-amber-800">{t(`${r.open.held} held back`, `${r.open.held} مؤجل`)}</p>}
                 </div>
+                {(r.allowanceOutMinor ?? 0) > 0 && (
+                  <div className="min-w-[9rem] text-sm" data-testid="dt-allowance">
+                    <p className="text-xs text-gray-500">{t('Daily allowance out', 'العهدة اليومية معه')}</p>
+                    <p className="font-semibold tabular-nums text-amber-800">{money(r.allowanceOutMinor)}</p>
+                  </div>
+                )}
                 {r.unpaidClosings.length > 0 && (
                   <div className="min-w-[10rem] text-sm" data-testid="dt-unpaid">
                     <p className="text-xs text-gray-500">{t(`Unpaid on ${r.unpaidClosings.length} earlier closing(s)`, `غير مدفوع من ${r.unpaidClosings.length} تقفيل سابق`)}</p>
@@ -103,8 +111,10 @@ export default function DriversTodayPage() {
                 )}
                 <div className="flex gap-2">
                   {r.phone && <a href={`tel:${r.phone}`} className="inline-flex min-h-[40px] items-center rounded-lg border border-gray-300 px-3 text-sm text-gray-800">{t('Call', 'اتصال')}</a>}
+                  <button type="button" onClick={() => { setPanel('allowance'); setOpenId(r.id); }} data-testid="dt-allowance-open"
+                    className="min-h-[40px] rounded-lg border border-gray-300 px-3 text-sm text-gray-800 hover:bg-gray-50">{t('Allowance', 'العهدة')}</button>
                   {(r.open.orders > 0 || r.unpaidClosings.length > 0) && (
-                    <button type="button" onClick={() => setOpenId(r.id)} data-testid="dt-close"
+                    <button type="button" onClick={() => { setPanel('close'); setOpenId(r.id); }} data-testid="dt-close"
                       className="min-h-[40px] rounded-lg bg-hatly-orange px-4 text-sm font-semibold text-white hover:bg-hatly-orangeDark">
                       {r.open.orders > 0 ? t('Close shift', 'تقفيل') : t('Settle', 'تسوية')}
                     </button>
@@ -116,8 +126,10 @@ export default function DriversTodayPage() {
         })}
       </ul>
 
-      <Drawer open={Boolean(current)} onClose={() => setOpenId(null)} title={current ? t(`Close — ${current.name}`, `تقفيل — ${current.name}`) : ''} testId="dt-drawer">
-        {current && <ClosePanel key={current.id} courier={current} onDone={() => today.reload()} />}
+      <Drawer open={Boolean(current)} onClose={() => setOpenId(null)}
+        title={current ? (panel === 'allowance' ? t(`Daily allowance — ${current.name}`, `العهدة اليومية — ${current.name}`) : t(`Close — ${current.name}`, `تقفيل — ${current.name}`)) : ''} testId="dt-drawer">
+        {current && panel === 'allowance' && <AllowancePanel key={`a-${current.id}`} courier={current} onChange={() => today.reload()} />}
+        {current && panel === 'close' && <ClosePanel key={current.id} courier={current} onDone={() => today.reload()} />}
       </Drawer>
     </div>
   );
@@ -205,6 +217,16 @@ function ClosePanel({ courier, onDone }: { courier: any; onDone: () => void }) {
                 {p.previousClosing ? t(`Since ${p.previousClosing.reference} (${dateTime(p.previousClosing.periodEnd)}) until now · ${p.totals.orders} order(s): ${p.totals.codOrders} cash, ${p.totals.electronicOrders} electronic.`, `من ${p.previousClosing.reference} (${dateTime(p.previousClosing.periodEnd)}) حتى الآن · ${p.totals.orders} طلب: ${p.totals.codOrders} نقدي، ${p.totals.electronicOrders} إلكتروني.`) : t(`First closing · ${p.totals.orders} order(s).`, `أول تقفيل · ${p.totals.orders} طلب.`)}
               </p>
               <CourierBreakdown totals={p.totals} testId="dt-totals" />
+              {(p.allowance?.outstandingMinor ?? 0) > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm" data-testid="dt-allowance-in-closing">
+                  <p className="flex justify-between gap-2"><span>{t('Daily allowance to return', 'العهدة اليومية المطلوب ردّها')}</span><span className="font-semibold tabular-nums">{money(p.allowance.outstandingMinor)}</span></p>
+                  <p className="mt-1 flex justify-between gap-2 font-semibold">
+                    <span>{p.allowance.cashToSettleMinor < 0 ? t('Total to receive from the courier now', 'الإجمالي المطلوب استلامه من المندوب الآن') : t('Total to pay the courier now', 'الإجمالي المطلوب دفعه للمندوب الآن')}</span>
+                    <span className="tabular-nums" data-testid="dt-cash-total">{money(Math.abs(p.allowance.cashToSettleMinor))}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-amber-900">{t('The closing marks the allowance as returned. The cash recorded below is the orders’ amount; the allowance is counted on its own record.', 'التقفيل يسجّل العهدة كمردودة. المبلغ المسجّل بالأسفل هو مبلغ الطلبات؛ والعهدة تُحسب في سجلها الخاص.')}</p>
+                </div>
+              )}
               {p.unresolved.length > 0 && (
                 <div className="rounded-lg bg-amber-50 p-3">
                   <p className="mb-1 text-sm font-semibold text-amber-900">{t(`Held for the next closing (${p.unresolved.length})`, `مؤجل للتقفيل التالي (${p.unresolved.length})`)}</p>
@@ -269,6 +291,78 @@ function ClosePanel({ courier, onDone }: { courier: any; onDone: () => void }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Daily driver allowance (owner decision 2026-11-23, "العهدة اليومية"): cash handed to the courier so he can pay stores. His liability:
+ * he cannot end his shift while any is out. Returned here ("Returned"), or by the courier closing together with the orders' money.
+ */
+function AllowancePanel({ courier, onChange }: { courier: any; onChange: () => void }) {
+  const { t, money, dateTime } = useLang();
+  const toast = useToast();
+  const list = useApi<any>(`/admin/drivers/${courier.id}/allowances`, undefined, { keepPreviousData: false });
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const parsed = parseEgpToMinor(amount);
+  const refresh = () => { list.reload(); onChange(); };
+
+  const act = async (fn: () => Promise<unknown>, okText: string) => {
+    setBusy(true); setError(null);
+    try { await fn(); toast.push('success', okText); refresh(); }
+    catch (e) { setError(apiErrorMessage(e, t('Could not save.', 'تعذّر الحفظ.'))); }
+    finally { setBusy(false); }
+  };
+  const statusLabel: Record<string, [string, string]> = { OUT: ['With the courier', 'مع المندوب'], RETURNED: ['Returned', 'مردودة'], CANCELLED: ['Cancelled', 'ملغاة'] };
+
+  return (
+    <div className="space-y-4 p-4" data-testid="dt-allowance-panel">
+      <div className="rounded-xl border border-gray-200 p-3">
+        <p className="text-xs text-gray-500">{t('Held by the courier now', 'مع المندوب الآن')}</p>
+        <p className="text-2xl font-bold tabular-nums text-amber-800" data-testid="dt-allowance-out">{money(list.data?.outstandingMinor ?? courier.allowanceOutMinor ?? 0)}</p>
+        <p className="mt-1 text-xs text-gray-500">{t('He cannot end his shift until it is returned (here, or with the closing).', 'لا يستطيع إنهاء ورديته قبل ردّها (هنا أو مع التقفيل).')}</p>
+      </div>
+
+      <form className="space-y-2 rounded-xl border border-gray-200 p-3" onSubmit={(e) => { e.preventDefault(); if (parsed.ok) void act(() => send('post', `/admin/drivers/${courier.id}/allowances`, { amountMinor: parsed.minor, note: note.trim() || undefined }).then(() => { setAmount(''); setNote(''); }), t(`Allowance handed: ${money(parsed.minor)}`, `تم تسليم عهدة: ${money(parsed.minor)}`)); }}>
+        <p className="text-sm font-semibold text-gray-900">{t('Hand cash to the courier', 'تسليم عهدة للمندوب')}</p>
+        <div className="flex flex-wrap gap-2">
+          <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder={t('Amount (EGP)', 'المبلغ (ج.م)')} aria-label={t('Amount', 'المبلغ')} data-testid="dt-allowance-amount"
+            className="min-h-[40px] w-36 rounded-lg border border-gray-300 px-3 text-sm tabular-nums" />
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder={t('Note (optional)', 'ملاحظة (اختياري)')} aria-label={t('Note', 'ملاحظة')}
+            className="min-h-[40px] flex-1 rounded-lg border border-gray-300 px-3 text-sm" />
+          <button type="submit" disabled={busy || !parsed.ok} data-testid="dt-allowance-hand" className="min-h-[40px] rounded-lg bg-hatly-orange px-4 text-sm font-semibold text-white disabled:opacity-50">{t('Hand over', 'تسليم')}</button>
+        </div>
+      </form>
+
+      {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      {list.error && <ErrorState message={list.error} onRetry={list.reload} />}
+      <ul className="space-y-2" data-testid="dt-allowance-list">
+        {(list.data?.items ?? []).map((a: any) => (
+          <li key={a.id} className="rounded-lg border border-gray-200 p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-semibold tabular-nums">{money(a.amountMinor)}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs ${a.status === 'OUT' ? 'bg-amber-100 text-amber-900' : a.status === 'RETURNED' ? 'bg-green-100 text-green-900' : 'bg-gray-100 text-gray-600'}`}>{t(...statusLabel[a.status])}</span>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              {t('Handed', 'سُلّمت')} {dateTime(a.handedAt)}{a.handedBy ? <> · <bdi>{a.handedBy}</bdi></> : null}{a.note ? <> · <bdi>{a.note}</bdi></> : null}
+              {a.returnedAt && <> · {t('returned', 'رُدّت')} {dateTime(a.returnedAt)}{a.closingReference ? <> ({t('closing', 'تقفيل')} <bdi className="font-mono">{a.closingReference}</bdi>)</> : null}</>}
+              {a.cancelReason && <> · {t('cancelled:', 'أُلغيت:')} <bdi>{a.cancelReason}</bdi></>}
+            </p>
+            {a.status === 'OUT' && (
+              <div className="mt-2 flex gap-2">
+                <button type="button" disabled={busy} data-testid="dt-allowance-return" onClick={() => void act(() => send('post', `/admin/driver-allowances/${a.id}/return`), t('Marked as returned.', 'تم تسجيل الرد.'))}
+                  className="min-h-[36px] rounded-lg bg-gray-900 px-3 text-xs font-semibold text-white disabled:opacity-50">{t('Returned in full', 'رُدّت بالكامل')}</button>
+                <button type="button" disabled={busy} onClick={() => { const reason = window.prompt(t('Why cancel this allowance (recorded by mistake)?', 'سبب إلغاء هذه العهدة (سُجّلت بالخطأ)؟')); if (reason && reason.trim()) void act(() => send('post', `/admin/driver-allowances/${a.id}/cancel`, { reason }), t('Cancelled.', 'تم الإلغاء.')); }}
+                  className="min-h-[36px] rounded-lg border border-gray-300 px-3 text-xs">{t('Cancel (mistake)', 'إلغاء (خطأ)')}</button>
+              </div>
+            )}
+          </li>
+        ))}
+        {list.data && list.data.items.length === 0 && <li className="text-sm text-gray-500">{t('No allowance recorded yet.', 'لا توجد عهدة مسجّلة بعد.')}</li>}
+      </ul>
     </div>
   );
 }

@@ -96,6 +96,60 @@ describe('E2E — driver shifts', () => {
     expect(state.onDuty).toBe(false);
   });
 
+  it('daily allowance (2026-11-23): handed out, blocks End shift, returned at the office or with the closing, cancel needs a reason', async () => {
+    const d = await s.driver({ ...near });
+    await world.ds.query(`UPDATE drivers SET commission_rate_basis_points = 1000 WHERE id = $1`, [d.driverId]);
+    expectData(await call('post', d.accessToken, '/driver/shift/start'), 201);
+
+    const team = await s.admin([Permission.VIEW_ORDERS], 'Allowance Outsider');
+    expect((await call('post', team.accessToken, `/admin/drivers/${d.driverId}/allowances`, { amountMinor: 50000 })).status).toBe(403);
+    expect((await call('post', sa.accessToken, `/admin/drivers/${d.driverId}/allowances`, { amountMinor: 0 })).status).toBe(400);
+    const first = expectData<any>(await call('post', sa.accessToken, `/admin/drivers/${d.driverId}/allowances`, { amountMinor: 50000, note: 'morning cash' }), 201);
+    expect(first).toMatchObject({ amountMinor: 50000, status: 'OUT', note: 'morning cash' });
+
+    // the driver sees it and cannot end his shift while he holds it
+    let state = expectData<any>(await call('get', d.accessToken, '/driver/shift'));
+    expect(state.allowanceOutMinor).toBe(50000);
+    expect(state.canEnd.reason).toBe('ALLOWANCE_OUT');
+    const blocked = await call('post', d.accessToken, '/driver/shift/end');
+    expect(blocked.status).toBe(409);
+    expect(code(blocked)).toBe('SHIFT_ALLOWANCE_OUT');
+
+    // returned at the office → he may end the shift; returning twice is refused
+    expectData(await call('post', sa.accessToken, `/admin/driver-allowances/${first.id}/return`), 201);
+    expect(code(await call('post', sa.accessToken, `/admin/driver-allowances/${first.id}/return`))).toBe('ALLOWANCE_NOT_OUT');
+    expect(expectData<any>(await call('get', d.accessToken, '/driver/shift')).canEnd.reason).toBeNull();
+
+    // cancelling one recorded by mistake needs a reason
+    const wrong = expectData<any>(await call('post', sa.accessToken, `/admin/drivers/${d.driverId}/allowances`, { amountMinor: 1000 }), 201);
+    expect((await call('post', sa.accessToken, `/admin/driver-allowances/${wrong.id}/cancel`, { reason: ' ' })).status).toBe(400);
+    expect(expectData<any>(await call('post', sa.accessToken, `/admin/driver-allowances/${wrong.id}/cancel`, { reason: 'typed twice' }), 201).status).toBe('CANCELLED');
+
+    // with a delivered order: the closing shows the allowance and the cash to settle, and returns it
+    const second = expectData<any>(await call('post', sa.accessToken, `/admin/drivers/${d.driverId}/allowances`, { amountMinor: 30000 }), 201);
+    const order = await s.simpleOrder(await s.customer(), vendor, product.id, home);
+    await s.vendorPrepares(vendor, order.id);
+    expect((await s.driverAssignedTo(order.id)).driverId).toBe(d.driverId);
+    const delivery = expectData<any[]>(await call('get', d.accessToken, '/driver/deliveries')).find((x) => x.orderId === order.id);
+    for (const status of ['PICKED_UP', 'ON_THE_WAY']) expectData(await call('patch', d.accessToken, `/driver/deliveries/${delivery.id}/status`, { status }));
+    expectData(await call('patch', d.accessToken, `/driver/deliveries/${delivery.id}/status`, { status: 'DELIVERED', proofPhotoUrl: await s.uploadFakePhoto(d.accessToken), recipientName: 'Customer' }));
+
+    const today = expectData<any[]>(await call('get', sa.accessToken, '/admin/settlement/couriers/today'));
+    expect(today.find((x) => x.id === d.driverId)?.allowanceOutMinor).toBe(30000);
+    const preview = expectData<any>(await call('get', sa.accessToken, `/admin/settlement/drivers/${d.driverId}/close-preview`));
+    expect(preview.allowance.outstandingMinor).toBe(30000);
+    expect(preview.allowance.cashToSettleMinor).toBe(preview.totals.netToCourierMinor - 30000);
+    const closed = expectData<any>(await call('post', sa.accessToken, `/admin/settlement/drivers/${d.driverId}/close`, { previewToken: preview.previewToken }), 201);
+    expect(closed.allowanceReturnedMinor).toBe(30000);
+    const [row] = await world.ds.query(`SELECT status, closing_period_id FROM driver_allowances WHERE id = $1`, [second.id]);
+    expect(row).toEqual({ status: 'RETURNED', closing_period_id: closed.id });
+    const list = expectData<any>(await call('get', sa.accessToken, `/admin/drivers/${d.driverId}/allowances`));
+    expect(list.outstandingMinor).toBe(0);
+    expect(list.items.find((i: any) => i.id === second.id).closingReference).toBe(closed.reference);
+    state = expectData<any>(await call('get', d.accessToken, '/driver/shift'));
+    expect(state.allowanceOutMinor).toBe(0);
+  });
+
   it('a supervisor can force-end a shift; the operations team cannot', async () => {
     const d = await s.driver({ ...near });
     expectData(await call('post', d.accessToken, '/driver/shift/start'), 201);

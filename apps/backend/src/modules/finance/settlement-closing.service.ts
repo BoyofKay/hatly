@@ -1,3 +1,4 @@
+import { DriverAllowanceService } from './driver-allowance.service';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { createHash } from 'crypto';
@@ -135,6 +136,10 @@ export class SettlementClosingService {
       if (remaining <= 0) continue;
       unpaidBy.set(u.driver_id, [...(unpaidBy.get(u.driver_id) ?? []), { periodId: u.id, reference: u.reference, closedAt: iso(u.closed_at), direction: due.direction, remainingMinor: remaining }]);
     }
+    const allowanceRows: Array<{ driver_id: string; s: string }> = await this.ds
+      .query(`SELECT driver_id, sum(amount_minor) AS s FROM driver_allowances WHERE status = 'OUT' GROUP BY driver_id`)
+      .catch(() => []);
+    const allowanceBy = new Map(allowanceRows.map((a) => [a.driver_id, Number(a.s)]));
     const out = [];
     for (const r of rows) {
       // the closing figures are a real query per courier: only for those with delivered orders not in a closing yet
@@ -146,9 +151,10 @@ export class SettlementClosingService {
         inProgress: r.in_progress, capacity: r.capacity, deliveredToday: r.delivered_today,
         open: { orders: totals.orders, codOrders: totals.codOrders, electronicOrders: totals.electronicOrders, netToCourierMinor: totals.netToCourierMinor, cashHeldMinor: totals.cashHeldMinor, held: unresolved.filter((u) => u.reason !== 'IN_PROGRESS').length },
         unpaidClosings: owed,
+        allowanceOutMinor: allowanceBy.get(r.id) ?? 0,
         lastClosing: r.last_closing ? { reference: r.last_closing.reference, closedAt: iso(r.last_closing.closed_at) } : null,
       };
-      out.push({ ...item, relevant: item.online || item.inProgress > 0 || item.deliveredToday > 0 || item.open.orders > 0 || item.open.held > 0 || owed.length > 0 });
+      out.push({ ...item, relevant: item.allowanceOutMinor > 0 || item.online || item.inProgress > 0 || item.deliveredToday > 0 || item.open.orders > 0 || item.open.held > 0 || owed.length > 0 });
     }
     // the ones the office must deal with first: something to close, then something unpaid, then the rest
     out.sort((a, b) => Number(b.open.orders > 0) - Number(a.open.orders > 0) || Number(b.unpaidClosings.length > 0) - Number(a.unpaidClosings.length > 0) || Number(b.online) - Number(a.online) || a.name.localeCompare(b.name));
@@ -266,6 +272,8 @@ export class SettlementClosingService {
       endedAt: r.ended_at ? iso(r.ended_at) : null,
       minutes: Math.max(0, Math.round(((r.ended_at ? new Date(r.ended_at) : new Date()).getTime() - new Date(r.started_at).getTime()) / 60_000)),
     }));
+    // Daily driver allowance (2026-11-23): cash he holds for paying stores, returned with this closing (its own ledger).
+    const allowanceOutMinor = await DriverAllowanceService.outstandingMinor(m, driverId);
     return {
       courier: { id: driver.id, userId: driver.user_id, name: driver.full_name, commissionRateBasisPoints: driver.commission_rate_basis_points },
       previousClosing: prev ? { periodEnd: iso(prev.period_end), reference: prev.reference } : null,
@@ -275,6 +283,11 @@ export class SettlementClosingService {
       direction: totals.netToCourierMinor >= 0 ? 'PAYOUT' : 'COLLECTION',
       loans: { outstandingMinor: loans.reduce((s, l) => s + l.outstandingMinor, 0), items: loans },
       shifts,
+      allowance: {
+        outstandingMinor: allowanceOutMinor,
+        // What changes hands at the counter: + Hatly pays the driver, − the driver pays Hatly (orders' net minus the allowance he returns).
+        cashToSettleMinor: totals.netToCourierMinor - allowanceOutMinor,
+      },
       previewToken: SettlementClosingService.token(lines.map((l) => ({ id: l.orderId, net: l.netToCourierMinor }))),
     };
   }
@@ -324,6 +337,8 @@ export class SettlementClosingService {
         );
         await m.query(`UPDATE driver_shifts SET closing_period_id = $2, updated_at = now() WHERE driver_id = $1 AND closing_period_id IS NULL`, [driverId, p.id]);
         await m.query(`UPDATE drivers SET is_online = false, accepting_new_orders = true, online_changed_at = now() WHERE id = $1 AND is_online`, [driverId]);
+        // Daily driver allowance: handed back with this closing.
+        const allowanceReturnedMinor = await DriverAllowanceService.returnWithClosing(m, driverId, p.id, actorUserId);
         const { previewToken: _t, ...rest } = preview;
         return {
           ...rest,
@@ -331,6 +346,7 @@ export class SettlementClosingService {
           periodStart: iso(p.period_start), periodEnd: iso(p.period_end), closedAt: iso(p.closed_at), closedByUserId: p.closed_by_user_id,
           totalEarningsMinor: num(p.total_earnings_minor), totalCommissionOwedMinor: num(p.total_commission_owed_minor),
           totalReimbursementsOwedMinor: num(p.total_reimbursements_owed_minor), netPayableMinor: num(p.net_payable_minor),
+          allowanceReturnedMinor,
         };
       });
     } catch (error: any) {

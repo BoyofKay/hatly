@@ -140,6 +140,12 @@ function CourierClosing() {
                 </ul>
               </Card>
             )}
+            {p.allowance?.outstandingMinor > 0 && (
+              <Card title={t('Daily allowance to return', 'العهدة اليومية المطلوب ردّها')} testId="courier-allowance">
+                <p className="text-sm text-gray-700">{t(`The courier holds ${money(p.allowance.outstandingMinor)} of daily allowance; this closing marks it as returned.`, `مع المندوب ${money(p.allowance.outstandingMinor)} عهدة يومية؛ هذا التقفيل يسجّلها كمردودة.`)}</p>
+                <p className="mt-1 text-sm font-semibold">{p.allowance.cashToSettleMinor < 0 ? t('Total to receive from the courier', 'الإجمالي المطلوب استلامه من المندوب') : t('Total to pay the courier', 'الإجمالي المطلوب دفعه للمندوب')}: <span className="tabular-nums">{money(Math.abs(p.allowance.cashToSettleMinor))}</span></p>
+              </Card>
+            )}
             {p.loans?.outstandingMinor > 0 && (
               <Card title={t('Loans the courier still owes', 'سلف مستحقة على المندوب')} testId="courier-loans">
                 <p className="text-sm text-gray-700">{t(`Collect ${money(p.loans.outstandingMinor)} in loans at this settlement and record the repayment. The closing amounts above do not include loans.`, `حصّل ${money(p.loans.outstandingMinor)} من السلف في هذه التسوية وسجّل السداد. مبالغ التقفيل أعلاه لا تشمل السلف.`)}</p>
