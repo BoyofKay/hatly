@@ -19,6 +19,7 @@ class HistoryScreen extends ConsumerStatefulWidget {
 
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   final List<DriverTransaction> _items = [];
+  String _scope = 'current';
   int _page = 0;
   bool _hasMore = true;
   bool _loading = false;
@@ -43,7 +44,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
       _failed = false;
     });
     try {
-      final result = await ref.read(driverApiProvider).getTransactions(page: _page + 1);
+      final result = await ref.read(driverApiProvider).getTransactions(page: _page + 1, scope: _scope);
       if (!mounted) return;
       setState(() {
         _items.addAll(result.items);
@@ -68,19 +69,50 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final ar = context.isArabic;
+    final periodStart = ref.watch(earningsProvider).valueOrNull?.open.periodStart;
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(title: Text(context.t('History', 'السجل')), backgroundColor: Colors.white, surfaceTintColor: Colors.transparent),
-      body: Builder(builder: (context) {
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: SegmentedButton<String>(
+            key: const Key('history-shift-selector'),
+            segments: [
+              ButtonSegment(value: 'current', label: Text(context.t('Current shift', 'الوردية الحالية'))),
+              ButtonSegment(value: 'previous', label: Text(context.t('Previous', 'السابقة'))),
+            ],
+            selected: {_scope},
+            onSelectionChanged: _loading ? null : (value) {
+              if (value.first == _scope) return;
+              setState(() => _scope = value.first);
+              _loadMore(reset: true);
+            },
+          ),
+        ),
+        if (_scope == 'current')
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text('${context.t('Shift duration', 'مدة الوردية')}: ${shiftDurationLabel(periodStart, arabic: ar)}', key: const Key('history-shift-duration')),
+            ),
+          ),
+        Expanded(child: Builder(builder: (context) {
         if (_items.isEmpty && _loading) return const Center(child: CircularProgressIndicator());
         if (_items.isEmpty && _failed) {
           return MessageView(icon: Icons.cloud_off_outlined, message: context.t('Could not load your history.', 'تعذّر تحميل السجل.'), onRetry: () => _loadMore());
         }
         if (_items.isEmpty) {
-          return MessageView(icon: Icons.history, message: context.t('No delivered orders yet.', 'لا توجد طلبات مُسلّمة بعد.'));
+          return MessageView(icon: Icons.history, message: _scope == 'current'
+            ? context.t('No delivered orders in this shift yet.', 'لا توجد طلبات مُسلّمة في الوردية الحالية بعد.')
+            : context.t('No previous shift orders yet.', 'لا توجد طلبات من ورديات سابقة بعد.'));
         }
         return RefreshIndicator(
-          onRefresh: () => _loadMore(reset: true),
+          onRefresh: () async {
+            ref.invalidate(earningsProvider);
+            await _loadMore(reset: true);
+          },
           child: ListView.builder(
             key: const Key('history-list'),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -129,7 +161,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             },
           ),
         );
-      }),
+      })),
+      ]),
     );
   }
 }
