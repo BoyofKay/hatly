@@ -4,6 +4,7 @@ import '../../../core/localization/bilingual.dart';
 import '../../../core/utils/money.dart';
 import '../../../shared_widgets/driver_ui.dart';
 import '../../deliveries/data/driver_providers.dart';
+import '../../shift/shift_duration_label.dart';
 import '../domain/earnings.dart';
 import 'money_breakdown_view.dart';
 
@@ -19,7 +20,6 @@ class EarningsScreen extends ConsumerWidget {
     String money(int v) => formatMinor(v, arabic: ar);
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(title: Text(context.t('Earnings', 'الأرباح')), backgroundColor: Colors.white, surfaceTintColor: Colors.transparent),
       body: earnings.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => MessageView(icon: Icons.cloud_off_outlined, message: context.t('Could not load your earnings.', 'تعذّر تحميل أرباحك.'), onRetry: () => ref.invalidate(earningsProvider)),
@@ -31,8 +31,14 @@ class EarningsScreen extends ConsumerWidget {
               key: const Key('earnings-list'),
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
-                SectionTitle(context.t('Current shift (not closed yet)', 'الوردية الحالية (لم تُقفل بعد)')),
-                DriverCard(
+                const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: ShiftDurationLabel()),
+                ExpansionTile(
+                  key: const Key('earnings-kpi-toggle'),
+                  initiallyExpanded: false,
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                  title: Text(context.t('Earnings indicators', 'مؤشرات الأرباح')),
+                  subtitle: Text('${money(open.netMinor.abs())} · ${open.deliveries} ${context.t('deliveries', 'طلبات مسلّمة')}', style: const TextStyle(fontSize: 12)),
+                  children: [DriverCard(
                   key: const Key('earnings-open'),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
@@ -60,6 +66,7 @@ class EarningsScreen extends ConsumerWidget {
                             style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
                       ),
                   ]),
+                )],
                 ),
                 if (open.excluded.isNotEmpty) ...[
                   SectionTitle(context.t('Orders held for the next closing', 'طلبات مؤجلة للتقفيلة التالية')),
