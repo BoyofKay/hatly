@@ -17,6 +17,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  ops-script-syntax:
+    name: Production operations script syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate production operations shell scripts
+        run: |
+          bash -n deploy/production/remote-ops.sh
+          bash -n deploy/production/prod.sh
+
   backend:
     name: Backend (typecheck, unit tests, build)
     runs-on: ubuntu-latest
