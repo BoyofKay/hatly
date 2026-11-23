@@ -210,7 +210,9 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
               HatlyCtaButton(
                 label: l10n.productAddToCart,
                 isLoading: _isAdding,
-                onPressed: () => _addToCart(product),
+                onPressed: product.vendor?.isOpen == false
+                    ? null
+                    : () => _addToCart(product),
               ),
             ],
           ],
