@@ -2565,4 +2565,61 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get tempPasswordSameAsTemporary => 'اختر كلمة مرور مختلفة عن المؤقتة.';
+
+  @override
+  String get forgotPasswordLink => 'نسيت كلمة المرور؟';
+
+  @override
+  String get forgotTitle => 'نسيت كلمة المرور؟';
+
+  @override
+  String get forgotExplain =>
+      'أرسل طلبًا إلى هتلي. سنتصل بك للتأكد أنك أنت ونعطيك كلمة مرور مؤقتة (صالحة 60 دقيقة).';
+
+  @override
+  String get forgotSend => 'إرسال الطلب';
+
+  @override
+  String get forgotHaveTemp => 'لدي كلمة مرور مؤقتة';
+
+  @override
+  String get forgotSent =>
+      'تم إرسال الطلب. عندما تعطيك هتلي كلمة مرور مؤقتة، اكتبها هنا مع كلمة مرورك الجديدة.';
+
+  @override
+  String get forgotTempLabel => 'كلمة المرور المؤقتة';
+
+  @override
+  String get forgotNewLabel => 'كلمة المرور الجديدة';
+
+  @override
+  String get forgotConfirmLabel => 'أعد كتابة كلمة المرور الجديدة';
+
+  @override
+  String get forgotChange => 'تغيير كلمة المرور';
+
+  @override
+  String get forgotDone => 'تم تغيير كلمة المرور. ادخل بها الآن.';
+
+  @override
+  String get forgotBackToSignIn => 'العودة لتسجيل الدخول';
+
+  @override
+  String get forgotCancel => 'إلغاء — أتذكر كلمة المرور';
+
+  @override
+  String get forgotTempInvalid =>
+      'كلمة المرور المؤقتة غير صحيحة (أو لم تُعطَ بعد).';
+
+  @override
+  String forgotTriesLeft(String n) {
+    return 'متبقٍ $n محاولات.';
+  }
+
+  @override
+  String get forgotExpired =>
+      'انتهت صلاحية كلمة المرور المؤقتة. أرسل طلبًا جديدًا.';
+
+  @override
+  String get forgotLocked => 'محاولات خاطئة كثيرة. أرسل طلبًا جديدًا.';
 }

@@ -1,3 +1,5 @@
+import { PasswordResetService } from './password-reset/password-reset.service';
+import { PasswordResetAdminController, PasswordResetPublicController } from './password-reset/password-reset.controller';
 import { Module } from '@nestjs/common';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -44,7 +46,7 @@ import { ReportsService } from './reports/reports.service';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([User]), PermissionsModule, UsersModule, OrdersModule, WalletModule, AuthModule, UploadsModule, HomeProductsModule, BusinessConfigModule],
-  controllers: [StaffAccountsController, AdminRecordsController, ExecutiveController, PermissionTemplatesController, AdminFinanceController, AdminOrderExtrasController, AdminOrderExceptionsController, AdminCustomersExtController, ReportsController, MediaController, MarketingController, CustomerInboxController, DirectoryController, SystemController, TelemetryController, ConfigOverviewController],
-  providers: [StaffAccountsService, AdminRecordsService, BranchReadinessService, ExecutiveService, PermissionTemplatesService, AdminFinanceService, AdminOrderExtrasService, ManualTransferExpiryService, AdminCustomersExtService, ReportsService, MediaService, MarketingService, SystemService, MetricsRecorder, { provide: APP_INTERCEPTOR, useClass: RequestMetricsInterceptor }],
+  controllers: [PasswordResetPublicController, PasswordResetAdminController, StaffAccountsController, AdminRecordsController, ExecutiveController, PermissionTemplatesController, AdminFinanceController, AdminOrderExtrasController, AdminOrderExceptionsController, AdminCustomersExtController, ReportsController, MediaController, MarketingController, CustomerInboxController, DirectoryController, SystemController, TelemetryController, ConfigOverviewController],
+  providers: [PasswordResetService, StaffAccountsService, AdminRecordsService, BranchReadinessService, ExecutiveService, PermissionTemplatesService, AdminFinanceService, AdminOrderExtrasService, ManualTransferExpiryService, AdminCustomersExtService, ReportsService, MediaService, MarketingService, SystemService, MetricsRecorder, { provide: APP_INTERCEPTOR, useClass: RequestMetricsInterceptor }],
 })
 export class AdminPlatformModule {}

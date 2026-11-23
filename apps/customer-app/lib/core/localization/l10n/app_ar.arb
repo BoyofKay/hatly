@@ -1283,5 +1283,29 @@
   "tempPasswordSave": "حفظ ومتابعة",
   "tempPasswordSignOut": "تسجيل الخروج",
   "tempPasswordMismatch": "كلمتا المرور الجديدتان غير متطابقتين.",
-  "tempPasswordSameAsTemporary": "اختر كلمة مرور مختلفة عن المؤقتة."
+  "tempPasswordSameAsTemporary": "اختر كلمة مرور مختلفة عن المؤقتة.",
+  "forgotPasswordLink": "نسيت كلمة المرور؟",
+  "forgotTitle": "نسيت كلمة المرور؟",
+  "forgotExplain": "أرسل طلبًا إلى هتلي. سنتصل بك للتأكد أنك أنت ونعطيك كلمة مرور مؤقتة (صالحة 60 دقيقة).",
+  "forgotSend": "إرسال الطلب",
+  "forgotHaveTemp": "لدي كلمة مرور مؤقتة",
+  "forgotSent": "تم إرسال الطلب. عندما تعطيك هتلي كلمة مرور مؤقتة، اكتبها هنا مع كلمة مرورك الجديدة.",
+  "forgotTempLabel": "كلمة المرور المؤقتة",
+  "forgotNewLabel": "كلمة المرور الجديدة",
+  "forgotConfirmLabel": "أعد كتابة كلمة المرور الجديدة",
+  "forgotChange": "تغيير كلمة المرور",
+  "forgotDone": "تم تغيير كلمة المرور. ادخل بها الآن.",
+  "forgotBackToSignIn": "العودة لتسجيل الدخول",
+  "forgotCancel": "إلغاء — أتذكر كلمة المرور",
+  "forgotTempInvalid": "كلمة المرور المؤقتة غير صحيحة (أو لم تُعطَ بعد).",
+  "forgotTriesLeft": "متبقٍ {n} محاولات.",
+  "forgotExpired": "انتهت صلاحية كلمة المرور المؤقتة. أرسل طلبًا جديدًا.",
+  "forgotLocked": "محاولات خاطئة كثيرة. أرسل طلبًا جديدًا.",
+  "@forgotTriesLeft": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  }
 }

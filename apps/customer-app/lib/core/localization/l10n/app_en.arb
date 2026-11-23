@@ -1269,5 +1269,29 @@
   "tempPasswordSave": "Save and continue",
   "tempPasswordSignOut": "Sign out",
   "tempPasswordMismatch": "The two new passwords do not match.",
-  "tempPasswordSameAsTemporary": "Choose a password different from the temporary one."
+  "tempPasswordSameAsTemporary": "Choose a password different from the temporary one.",
+  "forgotPasswordLink": "Forgot password?",
+  "forgotTitle": "Forgot your password?",
+  "forgotExplain": "Send a request to Hatly. We will call you to check it is you and give you a temporary password (valid 60 minutes).",
+  "forgotSend": "Send request",
+  "forgotHaveTemp": "I already have a temporary password",
+  "forgotSent": "Request sent. When Hatly gives you a temporary password, type it here with your new password.",
+  "forgotTempLabel": "Temporary password",
+  "forgotNewLabel": "New password",
+  "forgotConfirmLabel": "Repeat the new password",
+  "forgotChange": "Change password",
+  "forgotDone": "Your password was changed. Sign in with it now.",
+  "forgotBackToSignIn": "Back to sign in",
+  "forgotCancel": "Cancel — I remember my password",
+  "forgotTempInvalid": "The temporary password is not correct (or not given yet).",
+  "forgotTriesLeft": "{n} tries left.",
+  "forgotExpired": "The temporary password has expired. Send a new request.",
+  "forgotLocked": "Too many wrong tries. Send a new request.",
+  "@forgotTriesLeft": {
+    "placeholders": {
+      "n": {
+        "type": "String"
+      }
+    }
+  }
 }

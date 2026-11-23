@@ -201,7 +201,14 @@ class OverviewApi {
 
   /// "Forgot password?" — asks Hatly operations for a temporary password. The server answers the same for any phone.
   Future<void> requestPasswordReset(String phone) async {
-    await _client.dio.post('/auth/driver/password-reset-request', data: {'phone': phone});
+    await _client.dio.post('/auth/password-reset/request', data: {'phone': phone});
+  }
+
+  /// Completes it (owner decision 2026-11-23): the temporary password Operations gave + a new password, on the same screen.
+  /// Throws [DioException]; the refusal code is TEMP_PASSWORD_INVALID (with attemptsLeft), TEMP_PASSWORD_EXPIRED, TEMP_PASSWORD_LOCKED,
+  /// WEAK_PASSWORD or PASSWORD_UNCHANGED.
+  Future<void> completePasswordReset(String phone, String tempPassword, String newPassword) async {
+    await _client.dio.post('/auth/password-reset/complete', data: {'phone': phone, 'tempPassword': tempPassword, 'newPassword': newPassword});
   }
 }
 

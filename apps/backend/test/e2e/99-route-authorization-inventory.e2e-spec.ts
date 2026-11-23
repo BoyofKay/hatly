@@ -24,7 +24,7 @@ const ANY_AUTHENTICATED_ALLOWED = new Set<string>([
  */
 const PUBLIC_ALLOWED = new Set<string>([
   'POST /auth/customer/password/login', 'POST /auth/customer/password/register', 'POST /auth/customer/register/request-code',
-  'POST /auth/dashboard/login', 'POST /auth/dashboard/logout', 'POST /auth/dashboard/refresh', 'POST /auth/driver/login', 'POST /auth/driver/password-reset-request',
+  'POST /auth/dashboard/login', 'POST /auth/dashboard/logout', 'POST /auth/dashboard/refresh', 'POST /auth/driver/login', 'POST /auth/driver/password-reset-request', 'POST /auth/password-reset/request', 'POST /auth/password-reset/complete',
   'POST /auth/password/login', 'POST /auth/refresh', 'POST /auth/register',
   // account deletion WITHOUT the app (Google Play policy): password-verified self-service, or a request that deletes nothing by itself
   'POST /account-deletion/delete', 'POST /account-deletion/requests',

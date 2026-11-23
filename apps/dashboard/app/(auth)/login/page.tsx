@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginWithPassword } from '../../../lib/auth/session';
+import { ForgotPasswordPanel } from '../../../components/auth/ForgotPasswordPanel';
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { LangProvider, useLang } from '../../../lib/ui/lang';
 import { forgetAccount, maskPhone, readRecentAccounts, rememberAccount, RecentAccount } from '../../../lib/auth/recent-accounts';
@@ -173,14 +174,7 @@ function LoginForm() {
               </div>
             </div>
 
-            {forgotOpen && (
-              <div role="note" className="rounded-xl border border-orange-200 bg-orange-50 px-3.5 py-3 text-xs leading-relaxed text-gray-700">
-                <p className="font-medium text-gray-900">{t('Reset by your manager', 'يعيد تعيينها مديرك')}</p>
-                <p className="mt-1">{t('Hatly staff: ask your supervisor or admin to reset it from Staff & permissions.', 'فريق هتلي: اطلب من المشرف أو المدير إعادة تعيينها من صفحة الموظفين والصلاحيات.')}</p>
-                <p className="mt-1">{t('Store staff: ask your store manager (Team page) or Hatly support.', 'موظفو المتاجر: اطلب من مدير المتجر (صفحة الفريق) أو من دعم هتلي.')}</p>
-                <p className="mt-1">{t('You will get a temporary password — change it after signing in from your name at the top.', 'ستحصل على كلمة مرور مؤقتة — غيّرها بعد الدخول من اسمك أعلى الصفحة.')}</p>
-              </div>
-            )}
+            {forgotOpen && <ForgotPasswordPanel phone={phone} onClose={() => setForgotOpen(false)} />}
 
             {needsCode && (
               <div>

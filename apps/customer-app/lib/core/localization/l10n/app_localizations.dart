@@ -4597,6 +4597,108 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'اختر كلمة مرور مختلفة عن المؤقتة.'**
   String get tempPasswordSameAsTemporary;
+
+  /// No description provided for @forgotPasswordLink.
+  ///
+  /// In ar, this message translates to:
+  /// **'نسيت كلمة المرور؟'**
+  String get forgotPasswordLink;
+
+  /// No description provided for @forgotTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'نسيت كلمة المرور؟'**
+  String get forgotTitle;
+
+  /// No description provided for @forgotExplain.
+  ///
+  /// In ar, this message translates to:
+  /// **'أرسل طلبًا إلى هتلي. سنتصل بك للتأكد أنك أنت ونعطيك كلمة مرور مؤقتة (صالحة 60 دقيقة).'**
+  String get forgotExplain;
+
+  /// No description provided for @forgotSend.
+  ///
+  /// In ar, this message translates to:
+  /// **'إرسال الطلب'**
+  String get forgotSend;
+
+  /// No description provided for @forgotHaveTemp.
+  ///
+  /// In ar, this message translates to:
+  /// **'لدي كلمة مرور مؤقتة'**
+  String get forgotHaveTemp;
+
+  /// No description provided for @forgotSent.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم إرسال الطلب. عندما تعطيك هتلي كلمة مرور مؤقتة، اكتبها هنا مع كلمة مرورك الجديدة.'**
+  String get forgotSent;
+
+  /// No description provided for @forgotTempLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور المؤقتة'**
+  String get forgotTempLabel;
+
+  /// No description provided for @forgotNewLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور الجديدة'**
+  String get forgotNewLabel;
+
+  /// No description provided for @forgotConfirmLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'أعد كتابة كلمة المرور الجديدة'**
+  String get forgotConfirmLabel;
+
+  /// No description provided for @forgotChange.
+  ///
+  /// In ar, this message translates to:
+  /// **'تغيير كلمة المرور'**
+  String get forgotChange;
+
+  /// No description provided for @forgotDone.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم تغيير كلمة المرور. ادخل بها الآن.'**
+  String get forgotDone;
+
+  /// No description provided for @forgotBackToSignIn.
+  ///
+  /// In ar, this message translates to:
+  /// **'العودة لتسجيل الدخول'**
+  String get forgotBackToSignIn;
+
+  /// No description provided for @forgotCancel.
+  ///
+  /// In ar, this message translates to:
+  /// **'إلغاء — أتذكر كلمة المرور'**
+  String get forgotCancel;
+
+  /// No description provided for @forgotTempInvalid.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور المؤقتة غير صحيحة (أو لم تُعطَ بعد).'**
+  String get forgotTempInvalid;
+
+  /// No description provided for @forgotTriesLeft.
+  ///
+  /// In ar, this message translates to:
+  /// **'متبقٍ {n} محاولات.'**
+  String forgotTriesLeft(String n);
+
+  /// No description provided for @forgotExpired.
+  ///
+  /// In ar, this message translates to:
+  /// **'انتهت صلاحية كلمة المرور المؤقتة. أرسل طلبًا جديدًا.'**
+  String get forgotExpired;
+
+  /// No description provided for @forgotLocked.
+  ///
+  /// In ar, this message translates to:
+  /// **'محاولات خاطئة كثيرة. أرسل طلبًا جديدًا.'**
+  String get forgotLocked;
 }
 
 class _AppLocalizationsDelegate

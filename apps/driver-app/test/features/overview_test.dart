@@ -64,6 +64,8 @@ class _Api implements OverviewApi {
 
   @override
   Future<void> requestPasswordReset(String phone) async {}
+  @override
+  Future<void> completePasswordReset(String phone, String tempPassword, String newPassword) async {}
 }
 
 Future<void> _pump(WidgetTester tester, _Api api, Widget screen) async {

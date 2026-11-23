@@ -140,6 +140,8 @@ export const NAV: NavGroup[] = [
       // Owner request 2026-11-22: people who sign in — staff and drivers — under one "Users" tab.
       { href: '/users', en: 'Staff & permissions', ar: 'الموظفون والصلاحيات', perms: ['MANAGE_STAFF_ACCOUNTS'], sub: USERS },
       { href: '/drivers', en: 'Drivers', ar: 'السائقون', perms: ['MANAGE_DRIVERS'], sub: USERS },
+      // Owner decision 2026-11-23: "Forgot password?" requests from every app — answered here by someone above the person.
+      { href: '/password-requests', en: 'Password requests', ar: 'طلبات كلمة المرور', perms: ['MANAGE_CUSTOMERS', 'MANAGE_DRIVERS', 'CHANGE_DRIVER_ONLINE_STATUS', 'MANAGE_VENDOR_STAFF', 'MANAGE_STAFF_ACCOUNTS'], sub: USERS },
       // Owner request 2026-11-22: the critical setup lives in Settings.
       { href: '/sectors', en: 'Sectors', ar: 'الأقسام', perms: ['MANAGE_MARKETPLACE_SECTORS'] },
       { href: '/service-areas', en: 'Service Areas', ar: 'مناطق الخدمة', perms: ['MANAGE_SERVICE_AREAS'] },

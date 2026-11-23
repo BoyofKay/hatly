@@ -4,7 +4,7 @@ import '../../../core/localization/bilingual.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/providers.dart';
 import '../data/driver_auth_api.dart';
-import '../../overview/overview_api.dart';
+import 'forgot_password_screen.dart';
 import 'auth_state_provider.dart';
 
 /// CONFIRMED (locked decision): phone + password only, no OTP, no
@@ -70,76 +70,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// No SMS provider yet, so no self-service code: Hatly operations set a temporary password from the admin panel (Drivers ›
   /// Reset password) and send it to the driver, who signs in with it.
-  /// Driver app round 2: "Forgot password?" sends a request to Hatly operations (no SMS provider yet, so the app cannot verify identity by
-  /// itself). Operations call the driver, set a temporary password, and the app then asks for a new one at sign-in.
+  /// Request-based "Forgot password?" (owner decision 2026-11-23): its own screen — request, then the temporary password + a new one.
   void _showForgotPassword(BuildContext context) {
-    final phone = TextEditingController(text: _phoneController.text.trim());
-    showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        var sending = false;
-        var sent = false;
-        String? error;
-        return StatefulBuilder(
-          builder: (ctx, setDialog) => AlertDialog(
-            title: Text(ctx.t('Forgot your password?', 'نسيت كلمة المرور؟')),
-            content: sent
-                ? Text(
-                    ctx.t('Request sent. Hatly operations will call you and give you a temporary password — sign in with it here, then choose your own.',
-                        'تم إرسال الطلب. سيتصل بك فريق تشغيل هاتلي ويعطيك كلمة مرور مؤقتة — ادخل بها هنا ثم اختر كلمة مرور خاصة بك.'),
-                    key: const Key('forgot-sent'),
-                  )
-                : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(ctx.t('Send a request to Hatly operations. They will call you to confirm it is you and give you a temporary password.',
-                        'أرسل طلبًا لفريق تشغيل هاتلي. سيتصلون بك للتأكد أنك أنت ويعطونك كلمة مرور مؤقتة.')),
-                    const SizedBox(height: 12),
-                    TextField(
-                      key: const Key('forgot-phone'),
-                      controller: phone,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(labelText: ctx.t('Your phone number', 'رقم هاتفك'), border: const OutlineInputBorder()),
-                    ),
-                    if (error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(error!, style: const TextStyle(color: Colors.red))),
-                  ]),
-            actions: sent
-                ? [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(ctx.t('OK', 'حسنًا')))]
-                : [
-                    TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(ctx.t('Cancel', 'إلغاء'))),
-                    FilledButton(
-                      key: const Key('forgot-send'),
-                      onPressed: sending
-                          ? null
-                          : () async {
-                              if (phone.text.trim().length < 6) {
-                                setDialog(() => error = ctx.t('Enter your phone number.', 'أدخل رقم هاتفك.'));
-                                return;
-                              }
-                              setDialog(() {
-                                sending = true;
-                                error = null;
-                              });
-                              try {
-                                await ref.read(overviewApiProvider).requestPasswordReset(phone.text.trim());
-                                setDialog(() {
-                                  sending = false;
-                                  sent = true;
-                                });
-                              } on DioException catch (e) {
-                                setDialog(() {
-                                  sending = false;
-                                  error = e.response?.statusCode == 429
-                                      ? ctx.t('Too many attempts. Please wait a few minutes.', 'محاولات كثيرة. انتظر بضع دقائق.')
-                                      : ctx.t('Could not send the request. Check your connection, or call your supervisor.', 'تعذّر إرسال الطلب. تحقق من الاتصال، أو اتصل بمشرفك.');
-                                });
-                              }
-                            },
-                      child: Text(ctx.t('Send request', 'إرسال الطلب')),
-                    ),
-                  ],
-          ),
-        );
-      },
-    );
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ForgotPasswordScreen(initialPhone: _phoneController.text.trim())));
   }
 
   @override

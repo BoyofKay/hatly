@@ -1,5 +1,6 @@
 'use client';
 
+import { PasswordRequestsBanner } from './PasswordRequestsBanner';
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -306,6 +307,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         <OpsAlarmBar />
+        <PasswordRequestsBanner />
         {/* The Control Tower and the Orders workspace show these same facts as their own queues, so the shell banner stays out of their way. */}
         {/* Stage 5: the Operations board shows these facts itself (its "Other work" strip), so the banner steps aside wherever the board is on screen. */}
         {!boardShown && !['/control-tower', '/order-management'].some((p) => pathname === p) && <OperationsBanner facts={operations} />}
