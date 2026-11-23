@@ -15,6 +15,7 @@ import 'core/storage/theme_preference_storage.dart';
 import 'core/theme/hatly_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'core/routing/router_stack.dart';
+import 'shared_widgets/customer_global_header.dart';
 
 /// Customer Push Notifications — background state. Runs in a separate
 /// background isolate with NO access to this app's Riverpod
@@ -103,6 +104,10 @@ class HatlyCustomerApp extends ConsumerWidget {
       darkTheme: HatlyTheme.dark(),
       themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
+      builder: (context, child) => Column(children: [
+        SafeArea(bottom: false, child: CustomerGlobalHeader(router: router)),
+        Expanded(child: child ?? const SizedBox.shrink()),
+      ]),
 
       // Arabic is primary (spec section 4/19) and the default; the customer
       // can switch to English in Settings (localeProvider, persisted).
