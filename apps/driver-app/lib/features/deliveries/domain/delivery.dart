@@ -138,6 +138,7 @@ class DeliveryAddress {
     this.longitude,
     this.instructions,
     this.zoneNameAr,
+    this.zoneParentNameAr,
     this.zoneCityAr,
     this.buildingNumber,
     this.floor,
@@ -151,6 +152,7 @@ class DeliveryAddress {
   final double? longitude;
   final String? instructions;
   final String? zoneNameAr;
+  final String? zoneParentNameAr;
   final String? zoneCityAr;
   final String? buildingNumber;
   final String? floor;
@@ -162,7 +164,8 @@ class DeliveryAddress {
   /// "بلبيس — أبو نصيب", or null for an order placed before zones existed.
   String? get areaLabel {
     if (zoneNameAr == null) return null;
-    return zoneCityAr == null ? zoneNameAr : '$zoneCityAr — $zoneNameAr';
+    final parent = zoneParentNameAr ?? zoneCityAr;
+    return parent == null ? zoneNameAr : '$parent | $zoneNameAr';
   }
 
   factory DeliveryAddress.fromJson(Map<String, dynamic> json) {
@@ -183,6 +186,7 @@ class DeliveryAddress {
       longitude: lat != null && lng != null ? lng : null,
       instructions: json['instructions'] as String?,
       zoneNameAr: zone is Map ? zone['nameAr'] as String? : null,
+      zoneParentNameAr: zone is Map ? zone['zoneNameAr'] as String? : null,
       zoneCityAr: zone is Map ? zone['cityAr'] as String? : null,
       buildingNumber: json['buildingNumber'] as String?,
       floor: json['floor'] as String?,

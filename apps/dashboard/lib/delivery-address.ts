@@ -6,6 +6,8 @@ export interface DeliveryZoneSnapshotView {
   id: string;
   name: string;
   nameAr: string;
+  zoneName?: string | null;
+  zoneNameAr?: string | null;
   city: string;
   cityAr: string;
   governorate: string;
@@ -29,7 +31,7 @@ export interface DeliveryAddressView {
 export function deliveryAreaLabel(address: Pick<DeliveryAddressView, 'deliveryZone'> | null | undefined, locale: 'ar' | 'en' = 'en'): string | null {
   const zone = address?.deliveryZone;
   if (!zone) return null;
-  return locale === 'ar' ? `${zone.cityAr} — ${zone.nameAr}` : `${zone.city} — ${zone.name}`;
+  return locale === 'ar' ? `${zone.zoneNameAr ?? zone.cityAr} | ${zone.nameAr}` : `${zone.zoneName ?? zone.city} | ${zone.name}`;
 }
 
 /** Zone (when known) followed by the customer's own written address — what an operator needs when there is no pin. */

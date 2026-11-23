@@ -50,6 +50,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
 
   String? _governorate;
   String? _city;
+  String? _parentZoneAr;
   String? _zoneId;
   bool _zoneInitialized = false;
 
@@ -124,6 +125,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     }
     _governorate = current.governorateAr;
     _city = current.cityAr;
+    _parentZoneAr = current.parentZoneKey;
     if (zones.any((z) => z.id == current.id)) _zoneId = current.id;
   }
 
@@ -134,10 +136,14 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     if (_governorate == null && governorates.length == 1) _governorate = governorates.first;
     final cities = zones.where((z) => z.governorateAr == _governorate).map((z) => z.cityAr).toSet();
     if (_city == null && cities.length == 1) _city = cities.first;
-    if (!includeZone || _zoneId != null || _city == null) return;
+    if (_city == null) return;
     final cityZones = zones.where((z) => z.governorateAr == _governorate && z.cityAr == _city).toList();
-    if (cityZones.length == 1) {
-      _zoneId = cityZones.single.id;
+    final parents = cityZones.map((z) => z.parentZoneKey).toSet();
+    if (_parentZoneAr == null && parents.length == 1) _parentZoneAr = parents.first;
+    if (!includeZone || _zoneId != null || _parentZoneAr == null) return;
+    final children = cityZones.where((z) => z.parentZoneKey == _parentZoneAr).toList();
+    if (children.length == 1) {
+      _zoneId = children.single.id;
       _zoneAutoSelected = true;
     }
   }
@@ -193,6 +199,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
       } else {
         _governorate = null;
         _city = null;
+        _parentZoneAr = null;
         _zoneId = null;
         _zoneAutoSelected = false;
         _zoneInitialized = false;
@@ -344,7 +351,11 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           final cities = <String, DeliveryZone>{
             for (final z in zones.where((z) => z.governorateAr == _governorate)) z.cityAr: z,
           };
-          final areaZones = zones.where((z) => z.governorateAr == _governorate && z.cityAr == _city).toList();
+          final cityZones = zones.where((z) => z.governorateAr == _governorate && z.cityAr == _city).toList();
+          final parents = <String, DeliveryZone>{
+            for (final z in cityZones) z.parentZoneKey: z,
+          };
+          final areaZones = cityZones.where((z) => z.parentZoneKey == _parentZoneAr).toList();
           DeliveryZone? selected;
           for (final z in areaZones) {
             if (z.id == _zoneId) selected = z;
@@ -388,6 +399,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 onChanged: (v) => setState(() {
                   _governorate = v;
                   _city = null;
+                  _parentZoneAr = null;
                   _zoneId = null;
                   _zoneAutoSelected = false;
                   _applySingleChoices(zones);
@@ -403,6 +415,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 ],
                 onChanged: (v) => setState(() {
                   _city = v;
+                  _parentZoneAr = null;
                   _zoneId = null;
                   _zoneAutoSelected = false;
                   _applySingleChoices(zones);
@@ -410,8 +423,24 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
               ),
               const SizedBox(height: HatlySpacing.ms),
               _dropdown<String>(
-                key: ValueKey('address-zone-$_governorate-$_city'),
+                key: ValueKey('address-parent-zone-$_governorate-$_city'),
                 label: l10n.addressZoneLabel,
+                value: _parentZoneAr,
+                items: [
+                  for (final e in parents.entries)
+                    DropdownMenuItem(value: e.key, child: Text(e.value.displayZone(arabic))),
+                ],
+                onChanged: (v) => setState(() {
+                  _parentZoneAr = v;
+                  _zoneId = null;
+                  _zoneAutoSelected = false;
+                  _applySingleChoices(zones);
+                }),
+              ),
+              const SizedBox(height: HatlySpacing.ms),
+              _dropdown<String>(
+                key: ValueKey('address-zone-$_governorate-$_city-$_parentZoneAr'),
+                label: arabic ? 'الحي / القرية' : 'Neighborhood / Village',
                 value: _zoneId,
                 errorText: zoneMissing ? l10n.addressZoneRequired : null,
                 items: [
@@ -423,7 +452,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                   _zoneAutoSelected = false;
                 }),
               ),
-              if (_city != null && areaZones.isEmpty) ...[
+              if (_city != null && cityZones.isEmpty) ...[
                 const SizedBox(height: HatlySpacing.sm),
                 Text(l10n.addressCityNoZones,
                     key: const Key('address-city-no-zones'), style: context.type.small.copyWith(color: p.urgent)),

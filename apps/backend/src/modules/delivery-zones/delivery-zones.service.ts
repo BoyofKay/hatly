@@ -17,7 +17,7 @@ export class DeliveryZonesService {
   /** Customer-facing: active zones of active service areas, in display order. */
   async listActive(): Promise<DeliveryZone[]> {
     const zones = await this.zonesRepository.find({
-      where: { isActive: true },
+      where: { isActive: true, isSelectable: true },
       relations: { serviceArea: true },
       order: { governorateAr: 'ASC', cityAr: 'ASC', displayOrder: 'ASC', nameAr: 'ASC' },
     });
@@ -46,6 +46,8 @@ export class DeliveryZonesService {
         cityAr: dto.cityAr.trim(),
         name: dto.name.trim(),
         nameAr: dto.nameAr.trim(),
+        zoneName: dto.zoneName.trim(),
+        zoneNameAr: dto.zoneNameAr.trim(),
         deliveryFeeMinor: dto.deliveryFeeMinor,
         displayOrder: dto.displayOrder ?? 0,
         isActive: true,
@@ -61,7 +63,15 @@ export class DeliveryZonesService {
       await this.assertServiceArea(dto.serviceAreaId);
       zone.serviceAreaId = dto.serviceAreaId;
     }
-    for (const key of ['governorate', 'governorateAr', 'city', 'cityAr', 'name', 'nameAr'] as const) {
+    // Legacy rows have no parent. A partial parent update would violate
+    // the DB's bilingual-pair invariant, so return a clear validation error.
+    if ((dto.zoneName !== undefined) !== (dto.zoneNameAr !== undefined)) {
+      throw new BadRequestException({
+        message: 'Provide both English and Arabic parent delivery-zone names together.',
+        details: { code: 'DELIVERY_ZONE_BILINGUAL_PARENT_REQUIRED' },
+      });
+    }
+    for (const key of ['governorate', 'governorateAr', 'city', 'cityAr', 'name', 'nameAr', 'zoneName', 'zoneNameAr'] as const) {
       if (dto[key] !== undefined) zone[key] = dto[key]!.trim();
     }
     if (dto.displayOrder !== undefined) zone.displayOrder = dto.displayOrder;
@@ -111,7 +121,7 @@ export class DeliveryZonesService {
     } catch (error) {
       if (error instanceof QueryFailedError && (error as any).code === '23505') {
         throw new ConflictException({
-          message: 'A delivery zone with this name already exists in this service area.',
+          message: 'A neighborhood/village with this name already exists under this delivery zone.',
           details: { code: 'DELIVERY_ZONE_NAME_TAKEN' },
         });
       }

@@ -21,13 +21,15 @@ async function createZone(page: Page, opts: { name: string; nameAr: string; fee:
   await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
   await form.getByTestId('zone-city').fill('Belbeis');
   await form.getByTestId('zone-city-ar').fill('بلبيس');
+  await form.getByTestId('parent-zone-name').fill('Belbeis Zone');
+  await form.getByTestId('parent-zone-name-ar').fill('منطقة بلبيس');
   await form.getByTestId('zone-name').fill(opts.name);
   await form.getByTestId('zone-name-ar').fill(opts.nameAr);
   await form.getByTestId('zone-display-order').fill('90');
   await form.getByTestId('zone-fee').fill(opts.fee);
   const [res] = await Promise.all([
     page.waitForResponse((r) => r.url().endsWith('/admin/delivery-zones') && r.request().method() === 'POST'),
-    form.getByRole('button', { name: 'Create zone' }).click(),
+    form.getByRole('button', { name: 'Add neighborhood / village' }).click(),
   ]);
   expect(res.status()).toBe(201);
   return (await res.json()).data as { id: string };
@@ -96,35 +98,66 @@ test.describe('Admin — Delivery Zones', () => {
     await page.getByTestId('zone-new').click();
     const form = page.getByTestId('zone-form');
     // With a single service area it is preselected; the first missing required field is then the city.
-    await form.getByRole('button', { name: 'Create zone' }).click();
+    await form.getByRole('button', { name: 'Add neighborhood / village' }).click();
     await expect(page.getByTestId('zone-form-error')).toHaveText('City (EN) is required.');
     await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
     await form.getByTestId('zone-city').fill('Belbeis');
     await form.getByTestId('zone-city-ar').fill('بلبيس');
+    await form.getByTestId('parent-zone-name').fill('Belbeis Zone');
+    await form.getByTestId('parent-zone-name-ar').fill('منطقة بلبيس');
     await form.getByTestId('zone-name').fill('X');
     await form.getByTestId('zone-name-ar').fill('س');
     await form.getByTestId('zone-fee').fill('abc');
-    await form.getByRole('button', { name: 'Create zone' }).click();
+    await form.getByRole('button', { name: 'Add neighborhood / village' }).click();
     await expect(page.getByTestId('zone-form-error')).toContainText('Delivery fee must be an amount in EGP');
     await form.getByTestId('zone-fee').fill('15');
     await form.getByTestId('zone-lat').fill('30.4');
-    await form.getByRole('button', { name: 'Create zone' }).click();
+    await form.getByRole('button', { name: 'Add neighborhood / village' }).click();
     await expect(page.getByTestId('zone-form-error')).toHaveText('Enter both representative latitude and longitude, or neither.');
     expect(posted).toBe(0);
   });
 
-  test('a duplicate zone name is reported clearly (409 from the real backend)', async ({ page }) => {
+  test('a duplicate child under the SAME parent is a 409; same name under another parent remains allowed', async ({ page }) => {
+    await openPage(page);
+    const en = `Dup Child ${unique()}`;
+    const ar = `حي مكرر ${unique()}`;
+    const first = await createZone(page, { name: en, nameAr: ar, fee: '15' });
+    try {
+      await page.getByTestId('zone-new').click();
+      const form = page.getByTestId('zone-form');
+      await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
+      await form.getByTestId('zone-city').fill('Belbeis');
+      await form.getByTestId('zone-city-ar').fill('بلبيس');
+      await form.getByTestId('parent-zone-name').fill('Belbeis Zone');
+      await form.getByTestId('parent-zone-name-ar').fill('منطقة بلبيس');
+      await form.getByTestId('zone-name').fill(en);
+      await form.getByTestId('zone-name-ar').fill(ar);
+      await form.getByTestId('zone-fee').fill('15');
+      await form.getByRole('button', { name: 'Add neighborhood / village' }).click();
+      await expect(page.getByTestId('zone-form-error')).toHaveText('A neighborhood/village with this name already exists in this delivery zone.');
+    } finally {
+      await page.getByTestId('zone-new').click();
+      await deactivate(page, first.id);
+    }
+  });
+
+  test('rejects multiple villages in one name before posting', async ({ page }) => {
+    let posted = 0;
+    page.on('request', (r) => r.method() === 'POST' && r.url().endsWith('/admin/delivery-zones') && posted++);
     await openPage(page);
     await page.getByTestId('zone-new').click();
     const form = page.getByTestId('zone-form');
     await form.getByTestId('zone-service-area').selectOption({ label: 'Belbeis / بلبيس' });
     await form.getByTestId('zone-city').fill('Belbeis');
     await form.getByTestId('zone-city-ar').fill('بلبيس');
-    await form.getByTestId('zone-name').fill(`Dup ${unique()}`);
-    await form.getByTestId('zone-name-ar').fill('أبو نصيب');
+    await form.getByTestId('parent-zone-name').fill('Belbeis Zone');
+    await form.getByTestId('parent-zone-name-ar').fill('منطقة بلبيس');
+    await form.getByTestId('zone-name').fill('North, South');
+    await form.getByTestId('zone-name-ar').fill('الشمال، الجنوب');
     await form.getByTestId('zone-fee').fill('15');
-    await form.getByRole('button', { name: 'Create zone' }).click();
-    await expect(page.getByTestId('zone-form-error')).toHaveText('A zone with this name already exists in this service area.');
+    await form.getByRole('button', { name: 'Add neighborhood / village' }).click();
+    await expect(page.getByTestId('zone-form-error')).toContainText('Add each neighborhood/village separately');
+    expect(posted).toBe(0);
   });
 
   test('an admin WITHOUT the delivery-pricing permission cannot create zones or change fees, but can still manage structure', async ({ page }) => {

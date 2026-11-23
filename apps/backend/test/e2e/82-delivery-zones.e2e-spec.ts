@@ -27,6 +27,8 @@ describe('E2E — Delivery Zones (PD-009)', () => {
     governorateAr: 'الشرقية',
     city: 'Belbeis',
     cityAr: 'بلبيس',
+    zoneName: 'Central Belbeis',
+    zoneNameAr: 'وسط بلبيس',
     name: `Z ${Math.random().toString(36).slice(2, 8)}`,
     nameAr: `م ${Math.random().toString(36).slice(2, 8)}`,
     deliveryFeeMinor: 1800,
@@ -115,8 +117,48 @@ describe('E2E — Delivery Zones (PD-009)', () => {
       const list = expectData<any[]>(await world.api('get', '/delivery-zones', { token: c.accessToken }));
       expect(list.map((z) => z.id)).toContain(abuNaseeb.id);
       expect(list.map((z) => z.id)).not.toContain(hidden.id);
-      expect(Object.keys(list.find((z) => z.id === abuNaseeb.id)).sort()).toEqual(['city', 'cityAr', 'deliveryFeeMinor', 'governorate', 'governorateAr', 'id', 'name', 'nameAr']);
+      expect(Object.keys(list.find((z) => z.id === abuNaseeb.id)).sort()).toEqual(['city', 'cityAr', 'deliveryFeeMinor', 'governorate', 'governorateAr', 'id', 'name', 'nameAr', 'zoneName', 'zoneNameAr']);
     });
+  });
+
+  it('requires precisely one bilingual neighborhood per priced row', async () => {
+    const combined = zoneBody({ name: 'North, South', nameAr: 'الشمال، الجنوب' });
+    expect((await world.api('post', zonePath(), { token: superAdmin.accessToken, body: combined })).status).toBe(400);
+    const one = expectData<any>(await world.api('post', zonePath(), {
+      token: superAdmin.accessToken,
+      body: zoneBody({ zoneName: 'East Belbeis', zoneNameAr: 'شرق بلبيس', name: 'North', nameAr: 'الشمال', deliveryFeeMinor: 1100 }),
+    }), 201);
+    const two = expectData<any>(await world.api('post', zonePath(), {
+      token: superAdmin.accessToken,
+      body: zoneBody({ zoneName: 'East Belbeis', zoneNameAr: 'شرق بلبيس', name: 'South', nameAr: 'الجنوب', deliveryFeeMinor: 2300 }),
+    }), 201);
+    expect(one.id).not.toBe(two.id);
+    expect(one.deliveryFeeMinor).toBe(1100);
+    expect(two.deliveryFeeMinor).toBe(2300);
+  });
+
+  it('superseded combined row disappears from NEW selections but old saved address stays linked and priced', async () => {
+    const legacy = expectData<any>(await world.api('post', zonePath(), {
+      token: superAdmin.accessToken,
+      body: zoneBody({ name: 'Historic combined name', nameAr: 'اسم مركب قديم', deliveryFeeMinor: 1300 }),
+    }), 201);
+    const c = await s.customer();
+    const saved = await zoneAddress(c, legacy.id);
+    // Equivalent to the reconciliation utility's safe last step.
+    await world.ds.query('UPDATE delivery_zones SET is_selectable = false WHERE id = $1', [legacy.id]);
+    const options = expectData<any[]>(await world.api('get', '/delivery-zones', { token: c.accessToken }));
+    expect(options.map((z) => z.id)).not.toContain(legacy.id);
+    const addresses = expectData<any[]>(await world.api('get', '/addresses', { token: c.accessToken }));
+    expect(addresses.find((a) => a.id === saved.id)).toMatchObject({
+      deliveryZoneId: legacy.id, zoneStatus: 'OK', deliveryZone: { nameAr: 'اسم مركب قديم' },
+    });
+    const newAttempt = await world.api('post', '/addresses', {
+      token: c.accessToken,
+      body: { line1: 'Do not select a superseded combined row', deliveryZoneId: legacy.id },
+    });
+    expect(newAttempt.status).toBe(400);
+    // Restoring the test fixture keeps other tests independent.
+    await world.ds.query('UPDATE delivery_zones SET is_selectable = true WHERE id = $1', [legacy.id]);
   });
 
   describe('a pin-less, non-geocodable address is serviceable through its zone', () => {
