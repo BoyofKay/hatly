@@ -53,6 +53,10 @@ export class DeliveryZone extends BaseEntity {
   @Column({ name: 'delivery_fee_minor', type: 'bigint' })
   deliveryFeeMinor: number;
 
+  /** Hides superseded combined legacy names from new selections without invalidating old saved addresses. */
+  @Column({ name: 'is_selectable', type: 'boolean', default: true })
+  isSelectable: boolean;
+
   @Column({ name: 'display_order', type: 'int', default: 0 })
   displayOrder: number;
 
