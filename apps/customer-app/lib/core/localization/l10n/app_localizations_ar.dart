@@ -389,7 +389,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get customRequestEntryPoint => 'لم تجد ما تبحث عنه؟';
+  String get customRequestEntryPoint => 'خدمة هاتلي';
 
   @override
   String get customRequestSheetTitle => 'اطلب صنفًا غير موجود في القائمة';
@@ -1536,11 +1536,11 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addressOpenSettings => 'فتح إعدادات التطبيق';
 
   @override
-  String get hatlyServiceEntryTitle => 'خدمة هاتلي';
+  String get hatlyServiceEntryTitle => 'ملقتش المحل اللي بتدور عليه؟';
 
   @override
   String get hatlyServiceEntrySubtitle =>
-      'محتاج حاجة من مكان مش موجود عندنا؟ اطلبها من هاتلي.';
+      'ولا يهمك! مع خدمة هاتلي، اطلب اللي محتاجه من أي مكان، وإحنا نجيبهولك.';
 
   @override
   String get hatlyServiceScreenTitle => 'خدمة هاتلي';
