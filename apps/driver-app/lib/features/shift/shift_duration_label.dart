@@ -35,20 +35,26 @@ class _ShiftDurationLabelState extends ConsumerState<ShiftDurationLabel> {
     if (shift == null || !shift.onDuty || shift.startedAt == null) {
       return const SizedBox.shrink();
     }
-    final minutes = DateTime.now().difference(shift.startedAt!).inMinutes.clamp(0, 10000000);
+    // Prefer server-computed elapsed shift minutes. Local device clock skew must
+    // not inflate the current-shift duration; the device only advances the
+    // server duration from its own read timestamp.
+    final minuteAtRead = shift.serverElapsedMinutes;
+    final passed = shift.readAt == null ? 0 : DateTime.now().difference(shift.readAt!).inMinutes;
+    final minutes = (minuteAtRead == null
+      ? DateTime.now().difference(shift.startedAt!).inMinutes
+      : minuteAtRead + passed).clamp(0, 10000000);
     final hours = minutes ~/ 60;
     final mins = minutes % 60;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.schedule_outlined, size: 16, color: Color(0xFF6B6B6B)),
-        const SizedBox(width: 6),
-        Text(
-          context.t('Shift duration: ${hours} h ${mins} min', 'مدة الوردية: ${hours} س ${mins} د'),
-          key: const Key('shift-duration'),
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF424242)),
-        ),
-      ]),
-    );
+    final since = shift.startedAt!.toLocal();
+    final sinceText = '${since.hour.toString().padLeft(2, '0')}:${since.minute.toString().padLeft(2, '0')}';
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      const Icon(Icons.schedule_outlined, size: 16, color: Color(0xFF1B5E20)),
+      const SizedBox(width: 5),
+      Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart,
+        child: Text(context.t('On duty since $sinceText · $hours h $mins min',
+          'في الخدمة منذ $sinceText · مدة الوردية $hours س $mins د'),
+          key: const Key('shift-duration'), maxLines: 1,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20))))),
+    ]);
   }
 }
