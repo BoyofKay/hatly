@@ -47,6 +47,8 @@ export interface AddressView {
   deliveryZoneId: string | null;
   deliveryZone: DeliveryZoneSummary | null;
   zoneStatus: AddressZoneStatus;
+  /** Why an existing manual address cannot be used, without changing its historical reference. */
+  zoneUnavailableReason: 'SERVICE_AREA_INACTIVE' | 'DELIVERY_ZONE_INACTIVE' | 'NEIGHBORHOOD_INACTIVE' | 'AREA_REMOVED' | null;
 }
 
 /** Fields an update may change on a zone-less legacy address without having to choose a zone first. */
@@ -415,6 +417,11 @@ export class AddressesService {
       deliveryZone: zone ? toDeliveryZoneSummary(zone) : null,
       // A GPS address has no zone by design, so there is nothing for the customer to (re)select.
       zoneStatus: address.mode === AddressMode.GPS ? 'OK' : !address.deliveryZoneId ? 'MISSING' : isZoneServiceable(zone) ? 'OK' : 'UNAVAILABLE',
+      zoneUnavailableReason: address.mode === AddressMode.GPS || !address.deliveryZoneId || isZoneServiceable(zone)
+        ? null : !zone || zone.deletedAt || !zone.isSelectable ? 'AREA_REMOVED'
+        : zone.serviceArea?.isActive === false ? 'SERVICE_AREA_INACTIVE'
+        : zone.parentIsActive === false ? 'DELIVERY_ZONE_INACTIVE'
+        : !zone.isActive ? 'NEIGHBORHOOD_INACTIVE' : 'AREA_REMOVED',
     };
   }
 
