@@ -2657,4 +2657,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get addressVillageRequired => 'Choose your village or neighbourhood';
+  @override
+  String get homeDeliverTo => 'Deliver to';
+
+  @override
+  String get profileSettings => 'Settings';
+
+  @override
+  String get settingsLanguage => 'Language';
+
+  @override
+  String get languageArabic => 'العربية';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
+  String get settingsPasswordSection => 'Password & security';
+
+  @override
+  String get settingsAccountSection => 'Account';
+
+  @override
+  String get settingsAppSection => 'App';
+
+  @override
+  String get searchFilterVendors => 'Stores only';
+
+  @override
+  String get searchFilterProducts => 'Products only';
 }

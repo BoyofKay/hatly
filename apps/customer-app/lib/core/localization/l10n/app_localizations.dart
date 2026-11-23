@@ -4711,6 +4711,65 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'اختر قريتك أو حيّك'**
   String get addressVillageRequired;
+  /// No description provided for @homeDeliverTo.
+  ///
+  /// In ar, this message translates to:
+  /// **'التوصيل إلى'**
+  String get homeDeliverTo;
+
+  /// No description provided for @profileSettings.
+  ///
+  /// In ar, this message translates to:
+  /// **'الإعدادات'**
+  String get profileSettings;
+
+  /// No description provided for @settingsLanguage.
+  ///
+  /// In ar, this message translates to:
+  /// **'اللغة'**
+  String get settingsLanguage;
+
+  /// No description provided for @languageArabic.
+  ///
+  /// In ar, this message translates to:
+  /// **'العربية'**
+  String get languageArabic;
+
+  /// No description provided for @languageEnglish.
+  ///
+  /// In ar, this message translates to:
+  /// **'English'**
+  String get languageEnglish;
+
+  /// No description provided for @settingsPasswordSection.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور والأمان'**
+  String get settingsPasswordSection;
+
+  /// No description provided for @settingsAccountSection.
+  ///
+  /// In ar, this message translates to:
+  /// **'الحساب'**
+  String get settingsAccountSection;
+
+  /// No description provided for @settingsAppSection.
+  ///
+  /// In ar, this message translates to:
+  /// **'التطبيق'**
+  String get settingsAppSection;
+
+  /// No description provided for @searchFilterVendors.
+  ///
+  /// In ar, this message translates to:
+  /// **'متاجر'**
+  String get searchFilterVendors;
+
+  /// No description provided for @searchFilterProducts.
+  ///
+  /// In ar, this message translates to:
+  /// **'منتجات'**
+  String get searchFilterProducts;
 }
 
 class _AppLocalizationsDelegate
