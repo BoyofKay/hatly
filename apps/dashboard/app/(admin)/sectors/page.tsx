@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AdminSector, MANAGE_MARKETPLACE_SECTORS, createSector, listAdminSectors, setSectorActive, setSectorCustomRequests } from '../../../lib/api/admin-sectors';
+import { AdminSector, MANAGE_MARKETPLACE_SECTORS, createSector, listAdminSectors, setSectorActive, setSectorCustomRequests, setSectorBanner } from '../../../lib/api/admin-sectors';
+import { MediaPicker } from '../../../components/media/MediaPicker';
+import { resolveMediaUrl } from '../../../lib/media-url';
 import { EMPTY_SECTOR_FORM, SectorFormState, buildCreateSectorBody, suggestSlug } from '../../../lib/sectors/sector-form';
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { useAdminPermission } from '../../../lib/auth/use-admin-permission';
@@ -25,6 +27,7 @@ export default function SectorsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const canManage = useAdminPermission(MANAGE_MARKETPLACE_SECTORS) === true;
   const [creating, setCreating] = useState(false);
+  const [bannerSector, setBannerSector] = useState<AdminSector | null>(null);
   const [form, setForm] = useState<SectorFormState>(EMPTY_SECTOR_FORM);
   const [slugTouched, setSlugTouched] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -78,6 +81,16 @@ export default function SectorsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function updateBanner(sector: AdminSector, url: string | null) {
+    if (!canManage || busyId) return;
+    setBusyId(sector.id); setError(null);
+    try {
+      const updated = await setSectorBanner(sector.id, url);
+      setSectors((all) => (all ?? []).map((s) => s.id === updated.id ? updated : s));
+    } catch (err) { setError(apiErrorMessage(err, t('Failed to save sector banner.', 'تعذر حفظ بانر القطاع.'))); }
+    finally { setBusyId(null); }
   }
 
   async function toggleActive(sector: AdminSector) {
@@ -162,6 +175,7 @@ export default function SectorsPage() {
                 <tr className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                   <th className="px-3 py-2 text-start font-medium">{t('Sector', 'القطاع')}</th>
                   <th className="px-3 py-2 text-start font-medium">{t('Slug', 'المعرّف')}</th>
+                  <th className="px-3 py-2 text-start font-medium">{t('Sector banner', 'بانر القطاع')}</th>
                   <th className="px-3 py-2 text-start font-medium">{t('Status', 'الحالة')}</th>
                   <th className="px-3 py-2 text-start font-medium" />
                   <th className="px-3 py-2 text-start font-medium">{t('Custom requests', 'الطلبات المخصصة')}</th>
@@ -172,6 +186,11 @@ export default function SectorsPage() {
                   <tr key={s.id} data-testid={`sector-row-${s.id}`} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-3 py-2"><span className="font-medium text-gray-900">{s.name}</span>{s.nameAr ? <span dir="rtl" className="text-gray-500"> / {s.nameAr}</span> : null}</td>
                     <td className="px-3 py-2 text-gray-500" dir="ltr">{s.slug}</td>
+                    <td className="px-3 py-2"><div className="flex items-center gap-2">
+                      {s.bannerUrl ? <img alt="" src={resolveMediaUrl(s.bannerUrl)} className="h-12 w-20 rounded-lg object-cover" /> : <span className="text-xs text-gray-400">{t('No banner', 'لا يوجد بانر')}</span>}
+                      <button type="button" className="rounded-lg border px-2 py-2 text-xs text-hatly-orangeDark disabled:opacity-40" disabled={!canManage || !!busyId} onClick={() => setBannerSector(s)}>{t('Choose image', 'اختيار صورة')}</button>
+                      {s.bannerUrl && <button type="button" className="text-xs text-red-600 disabled:opacity-40" disabled={!canManage || !!busyId} onClick={() => void updateBanner(s, null)}>{t('Remove', 'إزالة')}</button>}
+                    </div></td>
                     <td className="px-3 py-2"><Badge tone={s.isActive ? 'green' : 'gray'}>{s.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge></td>
                     <td className="px-3 py-2"><button data-testid={`sector-active-toggle-${s.id}`} disabled={!canManage || busyId === s.id} onClick={() => toggleActive(s)} className="min-h-[36px] text-xs font-medium text-hatly-orangeDark hover:underline disabled:opacity-40">{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</button></td>
                     <td className="px-3 py-2"><Switch s={s} testId={`sector-custom-requests-${s.id}`} /></td>
@@ -188,6 +207,10 @@ export default function SectorsPage() {
                   <Badge tone={s.isActive ? 'green' : 'gray'}>{s.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge>
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
+                  <button type="button" className="text-xs text-hatly-orangeDark disabled:opacity-40" disabled={!canManage || !!busyId} onClick={() => setBannerSector(s)}>{s.bannerUrl ? t('Change banner', 'تغيير البانر') : t('Add banner', 'إضافة بانر')}</button>
+                  {s.bannerUrl && <button type="button" className="text-xs text-red-600 disabled:opacity-40" disabled={!canManage || !!busyId} onClick={() => void updateBanner(s, null)}>{t('Remove', 'إزالة')}</button>}
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
                   <span className="text-xs text-gray-600">{t('Custom requests', 'الطلبات المخصصة')}</span>
                   <span className="flex items-center gap-2"><Switch s={s} /><button disabled={!canManage || busyId === s.id} onClick={() => toggleActive(s)} className="min-h-[36px] text-xs font-medium text-hatly-orangeDark disabled:opacity-40">{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</button></span>
                 </div>
@@ -196,6 +219,13 @@ export default function SectorsPage() {
           </ul>
         </>
       )}
+      <MediaPicker open={bannerSector !== null} onClose={() => setBannerSector(null)} title={t('Choose sector banner', 'اختر بانر القطاع')} onPick={(items) => {
+        const sector = bannerSector;
+        const url = items[0]?.display?.url;
+        setBannerSector(null);
+        if (sector && typeof url === 'string') void updateBanner(sector, url);
+        else setError(t('Selected image has no display URL.', 'الصورة المحددة لا تحتوي على رابط.'));
+      }} />
     </div>
   );
 }
