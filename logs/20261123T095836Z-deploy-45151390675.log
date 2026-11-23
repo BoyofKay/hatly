@@ -1,0 +1,599 @@
+action=deploy arg= commit=1751fe5fb26b5bab40276be45a4fdf4d3c335414 run=45151390675 started=2026-11-23T09:55:43Z
+bundle OK: /home/runner/work/_temp/rel/hatly-prod-src.tar.gz  (30616326 bytes, 1938 entries, 94 migrations)
+release id: 20261123T095541Z-df5dfdbe7069
+uploaded 20261123T095541Z-df5dfdbe7069
+current release (rollback target): 20261123T075657Z-17362f5a4572
+
+==== 1. verify + extract  (09:55:54 UTC)
+incoming/20261123T095541Z-df5dfdbe7069.tar.gz: OK
+
+==== 2. build images (the live release keeps serving)  (09:55:55 UTC)
+ Image hatly-prod-backend:20261123T095541Z-df5dfdbe7069 Building 
+ Image hatly-prod-dashboard:20261123T095541Z-df5dfdbe7069 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.29kB done
+#1 DONE 0.0s
+
+#2 [prod-dashboard internal] load build definition from dashboard.Dockerfile
+#2 transferring dockerfile: 2.02kB done
+#2 DONE 0.0s
+
+#3 [prod-backend internal] load build definition from backend.Dockerfile
+#3 transferring dockerfile: 2.58kB done
+#3 DONE 0.0s
+
+#4 [prod-dashboard internal] load metadata for docker.io/library/node:22-bookworm-slim
+#4 DONE 0.6s
+
+#5 [prod-dashboard build  1/10] FROM docker.io/library/node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+#5 resolve docker.io/library/node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee 0.0s done
+#5 DONE 0.0s
+
+#6 [prod-dashboard internal] load build context
+#6 transferring context: 3.15MB 0.1s done
+#6 DONE 0.1s
+
+#7 [prod-dashboard build  2/10] WORKDIR /repo
+#7 CACHED
+
+#8 [prod-dashboard build  3/10] COPY package.json package-lock.json ./
+#8 CACHED
+
+#9 [prod-dashboard build  4/10] COPY apps/backend/package.json apps/backend/package.json
+#9 DONE 0.1s
+
+#10 [prod-backend internal] load build context
+#10 transferring context: 9.62MB 0.2s done
+#10 DONE 0.2s
+
+#7 [prod-backend build  2/10] WORKDIR /repo
+#7 CACHED
+
+#8 [prod-backend build  3/10] COPY package.json package-lock.json ./
+#8 CACHED
+
+#9 [prod-backend build  4/10] COPY apps/backend/package.json apps/backend/package.json
+#9 DONE 0.1s
+
+#11 [prod-dashboard build  5/10] COPY apps/dashboard/package.json apps/dashboard/package.json
+#11 DONE 0.0s
+
+#12 [prod-backend build  6/10] COPY packages packages
+#12 DONE 0.0s
+
+#13 [prod-backend build 6/9] COPY packages packages
+#13 CACHED
+
+#14 [prod-backend build 3/9] COPY package.json package-lock.json ./
+#14 CACHED
+
+#15 [prod-backend build 4/9] COPY apps/backend/package.json apps/backend/package.json
+#15 CACHED
+
+#16 [prod-backend build 5/9] COPY apps/dashboard/package.json apps/dashboard/package.json
+#16 CACHED
+
+#17 [prod-backend build 7/9] RUN npm ci --workspace=apps/backend --include-workspace-root
+#17 4.052 npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+#17 ...
+
+#18 [prod-backend prod-deps 7/7] RUN npm ci --omit=dev --workspace=apps/backend --include-workspace-root
+#18 4.633 npm warn deprecated crypto-js@4.2.0: Active development of CryptoJS has been discontinued. This library is no longer maintained.
+#18 4.641 npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+#18 4.698 npm warn deprecated jpeg-exif@1.1.4: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+#18 5.483 npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#18 5.642 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#18 5.685 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#18 5.729 npm warn deprecated uuid@10.0.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#18 ...
+
+#17 [prod-backend build 7/9] RUN npm ci --workspace=apps/backend --include-workspace-root
+#17 5.947 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#17 6.057 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#17 6.058 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#17 6.148 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#17 6.308 npm warn deprecated jpeg-exif@1.1.4: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+#17 6.397 npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+#17 6.532 npm warn deprecated crypto-js@4.2.0: Active development of CryptoJS has been discontinued. This library is no longer maintained.
+#17 8.049 npm warn deprecated glob@10.4.5: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#17 8.193 npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#17 8.247 npm warn deprecated uuid@10.0.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#17 8.348 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#17 8.405 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#17 ...
+
+#19 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#19 2.390 npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+#19 2.665 npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+#19 3.618 npm warn deprecated @humanwhocodes/config-array@0.13.0: Use @eslint/config-array instead
+#19 3.639 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#19 3.703 npm warn deprecated @humanwhocodes/object-schema@2.0.3: Use @eslint/object-schema instead
+#19 5.128 npm warn deprecated glob@10.3.10: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#19 7.915 npm warn deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+#19 ...
+
+#18 [prod-backend prod-deps 7/7] RUN npm ci --omit=dev --workspace=apps/backend --include-workspace-root
+#18 10.41 
+#18 10.41 added 453 packages, and audited 455 packages in 10s
+#18 10.41 
+#18 10.41 112 packages are looking for funding
+#18 10.41   run `npm fund` for details
+#18 10.44 
+#18 10.44 20 vulnerabilities (1 low, 15 moderate, 4 high)
+#18 10.44 
+#18 10.44 To address issues that do not require attention, run:
+#18 10.44   npm audit fix
+#18 10.44 
+#18 10.44 To address all issues (including breaking changes), run:
+#18 10.44   npm audit fix --force
+#18 10.44 
+#18 10.44 Run `npm audit` for details.
+#18 10.45 npm notice
+#18 10.45 npm notice New major version of npm available! 10.9.9 -> 12.2.3
+#18 10.45 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#18 10.45 npm notice To update run: npm install -g npm@12.2.3
+#18 10.45 npm notice
+#18 DONE 11.2s
+
+#19 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#19 ...
+
+#17 [prod-backend build 7/9] RUN npm ci --workspace=apps/backend --include-workspace-root
+#17 15.74 
+#17 15.74 added 888 packages, and audited 890 packages in 15s
+#17 15.74 
+#17 15.74 169 packages are looking for funding
+#17 15.74   run `npm fund` for details
+#17 15.83 
+#17 15.83 34 vulnerabilities (4 low, 21 moderate, 8 high, 1 critical)
+#17 15.83 
+#17 15.83 To address issues that do not require attention, run:
+#17 15.83   npm audit fix
+#17 15.83 
+#17 15.83 To address all issues (including breaking changes), run:
+#17 15.83   npm audit fix --force
+#17 15.83 
+#17 15.83 Run `npm audit` for details.
+#17 15.83 npm notice
+#17 15.83 npm notice New major version of npm available! 10.9.9 -> 12.2.3
+#17 15.83 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#17 15.83 npm notice To update run: npm install -g npm@12.2.3
+#17 15.83 npm notice
+#17 DONE 16.4s
+
+#19 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#19 ...
+
+#20 [prod-backend build 8/9] COPY apps/backend apps/backend
+#20 DONE 0.5s
+
+#19 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#19 ...
+
+#21 [prod-backend build 9/9] RUN cd apps/backend && npx nest build
+#21 DONE 17.9s
+
+#19 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#19 ...
+
+#22 [prod-backend runtime 3/9] RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+#22 CACHED
+
+#23 [prod-backend runtime 4/9] COPY --from=prod-deps /repo/node_modules /repo/node_modules
+#23 CACHED
+
+#24 [prod-backend runtime 2/9] WORKDIR /repo/apps/backend
+#24 CACHED
+
+#25 [prod-backend runtime 5/9] COPY --from=prod-deps /repo/apps/backend/node_modules ./node_modules
+#25 CACHED
+
+#26 [prod-backend runtime 6/9] COPY --from=build /repo/apps/backend/dist ./dist
+#26 DONE 0.4s
+
+#19 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#19 ...
+
+#27 [prod-backend runtime 7/9] COPY apps/backend/assets ./assets
+#27 DONE 0.0s
+
+#28 [prod-backend runtime 8/9] COPY apps/backend/package.json ./package.json
+#28 DONE 0.0s
+
+#29 [prod-backend runtime 9/9] RUN mkdir -p /data/uploads && chown -R node:node /data /repo/apps/backend
+#29 DONE 3.9s
+
+#19 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#19 ...
+
+#30 [prod-backend] exporting to image
+#30 exporting layers
+#30 exporting layers 3.4s done
+#30 exporting manifest sha256:f385a30ba35bd5f2162e92a8ce57298be1447af5eec997c24cd35bb483b97311 done
+#30 exporting config sha256:b106eab5de8b48cace5c5316cc80bb76b9ff4c90f1da9750d928400e691fcef6 done
+#30 exporting attestation manifest sha256:1a11988fa3c0a6519f4bce47ca6a00c7ee494d8957efe23df25df45dfc2fbbb6 done
+#30 exporting manifest list sha256:4b69335e3950676aedba615fb6ba32954ba9d73aba99d471402d55fc6d3276f6 done
+#30 naming to docker.io/library/hatly-prod-backend:20261123T095541Z-df5dfdbe7069 done
+#30 unpacking to docker.io/library/hatly-prod-backend:20261123T095541Z-df5dfdbe7069
+#30 unpacking to docker.io/library/hatly-prod-backend:20261123T095541Z-df5dfdbe7069 1.5s done
+#30 DONE 5.0s
+
+#31 [prod-backend] resolving provenance for metadata file
+#31 DONE 0.0s
+
+#19 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#19 46.09 
+#19 46.09 added 423 packages, and audited 425 packages in 46s
+#19 46.09 
+#19 46.09 158 packages are looking for funding
+#19 46.09   run `npm fund` for details
+#19 46.23 
+#19 46.23 10 vulnerabilities (1 moderate, 8 high, 1 critical)
+#19 46.23 
+#19 46.23 To address issues that do not require attention, run:
+#19 46.23   npm audit fix
+#19 46.23 
+#19 46.23 To address all issues (including breaking changes), run:
+#19 46.23   npm audit fix --force
+#19 46.23 
+#19 46.23 Run `npm audit` for details.
+#19 46.23 npm notice
+#19 46.23 npm notice New major version of npm available! 10.9.9 -> 12.2.3
+#19 46.23 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#19 46.23 npm notice To update run: npm install -g npm@12.2.3
+#19 46.23 npm notice
+#19 DONE 46.9s
+
+#32 [prod-dashboard build  8/10] COPY apps/dashboard apps/dashboard
+#32 DONE 0.3s
+
+#33 [prod-dashboard build  9/10] RUN test -f apps/dashboard/postcss.config.js
+#33 DONE 0.2s
+
+#34 [prod-dashboard build 10/10] RUN test -n "https://api.hatly.dev/api/v1" && cd apps/dashboard && npx next build
+#34 1.153    ▲ Next.js 15.5.27
+#34 1.153 
+#34 1.190    Creating an optimized production build ...
+#34 18.78  ✓ Compiled successfully in 14.9s
+#34 18.78    Linting and checking validity of types ...
+#34 30.41    Collecting page data ...
+#34 32.85    Generating static pages (0/83) ...
+#34 33.48    Generating static pages (20/83) 
+#34 33.57    Generating static pages (41/83) 
+#34 33.61    Generating static pages (62/83) 
+#34 33.63  ✓ Generating static pages (83/83)
+#34 34.28    Finalizing page optimization ...
+#34 34.28    Collecting build traces ...
+#34 41.19 
+#34 41.20 Route (app)                                 Size  First Load JS
+#34 41.20 ┌ ○ /                                      136 B         103 kB
+#34 41.20 ├ ○ /_not-found                             1 kB         103 kB
+#34 41.20 ├ ○ /access/templates                     3.7 kB         157 kB
+#34 41.20 ├ ○ /account-deletion                    5.36 kB         126 kB
+#34 41.20 ├ ○ /account-deletion-requests           3.69 kB         152 kB
+#34 41.20 ├ ○ /alerts                              2.75 kB         160 kB
+#34 41.20 ├ ○ /audiences                           3.58 kB         157 kB
+#34 41.20 ├ ○ /audit-log                           3.38 kB         151 kB
+#34 41.20 ├ ○ /banners                             7.89 kB         141 kB
+#34 41.20 ├ ○ /branch-requests                     2.51 kB         150 kB
+#34 41.20 ├ ○ /branches                            4.84 kB         162 kB
+#34 41.20 ├ ƒ /branches/[id]                       10.7 kB         186 kB
+#34 41.20 ├ ○ /broadcasts                          4.28 kB         161 kB
+#34 41.20 ├ ƒ /broadcasts/[id]                     5.64 kB         162 kB
+#34 41.20 ├ ○ /campaigns                            3.3 kB         160 kB
+#34 41.20 ├ ƒ /campaigns/[id]                      5.57 kB         162 kB
+#34 41.20 ├ ○ /cash-remainders                     2.27 kB         154 kB
+#34 41.20 ├ ○ /catalog                             7.84 kB         175 kB
+#34 41.20 ├ ○ /change-password                     2.49 kB         144 kB
+#34 41.20 ├ ○ /config                               3.9 kB         161 kB
+#34 41.20 ├ ○ /control-tower                       14.2 kB         165 kB
+#34 41.20 ├ ○ /customers                           4.07 kB         161 kB
+#34 41.20 ├ ƒ /customers/[id]                      9.86 kB         167 kB
+#34 41.20 ├ ○ /delivery-zones                      7.37 kB         141 kB
+#34 41.20 ├ ○ /dispatch                              497 B         106 kB
+#34 41.20 ├ ○ /drivers                             11.7 kB         160 kB
+#34 41.20 ├ ○ /drivers-today                       11.3 kB         168 kB
+#34 41.20 ├ ○ /earnings                            3.09 kB         160 kB
+#34 41.20 ├ ○ /employee-loans                      4.74 kB         158 kB
+#34 41.20 ├ ○ /exceptions                           9.3 kB         166 kB
+#34 41.20 ├ ○ /executive                            8.2 kB         165 kB
+#34 41.20 ├ ○ /exports                              3.9 kB         157 kB
+#34 41.20 ├ ○ /failed-deliveries                   3.49 kB         155 kB
+#34 41.20 ├ ƒ /failed-deliveries/[id]              6.03 kB         157 kB
+#34 41.20 ├ ○ /finance                             4.93 kB         162 kB
+#34 41.20 ├ ○ /finance/ledger                      7.29 kB         164 kB
+#34 41.20 ├ ○ /finance/liabilities                  4.6 kB         158 kB
+#34 41.20 ├ ○ /finance/receivables                 2.85 kB         156 kB
+#34 41.20 ├ ○ /finance/reconciliation              3.29 kB         157 kB
+#34 41.20 ├ ○ /finance/revenue                     4.38 kB         158 kB
+#34 41.20 ├ ○ /fleet                               5.81 kB         163 kB
+#34 41.20 ├ ○ /growth                              2.54 kB         156 kB
+#34 41.20 ├ ○ /home                                10.2 kB         189 kB
+#34 41.20 ├ ○ /inbox                               2.22 kB         176 kB
+#34 41.20 ├ ○ /insights                            3.08 kB         156 kB
+#34 41.20 ├ ○ /inventory                           2.16 kB         159 kB
+#34 41.20 ├ ○ /login                               5.62 kB         147 kB
+#34 41.20 ├ ○ /manual-transfer                     7.06 kB         158 kB
+#34 41.20 ├ ○ /media                               4.67 kB         163 kB
+#34 41.20 ├ ○ /my-branches                         5.54 kB         163 kB
+#34 41.20 ├ ○ /notification-setup                  5.93 kB         172 kB
+#34 41.20 ├ ○ /notifications                         392 B         156 kB
+#34 41.20 ├ ○ /offers                              9.73 kB         167 kB
+#34 41.20 ├ ○ /operations                          2.07 kB         169 kB
+#34 41.20 ├ ○ /order-history                       3.33 kB         160 kB
+#34 41.20 ├ ○ /order-management                    10.3 kB         183 kB
+#34 41.20 ├ ○ /order-search                        5.07 kB         156 kB
+#34 41.20 ├ ƒ /order-search/[id]                     393 B         173 kB
+#34 41.20 ├ ○ /orders                              7.63 kB         165 kB
+#34 41.20 ├ ƒ /orders/[id]                           377 B         148 kB
+#34 41.20 ├ ○ /overview                            6.97 kB         167 kB
+#34 41.20 ├ ○ /password-requests                   2.81 kB         156 kB
+#34 41.20 ├ ○ /payments                             6.1 kB         163 kB
+#34 41.20 ├ ○ /privacy                               136 B         103 kB
+#34 41.20 ├ ○ /product-requests                    3.73 kB         152 kB
+#34 41.20 ├ ○ /products                            9.86 kB         162 kB
+#34 41.20 ├ ○ /refunds                             2.25 kB         159 kB
+#34 41.20 ├ ○ /reports                             2.26 kB         159 kB
+#34 41.20 ├ ƒ /reports/[id]                        4.41 kB         161 kB
+#34 41.20 ├ ○ /reviews                             2.53 kB         156 kB
+#34 41.20 ├ ○ /sectors                             6.95 kB         166 kB
+#34 41.20 ├ ○ /security                            2.87 kB         151 kB
+#34 41.20 ├ ○ /service-areas                       4.97 kB         153 kB
+#34 41.20 ├ ○ /settings                            7.91 kB         150 kB
+#34 41.20 ├ ○ /settlement                          9.56 kB         166 kB
+#34 41.20 ├ ○ /settlement-statements               7.75 kB         165 kB
+#34 41.20 ├ ○ /settlements                          5.3 kB         162 kB
+#34 41.20 ├ ƒ /settlements/[party]/[id]            10.5 kB         167 kB
+#34 41.20 ├ ○ /stock                               3.11 kB         151 kB
+#34 41.20 ├ ○ /stock-history                        7.1 kB         155 kB
+#34 41.20 ├ ○ /stores-now                          6.55 kB         163 kB
+#34 41.20 ├ ○ /system                              3.25 kB         160 kB
+#34 41.20 ├ ○ /system/jobs                         2.68 kB         159 kB
+#34 41.20 ├ ○ /system/metrics                      3.01 kB         156 kB
+#34 41.20 ├ ○ /team                                 6.3 kB         160 kB
+#34 41.20 ├ ○ /users                               6.36 kB         154 kB
+#34 41.20 ├ ○ /vehicle-types                        4.3 kB         152 kB
+#34 41.20 ├ ○ /vendor-staff                        7.42 kB         155 kB
+#34 41.20 ├ ○ /vendors                             5.48 kB         162 kB
+#34 41.20 ├ ƒ /vendors/[id]                        10.6 kB         162 kB
+#34 41.20 └ ○ /wallet-adjustments                   3.3 kB         160 kB
+#34 41.20 + First Load JS shared by all             102 kB
+#34 41.20   ├ chunks/1255-8dc91b756d944555.js      46.2 kB
+#34 41.20   ├ chunks/4bd1b696-100b9d70ed4e49c1.js  54.2 kB
+#34 41.20   └ other shared chunks (total)          1.94 kB
+#34 41.20 
+#34 41.20 
+#34 41.20 ○  (Static)   prerendered as static content
+#34 41.20 ƒ  (Dynamic)  server-rendered on demand
+#34 41.20 
+#34 DONE 41.4s
+
+#35 [prod-dashboard runtime 3/5] RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+#35 CACHED
+
+#36 [prod-dashboard runtime 4/5] COPY --from=build /repo /repo
+#36 DONE 3.7s
+
+#37 [prod-dashboard runtime 5/5] WORKDIR /repo/apps/dashboard
+#37 DONE 0.2s
+
+#38 [prod-dashboard] exporting to image
+#38 exporting layers
+#38 exporting layers 27.7s done
+#38 exporting manifest sha256:bfe30eac13f1a7df8354d37eb148e54f445920c25a23d788668d3b9bbf3c5bd6 done
+#38 exporting config sha256:bdc26b0c6a370070fc8a1212bf6237b4c8e9066ba8c05acfd9f1cc25423a33e8 done
+#38 exporting attestation manifest sha256:3315095044427c1bd40d721888741ef62dd577550dc26f83f6ba2d756a89a259 done
+#38 exporting manifest list sha256:b9cea7d1e574f2bdcf451ab90421256640fb9e30e849edf63f3fa5d2d5ea4b7f done
+#38 naming to docker.io/library/hatly-prod-dashboard:20261123T095541Z-df5dfdbe7069 done
+#38 unpacking to docker.io/library/hatly-prod-dashboard:20261123T095541Z-df5dfdbe7069
+#38 unpacking to docker.io/library/hatly-prod-dashboard:20261123T095541Z-df5dfdbe7069 5.7s done
+#38 DONE 33.4s
+
+#39 [prod-dashboard] resolving provenance for metadata file
+#39 DONE 0.0s
+ Image hatly-prod-backend:20261123T095541Z-df5dfdbe7069 Built 
+ Image hatly-prod-dashboard:20261123T095541Z-df5dfdbe7069 Built 
+
+==== 3. env check with the new image  (09:58:05 UTC)
+ Container hatly-prod-prod-backend-run-9a363ff9c67a Creating 
+ Container hatly-prod-prod-backend-run-9a363ff9c67a Created 
+WARN   REDIS_URL is not TLS (redis://): acceptable only on a private network (e.g. the staging compose network); use rediss:// for a managed/remote Redis.
+WARN   MAPS_PROVIDER=none: Google Maps is disabled — delivery fees and serviceability come from the selected Delivery Zone only, address search/suggestions are off, and dispatch ranks drivers by straight-line distance (bicycle drivers are not auto-ranked).
+WARN   SMS provider (Unifonic) is not configured (ALLOW_MISSING_SMS_PROVIDER=true): OTP/phone-verification messages cannot be sent.
+WARN   Firebase push (FCM) is not configured (ALLOW_MISSING_PUSH_PROVIDER=true): push notifications are disabled.
+ENV CHECK PASSED (4 warnings)
+
+==== 4. migration plan  (09:58:06 UTC)
+ Container hatly-prod-prod-backend-run-41ca3a0b259a Creating 
+ Container hatly-prod-prod-backend-run-41ca3a0b259a Created 
+ Container hatly-prod-prod-backend-run-5a2a4e46977f Creating 
+ Container hatly-prod-prod-backend-run-5a2a4e46977f Created 
+[X] 87 EarlyDispatch1700008600000
+[X] 88 DriverShifts1700008700000
+[X] 89 MustChangePassword1700008800000
+[X] 90 DriverAllowances1700008900000
+[X] 91 PasswordResetRequests1700009000000
+[X] 92 PasswordResetSelfComplete1700009100000
+[X] 93 DeliveryZoneAreas1700009200000
+[ ] DeliveryZoneNeighborhoods1700009300000
+pending migrations: 1
+
+==== 5. backup + restore drill  (09:58:07 UTC)
+backup OK: hatly-prod-20261123T095807Z.dump 1742623 bytes, 109 table-data sections, sha256 30f831ee46e6…, off-site: NOT CONFIGURED
+uploads backup OK: hatly-prod-uploads-20261123T095808Z.tar.gz 11814117 bytes, 103 files, sha256 9ca42f39df11…, off-site: NOT CONFIGURED
+newest dump: hatly-prod-20261123T095807Z.dump
+drill database hatly_drill_20261123095809 restored from hatly-prod-20261123T095807Z.dump: 109 tables, 93 migrations recorded, 22 users
+restore drill OK
+
+==== 6. migrate (guarded; additive migrations — the old release stays compatible while it runs)  (09:58:12 UTC)
+ Container hatly-prod-prod-backend-run-de3249f9ce4b Creating 
+ Container hatly-prod-prod-backend-run-de3249f9ce4b Created 
+database target: postgres/hatly_prod | NODE_ENV=production | OK (production)
+before: 93 migrations applied, 109 public tables
+backup OK: hatly-prod-20261123T095813Z.dump 1742623 bytes, 109 table-data sections, sha256 c5719e2cb930…, off-site: NOT CONFIGURED
+uploads backup OK: hatly-prod-uploads-20261123T095814Z.tar.gz 11814117 bytes, 103 files, sha256 9ca42f39df11…, off-site: NOT CONFIGURED
+ Container hatly-prod-prod-backend-run-cb203257db3d Creating 
+ Container hatly-prod-prod-backend-run-cb203257db3d Created 
+query: SELECT version()
+query: SELECT * FROM current_schema()
+query: CREATE EXTENSION IF NOT EXISTS "uuid-ossp"
+query: SELECT * FROM "information_schema"."tables" WHERE "table_schema" = 'public' AND "table_name" = 'migrations'
+query: SELECT * FROM "migrations" "migrations" ORDER BY "id" DESC
+93 migrations are already loaded in the database.
+94 migrations were found in the source code.
+DeliveryZoneAreas1700009200000 is the last executed migration. It was executed on Wed Nov 15 2023 00:46:40 GMT+0000 (Coordinated Universal Time).
+1 migrations are new migrations must be executed.
+query: START TRANSACTION
+query: ALTER TABLE "delivery_zones" ADD COLUMN "zone_name" varchar(150),
+ADD COLUMN "zone_name_ar" varchar(150),
+ADD COLUMN "is_selectable" boolean NOT NULL DEFAULT true;
+ALTER TABLE "delivery_zones" ADD CONSTRAINT "chk_delivery_zones_parent_pair"
+CHECK (("zone_name" IS NULL AND "zone_name_ar" IS NULL)
+OR ("zone_name" IS NOT NULL AND "zone_name_ar" IS NOT NULL
+AND length(btrim("zone_name")) > 0 AND length(btrim("zone_name_ar")) > 0));
+query: SELECT id, service_area_id, name, name_ar, governorate, governorate_ar, city, city_ar, display_order, is_active, areas FROM delivery_zones WHERE deleted_at IS NULL AND jsonb_typeof(areas) = 'array' AND jsonb_array_length(areas) > 0 ORDER BY service_area_id, name_ar FOR UPDATE
+query: DROP INDEX IF EXISTS "UQ_delivery_zones_area_name_ar";
+DROP INDEX IF EXISTS "UQ_delivery_zones_area_name";
+CREATE UNIQUE INDEX "UQ_delivery_zones_area_name_ar"
+ON "delivery_zones" ("service_area_id", lower(coalesce("zone_name_ar", '')), lower("name_ar"))
+WHERE "deleted_at" IS NULL;
+CREATE UNIQUE INDEX "UQ_delivery_zones_area_name"
+ON "delivery_zones" ("service_area_id", lower(coalesce("zone_name", '')), lower("name"))
+WHERE "deleted_at" IS NULL;
+CREATE INDEX "IDX_delivery_zones_parent" ON "delivery_zones"
+("service_area_id", "zone_name_ar", "display_order") WHERE "deleted_at" IS NULL;
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Anshas El-Raml","أنشاص الرمل","Anshas El-Raml","أنشاص الرمل",1500,109,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Salmant","سلمنت","Anshas El-Raml","أنشاص الرمل",1500,110,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Bir Emara","بير عمارة","Anshas El-Raml","أنشاص الرمل",1500,111,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Saeediya","السعيدية","Anshas El-Raml","أنشاص الرمل",1500,112,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["0d0fce6d-991e-40a6-a40f-a29ad33e070e"]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Awlad Seif","أولاد سيف","Awlad Seif","أولاد سيف",1500,105,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Awlad Mehanna","أولاد مهنا","Awlad Seif","أولاد سيف",1500,106,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Mit Rabia Al-Bayda","ميت ربيعة البيضا","Awlad Seif","أولاد سيف",1500,107,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Nuba Al-Dahashna","نوبة الدهاشنة","Awlad Seif","أولاد سيف",1500,108,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Kafr El-Sheikh Eissa","كفر الشيخ عيسى","Awlad Seif","أولاد سيف",1500,109,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Manshiya","المنشية","Awlad Seif","أولاد سيف",1500,110,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Rawda","الروضة","Awlad Seif","أولاد سيف",1500,111,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Arayeshya","العرايشية","Awlad Seif","أولاد سيف",1500,112,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Hawd Al-Nada","حوض الندى","Awlad Seif","أولاد سيف",1500,113,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["0af89b9b-2e4e-46c2-ace3-cab5bf86ddde"]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","El-Balashon","البلاشون","El-Balashon","البلاشون",1500,104,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Mit Gaber","ميت جابر","El-Balashon","البلاشون",1500,105,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Bani Saleh","بني صالح","El-Balashon","البلاشون",1500,106,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Qarmala","قرملة","El-Balashon","البلاشون",1500,107,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Manshaat El-Salam","منشأة السلام","El-Balashon","البلاشون",1500,108,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Kafr Masoud Hegazy","كفر مسعود حجازي","El-Balashon","البلاشون",1500,109,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Mit Maalla","ميت معلا","El-Balashon","البلاشون",1500,110,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Kafr Hafna","كفر حفنا","El-Balashon","البلاشون",1500,111,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["f836bd90-eee8-4152-9d62-7e07bb990f70"]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","El-Zawamel","الزوامل","El-Zawamel","الزوامل",1500,108,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Basatin Al-Ismailia","بساتين الإسماعيلية","El-Zawamel","الزوامل",1500,109,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Minyat Salmant","منية سلمنت","El-Zawamel","الزوامل",1500,110,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["bd72b93d-e8b7-49aa-b305-65d2e9089ac0"]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","El-Adleya","العدلية","El-Adleya","العدلية",1500,106,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Mit Hamal","ميت حمل","El-Adleya","العدلية",1500,107,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Shaghanba","الشغانبة","El-Adleya","العدلية",1500,108,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Mit Habib","ميت حبيب","El-Adleya","العدلية",1500,109,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Kafr Akyad","كفر أكياد","El-Adleya","العدلية",1500,110,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Sandanhour","سندنهور","El-Adleya","العدلية",1500,111,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Qahla Al-Gabla","قهلة الجبلة","El-Adleya","العدلية",1500,112,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Kafr El-Arab","كفر العرب","El-Adleya","العدلية",1500,113,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["88014abd-dba1-4675-8095-a3d2cf685f43"]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Shubra El-Nakhla","شبرا النخلة","Shubra El-Nakhla","شبرا النخلة",1500,110,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Hafna","حفنا","Shubra El-Nakhla","شبرا النخلة",1500,111,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Gawsak","الجوسق","Shubra El-Nakhla","شبرا النخلة",1500,112,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Absi","العبسي","Shubra El-Nakhla","شبرا النخلة",1500,113,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["ec0179bc-a86f-4b86-8760-ce11d0353ff4"]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Ghita","غيتة","Ghita","غيتة",1500,107,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Salam","السلام","Ghita","غيتة",1500,108,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Tell Rozen","تل روزن","Ghita","غيتة",1500,109,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Shawliya","الشولية","Ghita","غيتة",1500,110,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["ca434d9f-ded6-477d-b747-286482146b0e"]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Kafr Ayoub Soliman","كفر أيوب سليمان","Kafr Ayoub Soliman","كفر أيوب سليمان",1500,102,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Katiba","الكتيبة","Kafr Ayoub Soliman","كفر أيوب سليمان",1500,103,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Saadat","السعادات","Kafr Ayoub Soliman","كفر أيوب سليمان",1500,104,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Basatin Siraj El-Din","بساتين سراج الدين","Kafr Ayoub Soliman","كفر أيوب سليمان",1500,105,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Tahaweya","الطحاوية","Kafr Ayoub Soliman","كفر أيوب سليمان",1500,106,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["53f4209b-947f-4f9a-b54b-18a7f156e056"]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Old Kafr","الكفر القديم","Kafr Ibrahim El-Aydy","كفر إبراهيم العايدي",1500,103,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Kafr Ibrahim El-Aydy","كفر إبراهيم العايدي","Kafr Ibrahim El-Aydy","كفر إبراهيم العايدي",1500,104,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Kafr Bani Aleem","كفر بني عليم","Kafr Ibrahim El-Aydy","كفر إبراهيم العايدي",1500,105,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Minyat Santa","منية سنتا","Kafr Ibrahim El-Aydy","كفر إبراهيم العايدي",1500,106,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["f8ecb605-4622-4942-8703-fd367a145853"]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Zohour Neighborhood","حي الزهور","Belbeis City","مدينة بلبيس",1500,101,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Nadi Neighborhood","حي النادي","Belbeis City","مدينة بلبيس",1500,102,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Alwan Neighborhood","حي علوان","Belbeis City","مدينة بلبيس",1500,103,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Industrial Area","المنطقة الصناعية","Belbeis City","مدينة بلبيس",1500,104,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Abu Naseeb Neighborhood","حي أبو نصيب","Belbeis City","مدينة بلبيس",1500,105,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Saadoun Neighborhood","حي سعدون","Belbeis City","مدينة بلبيس",1500,106,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Manshiya Neighborhood","حي المنشية","Belbeis City","مدينة بلبيس",1500,107,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Markaz Neighborhood","حي المركز","Belbeis City","مدينة بلبيس",1500,108,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Old Market Neighborhood","حي السوق القديم","Belbeis City","مدينة بلبيس",1500,109,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Market Neighborhood","حي السوق","Belbeis City","مدينة بلبيس",1500,110,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Medical Center Neighborhood","حي المركز الطبي","Belbeis City","مدينة بلبيس",1500,111,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Station Neighborhood","حي المحطة","Belbeis City","مدينة بلبيس",1500,112,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Saha Neighborhood","حي الساحة","Belbeis City","مدينة بلبيس",1500,113,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Air Academy Neighborhood","حي الكلية الجوية","Belbeis City","مدينة بلبيس",1500,114,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Mat'han Neighborhood","حي المطحن","Belbeis City","مدينة بلبيس",1500,115,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Military Secondary School Neighborhood","حي الثانوي العسكرية","Belbeis City","مدينة بلبيس",1500,116,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","New Housing Neighborhood","حي المساكن الجديدة","Belbeis City","مدينة بلبيس",1500,117,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Old Court Neighborhood","حي المحكمة القديمة","Belbeis City","مدينة بلبيس",1500,118,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","New Court Neighborhood","حي المحكمة الجديدة","Belbeis City","مدينة بلبيس",1500,119,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Downtown","وسط البلد","Belbeis City","مدينة بلبيس",1500,120,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Popular Shops Neighborhood","حي المتاجر الشعبية","Belbeis City","مدينة بلبيس",1500,121,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","New Street","الشارع الجديد","Belbeis City","مدينة بلبيس",1500,122,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Old Street","الشارع القديم","Belbeis City","مدينة بلبيس",1500,123,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Al-Mazloum Neighborhood","حي المظلوم","Belbeis City","مدينة بلبيس",1500,124,true]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Rabb Al-Alameen Neighborhood","حي رب العالمين","Belbeis City","مدينة بلبيس",1500,125,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["c169f0e8-73c7-4439-8691-6cec4f99bf0c"]
+query: INSERT INTO delivery_zones (service_area_id, governorate, governorate_ar, city, city_ar, name, name_ar, zone_name, zone_name_ar, delivery_fee_minor, display_order, is_active, is_selectable, areas) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'[]'::jsonb) -- PARAMETERS: ["8cf0a405-4514-4259-a1cc-dc74f3d6e940","Sharqia","الشرقية","Belbies","بلبيس","Unlisted Delivery Area","منطقة توصيل غير مدرجة","Unlisted Zone","نطاق غير موجود",1500,111,true]
+query: UPDATE delivery_zones SET is_selectable = false WHERE id = $1 -- PARAMETERS: ["3ecae26e-74a9-4e70-a8fe-dee39b677465"]
+query: UPDATE delivery_zones SET delivery_fee_minor = $1 WHERE zone_name IS NOT NULL AND is_selectable = true AND deleted_at IS NULL -- PARAMETERS: [1500]
+Bilingual neighborhood/village rows created at 15 EGP: 75
+query: INSERT INTO "migrations"("timestamp", "name") VALUES ($1, $2) -- PARAMETERS: [1700009300000,"DeliveryZoneNeighborhoods1700009300000"]
+Migration DeliveryZoneNeighborhoods1700009300000 has been executed successfully.
+query: COMMIT
+after: 94 migrations applied
+ Container hatly-prod-prod-backend-run-ab1a667b5bbe Creating 
+ Container hatly-prod-prod-backend-run-ab1a667b5bbe Created 
+OK    no pending migrations
+
+==== 7. switch release + start the new apps  (09:58:17 UTC)
+ Container hatly-prod-postgres-1 Running 
+ Container hatly-prod-redis-1 Running 
+ Container hatly-prod-backend-1 Recreate 
+ Container hatly-prod-backend-1 Recreated 
+ Container hatly-prod-dashboard-1 Recreate 
+ Container hatly-prod-dashboard-1 Recreated 
+ Container hatly-prod-redis-1 Waiting 
+ Container hatly-prod-postgres-1 Waiting 
+ Container hatly-prod-postgres-1 Healthy 
+ Container hatly-prod-redis-1 Healthy 
+ Container hatly-prod-backend-1 Starting 
+ Container hatly-prod-backend-1 Started 
+ Container hatly-prod-backend-1 Waiting 
+ Container hatly-prod-backend-1 Healthy 
+ Container hatly-prod-dashboard-1 Starting 
+ Container hatly-prod-dashboard-1 Started 
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED         STATUS                                     PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261123T095541Z-df5dfdbe7069     "docker-entrypoint.s…"   prod-backend     8 seconds ago   Up 5 seconds (healthy)                     3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261123T095541Z-df5dfdbe7069   "docker-entrypoint.s…"   prod-dashboard   8 seconds ago   Up Less than a second (health: starting)   3001/tcp
+
+==== 8. health  (09:58:25 UTC)
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED          STATUS                    PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261123T095541Z-df5dfdbe7069     "docker-entrypoint.s…"   prod-backend     13 seconds ago   Up 11 seconds (healthy)   3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261123T095541Z-df5dfdbe7069   "docker-entrypoint.s…"   prod-dashboard   13 seconds ago   Up 5 seconds (healthy)    3001/tcp
+hatly-prod-postgres-1    postgres:16-alpine                                   "docker-entrypoint.s…"   postgres         4 weeks ago      Up 12 days (healthy)      5432/tcp
+hatly-prod-redis-1       redis:7-alpine                                       "docker-entrypoint.s…"   redis            4 weeks ago      Up 12 days (healthy)      6379/tcp
+{"data":{"status":"ok","checks":{"database":"up","redis":"up"}}}
+dashboard /privacy 200
+
+==== 9. recent backend errors  (09:58:30 UTC)
+0
+
+==== 10. tidy disk (keeps the 3 newest releases + their images; build cache capped at 5 GB)  (09:58:30 UTC)
+/dev/sda1        96G   21G   76G  22% /
+DEPLOYED 20261123T095541Z-df5dfdbe7069 (previous: 20261123T075657Z-17362f5a4572 — rollback: request ACTION=rollback RELEASE=20261123T075657Z-17362f5a4572)
+200  https://api.hatly.dev/api/v1/health/ready
+307  https://admin.hatly.dev/
+job status: success
