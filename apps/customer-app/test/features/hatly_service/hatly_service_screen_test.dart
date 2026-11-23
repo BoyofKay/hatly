@@ -309,6 +309,7 @@ Widget _app({
   List<SavedAddress> saved = const [_home, _shop, _zoneOnly],
   SavedAddress? addedByAddScreen,
   RouteDefaults defaults = RouteDefaults.none,
+  bool buyOnly = false,
 }) {
   var pickIndex = 0;
   return hatlyRouterApp(
@@ -323,6 +324,7 @@ Widget _app({
       GoRoute(
         path: '/hatly-service',
         builder: (context, state) => HatlyServiceScreen(
+          buyFromPlaceOnly: buyOnly,
           pickImageOverride: imagesToPick == null
               ? null
               : () async {
@@ -389,6 +391,37 @@ Future<void> _chooseSaved(WidgetTester tester, {required bool origin, String id 
 }
 
 void main() {
+  group('sector-only navigation is presentation only', () {
+    testWidgets('sector entry selects Hatly and never shows Wasaly type',
+        (tester) async {
+      _tallViewport(tester);
+      await tester.pumpWidget(_app(
+        cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi(),
+        defaults: _allDefaults, buyOnly: true));
+      await _settle(tester);
+      expect(find.byKey(const Key('hatly-service-type-buy')), findsOneWidget);
+      expect(find.byKey(const Key('hatly-service-type-deliver')), findsNothing);
+      expect(find.byKey(const Key('hatly-service-place-name')), findsOneWidget);
+    });
+    testWidgets('sector entry never converts an existing Wasaly cart group',
+        (tester) async {
+      _tallViewport(tester);
+      final api = _FakeCartApi(initialGroups: [
+        const CartGroup(
+          id: 'existing-wasaly', groupType: 'AD_HOC_SERVICE',
+          adHocPlaceName: 'Existing delivery',
+          adHocServiceType: 'DELIVER_TO_PLACE', items: []),
+      ]);
+      await tester.pumpWidget(_app(
+        cartApi: api, uploadsApi: _FakeUploadsApi(),
+        defaults: _allDefaults, buyOnly: true));
+      await _settle(tester);
+      expect(find.byKey(const Key('hatly-service-type-deliver')), findsNothing);
+      expect(find.byKey(const Key('hatly-service-place-name')), findsNothing);
+      expect(api.addAdHocCalls, isEmpty);
+    });
+  });
+
   group('route ends: customer choice, else the service default, else nothing (PD-012)', () {
     testWidgets('Hatly with both defaults configured: the resolved route is shown with Default badges and the customer can continue without choosing', (tester) async {
       _tallViewport(tester);

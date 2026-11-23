@@ -29,6 +29,7 @@ import '../../features/addresses/presentation/add_address_screen.dart';
 import '../../features/addresses/presentation/my_addresses_screen.dart';
 import '../../features/addresses/domain/saved_address.dart';
 import '../../features/hatly_service/presentation/hatly_service_screen.dart';
+import '../../features/profile/presentation/settings_screen.dart';
 import '../../features/wallet/presentation/wallet_screen.dart';
 import '../../features/loyalty/presentation/loyalty_screen.dart';
 
@@ -131,7 +132,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       // branch screen instead).
       GoRoute(
         path: '/hatly-service',
-        builder: (context, state) => const HatlyServiceScreen(),
+        builder: (context, state) => HatlyServiceScreen(
+          buyFromPlaceOnly: state.uri.queryParameters['entry'] == 'sector',
+        ),
       ),
       GoRoute(
         path: '/vendors',
@@ -214,6 +217,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile/loyalty',
         builder: (context, state) => const LoyaltyScreen(),
+      ),
+      GoRoute(
+        path: '/profile/settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: '/addresses/add',

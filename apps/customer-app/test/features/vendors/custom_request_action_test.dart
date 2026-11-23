@@ -24,6 +24,21 @@ final String l10nSubmitAr =
     lookupAppLocalizations(const Locale('ar')).customRequestSubmit;
 
 void main() {
+  testWidgets('movable store entry uses the existing vendor-specific request sheet',
+      (tester) async {
+    await tester.pumpWidget(hatlyTestApp(
+      const Scaffold(body: Center(child: CustomRequestAction(
+        vendorBranchId: 'branch-1', floating: true))),
+      locale: const Locale('en'),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('vendor-custom-request-bubble')), findsOneWidget);
+    expect(find.text('Hatly Service'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('vendor-custom-request-bubble')));
+    await tester.pumpAndSettle();
+    expect(find.text("Request an item that isn't listed"), findsOneWidget);
+  });
+
   testWidgets(
       'dismissing the sheet while an image pick is still in flight never throws (mounted guard)',
       (tester) async {

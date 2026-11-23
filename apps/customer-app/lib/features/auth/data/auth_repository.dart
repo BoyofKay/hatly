@@ -78,5 +78,19 @@ class AuthRepository {
     return token != null;
   }
 
-  Future<String?> getDisplayName() => _tokenStorage.displayName;
+  Future<String?> getDisplayName() async {
+    try {
+      final serverName = await _authApi.getCustomerName();
+      await _tokenStorage.saveDisplayName(serverName);
+      return serverName;
+    } catch (_) {
+      // Older/offline servers: preserve the existing local registration name.
+      return _tokenStorage.displayName;
+    }
+  }
+
+  Future<void> updateDisplayName(String name) async {
+    final confirmed = await _authApi.updateCustomerName(name.trim());
+    await _tokenStorage.saveDisplayName(confirmed);
+  }
 }

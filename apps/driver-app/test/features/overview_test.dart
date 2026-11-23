@@ -8,6 +8,9 @@ import 'package:hatly_driver/features/overview/overview_api.dart';
 
 /// Driver app round 2 (owner decision 2026-11-22): Orders (Today | Previous) and Earnings (Current shift | Previous) with KPIs.
 class _Api implements OverviewApi {
+  @override
+  Future<String> driverProfileName() async => 'Test Driver';
+
   final calls = <String>[];
   bool unavailable = false;
   @override

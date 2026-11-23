@@ -1309,5 +1309,17 @@
     }
   },
   "addressVillageLabel": "القرية / الحي",
-  "addressVillageRequired": "اختر قريتك أو حيّك"
+  "addressVillageRequired": "اختر قريتك أو حيّك",
+  "homeDeliverTo": "التوصيل إلى",
+  "profileSettings": "الإعدادات",
+  "settingsLanguage": "اللغة",
+  "languageArabic": "العربية",
+  "languageEnglish": "English",
+  "settingsPasswordSection": "كلمة المرور والأمان",
+  "settingsAccountSection": "الحساب",
+  "settingsAppSection": "التطبيق",
+  "searchFilterVendors": "متاجر",
+  "searchFilterProducts": "منتجات",
+  "vendorCustomBubbleLabel": "خدمة هاتلي",
+  "sectorHatlyExistingWasaly": "لديك طلب «وصّلي لمكان» موجود بالفعل في السلة. هذه الصفحة تتيح «هاتلي من مكان» فقط. راجع السلة أولاً؛ لن يتم تغيير طلبك الحالي."
 }

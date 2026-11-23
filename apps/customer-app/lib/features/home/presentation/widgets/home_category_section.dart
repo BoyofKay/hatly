@@ -12,7 +12,7 @@ import '../../data/home_content_config.dart';
 import '../../data/home_providers.dart';
 import 'category_card.dart';
 
-/// Shop by Category — a calm 3-column grid, the Marketplace entry point of
+/// Shop by Category — two soft category cards per row (owner, 2026-11-11), the Marketplace entry point of
 /// Home. Shows the first [kHomeMaxCategories] of [homeCategoriesProvider]
 /// (data-driven order, re-orderable through `home_content_config.dart`); when
 /// there are more, the header gets "عرض الكل ←", which opens Explore.
@@ -51,7 +51,9 @@ class HomeCategorySection extends ConsumerWidget {
             ),
             const SizedBox(height: HatlySpacing.sm),
             CategoryGrid(
-                categories: categories.take(kHomeMaxCategories).toList()),
+                categories: categories.take(kHomeMaxCategories).toList(),
+                columns: CategoryGrid.homeColumns,
+                large: true),
           ],
         );
       },
@@ -79,11 +81,19 @@ String categoryDisplayName(MarketplaceSector sector,
 /// [columns] equal cells, generous spacing, no cards or dividers. Rows size to
 /// their content, so larger system text never overflows.
 class CategoryGrid extends StatelessWidget {
-  const CategoryGrid({super.key, required this.categories});
+  const CategoryGrid(
+      {super.key,
+      required this.categories,
+      this.columns = 3,
+      this.large = false});
 
   final List<MarketplaceSector> categories;
 
-  static const int columns = 3;
+  /// Two soft cards per row on Home and on the Categories page ("الأقسام").
+  final int columns;
+  final bool large;
+
+  static const int homeColumns = 2;
   static const double columnGap = HatlySpacing.md;
   static const double rowGap = HatlySpacing.md;
 
@@ -93,6 +103,7 @@ class CategoryGrid extends StatelessWidget {
 
     Widget cell(MarketplaceSector sector) {
       return CategoryCard(
+        large: large,
         label: categoryDisplayName(sector, isArabic: isArabic),
         slug: sector.slug,
         imageUrl: sector.imageUrl,
@@ -137,15 +148,15 @@ class CategoryGridSkeleton extends StatelessWidget {
           const EdgeInsets.symmetric(horizontal: HatlySpacing.screenPadding),
       child: Row(
         children: [
-          for (var i = 0; i < CategoryGrid.columns; i++) ...[
+          for (var i = 0; i < CategoryGrid.homeColumns; i++) ...[
             if (i > 0) const SizedBox(width: CategoryGrid.columnGap),
             const Expanded(
               child: AspectRatio(
-                aspectRatio: 1,
+                aspectRatio: 1.05,
                 child: SkeletonBox(
                     width: double.infinity,
                     height: double.infinity,
-                    borderRadius: HatlyRadius.imageContainer),
+                    borderRadius: kCategoryCardRadius),
               ),
             ),
           ],

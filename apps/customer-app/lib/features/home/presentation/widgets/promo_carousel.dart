@@ -16,13 +16,18 @@ import 'promo_cta_button.dart';
 /// The hero banner's proportions: each card is about 1.6 : 1 (it used to be ~2 : 1, a thin strip), within a sane range so a
 /// tablet does not get a giant banner and a small phone still gets a full-size one.
 const double kPromoBannerAspect = 1.5;
-const double kPromoViewportFraction = 0.92;
+/// Each banner page spans the FULL width and insets its card by the page margin, so the card's edges line up with the rest of the Home
+/// content (owner, 2026-11-13: the former 0.92 viewport made a narrower, centred card with neighbours peeking in at both sides).
+const double kHeroBannerSideMargin = HatlySpacing.screenPadding;
+
+/// Width of the banner card on a screen [availableWidth] wide: the content width between the two page margins.
+double heroBannerCardWidth(double availableWidth) =>
+    availableWidth - 2 * kHeroBannerSideMargin;
 const double kPromoBannerMinHeight = 210;
 const double kPromoBannerMaxHeight = 320;
 
 double promoBannerHeight(double availableWidth) {
-  final cardWidth =
-      availableWidth * kPromoViewportFraction - 2 * HatlySpacing.xs;
+  final cardWidth = heroBannerCardWidth(availableWidth);
   return (cardWidth / kPromoBannerAspect)
       .clamp(kPromoBannerMinHeight, kPromoBannerMaxHeight);
 }
@@ -49,7 +54,6 @@ class PromoCarousel extends StatefulWidget {
 }
 
 class _PromoCarouselState extends State<PromoCarousel> {
-  int _page = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -74,12 +78,12 @@ class _PromoCarouselState extends State<PromoCarousel> {
               // Endless in both directions; auto-play always glides forward (see LoopingPager).
               child: LoopingPager(
                 count: promos.length,
-                viewportFraction: kPromoViewportFraction,
                 autoPlayInterval: widget.autoRotateInterval,
-                onIndexChanged: (i) => setState(() => _page = i),
+                autoPlayGlide: const Duration(milliseconds: 900),
+                autoPlayCurve: Curves.easeInOutCubic,
                 itemBuilder: (context, index) => Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: HatlySpacing.xs),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: kHeroBannerSideMargin),
                   child: _PromoCard(
                       promo: promos[index],
                       onAction: () => widget.onAction(promos[index])),
@@ -87,10 +91,6 @@ class _PromoCarouselState extends State<PromoCarousel> {
               ),
             ),
           ),
-          if (promos.length > 1) ...[
-            const SizedBox(height: HatlySpacing.sm),
-            PromoPageIndicator(count: promos.length, index: _page),
-          ],
         ],
       ),
     );
@@ -114,7 +114,7 @@ class _PromoCard extends StatelessWidget {
         // Subtle brand tint over the surface, no shadow — the calm main
         // commercial element, not a flat orange banner.
         color: Color.alphaBlend(p.accentSoft, p.surface),
-        borderRadius: BorderRadius.circular(HatlyRadius.promoBanner),
+        borderRadius: BorderRadius.circular(HatlyRadius.heroBanner),
       ),
       padding: const EdgeInsets.all(HatlySpacing.md),
       child: Row(

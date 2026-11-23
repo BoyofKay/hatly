@@ -5,6 +5,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hatly_customer/shared_widgets/looping_pager.dart';
+import 'package:hatly_customer/shared_widgets/hatly_soft_image.dart';
+import 'package:hatly_customer/core/theme/hatly_theme.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hatly_customer/core/network/api_client.dart';
 import 'package:hatly_customer/core/network/api_exception.dart';
@@ -158,14 +161,63 @@ void main() {
       await tester.pump(const Duration(hours: 2));
     });
 
-    testWidgets('banners are shown in the server order with page dots, and REPLACE the offer-derived promos', (tester) async {
+    testWidgets('banners are shown in the server order without page dots, and REPLACE the offer-derived promos', (tester) async {
       await pump(tester, () async => [_banner('b1', titleAr: 'الأول'), _banner('b2', titleAr: 'التاني')], promos: _promos);
       await tester.pumpAndSettle();
       expect(find.byType(HomeBannerCarousel), findsOneWidget);
       expect(find.byType(PromoCarousel), findsNothing);
       expect(find.byKey(const Key('home-banner-b1')), findsOneWidget);
-      expect(find.byType(PromoPageIndicator), findsOneWidget); // two banners → dots
+      expect(find.byType(PromoPageIndicator), findsNothing); // no dots, even with several banners (owner, 2026-11-11)
       expect(find.bySemanticsLabel('الأول'), findsOneWidget); // the accessible label is the (Arabic) title
+    });
+
+    for (final width in [320.0, 360.0, 375.0, 390.0, 430.0]) {
+      for (final locale in const [Locale('ar'), Locale('en')]) {
+        testWidgets('the banner card fills the content width with equal 16 pt page margins (${width.toInt()} pt, ${locale.languageCode}); no neighbour peeks in', (tester) async {
+          await pump(tester, () async => [_banner('b1'), _banner('b2'), _banner('b3')], width: width, locale: locale);
+          await tester.pumpAndSettle();
+          final card = tester.getRect(find.byKey(const Key('home-banner-b1')));
+          expect(card.left, closeTo(HatlySpacing.screenPadding, 0.5));
+          expect(width - card.right, closeTo(HatlySpacing.screenPadding, 0.5));
+          expect(card.width, closeTo(width - 2 * HatlySpacing.screenPadding, 0.5));
+          expect(card.height, closeTo(bannerHeight(width) - 12, 0.5)); // the page height minus 6 pt top and bottom
+          // the neighbouring banners are entirely off screen (no peeking card, no gap at the edges)
+          for (final other in ['home-banner-b2', 'home-banner-b3']) {
+            final f = find.byKey(Key(other));
+            if (f.evaluate().isNotEmpty) {
+              final r = tester.getRect(f);
+              expect(r.right <= 0 || r.left >= width, isTrue, reason: '$other must not show at the edge');
+            }
+          }
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
+    testWidgets('the height is about what it was before (≈1.7 : 1 of the card, ~210 pt on a 390 pt phone) and the image is cover-fitted, never stretched', (tester) async {
+      expect(bannerHeight(390), closeTo(210.6, 0.5));
+      expect(bannerHeight(320), 190); // the minimum keeps small phones readable
+      await pump(tester, () async => [_banner('b1')]);
+      await tester.pumpAndSettle();
+      final image = tester.widget<HatlySoftImage>(find.byType(HatlySoftImage));
+      expect(image.fit, BoxFit.cover);
+    });
+
+    testWidgets('swiping still moves to the next banner, and it rotates on its own every 5 s with a 0.9 s glide', (tester) async {
+      await pump(tester, () async => [_banner('b1'), _banner('b2')]);
+      await tester.pumpAndSettle();
+      final start = tester.widget<PageView>(find.byType(PageView)).controller!.page!;
+      await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
+      await tester.pumpAndSettle();
+      final afterSwipe = tester.widget<PageView>(find.byType(PageView)).controller!.page!;
+      expect(afterSwipe, isNot(start));
+      expect(tester.widget<LoopingPager>(find.byType(LoopingPager)).autoPlayGlide,
+          const Duration(milliseconds: 900));
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+      expect(tester.widget<PageView>(find.byType(PageView)).controller!.page!, isNot(afterSwipe));
+      expect(find.byType(PromoPageIndicator), findsNothing);
+      await tester.pumpWidget(const SizedBox());
     });
 
     testWidgets('a single banner has no page dots and does not auto-rotate', (tester) async {

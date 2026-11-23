@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -44,6 +44,15 @@ export class UsersService {
 
   findById(id: string): Promise<User | null> {
     return this.usersRepository.findOne({ where: { id } });
+  }
+
+  /** Customer-only name update. Never writes phone, role, auth state or orders. */
+  async updateCustomerName(id: string, fullName: string): Promise<string> {
+    const result = await this.usersRepository.update(
+      { id, role: Role.CUSTOMER, isActive: true }, { fullName },
+    );
+    if (!result.affected) throw new UnauthorizedException('Customer account unavailable.');
+    return fullName;
   }
 
   /**

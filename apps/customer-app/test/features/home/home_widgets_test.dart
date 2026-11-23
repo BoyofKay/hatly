@@ -100,30 +100,17 @@ void main() {
       }
     });
 
-    testWidgets(
-        'page indicators: one per promo, the active one is a longer pill; swiping moves it',
+    testWidgets('promotions have no page indicators and swiping still changes page',
         (tester) async {
       await tester.pumpWidget(hatlyTestApp(PromoCarousel(
           promos: _promos,
           onAction: (_) {},
           autoRotateInterval: const Duration(days: 1))));
-      expect(find.byType(PromoPageIndicator), findsOneWidget);
-      double activeWidth() {
-        final widths = tester
-            .widgetList<AnimatedContainer>(find.descendant(
-                of: find.byType(PromoPageIndicator),
-                matching: find.byType(AnimatedContainer)))
-            .map((c) => c.constraints!.maxWidth)
-            .toList();
-        expect(widths, hasLength(5));
-        return widths.reduce((a, b) => a > b ? a : b);
-      }
-
-      expect(activeWidth(), 20);
-      final firstActive = _activeIndex(tester);
+      expect(find.byType(PromoPageIndicator), findsNothing);
+      final initial = _activeIndex(tester);
       await tester.fling(find.byType(PageView), const Offset(400, 0), 1000);
       await tester.pumpAndSettle();
-      expect(_activeIndex(tester), isNot(firstActive));
+      expect(_activeIndex(tester), isNot(initial));
     });
 
     testWidgets(
@@ -164,7 +151,7 @@ void main() {
       expect(_activeIndex(tester), 0);
     });
 
-    testWidgets('the card is a radius-20 inset card', (tester) async {
+    testWidgets('the promo card uses restrained 8px corners', (tester) async {
       await tester.pumpWidget(hatlyTestApp(PromoCarousel(
           promos: _promos,
           onAction: (_) {},
@@ -173,7 +160,7 @@ void main() {
           .widgetList<Container>(find.byType(Container))
           .map((c) => c.decoration)
           .whereType<BoxDecoration>()
-          .firstWhere((d) => d.borderRadius == BorderRadius.circular(20));
+          .firstWhere((d) => d.borderRadius == BorderRadius.circular(HatlyRadius.heroBanner));
       expect(card.boxShadow, isNull, reason: 'calm: no shadow on the promo');
       final screen = tester.getSize(find.byType(PromoCarousel)).width;
       expect(tester.getSize(find.byType(PromoCtaButton).first).height,
@@ -701,11 +688,6 @@ void main() {
 }
 
 int _activeIndex(WidgetTester tester) {
-  final widths = tester
-      .widgetList<AnimatedContainer>(find.descendant(
-          of: find.byType(PromoPageIndicator),
-          matching: find.byType(AnimatedContainer)))
-      .map((c) => c.constraints!.maxWidth)
-      .toList();
-  return widths.indexOf(widths.reduce((a, b) => a > b ? a : b));
+  final page = tester.widget<PageView>(find.byType(PageView)).controller!.page!;
+  return page.round() % _promos.length;
 }

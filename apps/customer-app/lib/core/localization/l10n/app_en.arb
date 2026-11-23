@@ -1295,5 +1295,17 @@
     }
   },
   "addressVillageLabel": "Village / neighbourhood",
-  "addressVillageRequired": "Choose your village or neighbourhood"
+  "addressVillageRequired": "Choose your village or neighbourhood",
+  "homeDeliverTo": "Deliver to",
+  "profileSettings": "Settings",
+  "settingsLanguage": "Language",
+  "languageArabic": "العربية",
+  "languageEnglish": "English",
+  "settingsPasswordSection": "Password & security",
+  "settingsAccountSection": "Account",
+  "settingsAppSection": "App",
+  "searchFilterVendors": "Stores only",
+  "searchFilterProducts": "Products only",
+  "vendorCustomBubbleLabel": "Hatly Service",
+  "sectorHatlyExistingWasaly": "You already have a Wasaly (Deliver to a place) request in your cart. This sector offers Hatly (Buy from a place) only. Review your cart first; your existing request will not be changed."
 }

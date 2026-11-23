@@ -2628,4 +2628,39 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get addressVillageRequired => 'اختر قريتك أو حيّك';
+  @override
+  String get homeDeliverTo => 'التوصيل إلى';
+
+  @override
+  String get profileSettings => 'الإعدادات';
+
+  @override
+  String get settingsLanguage => 'اللغة';
+
+  @override
+  String get languageArabic => 'العربية';
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
+  String get settingsPasswordSection => 'كلمة المرور والأمان';
+
+  @override
+  String get settingsAccountSection => 'الحساب';
+
+  @override
+  String get settingsAppSection => 'التطبيق';
+
+  @override
+  String get searchFilterVendors => 'متاجر';
+
+  @override
+  String get searchFilterProducts => 'منتجات';
+  @override
+  String get vendorCustomBubbleLabel => 'خدمة هاتلي';
+
+  @override
+  String get sectorHatlyExistingWasaly => 'لديك طلب «وصّلي لمكان» موجود بالفعل في السلة. هذه الصفحة تتيح «هاتلي من مكان» فقط. راجع السلة أولاً؛ لن يتم تغيير طلبك الحالي.';
+
 }

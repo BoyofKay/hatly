@@ -297,7 +297,7 @@ void main() {
     });
 
     testWidgets(
-        'Shop by Category: a 3-column grid; tap → existing listing route',
+        'Shop by Category: two-column large cards; tap → existing listing route',
         (tester) async {
       _phone(tester);
       final visited = <String>[];
@@ -305,13 +305,14 @@ void main() {
 
       final grid =
           tester.widgetList<CategoryCard>(find.byType(CategoryCard)).toList();
-      expect(grid, hasLength(6), reason: 'collapsed: two rows of three');
+      expect(grid, hasLength(6), reason: 'collapsed: three rows of two');
+      expect(grid.every((c) => c.large), isTrue);
       final rects = [
         for (var i = 0; i < 6; i++)
           tester.getRect(find.byType(CategoryCard).at(i))
       ];
-      expect({for (final r in rects) r.left.round()}.length, 3);
-      expect({for (final r in rects) r.top.round()}.length, 2);
+      expect({for (final r in rects) r.left.round()}.length, 2);
+      expect({for (final r in rects) r.top.round()}.length, 3);
       // Arabic: the first category is on the right
       expect(rects[0].left, greaterThan(rects[1].left));
 

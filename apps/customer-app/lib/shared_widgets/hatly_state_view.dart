@@ -36,7 +36,14 @@ class HatlyStateView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: p.textMuted),
+            // A soft brand halo around the icon: calm, recognisably Hatly, never alarming.
+            Container(
+              width: 64,
+              height: 64,
+              decoration:
+                  BoxDecoration(color: p.accentSoft, shape: BoxShape.circle),
+              child: Icon(icon, size: 30, color: p.accent),
+            ),
             const SizedBox(height: 16),
             Text(
               title,
@@ -44,8 +51,8 @@ class HatlyStateView extends StatelessWidget {
               // Polish pass: was a raw `TextStyle` (Roboto fallback, not the
               // approved Inter+Cairo family) — now the app's own type scale,
               // same visual weight as before.
-              style: context.type.body
-                  .copyWith(fontWeight: FontWeight.w600, color: p.textPrimary),
+              style: context.type.title
+                  .copyWith(fontWeight: FontWeight.w700, color: p.textPrimary),
             ),
             if (subtitle != null) ...[
               const SizedBox(height: 6),
@@ -57,7 +64,11 @@ class HatlyStateView extends StatelessWidget {
             ],
             if (onRetry != null) ...[
               const SizedBox(height: 20),
-              OutlinedButton(onPressed: onRetry, child: Text(retryLabel ?? '')),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 260),
+                child: OutlinedButton(
+                    onPressed: onRetry, child: Text(retryLabel ?? '')),
+              ),
             ],
           ],
         ),

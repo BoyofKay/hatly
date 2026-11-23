@@ -14,6 +14,7 @@ import 'widgets/vendor_card.dart';
 import 'widgets/vendor_card_skeleton.dart';
 import 'widgets/subcategory_chip_row.dart';
 import 'widgets/vendor_filter_sheet.dart';
+import '../../home/presentation/widgets/hatly_service_entry_card.dart';
 
 class VendorListScreen extends ConsumerStatefulWidget {
   const VendorListScreen({super.key, this.category, this.categoryName});
@@ -83,6 +84,15 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(title)),
+      // Sector pages always offer the standalone Hatly purchase service,
+      // including when no vendors are returned. Not linked to any store.
+      bottomNavigationBar: const SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: HatlySpacing.sm),
+          child: HatlyServiceEntryCard(buyFromPlaceOnly: true),
+        ),
+      ),
       body: Column(
         children: [
           Padding(
@@ -154,11 +164,7 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
               ),
               data: (vendors) {
                 if (vendors.isEmpty) {
-                  return HatlyStateView(
-                    icon: Icons.storefront_outlined,
-                    title: l10n.noVendorsFound,
-                    subtitle: l10n.noVendorsFoundSubtitle,
-                  );
+                  return _SectorEmptyState(hasFilters: _searchQuery.trim().isNotEmpty || _selectedSubcategoryId != null || _filters.activeCount > 0);
                 }
                 return RefreshIndicator(
                   onRefresh: () => ref
@@ -194,6 +200,69 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// An empty sector still offers the fixed Hatly Service card below.
+/// Distinguishes no merchants in the sector from a zero-result filter.
+class _SectorEmptyState extends StatelessWidget {
+  const _SectorEmptyState({required this.hasFilters});
+  final bool hasFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    final ar = Localizations.localeOf(context).languageCode == 'ar';
+    final p = context.palette;
+    final title = hasFilters
+        ? (ar ? 'مفيش متاجر مطابقة لبحثك' : 'No matching stores')
+        : (ar ? 'ملقتش المحل اللي بتدور عليه؟' : "Can't find the store you're looking for?");
+    final description = hasFilters
+        ? (ar
+            ? 'جرّب تغيير البحث أو الفلاتر، أو اطلب احتياجاتك بخدمة هاتلي.'
+            : 'Try adjusting your search or filters, or request what you need with Hatly Service.')
+        : (ar
+            ? 'ولا يهمك! مع خدمة هاتلي، اطلب اللي محتاجه من أي مكان، وإحنا نجيبهولك.'
+            : "No worries! With Hatly Service, you can request what you need from another place, and we'll get it for you.");
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: HatlySpacing.md, vertical: HatlySpacing.lg),
+        child: Container(
+          key: const Key('sector-hatly-empty-state'),
+          width: double.infinity,
+          padding: const EdgeInsets.all(HatlySpacing.lg),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [p.accentSoft, p.surface],
+              begin: AlignmentDirectional.topStart,
+              end: AlignmentDirectional.bottomEnd,
+            ),
+            borderRadius: BorderRadius.circular(HatlyRadius.card),
+            border: Border.all(color: p.border),
+            boxShadow: HatlyShadows.soft(p),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: p.surface, shape: BoxShape.circle),
+              child: Icon(Icons.storefront_outlined, size: 40, color: p.accent),
+            ),
+            const SizedBox(height: HatlySpacing.md),
+            Text(title, textAlign: TextAlign.center,
+              style: context.type.title.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: HatlySpacing.sm),
+            Text(description, textAlign: TextAlign.center,
+              style: context.type.body.copyWith(color: p.textMuted)),
+            const SizedBox(height: HatlySpacing.md),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(color: p.accent, borderRadius: BorderRadius.circular(24)),
+              child: Text(ar ? 'خدمة هاتلي ↓' : 'Hatly Service ↓',
+                style: context.type.small.copyWith(color: p.accentOn, fontWeight: FontWeight.w800)),
+            ),
+          ]),
+        ),
       ),
     );
   }

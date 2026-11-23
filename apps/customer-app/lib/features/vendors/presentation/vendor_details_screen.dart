@@ -7,6 +7,7 @@ import '../../../shared_widgets/filter_action_button.dart';
 import '../../../shared_widgets/hatly_loading_view.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/hatly_soft_image.dart';
+import '../../../shared_widgets/store_cover_image.dart';
 import '../../../shared_widgets/hatly_rating_inline.dart';
 import '../../../shared_widgets/availability_badge.dart';
 import '../../../shared_widgets/cart_summary_bar.dart';
@@ -51,6 +52,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen> {
   // Filters V1. The committed/active filter state — the filter sheet
   // only ever replaces this wholesale, on Apply.
   ProductFilters _filters = ProductFilters.empty;
+  double? _customBubbleY;
 
   @override
   Widget build(BuildContext context) {
@@ -75,17 +77,39 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen> {
       ),
       data: (details) => Scaffold(
         bottomNavigationBar: const CartSummaryBar(),
-        body: _VendorDetailsContent(
-          details: details,
-          selectedCategoryId: _selectedCategoryId,
-          onCategorySelected: (id) => setState(() => _selectedCategoryId = id),
-          sortOption: _sortOption,
-          onSortChanged: (sort) => setState(() => _sortOption = sort),
-          searchQuery: _searchQuery,
-          onSearchChanged: (query) => setState(() => _searchQuery = query),
-          filters: _filters,
-          onFiltersChanged: (filters) => setState(() => _filters = filters),
-        ),
+        body: LayoutBuilder(builder: (context, constraints) {
+          // Overlay never becomes a menu sliver: lazy paging and cached pages survive.
+          final maxTop = (constraints.maxHeight - 80).clamp(0.0, double.infinity).toDouble();
+          final minTop = maxTop < 80 ? 0.0 : 80.0;
+          final top = (_customBubbleY ?? constraints.maxHeight * 0.50)
+              .clamp(minTop, maxTop).toDouble();
+          return Stack(children: [
+            Positioned.fill(child: _VendorDetailsContent(
+              details: details,
+              selectedCategoryId: _selectedCategoryId,
+              onCategorySelected: (id) => setState(() => _selectedCategoryId = id),
+              sortOption: _sortOption,
+              onSortChanged: (sort) => setState(() => _sortOption = sort),
+              searchQuery: _searchQuery,
+              onSearchChanged: (query) => setState(() => _searchQuery = query),
+              filters: _filters,
+              onFiltersChanged: (filters) => setState(() => _filters = filters),
+            )),
+            if (details.branch.allowsCustomRequests && details.branch.isOpen)
+              PositionedDirectional(
+                end: HatlySpacing.sm,
+                top: top,
+                child: GestureDetector(
+                  onVerticalDragUpdate: (d) => setState(() =>
+                    _customBubbleY = (top + d.delta.dy).clamp(minTop, maxTop).toDouble()),
+                  child: CustomRequestAction(
+                    vendorBranchId: details.branch.id,
+                    floating: true,
+                  ),
+                ),
+              ),
+          ]);
+        }),
       ),
     );
   }
@@ -287,17 +311,6 @@ class _VendorDetailsContent extends ConsumerWidget {
                 ),
               ),
             ),
-          // Only where the server allows it (the branch's sector setting; the cart endpoint enforces the same rule).
-          if (details.branch.allowsCustomRequests && details.branch.isOpen)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Center(
-                    child:
-                        CustomRequestAction(vendorBranchId: details.branch.id)),
-              ),
-            ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
         ],
       ),
@@ -327,13 +340,12 @@ class _VendorHeader extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              HatlySoftImage(
-                url: details.vendor.coverImageUrl ?? details.vendor.logoUrl,
+              StoreCoverImage(
+                coverUrl: details.vendor.coverImageUrl,
+                logoUrl: details.vendor.logoUrl,
                 width: double.infinity,
                 height: 140,
                 radius: HatlyRadius.card,
-                placeholderIcon: Icons.storefront_outlined,
-                placeholderIconSize: 44,
               ),
               PositionedDirectional(
                 bottom: -(logoSize / 2),

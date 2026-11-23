@@ -1,3 +1,3 @@
 ACTION=deploy
 ARG=
-# Production release: grouped bilingual Delivery Zones and closed-store cart safeguards; verified CI required.
+# Production source: customer editable name + admin-managed driver display name + shift-scoped History; CI 45229239987 SUCCESS.

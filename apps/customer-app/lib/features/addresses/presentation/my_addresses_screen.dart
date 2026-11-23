@@ -208,7 +208,14 @@ class _AddressTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.location_on_outlined, color: p.textMuted),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+                color: p.accentSoft,
+                borderRadius: BorderRadius.circular(HatlyRadius.button)),
+            child: Icon(Icons.location_on_outlined, color: p.accent),
+          ),
           const SizedBox(width: HatlySpacing.ms),
           Expanded(
             child: Column(

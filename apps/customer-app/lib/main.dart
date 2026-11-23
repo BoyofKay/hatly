@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/localization/locale_provider.dart';
+import 'core/storage/locale_preference_storage.dart';
 import 'core/config/api_config.dart';
 import 'core/error/error_reporting.dart';
 import 'core/localization/l10n/app_localizations.dart';
@@ -13,6 +15,7 @@ import 'core/storage/theme_preference_storage.dart';
 import 'core/theme/hatly_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'core/routing/router_stack.dart';
+import 'shared_widgets/customer_global_header.dart';
 
 /// Customer Push Notifications — background state. Runs in a separate
 /// background isolate with NO access to this app's Riverpod
@@ -58,8 +61,13 @@ Future<void> _start() async {
   // override rather than an async value read inside the widget tree.
   final initialThemeMode =
       await ThemePreferenceStorage().readThemeMode() ?? ThemeMode.light;
+  final initialLocale =
+      await LocalePreferenceStorage().readLocale() ?? const Locale('ar');
   runApp(ProviderScope(
-    overrides: [initialThemeModeProvider.overrideWithValue(initialThemeMode)],
+    overrides: [
+      initialThemeModeProvider.overrideWithValue(initialThemeMode),
+      initialLocaleProvider.overrideWithValue(initialLocale),
+    ],
     child: const HatlyCustomerApp(),
   ));
 }
@@ -96,13 +104,22 @@ class HatlyCustomerApp extends ConsumerWidget {
       darkTheme: HatlyTheme.dark(),
       themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
+      builder: (context, child) => Column(children: [
+        SafeArea(bottom: false, child: CustomerGlobalHeader(router: router)),
+        Expanded(child: MediaQuery.removePadding(
+          context: context,
+          removeTop: true,
+          child: child ?? const SizedBox.shrink(),
+        )),
+      ]),
 
-      // Arabic is primary (spec section 4/19) — listed first so it's
-      // the default locale; Flutter derives RTL/LTR automatically from
-      // the active locale via Directionality, so no manual RTL flag is
-      // needed as long as every widget uses logical (start/end)
-      // properties instead of hard-coded left/right.
-      locale: const Locale('ar'),
+      // Arabic is primary (spec section 4/19) and the default; the customer
+      // can switch to English in Settings (localeProvider, persisted).
+      // Flutter derives RTL/LTR automatically from the active locale via
+      // Directionality, so no manual RTL flag is needed as long as every
+      // widget uses logical (start/end) properties instead of hard-coded
+      // left/right.
+      locale: ref.watch(localeProvider),
       supportedLocales: const [Locale('ar'), Locale('en')],
       localizationsDelegates: const [
         AppLocalizations.delegate,

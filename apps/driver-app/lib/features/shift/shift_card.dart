@@ -4,6 +4,7 @@ import '../../core/localization/bilingual.dart';
 import '../deliveries/data/driver_providers.dart';
 import '../../core/utils/money.dart';
 import 'shift_api.dart';
+import 'shift_duration_label.dart';
 
 /// Driver shifts (owner decision 2026-11-22): replaces the online switch. Off duty → "Start shift". On duty → since when, a
 /// "take new orders" switch (switch it off to finish what you carry and receive nothing new) and "End shift" — refused, with the
@@ -125,6 +126,7 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
                   ]),
                 ),
               if (s.onDuty) ...[
+                const ShiftDurationLabel(),
                 SwitchListTile(
                   key: const Key('accepting-switch'),
                   contentPadding: EdgeInsets.zero,

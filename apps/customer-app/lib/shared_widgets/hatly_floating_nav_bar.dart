@@ -19,10 +19,11 @@ class HatlyNavItem {
   final Key? key;
 }
 
-/// Floating, rounded bottom navigation: white (theme surface) card with a
-/// soft shadow, inset from the sides and the bottom. The active item gets a
-/// subtle orange pill AND a heavier label (state is not colour-only). Each
-/// item is ≥44px in both dimensions.
+/// Bottom navigation (reference board): a flat, full-width white bar with a
+/// hairline top border. The active item is orange — filled icon, orange label
+/// and a short orange indicator above the icon — so state is never colour-only
+/// (the icon shape and the indicator change too). Each item is ≥44px in both
+/// dimensions. (The class keeps its historical name; it no longer floats.)
 ///
 /// Presentation only — it knows nothing about routes. [selectedIndex] may be
 /// null when the current destination is not one of the items (e.g. Cart is a
@@ -42,31 +43,32 @@ class HatlyFloatingNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-            HatlySpacing.md, HatlySpacing.xs, HatlySpacing.md, HatlySpacing.ms),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: p.surface,
-            borderRadius: BorderRadius.circular(HatlyRadius.promoBanner + 4),
-            boxShadow: HatlyShadows.floating(p),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: HatlySpacing.sm, vertical: HatlySpacing.sm),
-            child: Row(
-              children: [
-                for (var i = 0; i < items.length; i++)
-                  Expanded(
-                    child: _NavButton(
-                        item: items[i],
-                        selected: selectedIndex == i,
-                        onTap: () => onTap(i)),
-                  ),
-              ],
-            ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: p.surface,
+        border: Border(top: BorderSide(color: p.border)),
+        boxShadow: [
+          BoxShadow(
+              color: p.shadow.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, -2)),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+              HatlySpacing.xs, 0, HatlySpacing.xs, HatlySpacing.sm),
+          child: Row(
+            children: [
+              for (var i = 0; i < items.length; i++)
+                Expanded(
+                  child: _NavButton(
+                      item: items[i],
+                      selected: selectedIndex == i,
+                      onTap: () => onTap(i)),
+                ),
+            ],
           ),
         ),
       ),
@@ -104,17 +106,22 @@ class _NavButton extends StatelessWidget {
           // Scaffold's bottomNavigationBar slot offers (loose constraints).
           child: Center(
             heightFactor: 1,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: HatlySpacing.sm, vertical: 6),
-              decoration: BoxDecoration(
-                color: selected ? p.accentSoft : Colors.transparent,
-                borderRadius: BorderRadius.circular(HatlyRadius.circular),
-              ),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 6),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: selected ? 24 : 0,
+                    height: 3,
+                    margin: const EdgeInsets.only(bottom: 6),
+                    decoration: BoxDecoration(
+                      color: p.accent,
+                      borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(3)),
+                    ),
+                  ),
                   Stack(
                     clipBehavior: Clip.none,
                     children: [

@@ -35,7 +35,10 @@ import 'widgets/route_summary.dart';
 const int hatlyServiceMaxImages = 2;
 
 class HatlyServiceScreen extends ConsumerStatefulWidget {
-  const HatlyServiceScreen({super.key, this.pickImageOverride});
+  const HatlyServiceScreen({super.key, this.pickImageOverride, this.buyFromPlaceOnly = false});
+
+  /// Sector-listing entry: present only Hatly/Buys From Place. Never alters cart rules.
+  final bool buyFromPlaceOnly;
 
   /// Test hook only — defaults to the real gallery picker
   /// (`ImagePicker().pickImage(...)`, the same call
@@ -52,6 +55,12 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
   _Phase _phase = _Phase.form;
 
   String? _serviceType;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.buyFromPlaceOnly) _serviceType = HatlyServiceType.buyFromPlace;
+  }
   final _placeNameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final List<XFile> _images = [];
@@ -250,6 +259,28 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
     final l10n = AppLocalizations.of(context);
     final existingGroup = _existingGroup(ref);
     _existingGroupIdCache = existingGroup?.id;
+    // An existing Wasaly cart group cannot be silently changed or extended by
+    // a sector-only Hatly entry. The established cart remains untouched.
+    if (widget.buyFromPlaceOnly &&
+        existingGroup?.adHocServiceType == HatlyServiceType.deliverToPlace) {
+      final l10n = AppLocalizations.of(context);
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.hatlyServiceScreenTitle)),
+        body: Center(child: Padding(
+          padding: const EdgeInsets.all(HatlySpacing.lg),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.info_outline_rounded, size: 42),
+            const SizedBox(height: HatlySpacing.md),
+            Text(l10n.sectorHatlyExistingWasaly,
+              textAlign: TextAlign.center, style: context.type.body),
+            const SizedBox(height: HatlySpacing.md),
+            TextButton.icon(onPressed: () => context.push('/cart'),
+              icon: const Icon(Icons.shopping_cart_outlined),
+              label: Text(l10n.cartSummaryViewCart)),
+          ]),
+        )),
+      );
+    }
     // While the defaults load (or if they cannot be read) nothing is configured: the customer simply chooses the ends themselves.
     final defaults = ref.watch(routeDefaultsProvider).valueOrNull ?? RouteDefaults.none;
     final route = _routeFor(existingGroup, defaults);
@@ -263,6 +294,7 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
                 key: const ValueKey('hatly-service-form'),
                 existingGroup: existingGroup,
                 serviceType: _serviceType,
+                buyFromPlaceOnly: widget.buyFromPlaceOnly,
                 onServiceTypeChanged: (t) => setState(() {
                   // The two services have different defaults and rules, so a choice made for the other one is dropped.
                   if (t != _serviceType) {
@@ -311,6 +343,7 @@ class _FormPhase extends StatelessWidget {
     super.key,
     required this.existingGroup,
     required this.serviceType,
+    required this.buyFromPlaceOnly,
     required this.onServiceTypeChanged,
     required this.placeNameController,
     required this.descriptionController,
@@ -331,6 +364,7 @@ class _FormPhase extends StatelessWidget {
 
   final CartGroup? existingGroup;
   final String? serviceType;
+  final bool buyFromPlaceOnly;
   final ValueChanged<String> onServiceTypeChanged;
   final TextEditingController placeNameController;
   final TextEditingController descriptionController;
@@ -379,16 +413,18 @@ class _FormPhase extends StatelessWidget {
                   onTap: () =>
                       onServiceTypeChanged(HatlyServiceType.buyFromPlace),
                 ),
-                const SizedBox(height: HatlySpacing.sm),
-                _ServiceTypeTile(
-                  key: const Key('hatly-service-type-deliver'),
+                if (!buyFromPlaceOnly) ...[
+                  const SizedBox(height: HatlySpacing.sm),
+                  _ServiceTypeTile(
+                    key: const Key('hatly-service-type-deliver'),
                   title: l10n.hatlyServiceTypeDeliverToPlace,
                   subtitle: l10n.hatlyServiceTypeDeliverToPlaceHint,
                   icon: Icons.delivery_dining_outlined,
                   selected: serviceType == HatlyServiceType.deliverToPlace,
-                  onTap: () =>
-                      onServiceTypeChanged(HatlyServiceType.deliverToPlace),
-                ),
+                    onTap: () =>
+                        onServiceTypeChanged(HatlyServiceType.deliverToPlace),
+                  ),
+                ],
               ],
             ),
           ),

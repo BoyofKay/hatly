@@ -9,6 +9,7 @@ import 'core/localization/l10n/app_localizations.dart';
 import 'core/network/providers.dart';
 import 'core/routing/app_router.dart';
 import 'core/theme/hatly_theme.dart';
+import 'shared_widgets/driver_global_header.dart';
 
 /// Separate entry point from the customer app, per the client's
 /// explicit correction: two independent Flutter applications, not one
@@ -60,6 +61,14 @@ class HatlyDriverApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: HatlyTheme.light(),
       routerConfig: router,
+      builder: (context, child) => Column(children: [
+        const SafeArea(bottom: false, child: DriverGlobalHeader()),
+        Expanded(child: MediaQuery.removePadding(
+          context: context,
+          removeTop: true,
+          child: child ?? const SizedBox.shrink(),
+        )),
+      ]),
       locale: ref.watch(localeProvider),
       supportedLocales: const [Locale('ar'), Locale('en')],
       localizationsDelegates: const [

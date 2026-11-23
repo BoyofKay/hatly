@@ -52,6 +52,12 @@ ApiException get otpDisabledError =>
 
 /// A scriptable backend: every call is recorded in [calls] (the endpoint-level contract), and each outcome can be set.
 class FakeAuthApi implements AuthApi {
+  String fullName = 'Test Customer';
+  @override
+  Future<String> getCustomerName() async => fullName;
+  @override
+  Future<String> updateCustomerName(String name) async => fullName = name;
+
   /// Whether `CUSTOMER_OTP_ENABLED` is currently on. Changing it between calls simulates the Admin toggling it mid-flow.
   bool otpEnabled = true;
 

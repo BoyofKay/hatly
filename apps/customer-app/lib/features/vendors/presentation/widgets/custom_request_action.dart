@@ -23,7 +23,9 @@ const int _maxCustomRequestImages = 2;
 /// this app and is untouched by this widget.
 class CustomRequestAction extends ConsumerWidget {
   const CustomRequestAction(
-      {super.key, required this.vendorBranchId, this.pickImageOverride});
+      {super.key, required this.vendorBranchId, this.pickImageOverride,
+      this.floating = false});
+  final bool floating;
 
   final String vendorBranchId;
 
@@ -36,8 +38,51 @@ class CustomRequestAction extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final p = context.palette;
-    // Polish pass: was a raw `OutlinedButton.icon` — `HatlyButton` exists
-    // specifically to replace ad hoc button combinations like this one.
+    Future<void> openRequest() async {
+      // Identical sign-in, upload, sheet and cart behavior regardless of entry.
+      if (!requireSignIn(context, ref)) return;
+      final messenger = ScaffoldMessenger.of(context);
+      final added = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => _CustomRequestSheet(
+          vendorBranchId: vendorBranchId,
+          pickImageOverride: pickImageOverride),
+      );
+      if (added == true) {
+        messenger.showSnackBar(SnackBar(content: Text(l10n.customRequestAdded)));
+      }
+    }
+    if (floating) {
+      final label = l10n.vendorCustomBubbleLabel;
+      return Tooltip(
+        message: l10n.customRequestEntryPoint,
+        child: Material(
+          color: p.accent,
+          elevation: 5,
+          borderRadius: BorderRadius.circular(30),
+          child: InkWell(
+            key: const Key('vendor-custom-request-bubble'),
+            borderRadius: BorderRadius.circular(30),
+            onTap: openRequest,
+            child: Semantics(
+              button: true,
+              label: l10n.customRequestEntryPoint,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: HatlySpacing.md, vertical: HatlySpacing.ms),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.add_shopping_cart_outlined, color: p.accentOn),
+                  const SizedBox(width: HatlySpacing.xs),
+                  Text(label, style: context.type.small.copyWith(
+                    color: p.accentOn, fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -45,33 +90,14 @@ class CustomRequestAction extends ConsumerWidget {
           variant: HatlyButtonVariant.secondary,
           icon: Icons.help_outline,
           label: l10n.customRequestEntryPoint,
-          // Not full-width — this is a compact entry-point button (was a
-          // content-sized `OutlinedButton.icon`), not a full-width CTA.
           fullWidth: false,
-          onPressed: () async {
-            // A custom request goes into the cart, which needs an account: a guest signs in first (and returns here).
-            if (!requireSignIn(context, ref)) return;
-            final messenger = ScaffoldMessenger.of(context);
-            final added = await showModalBottomSheet<bool>(
-              context: context,
-              isScrollControlled: true,
-              builder: (_) => _CustomRequestSheet(
-                  vendorBranchId: vendorBranchId,
-                  pickImageOverride: pickImageOverride),
-            );
-            // Say what happened: it is now in the cart, and the store (not the app) sets the price.
-            if (added == true) {
-              messenger.showSnackBar(
-                  SnackBar(content: Text(l10n.customRequestAdded)));
-            }
-          },
+          onPressed: openRequest,
         ),
         const SizedBox(height: HatlySpacing.xs),
-        // What tapping it does, before tapping it.
         Text(l10n.customRequestEntryHint,
-            key: const Key('custom-request-hint'),
-            textAlign: TextAlign.center,
-            style: context.type.caption.copyWith(color: p.textMuted)),
+          key: const Key('custom-request-hint'),
+          textAlign: TextAlign.center,
+          style: context.type.caption.copyWith(color: p.textMuted)),
       ],
     );
   }
