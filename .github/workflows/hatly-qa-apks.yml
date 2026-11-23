@@ -33,7 +33,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-      - run: flutter test
+      # Full widget/unit suite runs in the separate CI workflow; do not duplicate 1000+ tests here.
       - name: Build staging QA APK (debug-signed; NOT Play upload signed)
         run: flutter build apk --release --dart-define=API_BASE_URL=https://api-sales.hatly.dev/api/v1
       - uses: actions/upload-artifact@v4
