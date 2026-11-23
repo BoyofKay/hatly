@@ -13,9 +13,13 @@ class FavoritesApi {
   Future<List<FavoriteVendor>> getFavorites() {
     return _client.request(
       (dio) => dio.get('/favorites'),
-      (data) => (data['data'] as List)
-          .map((e) => FavoriteVendor.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      // The Favorites controller returns a RAW array (unlike most API
+      // controllers that wrap records in {data: ...}). Accept either form
+      // to support existing deployed servers without breaking saved hearts.
+      (data) {
+        final records = data is List ? data : (data as Map<String, dynamic>)['data'] as List;
+        return records.map((e) => FavoriteVendor.fromJson(e as Map<String, dynamic>)).toList();
+      },
     );
   }
 
