@@ -101,7 +101,7 @@ class _FavoriteVendorCard extends StatelessWidget {
         // Reuses the existing real Vendor Details route exactly as
         // VendorCard itself does — no new route, no duplicated
         // Vendor Details logic.
-        onTap: () => context.push('/vendors/${favorite.vendorId}'),
+        onTap: favorite.branchId == null ? null : () => context.push('/vendors/${favorite.branchId}'),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

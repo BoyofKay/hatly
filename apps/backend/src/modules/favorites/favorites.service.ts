@@ -1,12 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { QueryFailedError } from 'typeorm';
 import { Favorite } from './entities/favorite.entity';
 import { Vendor } from '../vendors/entities/vendor.entity';
+import { VendorBranch } from '../vendors/entities/vendor-branch.entity';
 
 export interface FavoriteVendorView {
   vendorId: string;
+  /** Resolvable branch route for opening a favorited vendor; null when no active branch exists. */
+  branchId: string | null;
   name: string;
   nameAr: string | null;
   logoUrl: string | null;
@@ -26,6 +29,7 @@ export class FavoritesService {
   constructor(
     @InjectRepository(Favorite) private readonly favoritesRepository: Repository<Favorite>,
     @InjectRepository(Vendor) private readonly vendorRepository: Repository<Vendor>,
+    @InjectRepository(VendorBranch) private readonly branchesRepository: Repository<VendorBranch>,
   ) {}
 
   /**
@@ -103,8 +107,19 @@ export class FavoritesService {
       .orderBy('favorite.createdAt', 'DESC')
       .getMany();
 
+    if (favorites.length === 0) return [];
+    // Favorites are vendor-level, but the store details route is branch-level.
+    // Resolve a deterministic active branch in one batched query (no N+1).
+    const branches = await this.branchesRepository.find({
+      where: { vendorId: In(favorites.map((f) => f.vendorId)), isActive: true },
+      select: { id: true, vendorId: true },
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+    const firstBranch = new Map<string, string>();
+    for (const b of branches) if (!firstBranch.has(b.vendorId)) firstBranch.set(b.vendorId, b.id);
     return favorites.map((favorite) => ({
       vendorId: favorite.vendorId,
+      branchId: firstBranch.get(favorite.vendorId) ?? null,
       name: favorite.vendor.name,
       nameAr: favorite.vendor.nameAr ?? null,
       logoUrl: favorite.vendor.logoUrl ?? null,

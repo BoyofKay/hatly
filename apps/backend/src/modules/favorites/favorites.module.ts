@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Favorite } from './entities/favorite.entity';
 import { Vendor } from '../vendors/entities/vendor.entity';
+import { VendorBranch } from '../vendors/entities/vendor-branch.entity';
 import { FavoritesService } from './favorites.service';
 import { FavoritesController } from './favorites.controller';
 
@@ -12,7 +13,7 @@ import { FavoritesController } from './favorites.controller';
  * services, no forwardRef needed.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([Favorite, Vendor])],
+  imports: [TypeOrmModule.forFeature([Favorite, Vendor, VendorBranch])],
   controllers: [FavoritesController],
   providers: [FavoritesService],
 })

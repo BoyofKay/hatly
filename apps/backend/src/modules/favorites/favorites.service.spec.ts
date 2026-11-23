@@ -11,6 +11,7 @@ import { FavoritesService } from './favorites.service';
 function buildHarness(options: {
   vendors?: Record<string, { id: string; name: string; nameAr?: string | null; logoUrl?: string | null; isActive: boolean }>;
   existingFavorites?: Array<{ customerId: string; vendorId: string; createdAt: Date }>;
+  branches?: Array<{ id: string; vendorId: string; isActive: boolean }>;
 }) {
   const vendors = options.vendors ?? {};
   const rows = [...(options.existingFavorites ?? [])].map((f, i) => ({ ...f, id: `fav-${i}` }));
@@ -70,7 +71,10 @@ function buildHarness(options: {
     }),
   };
 
-  const service = new FavoritesService(favoritesRepository as any, vendorRepository as any);
+  const branchesRepository = {
+    find: jest.fn(async () => options.branches ?? []),
+  };
+  const service = new FavoritesService(favoritesRepository as any, vendorRepository as any, branchesRepository as any);
   return { service, rows, vendorRepository, favoritesRepository };
 }
 
@@ -180,6 +184,7 @@ describe('FavoritesService', () => {
     expect(result).toEqual([
       {
         vendorId: 'vendor-1',
+        branchId: null,
         name: 'Vendor One',
         nameAr: 'فيندور واحد',
         logoUrl: 'https://x/logo.png',
@@ -188,6 +193,15 @@ describe('FavoritesService', () => {
         favoritedAt: new Date('2026-01-01'),
       },
     ]);
+  });
+
+  it('exposes an active branch route, not the vendor ID, when opening a favorite', async () => {
+    const { service } = buildHarness({
+      vendors: { 'vendor-1': { id: 'vendor-1', name: 'Example', isActive: true } },
+      existingFavorites: [{ customerId: 'customer-1', vendorId: 'vendor-1', createdAt: new Date() }],
+      branches: [{ id: 'branch-1', vendorId: 'vendor-1', isActive: true }],
+    });
+    expect((await service.listForCustomer('customer-1'))[0].branchId).toBe('branch-1');
   });
 
   it('CRITICAL: an inactive Vendor remains favorited — isActive read live, not hidden or removed', async () => {

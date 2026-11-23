@@ -14,6 +14,7 @@
 class FavoriteVendor {
   const FavoriteVendor({
     required this.vendorId,
+    this.branchId,
     required this.name,
     this.nameAr,
     this.logoUrl,
@@ -22,6 +23,8 @@ class FavoriteVendor {
   });
 
   final String vendorId;
+  /// Branch route is distinct from vendor-level favorite identity. */
+  final String? branchId;
   final String name;
   final String? nameAr;
   final String? logoUrl;
@@ -31,6 +34,7 @@ class FavoriteVendor {
   factory FavoriteVendor.fromJson(Map<String, dynamic> json) {
     return FavoriteVendor(
       vendorId: json['vendorId'] as String,
+      branchId: json['branchId'] as String?,
       name: json['name'] as String,
       nameAr: json['nameAr'] as String?,
       logoUrl: json['logoUrl'] as String?,
