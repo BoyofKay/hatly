@@ -76,7 +76,7 @@ export class DriverController {
 
   /** One row per credited delivery, newest first (paginated). */
   @Get('transactions')
-  async transactions(@CurrentUser() user: AuthenticatedUser, @Query() q: { page?: string; limit?: string }) {
+  async transactions(@CurrentUser() user: AuthenticatedUser, @Query() q: { page?: string; limit?: string; scope?: string }) {
     const r = await this.driverEarningsService.transactions(user.id, q);
     return { data: r.items, meta: { page: r.page, limit: r.limit, total: r.total } };
   }
