@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Patch, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Post, Patch, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { AllowWithoutMfa } from '../../common/decorators/csrf-mfa.decorators';
 import { ApiTags } from '@nestjs/swagger';
@@ -24,6 +24,10 @@ import { IsString, MaxLength, MinLength } from 'class-validator';
 
 class DriverResetRequestDto {
   @IsString() @MinLength(6) @MaxLength(20) phone: string;
+}
+
+class ChangeCustomerNameDto {
+  @IsString() @MinLength(2) @MaxLength(150) fullName: string;
 }
 
 class ChangeDriverPasswordDto {
@@ -239,6 +243,26 @@ export class AuthController {
    * genuine gap it closes (the dismissible post-login verification
    * prompt, Section 12).
    */
+  /** Customer can read and edit only their own display name. The existing /customer/me verification contract is unchanged. */
+  @UseGuards(RolesGuard)
+  @Roles(Role.CUSTOMER)
+  @Get('customer/profile')
+  async customerProfile(@CurrentUser() user: AuthenticatedUser) {
+    return { data: { fullName: await this.authService.getCustomerName(user.id) } };
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles(Role.CUSTOMER)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Patch('customer/profile')
+  async updateCustomerProfile(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChangeCustomerNameDto) {
+    const fullName = dto.fullName.trim();
+    if (fullName.length < 2) {
+      throw new BadRequestException({ message: 'Name must contain at least two characters.', details: { code: 'VALIDATION_FAILED' } });
+    }
+    return { data: { fullName: await this.authService.updateCustomerName(user.id, fullName) } };
+  }
+
   @UseGuards(RolesGuard)
   @Roles(Role.CUSTOMER) // customer-scoped: a vendor/driver/admin token has no business here
   @Get('customer/me')
