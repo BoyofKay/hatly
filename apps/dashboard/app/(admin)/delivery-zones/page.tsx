@@ -154,6 +154,7 @@ function Field({ label, value, onChange, testId, dir, placeholder }: { label: st
 function ZoneForm({
   initial,
   areas,
+  parentZones,
   showFee,
   submitLabel,
   onSubmit,
@@ -161,6 +162,7 @@ function ZoneForm({
 }: {
   initial: FormState;
   areas: ServiceArea[];
+  parentZones: DeliveryZone[];
   showFee: boolean;
   submitLabel: string;
   onSubmit: (v: Extract<Validated, { ok: true }>) => Promise<void>;
@@ -169,7 +171,31 @@ function ZoneForm({
   const [form, setForm] = useState<FormState>(initial);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [advanced, setAdvanced] = useState(false);
   const set = (key: keyof FormState) => (v: string) => setForm((f) => ({ ...f, [key]: v }));
+  const parentOptions = useMemo(() => {
+    const unique = new Map<string, DeliveryZone>();
+    for (const zone of parentZones) {
+      if (!zone.zoneName || !zone.zoneNameAr) continue;
+      const key = [zone.serviceAreaId, zone.governorate, zone.city, zone.zoneName, zone.zoneNameAr].join('::');
+      if (!unique.has(key)) unique.set(key, zone);
+    }
+    return [...unique.entries()].sort((a, b) => a[1].zoneNameAr!.localeCompare(b[1].zoneNameAr!));
+  }, [parentZones]);
+  const selectedParent = parentOptions.find(([, zone]) => zone.serviceAreaId === form.serviceAreaId && zone.zoneName === form.zoneName && zone.zoneNameAr === form.zoneNameAr && zone.city === form.city)?.[0] ?? '';
+  const isEditing = !showFee;
+  function chooseParent(key: string) {
+    const parent = parentOptions.find(([id]) => id === key)?.[1];
+    if (!parent) return;
+    setForm((current) => ({
+      ...current,
+      serviceAreaId: parent.serviceAreaId, governorate: parent.governorate,
+      governorateAr: parent.governorateAr, city: parent.city, cityAr: parent.cityAr,
+      zoneName: parent.zoneName ?? '', zoneNameAr: parent.zoneNameAr ?? '',
+      displayOrder: String(parent.displayOrder + 1),
+    }));
+    setError(null);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -192,6 +218,22 @@ function ZoneForm({
 
   return (
     <form onSubmit={submit} data-testid="zone-form" className="mt-4 space-y-3 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
+      {!isEditing && <label className="block text-sm">
+        <span className="font-medium">Delivery zone</span>
+        <select data-testid="zone-parent-select" value={selectedParent} onChange={(e) => chooseParent(e.target.value)} className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30">
+          <option value="">Select the delivery zone…</option>
+          {parentOptions.map(([key, zone]) => <option key={key} value={key}>{zone.zoneName} / {zone.zoneNameAr} — {zone.city}</option>)}
+        </select>
+      </label>}
+      {isEditing && <p className="text-sm text-gray-600">Delivery zone: <strong>{form.zoneName} / {form.zoneNameAr}</strong></p>}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label="Neighborhood / Village (EN)" value={form.name} onChange={set('name')} testId="zone-name" placeholder="e.g. Abu Naseeb" />
+        <Field label="Neighborhood / Village (AR)" value={form.nameAr} onChange={set('nameAr')} testId="zone-name-ar" dir="rtl" placeholder="مثال: أبو نصيب" />
+      </div>
+      {showFee && <div className="max-w-xs"><Field label="Delivery fee (EGP)" value={form.fee} onChange={set('fee')} testId="zone-fee" placeholder="15.00" /></div>}
+      <details open={advanced} onToggle={(e) => setAdvanced(e.currentTarget.open)} className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm">
+        <summary data-testid="zone-advanced-toggle" className="cursor-pointer font-medium text-gray-700">Advanced details (optional)</summary>
+        <div className="mt-3 space-y-3">
       <label className="block text-sm">
         <span className="font-medium">Service area</span>
         <select data-testid="zone-service-area" value={form.serviceAreaId} onChange={(e) => set('serviceAreaId')(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm">
@@ -205,25 +247,24 @@ function ZoneForm({
           ))}
         </select>
       </label>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Governorate (EN)" value={form.governorate} onChange={set('governorate')} testId="zone-governorate" />
         <Field label="Governorate (AR)" value={form.governorateAr} onChange={set('governorateAr')} testId="zone-governorate-ar" dir="rtl" />
         <Field label="City (EN)" value={form.city} onChange={set('city')} testId="zone-city" placeholder="Belbeis" />
         <Field label="City (AR)" value={form.cityAr} onChange={set('cityAr')} testId="zone-city-ar" dir="rtl" placeholder="بلبيس" />
         <Field label="Delivery Zone (EN)" value={form.zoneName} onChange={set('zoneName')} testId="parent-zone-name" placeholder="Central Belbeis" />
         <Field label="Delivery Zone (AR)" value={form.zoneNameAr} onChange={set('zoneNameAr')} testId="parent-zone-name-ar" dir="rtl" placeholder="وسط بلبيس" />
-        <Field label="Neighborhood / Village (EN)" value={form.name} onChange={set('name')} testId="zone-name" placeholder="Abu Naseeb" />
-        <Field label="Neighborhood / Village (AR)" value={form.nameAr} onChange={set('nameAr')} testId="zone-name-ar" dir="rtl" placeholder="أبو نصيب" />
         <Field label="Display order" value={form.displayOrder} onChange={set('displayOrder')} testId="zone-display-order" />
-        {showFee && <Field label="Delivery fee (EGP)" value={form.fee} onChange={set('fee')} testId="zone-fee" placeholder="15.00" />}
       </div>
       <fieldset className="rounded border border-dashed p-3">
         <legend className="px-1 text-xs text-gray-500">Representative point (optional metadata — never used for pricing or serviceability)</legend>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Latitude" value={form.lat} onChange={set('lat')} testId="zone-lat" />
           <Field label="Longitude" value={form.lng} onChange={set('lng')} testId="zone-lng" />
         </div>
       </fieldset>
+        </div>
+      </details>
       {error && (
         <p data-testid="zone-form-error" className="text-sm text-red-600">
           {error}
@@ -401,7 +442,7 @@ export default function DeliveryZonesPage() {
           title={canCreate ? undefined : 'Requires MANAGE_SERVICE_AREAS and MANAGE_DELIVERY_FEE_MULTIPLIER'}
           className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
         >
-          {creating ? 'Cancel' : 'New Delivery Zone'}
+          {creating ? 'Cancel' : 'Add neighborhood / village'}
         </button>
       </div>
       <div className="mt-2 space-y-1 text-sm text-gray-600">
@@ -420,6 +461,7 @@ export default function DeliveryZonesPage() {
           key={createPrefill ? `child-${createPrefill.serviceAreaId}-${createPrefill.zoneNameAr}` : 'new-zone'}
           initial={createPrefill ?? { ...EMPTY_FORM, serviceAreaId: areas.length === 1 ? areas[0].id : '' }}
           areas={areas}
+          parentZones={zones ?? []}
           showFee
           submitLabel="Add neighborhood / village"
           onCancel={() => setCreating(false)}
@@ -495,6 +537,7 @@ export default function DeliveryZonesPage() {
                       <ZoneForm
                         initial={toForm(z)}
                         areas={areas}
+                        parentZones={zones ?? []}
                         showFee={false}
                         submitLabel="Save changes"
                         onCancel={() => setEditingId(null)}
@@ -550,7 +593,7 @@ export default function DeliveryZonesPage() {
             {sorted.map((z) => (
               <li key={`card-${z.id}`} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
                 {editingId === z.id ? (
-                  <ZoneForm initial={toForm(z)} areas={areas} showFee={false} submitLabel="Save changes" onCancel={() => setEditingId(null)} onSubmit={async (v) => { await updateDeliveryZone(z.id, v.details); setEditingId(null); await refresh(); }} />
+                  <ZoneForm initial={toForm(z)} areas={areas} parentZones={zones ?? []} showFee={false} submitLabel="Save changes" onCancel={() => setEditingId(null)} onSubmit={async (v) => { await updateDeliveryZone(z.id, v.details); setEditingId(null); await refresh(); }} />
                 ) : (
                   <>
                     <div className="flex items-start justify-between gap-2">
