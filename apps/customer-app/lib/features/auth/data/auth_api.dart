@@ -170,6 +170,21 @@ class AuthApi {
     );
   }
 
+  /// Server-backed customer profile; older session-local names are only a fallback for offline use.
+  Future<String> getCustomerName() {
+    return _client.request(
+      (dio) => dio.get('/auth/customer/profile'),
+      (data) => (data['data'] as Map<String, dynamic>)['fullName'] as String,
+    );
+  }
+
+  Future<String> updateCustomerName(String name) {
+    return _client.request(
+      (dio) => dio.patch('/auth/customer/profile', data: {'fullName': name}),
+      (data) => (data['data'] as Map<String, dynamic>)['fullName'] as String,
+    );
+  }
+
   Future<void> logout() {
     return _client.request((dio) => dio.post('/auth/logout'), (_) => null);
   }
