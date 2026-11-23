@@ -35,7 +35,9 @@ class _Api implements DriverApi {
   Delivery delivery;
   DriverEarnings? earnings;
   final List<TransactionsPage> pages = [];
+  final List<TransactionsPage> previousPages = [];
   final pagesRequested = <int>[];
+  final scopesRequested = <String?>[];
   final statusCalls = <String>[];
   final purchaseCalls = <int>[];
   /// When set, updateDeliveryStatus applies the change (or not) and then throws this.
@@ -51,7 +53,8 @@ class _Api implements DriverApi {
   @override
   Future<TransactionsPage> getTransactions({int page = 1, int limit = 20, String? scope}) async {
     pagesRequested.add(page);
-    return pages[page - 1];
+    scopesRequested.add(scope);
+    return scope == 'previous' && previousPages.isNotEmpty ? previousPages[page - 1] : pages[page - 1];
   }
 
   @override
@@ -184,11 +187,26 @@ void main() {
       expect(find.byKey(const Key('history-load-more')), findsNothing);
     });
 
+    testWidgets('current shift and previous ask the backend for separate scopes', (tester) async {
+      final api = _Api()
+        ..pages.add(TransactionsPage(items: [_tx('1', 3000)], page: 1, limit: 20, total: 1))
+        ..previousPages.add(TransactionsPage(items: [_tx('2', 1000)], page: 1, limit: 20, total: 1));
+      await tester.pumpWidget(_app(api, const HistoryScreen()));
+      await tester.pumpAndSettle();
+      expect(api.scopesRequested, ['current']);
+      expect(find.text('HT-1'), findsOneWidget);
+      await tester.tap(find.text('Previous'));
+      await tester.pumpAndSettle();
+      expect(api.scopesRequested, ['current', 'previous']);
+      expect(find.text('HT-2'), findsOneWidget);
+      expect(find.text('HT-1'), findsNothing);
+    });
+
     testWidgets('empty history is an explicit empty state', (tester) async {
       final api = _Api()..pages.add(const TransactionsPage(items: [], page: 1, limit: 20, total: 0));
       await tester.pumpWidget(_app(api, const HistoryScreen()));
       await tester.pumpAndSettle();
-      expect(find.text('No delivered orders yet.'), findsOneWidget);
+      expect(find.text('No delivered orders in this shift yet.'), findsOneWidget);
     });
   });
 
