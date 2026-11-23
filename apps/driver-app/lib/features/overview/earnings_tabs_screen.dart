@@ -7,6 +7,7 @@ import '../earnings/presentation/earnings_screen.dart';
 import '../earnings/presentation/money_breakdown_view.dart';
 import 'overview_api.dart';
 import 'overview_widgets.dart';
+import '../shift/shift_duration_label.dart';
 
 /// Driver app round 2 (owner decision 2026-11-22): Earnings in two tabs, every amount the server's (the same figures the office closes with).
 ///  - Current shift: cash in pocket · revenue (earned after Hatly's commission) · loan · daily allowance · balance · unsettled orders, and
@@ -92,6 +93,7 @@ class _CurrentTabState extends ConsumerState<_CurrentTab> with AutomaticKeepAliv
         key: const Key('earnings-current-list'),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
+          const ShiftDurationLabel(),
           if (d.shiftStartedAt != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
