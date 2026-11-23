@@ -51,6 +51,21 @@ class OrderHistoryController
     }
   }
 
+  /// Re-reads the first page WITHOUT a loading state (the list stays on screen) — bug 2026-11-23: a delivered order stayed in "Active"
+  /// because the list was read once and kept. Called when the tab is shown, when the app comes back, and every 30 s on the Active tab.
+  /// A failure keeps what is shown.
+  Future<void> reload() async {
+    if (state.isLoading) return;
+    try {
+      final result = await _api.getOrders(page: 1, limit: _limit, status: _statusFilter, tab: tab);
+      _page = 1;
+      _hasMore = result.hasMore;
+      if (mounted) state = AsyncValue.data(result.orders);
+    } catch (_) {
+      // keep the current list
+    }
+  }
+
   /// Deliberately swallows a load-more failure — the already-loaded
   /// page stays visible; the user can simply scroll again or
   /// pull-to-refresh, rather than the whole list being replaced with
