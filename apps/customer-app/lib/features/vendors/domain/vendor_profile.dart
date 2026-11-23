@@ -11,6 +11,7 @@ class VendorProfile {
     this.nameAr,
     required this.category,
     this.logoUrl,
+    this.coverImageUrl,
   });
 
   final String id;
@@ -18,4 +19,5 @@ class VendorProfile {
   final String? nameAr;
   final String category;
   final String? logoUrl;
+  final String? coverImageUrl;
 }
