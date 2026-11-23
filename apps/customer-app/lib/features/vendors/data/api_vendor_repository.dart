@@ -77,6 +77,7 @@ class ApiVendorRepository implements VendorRepository {
             category:
                 '', // same as _toVendor below — no longer sourced from the legacy Vendor.category column
             logoUrl: vendorJson['logoUrl'] as String?,
+            coverImageUrl: vendorJson['coverImageUrl'] as String?,
           ),
           branch: VendorBranchSummary(
             id: json['id'] as String,
