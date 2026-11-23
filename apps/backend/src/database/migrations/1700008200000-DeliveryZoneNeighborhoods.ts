@@ -26,6 +26,16 @@ export class DeliveryZoneNeighborhoods1700008200000 implements MigrationInterfac
           OR ("zone_name" IS NOT NULL AND "zone_name_ar" IS NOT NULL
             AND length(btrim("zone_name")) > 0 AND length(btrim("zone_name_ar")) > 0)
         );
+      -- Existing names were unique for the entire service area. Scope uniqueness
+      -- to a bilingual parent so different zones can contain the same village name.
+      DROP INDEX IF EXISTS "UQ_delivery_zones_area_name_ar";
+      DROP INDEX IF EXISTS "UQ_delivery_zones_area_name";
+      CREATE UNIQUE INDEX "UQ_delivery_zones_area_name_ar"
+        ON "delivery_zones" ("service_area_id", lower(coalesce("zone_name_ar", '')), lower("name_ar"))
+        WHERE "deleted_at" IS NULL;
+      CREATE UNIQUE INDEX "UQ_delivery_zones_area_name"
+        ON "delivery_zones" ("service_area_id", lower(coalesce("zone_name", '')), lower("name"))
+        WHERE "deleted_at" IS NULL;
       CREATE INDEX "IDX_delivery_zones_parent" ON "delivery_zones"
         ("service_area_id", "zone_name_ar", "display_order")
         WHERE "deleted_at" IS NULL;
@@ -41,6 +51,12 @@ export class DeliveryZoneNeighborhoods1700008200000 implements MigrationInterfac
     if (Number(count) > 0) throw new Error('Cannot roll back: delivery-zone parent names exist; export and migrate them first.');
     await queryRunner.query(`
       DROP INDEX IF EXISTS "IDX_delivery_zones_parent";
+      DROP INDEX IF EXISTS "UQ_delivery_zones_area_name_ar";
+      DROP INDEX IF EXISTS "UQ_delivery_zones_area_name";
+      CREATE UNIQUE INDEX "UQ_delivery_zones_area_name_ar"
+        ON "delivery_zones" ("service_area_id", lower("name_ar")) WHERE "deleted_at" IS NULL;
+      CREATE UNIQUE INDEX "UQ_delivery_zones_area_name"
+        ON "delivery_zones" ("service_area_id", lower("name")) WHERE "deleted_at" IS NULL;
       ALTER TABLE "delivery_zones" DROP CONSTRAINT IF EXISTS "chk_delivery_zones_parent_pair";
       ALTER TABLE "delivery_zones" DROP COLUMN IF EXISTS "zone_name_ar", DROP COLUMN IF EXISTS "zone_name";
     `);
