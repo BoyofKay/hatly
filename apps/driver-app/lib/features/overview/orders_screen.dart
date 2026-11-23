@@ -9,6 +9,7 @@ import '../../shared_widgets/driver_ui.dart';
 import '../history/presentation/history_screen.dart';
 import 'overview_api.dart';
 import 'overview_widgets.dart';
+import '../shift/shift_duration_label.dart';
 
 /// Driver app round 2 (owner decision 2026-11-22): the order history in two tabs.
 ///  - Today: everything of the current, not-yet-closed shift (orders still with you + finished ones not settled yet).
@@ -35,7 +36,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
           bottom: TabBar(tabs: [
-            Tab(key: const Key('orders-tab-today'), text: context.t('Today', 'اليوم')),
+            Tab(key: const Key('orders-tab-today'), text: context.t('Current shift', 'الوردية الحالية')),
             Tab(key: const Key('orders-tab-previous'), text: context.t('Previous', 'السابق')),
           ]),
         ),
@@ -192,6 +193,7 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
         key: Key('orders-list-${widget.tab}'),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
+          if (widget.tab == 'today') const ShiftDurationLabel(),
           Row(children: [
             Expanded(
               child: TextField(
