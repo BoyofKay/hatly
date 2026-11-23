@@ -413,7 +413,9 @@ export class CartService {
       }
 
       // A closed branch cannot receive custom cart items either, including existing cart groups.
-      const customBranch = await this.branchesRepository.findOne({ where: { id: group.vendorBranchId }, relations: { vendor: true } });
+      const customBranch = group.vendorBranchId
+        ? await this.branchesRepository.findOne({ where: { id: group.vendorBranchId }, relations: { vendor: true } })
+        : null;
       if (!customBranch || !customBranch.isActive || !customBranch.vendor?.isActive || !customBranch.isOpen) {
         throw new BadRequestException({
           message: 'This store is currently closed or unavailable. Browse its menu and order when it reopens.',
