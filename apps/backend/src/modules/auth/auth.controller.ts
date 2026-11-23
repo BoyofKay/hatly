@@ -22,6 +22,10 @@ import { CustomerPasswordSetupDto } from './dto/customer-password-setup.dto';
 import { VerifyPhoneOtpDto } from './dto/verify-phone-otp.dto';
 import { IsString, MaxLength, MinLength } from 'class-validator';
 
+class DriverResetRequestDto {
+  @IsString() @MinLength(6) @MaxLength(20) phone: string;
+}
+
 class ChangeDriverPasswordDto {
   @IsString() @MinLength(1) @MaxLength(128) currentPassword: string;
   @IsString() @MinLength(8) @MaxLength(128) newPassword: string;
@@ -57,6 +61,19 @@ export class AuthController {
   async driverLogin(@Body() dto: DriverLoginDto) {
     const tokens = await this.authService.loginDriverWithPassword(dto.phone, dto.password);
     return { data: tokens };
+  }
+
+  /**
+   * Driver app "Forgot password?": asks Hatly operations for a temporary password (no SMS provider yet). Public and throttled; the answer
+   * is the same whether or not the phone belongs to a driver (never reveals accounts).
+   */
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @Post('driver/password-reset-request')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async driverPasswordResetRequest(@Body() dto: DriverResetRequestDto) {
+    await this.authService.requestDriverPasswordReset(dto.phone.trim());
+    return { message: 'If this number belongs to a Hatly driver, operations will contact you with a temporary password.' };
   }
 
   /** The driver changes their OWN password — required right after signing in with a temporary one set by Hatly operations. */

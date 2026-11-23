@@ -5,6 +5,7 @@ import { RequiresAnyPermission, RequiresPermission } from '../../permissions/dec
 import { BranchReadinessService } from './branch-readiness.service';
 import { Permission } from '../../permissions/permission.enum';
 import { AdminRecordsService, DeletableKind } from './admin-records.service';
+import { AuthenticatedUser, CurrentUser } from '../../../common/decorators/current-user.decorator';
 
 class EditPersonDto {
   @IsOptional() @IsString() @MinLength(2) @MaxLength(150) fullName?: string;
@@ -123,6 +124,20 @@ export class AdminRecordsController {
   @RequiresAnyPermission(Permission.MANAGE_DRIVERS, Permission.CHANGE_DRIVER_ONLINE_STATUS)
   async resetDriverPassword(@Param('id', ParseUUIDPipe) id: string, @Body() dto: ResetPersonPasswordDto) {
     await this.records.resetPersonPassword('driver', id, dto.newPassword);
+  }
+
+  /** "Forgot password?" requests sent from the driver app (round 2) — answered by Reset password on the driver. */
+  @Get('drivers/password-reset-requests')
+  @RequiresAnyPermission(Permission.MANAGE_DRIVERS, Permission.CHANGE_DRIVER_ONLINE_STATUS)
+  async driverResetRequests() {
+    return { data: await this.records.openDriverResetRequests() };
+  }
+
+  @Post('drivers/password-reset-requests/:id/dismiss')
+  @HttpCode(204)
+  @RequiresAnyPermission(Permission.MANAGE_DRIVERS, Permission.CHANGE_DRIVER_ONLINE_STATUS)
+  async dismissDriverResetRequest(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+    await this.records.dismissResetRequest(id, user.id);
   }
 
   /** A customer who forgot their password (no SMS reset yet): Operations set a temporary one; the app asks for a new one at sign-in. */

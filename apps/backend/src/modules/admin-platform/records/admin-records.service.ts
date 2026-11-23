@@ -271,7 +271,29 @@ export class AdminRecordsService {
       if (!row) throw new NotFoundException(kind === 'driver' ? 'Driver not found.' : 'Vendor staff member not found.');
     }
     await this.ds.query(`UPDATE users SET password_hash = $2, must_change_password = true, updated_at = now() WHERE id = $1`, [row!.user_id, await bcrypt.hash(newPassword, 10)]);
+    // A "forgot password" request from the app is answered by this reset.
+    await this.ds.query(`UPDATE password_reset_requests SET resolved_at = now(), resolution = 'RESET' WHERE user_id = $1 AND resolved_at IS NULL`, [row!.user_id]);
     await this.sessions.revoke(row!.user_id);
+  }
+
+  /** Open "forgot password" requests from the driver app, oldest first (for the Drivers page). */
+  async openDriverResetRequests(): Promise<Array<{ id: string; driverId: string; fullName: string; phone: string; requestedAt: string }>> {
+    const rows = await this.ds.query(
+      `SELECT r.id, d.id AS driver_id, u.full_name, u.phone, r.requested_at
+         FROM password_reset_requests r JOIN users u ON u.id = r.user_id JOIN drivers d ON d.user_id = u.id AND d.deleted_at IS NULL
+        WHERE r.resolved_at IS NULL ORDER BY r.requested_at`,
+    );
+    return rows.map((x: any) => ({ id: x.id, driverId: x.driver_id, fullName: x.full_name, phone: x.phone, requestedAt: new Date(x.requested_at).toISOString() }));
+  }
+
+  /** Close a request without resetting (e.g. the driver remembered the password). */
+  async dismissResetRequest(id: string, actorUserId: string): Promise<void> {
+    const res = await this.ds.query(
+      `UPDATE password_reset_requests SET resolved_at = now(), resolution = 'DISMISSED', resolved_by_user_id = $2 WHERE id = $1 AND resolved_at IS NULL RETURNING id`,
+      [id, actorUserId],
+    );
+    const rows = Array.isArray(res?.[0]) ? res[0] : res;
+    if (!rows?.length) throw new NotFoundException('No open request with this id.');
   }
 
   /** Edit a store staff member (by vendor_staff row id): name, sign-in phone, and manager/operator role. */

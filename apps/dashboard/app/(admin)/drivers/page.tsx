@@ -2,6 +2,7 @@
 import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 import { SimpleEditModal } from '../../../components/admin/SimpleEditModal';
 import { ResetPasswordButton } from '../../../components/admin/ResetPasswordButton';
+import { ResetRequestsCard } from '../../../components/drivers/ResetRequestsCard';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -217,6 +218,8 @@ function AdminDriversScreen() {
           <KpiCard label={tl('Waiting for approval', 'بانتظار الموافقة')} value={counts.pending} tone={counts.pending > 0 ? 'bad' : 'neutral'} hint={counts.pending > 0 ? tl('Cannot receive orders yet', 'لا يستقبلون طلبات بعد') : undefined} />
         </div>
       )}
+
+      <ResetRequestsCard />
 
       <div className="mb-3 flex flex-col gap-2">
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tl('Search by name or phone', 'ابحث بالاسم أو الهاتف')} aria-label={tl('Search by name or phone', 'ابحث بالاسم أو الهاتف')} className={`${inputCls} min-h-[44px] sm:min-h-0 sm:max-w-sm`} data-testid="drv-search" />

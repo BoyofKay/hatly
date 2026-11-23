@@ -19,7 +19,7 @@ function suggestPassword(): string {
  * the person must choose their own (server: users.must_change_password): the admin sets a temporary password and tells the person
  * (phone / WhatsApp). Every open session of that person ends. `path` is the reset endpoint, e.g. /admin/drivers/:id/reset-password.
  */
-export function ResetPasswordButton({ path, name, size = 'sm' }: { path: string; name: string; size?: 'sm' | 'md' }) {
+export function ResetPasswordButton({ path, name, size = 'sm', onDone }: { path: string; name: string; size?: 'sm' | 'md'; onDone?: () => void }) {
   const { t } = useLang();
   const toast = useToast();
   const [open, setOpen] = useState(false);
@@ -41,6 +41,7 @@ export function ResetPasswordButton({ path, name, size = 'sm' }: { path: string;
     try {
       await apiClient.post(path, { newPassword: value });
       setDone(value);
+      onDone?.();
       toast.push('success', t('Password reset. They were signed out everywhere.', 'تمت إعادة تعيين كلمة المرور وتسجيل خروجه من كل الأجهزة.'));
     } catch (e) {
       setError(apiErrorMessage(e, t('Could not reset the password.', 'تعذّرت إعادة تعيين كلمة المرور.')));

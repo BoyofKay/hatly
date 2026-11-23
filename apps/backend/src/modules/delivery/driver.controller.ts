@@ -11,6 +11,7 @@ import { DriverPurchaseService } from './driver-purchase.service';
 import { DriverWeightRecordService } from './driver-weight-record.service';
 import { DriverEarningsService } from './driver-earnings.service';
 import { DriverShiftService } from './driver-shift.service';
+import { DriverOverviewService } from './driver-overview.service';
 import { IsBoolean } from 'class-validator';
 
 class AcceptingNewOrdersDto {
@@ -47,6 +48,7 @@ export class DriverController {
     private readonly driverEarningsService: DriverEarningsService,
     private readonly businessConfigService: BusinessConfigService,
     private readonly driverShiftService: DriverShiftService,
+    private readonly driverOverviewService: DriverOverviewService,
   ) {}
 
   /** Shift (owner decision 2026-11-22): on/off duty, the open shift, and whether the driver may end it now (and why not). */
@@ -97,6 +99,21 @@ export class DriverController {
   @Get('earnings')
   async earnings(@CurrentUser() user: AuthenticatedUser) {
     return { data: await this.driverEarningsService.summary(user.id) };
+  }
+
+  /** Driver app round 2 — Orders tab: `tab=today|previous`, `from`/`to` (Cairo dates, Previous; default this week), `status`, `q`, `page`. */
+  @Get('orders/overview')
+  async ordersOverview(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() q: { tab?: string; from?: string; to?: string; status?: string; q?: string; page?: string; limit?: string },
+  ) {
+    return { data: await this.driverOverviewService.orders(user.id, q) };
+  }
+
+  /** Driver app round 2 — Earnings tab: `tab=current|previous`, `from`/`to` (Previous; default this week), `status=paid|unpaid`. */
+  @Get('earnings/overview')
+  async earningsOverview(@CurrentUser() user: AuthenticatedUser, @Query() q: { tab?: string; from?: string; to?: string; status?: string }) {
+    return { data: await this.driverOverviewService.earnings(user.id, q) };
   }
 
   /** One row per credited delivery, newest first (paginated). */

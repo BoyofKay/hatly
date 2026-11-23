@@ -1,3 +1,4 @@
+import { DriverOverviewService } from './driver-overview.service';
 import { DriverShiftService } from './driver-shift.service';
 import { Module, forwardRef } from '@nestjs/common';
 import { FinanceModule } from '../finance/finance.module';
@@ -61,6 +62,7 @@ import { UploadsModule } from '../uploads/uploads.module';
   controllers: [AdminDriversController, DriverController, AdminDispatchController, AdminDispatchAlertsController, AdminControlTowerController, AdminOperationsBoardController],
   providers: [
     DriverShiftService,
+    DriverOverviewService,
     OperationsBoardService,
     DeliveryAssignmentService,
     DriversService,
