@@ -79,6 +79,8 @@ class _PromoCarouselState extends State<PromoCarousel> {
               child: LoopingPager(
                 count: promos.length,
                 autoPlayInterval: widget.autoRotateInterval,
+                autoPlayGlide: const Duration(milliseconds: 900),
+                autoPlayCurve: Curves.easeInOutCubic,
                 itemBuilder: (context, index) => Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: kHeroBannerSideMargin),
