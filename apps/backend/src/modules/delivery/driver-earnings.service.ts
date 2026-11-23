@@ -100,11 +100,20 @@ export class DriverEarningsService {
   }
 
   /** The driver's delivered orders, newest delivery first (paginated), each with its money state. Never another driver's orders. */
-  async transactions(userId: string, q: { page?: string; limit?: string }) {
+  async transactions(userId: string, q: { page?: string; limit?: string; scope?: string }) {
     const driver = await this.auth.getDriverForUser(userId);
     const page = Math.max(1, Number(q.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(q.limit) || 20));
-    const where = `d.driver_id = $1 AND d.deleted_at IS NULL AND o.deleted_at IS NULL AND o.status = 'DELIVERED'`;
+    // Financial closing defines the shift boundary: not midnight or the driver's online toggle.
+    // Without scope the endpoint remains fully backward compatible with existing app versions.
+    const deliveredAt = `coalesce(d.delivered_at, (SELECT max(se.created_at) FROM order_status_events se WHERE se.order_id = o.id AND se.to_status = 'DELIVERED'), o.updated_at)`;
+    const closingCutoff = `(SELECT max(p.period_end) FROM driver_settlement_periods p WHERE p.driver_id = $1 AND p.status = 'CLOSED' AND p.deleted_at IS NULL)`;
+    const filter = q.scope === 'current'
+      ? ` AND ${deliveredAt} > coalesce(${closingCutoff}, '-infinity'::timestamptz)`
+      : q.scope === 'previous'
+        ? ` AND ${deliveredAt} <= coalesce(${closingCutoff}, '-infinity'::timestamptz)`
+        : '';
+    const where = `d.driver_id = $1 AND d.deleted_at IS NULL AND o.deleted_at IS NULL AND o.status = 'DELIVERED'${filter}`;
     const [tot] = await this.ds.query(`SELECT count(*)::int AS n FROM deliveries d JOIN orders o ON o.id = d.order_id WHERE ${where}`, [driver.id]);
     const rows: any[] = await this.ds.query(
       `SELECT o.id AS order_id, d.id AS delivery_id, o.order_number, o.status, o.payment_method, o.amount_due_minor, o.total_minor,
