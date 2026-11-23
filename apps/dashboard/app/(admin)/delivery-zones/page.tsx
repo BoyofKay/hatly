@@ -557,7 +557,7 @@ export default function DeliveryZonesPage() {
                       <div className="min-w-0">
                         <p className="font-semibold" dir="rtl">{z.zoneNameAr ?? z.cityAr} | {z.nameAr}</p>
                         <p className="text-xs text-gray-500">{z.zoneName ?? z.city} | {z.name}</p>
-                        {!z.zoneName && <p className="text-xs text-amber-700">Legacy: review parent</p>
+                        {!z.zoneName && <p className="text-xs text-amber-700">Legacy: review parent</p>}
                         <p className="mt-1 text-xs text-gray-600" dir="rtl">{z.governorateAr} — {z.cityAr}</p>
                         <p className="text-xs text-gray-400">{areaName.get(z.serviceAreaId) ?? z.serviceAreaId}</p>
                       </div>
