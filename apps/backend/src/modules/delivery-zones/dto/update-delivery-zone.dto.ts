@@ -37,16 +37,33 @@ export class UpdateDeliveryZoneDto {
   @Matches(NOT_BLANK)
   cityAr?: string;
 
+  /** Parent delivery zone name, separate from exactly ONE child neighborhood/village. */
   @IsOptional()
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter a single name, not a list.' })
+  zoneName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter a single name, not a list.' })
+  zoneNameAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter one neighborhood/village per record.' })
   name?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter one neighborhood/village per record.' })
   nameAr?: string;
 
   @IsOptional()
