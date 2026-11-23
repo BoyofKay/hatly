@@ -1,0 +1,6 @@
+### Customer app 1.1.0+14 — success
+**Debug-signed** (no keystore secrets) → install the .apk on a phone to test; Google Play will reject it.
+Push notifications: no
+APK (direct download, no zip): https://github.com/BoyofKay/hatly/releases/tag/customer-app-v1.1.0-b14-run45196700531
+f5fc80a87a057278c54f4a9cb308edc7dc01f5ce1c705d48e15c095ddab4fc19  hatly-customer-1.1.0+14.aab
+b034191ad2d4724ba21d85b887a0b6b7861e8ea3f0bca2628a67274d14285854  hatly-customer-1.1.0+14.apk
