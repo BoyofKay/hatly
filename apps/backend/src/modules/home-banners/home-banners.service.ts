@@ -26,6 +26,7 @@ export interface AdminHomeBannerView {
   imageUrl: string | null;
   actionType: HomeBannerActionType;
   actionTargetId: string | null;
+  sectorId: string | null;
   sortOrder: number;
   isActive: boolean;
   startsAt: Date | null;
@@ -43,6 +44,7 @@ export interface PublicHomeBannerView {
   imageUrl: string;
   actionType: HomeBannerActionType;
   actionTargetId: string | null;
+  sectorId: string | null;
 }
 
 @Injectable()
@@ -75,11 +77,13 @@ export class HomeBannersService {
     };
     this.assertSchedule(next.startsAt, next.endsAt);
     await this.assertAction(next.actionType, next.actionTargetId);
+    if (dto.sectorId) await this.assertSector(dto.sectorId);
     const saved = await this.repo.save(
       this.repo.create({
         title: dto.title.trim(),
         titleAr: dto.titleAr?.trim() || null,
         imageUrl: null,
+        sectorId: dto.sectorId ?? (next.actionType === HomeBannerActionType.SECTOR ? next.actionTargetId : null),
         ...next,
         sortOrder: dto.sortOrder ?? 0,
         isActive: false,
@@ -101,8 +105,10 @@ export class HomeBannersService {
       if (dto.actionType === HomeBannerActionType.NONE && dto.actionTargetId === undefined) banner.actionTargetId = null;
     }
     if (dto.actionTargetId !== undefined) banner.actionTargetId = dto.actionTargetId;
+    if (dto.sectorId !== undefined) banner.sectorId = dto.sectorId;
     this.assertSchedule(banner.startsAt ?? null, banner.endsAt ?? null);
     await this.assertAction(banner.actionType, banner.actionTargetId ?? null);
+    if (banner.sectorId) await this.assertSector(banner.sectorId);
     return this.toAdminView(await this.repo.save(banner));
   }
 
@@ -192,10 +198,17 @@ export class HomeBannersService {
         imageUrl: b.imageUrl as string,
         actionType: b.actionType,
         actionTargetId: b.actionTargetId ?? null,
+        sectorId: b.sectorId ?? (b.actionType === HomeBannerActionType.SECTOR ? b.actionTargetId ?? null : null),
       }));
   }
 
   // ---- internals -----------------------------------------------------------------------------------------------------------------
+
+  private async assertSector(id: string): Promise<void> {
+    if (!(await this.sectors.findOne({ where: { id, isActive: true } }))) {
+      throw new BadRequestException({ message: 'Choose an active sector for this promotion.', details: { code: 'BANNER_SECTOR_INVALID' } });
+    }
+  }
 
   private async getOne(id: string): Promise<HomeBanner> {
     const banner = await this.repo.findOne({ where: { id } });
@@ -246,6 +259,7 @@ export class HomeBannersService {
       imageUrl: b.imageUrl ?? null,
       actionType: b.actionType,
       actionTargetId: b.actionTargetId ?? null,
+      sectorId: b.sectorId ?? null,
       sortOrder: b.sortOrder,
       isActive: b.isActive,
       startsAt: b.startsAt ?? null,

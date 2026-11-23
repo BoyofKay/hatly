@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Min, MaxLength } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Min, MaxLength, Matches } from 'class-validator';
 
 /**
  * CONFIRMED (decision 10, "update safe configuration"): `slug` is
@@ -35,6 +35,10 @@ export class UpdateSectorDto {
   @IsString()
   @MaxLength(500)
   bannerUrl?: string | null;
+
+  @IsOptional()
+  @Matches(/^#[0-9a-fA-F]{6}$/)
+  accentColor?: string;
 
   /** May customers send custom (free-text / photo) requests to vendors of this sector? */
   @IsOptional()

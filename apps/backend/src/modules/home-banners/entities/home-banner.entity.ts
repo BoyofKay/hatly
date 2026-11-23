@@ -31,6 +31,9 @@ export class HomeBanner extends BaseEntity {
   @Column({ name: 'action_target_id', type: 'uuid', nullable: true })
   actionTargetId?: string | null;
 
+  @Column({ name: 'sector_id', type: 'uuid', nullable: true })
+  sectorId?: string | null;
+
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;
 

@@ -22,6 +22,10 @@ export class UpdateHomeBannerDto {
   @IsUUID()
   actionTargetId?: string | null;
 
+  @ValidateIf((_, v) => v !== undefined && v !== null)
+  @IsUUID()
+  sectorId?: string | null;
+
   @IsOptional()
   @IsInt()
   @Min(0)

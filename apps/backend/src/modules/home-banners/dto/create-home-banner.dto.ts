@@ -24,6 +24,10 @@ export class CreateHomeBannerDto {
   actionTargetId?: string;
 
   @IsOptional()
+  @IsUUID()
+  sectorId?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(0)
   @Max(10000)
