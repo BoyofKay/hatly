@@ -17,7 +17,7 @@ export class DeliveryZonesService {
   /** Customer-facing: active zones of active service areas, in display order. */
   async listActive(): Promise<DeliveryZone[]> {
     const zones = await this.zonesRepository.find({
-      where: { isActive: true },
+      where: { isActive: true, isSelectable: true },
       relations: { serviceArea: true },
       order: { governorateAr: 'ASC', cityAr: 'ASC', displayOrder: 'ASC', nameAr: 'ASC' },
     });
