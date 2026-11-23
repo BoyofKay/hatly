@@ -134,9 +134,9 @@ void main() {
     testWidgets('shows the open-period preview and the closed periods with their recorded payments, in English', (tester) async {
       final api = _Api()..earnings = _earnings();
       await tester.pumpWidget(_app(api, const EarningsScreen()));
-      await tester.pumpAndSettle()
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('earnings-kpi-toggle')));
-      await tester.pumpAndSettle();;
+      await tester.pumpAndSettle();
       expect(find.text('95.00 EGP'), findsWidgets); // owed to you (older backend: the four legacy figures only)
       expect(find.text('Owed to you'), findsNWidgets(2)); // open shift + the legacy closed period's net
       expect(find.text('90.00 EGP'), findsOneWidget);
@@ -150,9 +150,9 @@ void main() {
     testWidgets('Arabic: the same figures, Arabic labels and currency', (tester) async {
       final api = _Api()..earnings = _earnings();
       await tester.pumpWidget(_app(api, const EarningsScreen(), locale: const Locale('ar')));
-      await tester.pumpAndSettle()
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('earnings-kpi-toggle')));
-      await tester.pumpAndSettle();;
+      await tester.pumpAndSettle();
       expect(find.text('مؤشرات الأرباح'), findsOneWidget);
       expect(find.text('95.00 ج.م'), findsOneWidget);
       expect(find.textContaining('دُفع لك'), findsOneWidget);
@@ -212,9 +212,9 @@ void main() {
     testWidgets('COD 300 + 40, commission 10: owes Hatly 10; goods shown as excluded; no extra 30 payable; no goods reimbursement', (tester) async {
       final api = _Api()..earnings = withOpen(cod);
       await tester.pumpWidget(_app(api, const EarningsScreen()));
-      await tester.pumpAndSettle()
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('earnings-kpi-toggle')));
-      await tester.pumpAndSettle();;
+      await tester.pumpAndSettle();
       expect(find.text('You owe Hatly'), findsOneWidget);
       expect(find.text('10.00 EGP'), findsWidgets);
       expect(find.byKey(const Key('mb-goods-pass-through')), findsOneWidget);
@@ -227,9 +227,9 @@ void main() {
     testWidgets('electronic 300 + 40, commission 10: owed to the courier 330, every part separate', (tester) async {
       final api = _Api()..earnings = withOpen(electronic);
       await tester.pumpWidget(_app(api, const EarningsScreen()));
-      await tester.pumpAndSettle()
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('earnings-kpi-toggle')));
-      await tester.pumpAndSettle();;
+      await tester.pumpAndSettle();
       expect(find.text('Owed to you'), findsOneWidget);
       expect(find.text('330.00 EGP'), findsWidgets);
       expect(find.text('+ 300.00 EGP'), findsOneWidget);
@@ -241,9 +241,9 @@ void main() {
     testWidgets('Arabic labels; a delivered order without a commission rate is listed as held for the next closing with the reason', (tester) async {
       final api = _Api()..earnings = withOpen(cod, excluded: const [ExcludedOrder(orderNumber: 'HT-100009', reason: 'RATE_UNDEFINED')]);
       await tester.pumpWidget(_app(api, const EarningsScreen(), locale: const Locale('ar')));
-      await tester.pumpAndSettle()
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('earnings-kpi-toggle')));
-      await tester.pumpAndSettle();;
+      await tester.pumpAndSettle();
       expect(find.text('مستحق على المندوب'), findsOneWidget);
       expect(find.text('عمولة Hatly'), findsOneWidget);
       expect(find.text('رسوم التوصيل'), findsOneWidget);
