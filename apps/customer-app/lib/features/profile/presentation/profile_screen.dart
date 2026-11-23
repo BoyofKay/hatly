@@ -9,6 +9,7 @@ import '../../../shared_widgets/hatly_surface.dart';
 import '../../addresses/data/addresses_providers.dart';
 import '../../addresses/domain/saved_address.dart';
 import '../../auth/presentation/display_name_provider.dart';
+import '../../auth/data/auth_providers.dart';
 import '../../auth/presentation/session_controller.dart';
 import '../../support/presentation/support_contact_action.dart';
 import '../../wallet/data/wallet_providers.dart';
@@ -49,7 +50,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _ProfileHeader(name: ref.watch(displayNameProvider).valueOrNull),
+            _ProfileHeader(name: ref.watch(displayNameProvider).valueOrNull, onEdit: _editName),
             const SizedBox(height: HatlySpacing.md),
             _DefaultAddressCard(addressesAsync: addressesAsync),
             const SizedBox(height: HatlySpacing.md),
@@ -84,6 +85,46 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Future<void> _editName() async {
+    final currentName = await ref.read(displayNameProvider.future);
+    if (!mounted) return;
+    final ar = Localizations.localeOf(context).languageCode == 'ar';
+    final controller = TextEditingController(text: currentName ?? '');
+    final edited = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(ar ? 'تعديل الاسم' : 'Edit name'),
+        content: TextField(
+          key: const Key('profile-name-input'),
+          controller: controller,
+          autofocus: true,
+          maxLength: 150,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(labelText: ar ? 'الاسم' : 'Your name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: Text(ar ? 'إلغاء' : 'Cancel')),
+          FilledButton(
+            onPressed: () {
+              final value = controller.text.trim();
+              if (value.length >= 2) Navigator.pop(dialogContext, value);
+            },
+            child: Text(ar ? 'حفظ' : 'Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (edited == null || edited == currentName || !mounted) return;
+    try {
+      await ref.read(authRepositoryProvider).updateDisplayName(edited);
+      ref.invalidate(displayNameProvider);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ar ? 'تم تحديث الاسم' : 'Name updated')));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(ar ? 'تعذر تحديث الاسم، حاول مرة أخرى' : 'Could not update name. Try again.')));
+    }
+  }
+
   Future<void> _logout() async {
     if (_isLoggingOut) return;
     setState(() => _isLoggingOut = true);
@@ -98,9 +139,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
 /// The top of the account: an orange avatar with the customer's initial and, when it is known on this device, their name.
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.name});
+  const _ProfileHeader({required this.name, required this.onEdit});
 
   final String? name;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -139,6 +181,12 @@ class _ProfileHeader extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: context.type.h2,
             ),
+          ),
+          IconButton(
+            key: const Key('profile-edit-name'),
+            tooltip: Localizations.localeOf(context).languageCode == 'ar' ? 'تعديل الاسم' : 'Edit name',
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined),
           ),
         ],
       ),
