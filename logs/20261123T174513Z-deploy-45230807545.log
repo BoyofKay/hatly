@@ -1,0 +1,226 @@
+action=deploy arg= commit=b72d5d27fb0fc03df25f61fc94c3b4ee5ad337cc run=45230807545 started=2026-11-23T17:44:09Z
+bundle OK: /home/runner/work/_temp/rel/hatly-prod-src.tar.gz  (30624040 bytes, 1943 entries, 95 migrations)
+release id: 20261123T174407Z-bafe081b4e55
+uploaded 20261123T174407Z-bafe081b4e55
+current release (rollback target): 20261123T105540Z-9c92dbcf1160
+
+==== 1. verify + extract  (17:44:20 UTC)
+incoming/20261123T174407Z-bafe081b4e55.tar.gz: OK
+
+==== 2. build images (the live release keeps serving)  (17:44:20 UTC)
+ Image hatly-prod-backend:20261123T174407Z-bafe081b4e55 Building 
+ Image hatly-prod-dashboard:20261123T174407Z-bafe081b4e55 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.29kB done
+#1 DONE 0.0s
+
+#2 [prod-backend internal] load build definition from backend.Dockerfile
+#2 transferring dockerfile: 2.58kB done
+#2 DONE 0.0s
+
+#3 [prod-dashboard internal] load build definition from dashboard.Dockerfile
+#3 transferring dockerfile: 2.02kB done
+#3 DONE 0.0s
+
+#4 [prod-dashboard internal] load metadata for docker.io/library/node:22-bookworm-slim
+#4 DONE 0.6s
+
+#5 [prod-backend build 1/9] FROM docker.io/library/node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee
+#5 resolve docker.io/library/node:22-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee 0.0s done
+#5 DONE 0.0s
+
+#6 [prod-backend internal] load build context
+#6 transferring context: 3.61MB 0.1s
+#6 transferring context: 9.63MB 0.2s done
+#6 DONE 0.2s
+
+#7 [prod-dashboard internal] load build context
+#7 transferring context: 3.14MB 0.1s done
+#7 DONE 0.1s
+
+#8 [prod-dashboard build  8/10] COPY apps/dashboard apps/dashboard
+#8 CACHED
+
+#9 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#9 CACHED
+
+#10 [prod-dashboard build  3/10] COPY package.json package-lock.json ./
+#10 CACHED
+
+#11 [prod-dashboard build 10/10] RUN test -n "https://api.hatly.dev/api/v1" && cd apps/dashboard && npx next build
+#11 CACHED
+
+#12 [prod-dashboard build  5/10] COPY apps/dashboard/package.json apps/dashboard/package.json
+#12 CACHED
+
+#13 [prod-dashboard runtime 4/5] COPY --from=build /repo /repo
+#13 CACHED
+
+#14 [prod-dashboard build  6/10] COPY packages packages
+#14 CACHED
+
+#15 [prod-dashboard runtime 3/5] RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+#15 CACHED
+
+#16 [prod-dashboard build  4/10] COPY apps/backend/package.json apps/backend/package.json
+#16 CACHED
+
+#17 [prod-dashboard build  9/10] RUN test -f apps/dashboard/postcss.config.js
+#17 CACHED
+
+#18 [prod-dashboard runtime 5/5] WORKDIR /repo/apps/dashboard
+#18 CACHED
+
+#19 [prod-dashboard] exporting to image
+#19 exporting layers done
+#19 exporting manifest sha256:2b4406e06e032c6475a02010d68da59b70cf22ec45e9411427b70afd0fbd536a done
+#19 exporting config sha256:dfe6455bb9637f2403e08a88f4da02056c2ae0fd945b98042e18882a21af4654 done
+#19 exporting attestation manifest sha256:2e96dd7f7389692e0cb1fc0c0e6a9ddd71b0957b000ae98013ae732e794c55bb done
+#19 exporting manifest list sha256:c6e6f405709141d3140675f8b0762246b155f04ee1f1e43f6897ee6a499b92dc done
+#19 naming to docker.io/library/hatly-prod-dashboard:20261123T174407Z-bafe081b4e55 done
+#19 unpacking to docker.io/library/hatly-prod-dashboard:20261123T174407Z-bafe081b4e55 done
+#19 DONE 0.1s
+
+#20 [prod-backend build 6/9] COPY packages packages
+#20 CACHED
+
+#21 [prod-backend build 4/9] COPY apps/backend/package.json apps/backend/package.json
+#21 CACHED
+
+#22 [prod-backend build 3/9] COPY package.json package-lock.json ./
+#22 CACHED
+
+#23 [prod-backend build 5/9] COPY apps/dashboard/package.json apps/dashboard/package.json
+#23 CACHED
+
+#24 [prod-backend build 2/9] WORKDIR /repo
+#24 CACHED
+
+#25 [prod-backend build 7/9] RUN npm ci --workspace=apps/backend --include-workspace-root
+#25 CACHED
+
+#26 [prod-dashboard] resolving provenance for metadata file
+#26 DONE 0.0s
+
+#27 [prod-backend build 8/9] COPY apps/backend apps/backend
+#27 DONE 0.2s
+
+#28 [prod-backend build 9/9] RUN cd apps/backend && npx nest build
+#28 DONE 17.1s
+
+#29 [prod-backend prod-deps 7/7] RUN npm ci --omit=dev --workspace=apps/backend --include-workspace-root
+#29 CACHED
+
+#30 [prod-backend runtime 4/9] COPY --from=prod-deps /repo/node_modules /repo/node_modules
+#30 CACHED
+
+#31 [prod-backend runtime 3/9] RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+#31 CACHED
+
+#32 [prod-backend runtime 2/9] WORKDIR /repo/apps/backend
+#32 CACHED
+
+#33 [prod-backend runtime 5/9] COPY --from=prod-deps /repo/apps/backend/node_modules ./node_modules
+#33 CACHED
+
+#34 [prod-backend runtime 6/9] COPY --from=build /repo/apps/backend/dist ./dist
+#34 DONE 0.4s
+
+#35 [prod-backend runtime 7/9] COPY apps/backend/assets ./assets
+#35 DONE 0.0s
+
+#36 [prod-backend runtime 8/9] COPY apps/backend/package.json ./package.json
+#36 DONE 0.0s
+
+#37 [prod-backend runtime 9/9] RUN mkdir -p /data/uploads && chown -R node:node /data /repo/apps/backend
+#37 DONE 3.4s
+
+#38 [prod-backend] exporting to image
+#38 exporting layers
+#38 exporting layers 3.5s done
+#38 exporting manifest sha256:b5e126bed1fd8d985df311fe0fca0f1a6c01409a8093be1e793b153890b2b98a done
+#38 exporting config sha256:bef8c5b73b1fbc10dabedfb094ccb3e2e8da3617c445f10f95cfde624f8d204c done
+#38 exporting attestation manifest sha256:e42e4814907d054e22e0d1e3c1cc71dac6f40726d66f613e9106f55ef2a42d9b done
+#38 exporting manifest list sha256:8ba529d5e240ec9c5cd99b87ab2559c884c399259f3f84cb4a457b7232f7bb85 done
+#38 naming to docker.io/library/hatly-prod-backend:20261123T174407Z-bafe081b4e55 done
+#38 unpacking to docker.io/library/hatly-prod-backend:20261123T174407Z-bafe081b4e55
+#38 unpacking to docker.io/library/hatly-prod-backend:20261123T174407Z-bafe081b4e55 1.4s done
+#38 DONE 5.0s
+
+#39 [prod-backend] resolving provenance for metadata file
+#39 DONE 0.0s
+ Image hatly-prod-backend:20261123T174407Z-bafe081b4e55 Built 
+ Image hatly-prod-dashboard:20261123T174407Z-bafe081b4e55 Built 
+
+==== 3. env check with the new image  (17:44:48 UTC)
+ Container hatly-prod-prod-backend-run-87516aadf2c6 Creating 
+ Container hatly-prod-prod-backend-run-87516aadf2c6 Created 
+WARN   REDIS_URL is not TLS (redis://): acceptable only on a private network (e.g. the staging compose network); use rediss:// for a managed/remote Redis.
+WARN   MAPS_PROVIDER=none: Google Maps is disabled — delivery fees and serviceability come from the selected Delivery Zone only, address search/suggestions are off, and dispatch ranks drivers by straight-line distance (bicycle drivers are not auto-ranked).
+WARN   SMS provider (Unifonic) is not configured (ALLOW_MISSING_SMS_PROVIDER=true): OTP/phone-verification messages cannot be sent.
+WARN   Firebase push (FCM) is not configured (ALLOW_MISSING_PUSH_PROVIDER=true): push notifications are disabled.
+ENV CHECK PASSED (4 warnings)
+
+==== 4. migration plan  (17:44:49 UTC)
+ Container hatly-prod-prod-backend-run-4d1ee930ed18 Creating 
+ Container hatly-prod-prod-backend-run-4d1ee930ed18 Created 
+ Container hatly-prod-prod-backend-run-f781fa8a72e5 Creating 
+ Container hatly-prod-prod-backend-run-f781fa8a72e5 Created 
+[X] 88 DriverShifts1700008700000
+[X] 89 MustChangePassword1700008800000
+[X] 90 DriverAllowances1700008900000
+[X] 91 PasswordResetRequests1700009000000
+[X] 92 PasswordResetSelfComplete1700009100000
+[X] 93 DeliveryZoneAreas1700009200000
+[X] 94 DeliveryZoneNeighborhoods1700009300000
+[X] 95 DeliveryZoneParentStatus1700009400000
+pending migrations: 0
+
+==== 5. backup + restore drill  (17:44:51 UTC)
+backup OK: hatly-prod-20261123T174451Z.dump 1809715 bytes, 109 table-data sections, sha256 5be75044f5c3…, off-site: NOT CONFIGURED
+uploads backup OK: hatly-prod-uploads-20261123T174452Z.tar.gz 17530649 bytes, 135 files, sha256 25e0ec2678ea…, off-site: NOT CONFIGURED
+newest dump: hatly-prod-20261123T174451Z.dump
+drill database hatly_drill_20261123174453 restored from hatly-prod-20261123T174451Z.dump: 109 tables, 95 migrations recorded, 22 users
+restore drill OK
+
+==== 6. no migrations to run  (17:44:56 UTC)
+
+==== 7. switch release + start the new apps  (17:44:56 UTC)
+ Container hatly-prod-redis-1 Running 
+ Container hatly-prod-postgres-1 Running 
+ Container hatly-prod-backend-1 Recreate 
+ Container hatly-prod-backend-1 Recreated 
+ Container hatly-prod-dashboard-1 Recreate 
+ Container hatly-prod-dashboard-1 Recreated 
+ Container hatly-prod-redis-1 Waiting 
+ Container hatly-prod-postgres-1 Waiting 
+ Container hatly-prod-redis-1 Healthy 
+ Container hatly-prod-postgres-1 Healthy 
+ Container hatly-prod-backend-1 Starting 
+ Container hatly-prod-backend-1 Started 
+ Container hatly-prod-backend-1 Waiting 
+ Container hatly-prod-backend-1 Healthy 
+ Container hatly-prod-dashboard-1 Starting 
+ Container hatly-prod-dashboard-1 Started 
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED         STATUS                                     PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261123T174407Z-bafe081b4e55     "docker-entrypoint.s…"   prod-backend     8 seconds ago   Up 5 seconds (healthy)                     3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261123T174407Z-bafe081b4e55   "docker-entrypoint.s…"   prod-dashboard   8 seconds ago   Up Less than a second (health: starting)   3001/tcp
+
+==== 8. health  (17:45:04 UTC)
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED          STATUS                    PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261123T174407Z-bafe081b4e55     "docker-entrypoint.s…"   prod-backend     13 seconds ago   Up 11 seconds (healthy)   3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261123T174407Z-bafe081b4e55   "docker-entrypoint.s…"   prod-dashboard   13 seconds ago   Up 5 seconds (healthy)    3001/tcp
+hatly-prod-postgres-1    postgres:16-alpine                                   "docker-entrypoint.s…"   postgres         4 weeks ago      Up 13 days (healthy)      5432/tcp
+hatly-prod-redis-1       redis:7-alpine                                       "docker-entrypoint.s…"   redis            4 weeks ago      Up 13 days (healthy)      6379/tcp
+{"data":{"status":"ok","checks":{"database":"up","redis":"up"}}}
+dashboard /privacy 200
+
+==== 9. recent backend errors  (17:45:09 UTC)
+0
+
+==== 10. tidy disk (keeps the 3 newest releases + their images; build cache capped at 5 GB)  (17:45:09 UTC)
+/dev/sda1        96G   19G   78G  20% /
+DEPLOYED 20261123T174407Z-bafe081b4e55 (previous: 20261123T105540Z-9c92dbcf1160 — rollback: request ACTION=rollback RELEASE=20261123T105540Z-9c92dbcf1160)
+200  https://api.hatly.dev/api/v1/health/ready
+307  https://admin.hatly.dev/
+job status: success
