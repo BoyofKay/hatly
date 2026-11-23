@@ -317,6 +317,29 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     );
   }
 
+  String _unavailableZoneMessage(String? reason, bool arabic, String fallback) {
+    switch (reason) {
+      case 'SERVICE_AREA_INACTIVE':
+        return arabic
+            ? 'منطقة الخدمة غير نشطة حاليًا. يرجى اختيار عنوان ضمن منطقة خدمة متاحة.'
+            : 'The service area is currently inactive. Choose an address in an available service area.';
+      case 'DELIVERY_ZONE_INACTIVE':
+        return arabic
+            ? 'منطقة التوصيل هذه موقوفة حاليًا. اختر منطقة توصيل نشطة وحيًا أو قرية متاحة.'
+            : 'This delivery zone is currently deactivated. Choose an active zone and neighborhood/village.';
+      case 'NEIGHBORHOOD_INACTIVE':
+        return arabic
+            ? 'الحي أو القرية المحددة موقوفة حاليًا للتوصيل. يرجى اختيار حي أو قرية نشطة.'
+            : 'Delivery to this neighborhood/village is currently deactivated. Select an active neighborhood/village.';
+      case 'AREA_REMOVED':
+        return arabic
+            ? 'منطقة التوصيل المحفوظة لم تعد متاحة للطلبات الجديدة. يرجى تحديث عنوانك.'
+            : 'The saved delivery area is no longer offered for new orders. Update your address to an available zone and neighborhood/village.';
+      default:
+        return fallback;
+    }
+  }
+
   Widget _zoneSection(BuildContext context, AppLocalizations l10n) {
     final p = context.palette;
     final arabic = Localizations.localeOf(context).languageCode == 'ar';
@@ -380,7 +403,9 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                       Expanded(
                         child: Text(
                           existing.zoneStatus == AddressZoneStatus.unavailable
-                              ? l10n.addressZoneUnavailableBanner
+                              ? _unavailableZoneMessage(existing.zoneUnavailableReason,
+                                  Localizations.localeOf(context).languageCode == 'ar',
+                                  l10n.addressZoneUnavailableBanner)
                               : l10n.addressZoneMissingBanner,
                           style: context.type.small,
                         ),
