@@ -10,6 +10,7 @@ import { Permission } from '../permissions/permission.enum';
 import { DriversService } from './drivers.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { UpdateDriverVerificationDto } from './dto/update-driver-verification.dto';
+import { UpdateFullNameDto } from '../users/dto/update-full-name.dto';
 import { UpdateDriverVehicleTypeDto } from './dto/update-driver-vehicle-type.dto';
 import { VehicleTypesService } from '../business-config/vehicle-types.service';
 
@@ -70,6 +71,14 @@ export class AdminDriversController {
       await this.audit.record({ actorUserId: user.id, actorRole: user.role, action: AdminAuditAction.DRIVER_CAPACITY_OVERRIDDEN, targetType: 'driver', targetId: id, metadata: { before: d.capacity_override, after: capacity, effectiveBefore: before.capacity, effectiveAfter: after.capacity, reason } } as never, m);
     });
     return this.capacity(id);
+  }
+
+  @Patch(':id/name')
+  @RequiresPermission(Permission.MANAGE_DRIVERS)
+  async setName(@CurrentUser() user: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateFullNameDto) {
+    const updated = await this.driversService.setName(id, dto.fullName);
+    await this.audit.record({ actorUserId: user.id, actorRole: user.role, action: AdminAuditAction.DRIVER_NAME_UPDATED, targetType: 'driver', targetId: id, metadata: { fullName: updated.fullName } });
+    return { data: updated };
   }
 
   @Post()

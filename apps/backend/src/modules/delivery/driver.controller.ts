@@ -46,6 +46,11 @@ export class DriverController {
    * The driver's own online switch as the SERVER holds it (2026-11-15). The app used to start every launch at "offline" without asking, so a
    * driver who was still online for dispatch saw "offline" after reopening the app. Read-only; the switch is still changed only by PATCH.
    */
+  @Get('profile')
+  async profile(@CurrentUser() user: AuthenticatedUser) {
+    return { data: await this.driverProfileService.getProfile(user.id) };
+  }
+
   @Get('online-status')
   async getOnlineStatus(@CurrentUser() user: AuthenticatedUser) {
     return { data: await this.driverProfileService.getOnlineStatus(user.id) };

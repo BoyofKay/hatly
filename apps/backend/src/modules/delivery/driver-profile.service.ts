@@ -45,6 +45,13 @@ export class DriverProfileService {
     return { isOnline: Boolean(driver.isOnline) };
   }
 
+  /** Read-only profile name backed by the same user record that Admin edits. */
+  async getProfile(userId: string): Promise<{ fullName: string }> {
+    const driver = await this.driverAuthorizationService.getDriverForUser(userId);
+    const withUser = await this.driversRepository.findOneOrFail({ where: { id: driver.id }, relations: { user: true } });
+    return { fullName: withUser.user.fullName };
+  }
+
   async updateLocation(userId: string, latitude: number, longitude: number): Promise<Driver> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
     await this.driversRepository.update({ id: driver.id }, { lastLatitude: latitude, lastLongitude: longitude, lastLocationAt: new Date() });

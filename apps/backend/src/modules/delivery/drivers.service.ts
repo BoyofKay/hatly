@@ -186,6 +186,14 @@ export class DriversService {
     return view;
   }
 
+  /** Admin-only name change. No changes to driver IDs, phone, credentials, assignments or settlement rows. */
+  async setName(driverId: string, name: string): Promise<AdminDriverView> {
+    const driver = await this.requireDriver(driverId);
+    await this.dataSource.getRepository(User).update({ id: driver.userId }, { fullName: name.trim().replace(/\s+/g, ' ') });
+    const [view] = await this.listAll({ driverId });
+    return view;
+  }
+
   private async requireDriver(driverId: string): Promise<Driver> {
     const driver = await this.driversRepository.findOne({ where: { id: driverId } });
     if (!driver) {
