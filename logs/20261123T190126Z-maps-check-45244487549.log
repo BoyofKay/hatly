@@ -1,0 +1,6 @@
+action=maps-check arg= commit=2946b833b22f9774dbbfe94537b1c71c17607383 run=45244487549 started=2026-11-23T19:01:22Z
+
+==== Google Routes + Geocoding preflight from the live backend container (no secret printed)  (19:01:25 UTC)
+FAIL Google Maps preflight: Routes HTTP 400
+REFUSED: provider validation failed — production settings unchanged
+job status: failure
