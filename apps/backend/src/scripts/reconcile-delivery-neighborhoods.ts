@@ -18,7 +18,9 @@ import { DeliveryZone } from '../modules/delivery-zones/entities/delivery-zone.e
  * DELIVERY_NEIGHBORHOOD_ALLOW_DATABASE=<exact current database name>
  * Never invoked by deployment. Execute only after a backup and manual review.
  */
-type Child = { name: string; nameAr: string; deliveryFeeMinor: number };
+/** Every newly reconciled child receives 15.00 EGP, until changed in the Admin panel. */
+const INITIAL_CHILD_FEE_MINOR = 1500;
+type Child = { name: string; nameAr: string; deliveryFeeMinor?: number };
 type Mapping = {
   sourceZoneId: string; existingName: string; existingNameAr: string;
   zoneName: string; zoneNameAr: string; children: Child[];
@@ -42,9 +44,9 @@ function parseMapping(raw: unknown): Mapping[] {
     const children = m.children.map((c, j) => {
       const name = oneName(c?.name, 'English child ' + j);
       const nameAr = oneName(c?.nameAr, 'Arabic child ' + j);
-      if (!Number.isSafeInteger(c?.deliveryFeeMinor) || c.deliveryFeeMinor < 0 || c.deliveryFeeMinor > 10000000)
-        throw new Error('Explicit fee in minor units required for child ' + j);
-      return { name, nameAr, deliveryFeeMinor: c.deliveryFeeMinor };
+      // The product owner has approved 15 EGP for ALL second-level records initially.
+      // Optional legacy file fee values are ignored deliberately; the Admin will edit fees afterward.
+      return { name, nameAr, deliveryFeeMinor: INITIAL_CHILD_FEE_MINOR };
     });
     if (new Set(children.map(c => c.name.toLowerCase())).size !== children.length ||
         new Set(children.map(c => c.nameAr.toLowerCase())).size !== children.length)
@@ -85,11 +87,11 @@ async function main(): Promise<void> {
             old.name !== m.existingName || old.nameAr !== m.existingNameAr)
           throw new Error('Legacy row changed since review: ' + m.sourceZoneId);
         if (m.children.length === 1 && old.name === m.children[0].name &&
-            old.nameAr === m.children[0].nameAr &&
-            Number(old.deliveryFeeMinor) === m.children[0].deliveryFeeMinor) {
+            old.nameAr === m.children[0].nameAr) {
           // Existing one-child row: preserve its ID, fee, names and saved addresses.
           old.zoneName = m.zoneName;
           old.zoneNameAr = m.zoneNameAr;
+          old.deliveryFeeMinor = INITIAL_CHILD_FEE_MINOR;
           await zones.save(old);
           continue;
         }
@@ -114,7 +116,8 @@ async function main(): Promise<void> {
         await zones.save(old);
       }
     });
-    console.log('Applied atomically. Original rows, fees, IDs and address links were preserved.');
+    console.log('Applied atomically. New child and classified single-row fees set to 15 EGP.');
+    console.log('Original combined names, source IDs and address links preserved; frozen order prices unchanged.');
   } finally {
     await AppDataSource.destroy();
   }
