@@ -1305,5 +1305,7 @@
   "settingsAccountSection": "Account",
   "settingsAppSection": "App",
   "searchFilterVendors": "Stores only",
-  "searchFilterProducts": "Products only"
+  "searchFilterProducts": "Products only",
+  "vendorCustomBubbleLabel": "Request item",
+  "sectorHatlyExistingWasaly": "You already have a Wasaly (Deliver to a place) request in your cart. This sector offers Hatly (Buy from a place) only. Review your cart first; your existing request will not be changed."
 }

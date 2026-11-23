@@ -2657,4 +2657,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get searchFilterProducts => 'منتجات';
+  @override
+  String get vendorCustomBubbleLabel => 'اطلب صنف';
+
+  @override
+  String get sectorHatlyExistingWasaly => 'لديك طلب «وصّلي لمكان» موجود بالفعل في السلة. هذه الصفحة تتيح «هاتلي من مكان» فقط. راجع السلة أولاً؛ لن يتم تغيير طلبك الحالي.';
+
 }

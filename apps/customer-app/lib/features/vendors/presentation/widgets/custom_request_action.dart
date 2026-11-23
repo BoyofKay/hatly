@@ -53,8 +53,7 @@ class CustomRequestAction extends ConsumerWidget {
       }
     }
     if (floating) {
-      final label = Localizations.localeOf(context).languageCode == 'ar'
-          ? 'اطلب صنف' : 'Request item';
+      final label = l10n.vendorCustomBubbleLabel;
       return Tooltip(
         message: l10n.customRequestEntryPoint,
         child: Material(

@@ -4770,6 +4770,12 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'منتجات'**
   String get searchFilterProducts;
+  /// Short label for the floating vendor-specific custom-request control.
+  String get vendorCustomBubbleLabel;
+
+  /// Existing Wasaly cart group cannot be used for a Hatly-only sector entry.
+  String get sectorHatlyExistingWasaly;
+
 }
 
 class _AppLocalizationsDelegate
