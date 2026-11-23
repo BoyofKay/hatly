@@ -16,6 +16,7 @@ import 'core/theme/hatly_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'core/routing/router_stack.dart';
 import 'shared_widgets/customer_global_header.dart';
+import 'shared_widgets/hero_colors.dart';
 
 /// Customer Push Notifications — background state. Runs in a separate
 /// background isolate with NO access to this app's Riverpod
@@ -78,6 +79,7 @@ class HatlyCustomerApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
+    final heroTint = ref.watch(activeHeroColorProvider);
 
     // Customer Push Notifications / Deep Links — the tap-to-navigate
     // wiring needs the router, which only exists here at the app
@@ -104,14 +106,30 @@ class HatlyCustomerApp extends ConsumerWidget {
       darkTheme: HatlyTheme.dark(),
       themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
-      builder: (context, child) => Column(children: [
-        SafeArea(bottom: false, child: CustomerGlobalHeader(router: router)),
-        Expanded(child: MediaQuery.removePadding(
-          context: context,
-          removeTop: true,
-          child: child ?? const SizedBox.shrink(),
-        )),
-      ]),
+      builder: (context, child) => AnimatedBuilder(
+        animation: router.routeInformationProvider,
+        builder: (context, _) {
+          final path = router.routeInformationProvider.value.uri.path;
+          final fullBleedHero = path == '/vendors' || path.startsWith('/vendors/');
+          final onHome = path == '/';
+          final surface = Theme.of(context).scaffoldBackgroundColor;
+          return Column(children: [
+            if (!fullBleedHero)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 420),
+                decoration: BoxDecoration(
+                  color: onHome ? translucentHero(heroTint, surface) : surface,
+                ),
+                child: SafeArea(bottom: false,
+                  child: CustomerGlobalHeader(router: router, showLocation: onHome)),
+              ),
+            Expanded(child: MediaQuery.removePadding(
+              context: context, removeTop: true,
+              child: child ?? const SizedBox.shrink(),
+            )),
+          ]);
+        },
+      ),
 
       // Arabic is primary (spec section 4/19) and the default; the customer
       // can switch to English in Settings (localeProvider, persisted).

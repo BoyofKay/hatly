@@ -13,6 +13,7 @@ class MarketplaceSector {
     required this.sortOrder,
     this.imageUrl,
     this.bannerUrl,
+    this.accentColor,
   });
 
   final String id;
@@ -30,6 +31,7 @@ class MarketplaceSector {
   /// read defensively so it lights up as soon as it is.
   final String? imageUrl;
   final String? bannerUrl;
+  final String? accentColor;
 
   factory MarketplaceSector.fromJson(Map<String, dynamic> json) {
     return MarketplaceSector(
@@ -40,6 +42,7 @@ class MarketplaceSector {
       sortOrder: json['sortOrder'] as int,
       imageUrl: json['imageUrl'] as String?,
       bannerUrl: json['bannerUrl'] as String?,
+      accentColor: json['accentColor'] as String?,
     );
   }
 }

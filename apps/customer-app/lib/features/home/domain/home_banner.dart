@@ -11,6 +11,7 @@ class HomeBanner {
     required this.imageUrl,
     this.action = HomeBannerAction.none,
     this.targetId,
+    this.sectorId,
   });
 
   final String id;
@@ -21,6 +22,7 @@ class HomeBanner {
   final String imageUrl;
   final HomeBannerAction action;
   final String? targetId;
+  final String? sectorId;
 
   /// The accessible description / label in the app's language (Arabic when the admin gave one).
   String displayTitle(bool arabic) =>
@@ -63,6 +65,7 @@ class HomeBanner {
       action: action,
       // A destination type this app version does not know, or one without a target, simply makes the banner non-tappable.
       targetId: target is String && target.isNotEmpty ? target : null,
+      sectorId: raw['sectorId'] is String ? raw['sectorId'] as String : null,
     );
   }
 }

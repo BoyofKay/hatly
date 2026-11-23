@@ -7,12 +7,14 @@ import '../features/notifications/presentation/widgets/notification_bell.dart';
 import '../features/shell/presentation/shell_tab_provider.dart';
 import '../features/auth/presentation/auth_gate.dart';
 import '../features/cart/data/cart_providers.dart';
+import '../features/home/presentation/widgets/home_location_bar.dart';
 
 
 /// Pinned across the entire customer Navigator (not a scrolling Home sliver).
 /// All actions reuse the existing notification and Favorites destinations.
 class CustomerGlobalHeader extends ConsumerWidget {
-  const CustomerGlobalHeader({super.key, required this.router});
+  const CustomerGlobalHeader({super.key, required this.router, this.showLocation = false});
+  final bool showLocation;
   final GoRouter router;
 
   @override
@@ -23,14 +25,17 @@ class CustomerGlobalHeader extends ConsumerWidget {
 
     return Container(
       key: const Key('customer-pinned-header'),
-      padding: const EdgeInsetsDirectional.fromSTEB(14, 3, 10, 3),
-      decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor),
+      padding: const EdgeInsetsDirectional.fromSTEB(12, 2, 8, 2),
       child: Row(children: [
         InkWell(
           onTap: () { ref.read(shellTabIndexProvider.notifier).state = ShellTab.home; router.go('/'); },
-          child: Image.asset('assets/images/hatly-app-icon.png', width: 52, height: 52, fit: BoxFit.contain),
+          child: ClipRRect(borderRadius: BorderRadius.circular(14),
+            child: Image.asset('assets/images/hatly-app-icon.png', width: 48, height: 48, fit: BoxFit.contain)),
         ),
-        const Spacer(),
+        if (showLocation) ...[
+          const SizedBox(width: 4),
+          const Expanded(child: HomeLocationBar()),
+        ] else const Spacer(),
         NotificationBell(router: router),
         Stack(clipBehavior: Clip.none, children: [
           IconButton(key: const Key('customer-header-cart'), tooltip: l10n.cart, onPressed: () => router.push('/cart'), icon: const Icon(Icons.shopping_bag_outlined)),

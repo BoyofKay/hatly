@@ -105,7 +105,7 @@ class HatlyRadius {
   static const double badge = 8;
   static const double button = 12;
   static const double input = 12;
-  static const double searchBar = 12;
+  static const double searchBar = 22;
   static const double card = 16;
   static const double dialog = 16;
   static const double imageContainer = 16;

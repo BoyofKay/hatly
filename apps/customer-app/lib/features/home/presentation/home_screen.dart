@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/localization/l10n/app_localizations.dart';
 import '../../../core/theme/hatly_theme.dart';
 import '../../../shared_widgets/cart_summary_bar.dart';
+import '../../../shared_widgets/hero_colors.dart';
 import '../../../shared_widgets/hatly_section_header.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/skeleton_box.dart';
@@ -50,16 +51,18 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final snapshotAsync = ref.watch(homeSnapshotProvider);
+    final promoTint = ref.watch(activeHeroColorProvider);
+    final topTint = translucentHero(promoTint, Theme.of(context).scaffoldBackgroundColor);
 
     return Scaffold(
       bottomNavigationBar: const CartSummaryBar(),
       body: SafeArea(
         child: Column(children: [
           // A continuous Home header: location and search stay in place while the feed scrolls.
-          const HomeLocationBar(),
-          const SizedBox(height: HatlySpacing.sm),
-          const HomeSearchEntry(),
-          const SizedBox(height: HatlySpacing.sm),
+          ColoredBox(color: topTint, child: const Padding(
+            padding: EdgeInsets.only(top: 6, bottom: 8),
+            child: HomeSearchEntry(),
+          )),
           Expanded(child: RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(homeCategoriesProvider);
@@ -83,11 +86,11 @@ class HomeScreen extends ConsumerWidget {
               // 3. Rotating promo carousel — INDEPENDENT of the product rows below: its own request starts with the screen, and a slow
               // or failed product load can never hold it back. Admin banners when there are any, otherwise the offer-derived promos
               // (available once the snapshot is); nothing → no space.
-              HomeBannerSection(
+              ColoredBox(color: topTint, child: HomeBannerSection(
                 fallbackPromos: snapshotAsync.valueOrNull?.promos ?? const [],
                 onPromoAction: (promo) =>
                     handlePromoAction(context, ref, promo),
-              ),
+              )),
               // 4. Shop by category — needs only the sectors request, so it appears as soon as that answers.
               const HomeCategorySection(),
               const SizedBox(height: _sectionGap),

@@ -24,11 +24,11 @@ class HatlySearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Material(
-      color: p.surfaceSoft,
+      color: Colors.white,
       borderRadius: BorderRadius.circular(HatlyRadius.searchBar),
       child: Container(
-        decoration: BoxDecoration(border: Border.all(color: p.border.withValues(alpha: .55)), borderRadius: BorderRadius.circular(HatlyRadius.searchBar)),
-        constraints: const BoxConstraints(minHeight: 52),
+        decoration: BoxDecoration(border: Border.all(color: p.border.withValues(alpha: .22)), borderRadius: BorderRadius.circular(HatlyRadius.searchBar)),
+        constraints: const BoxConstraints(minHeight: 44),
         child: Row(
           children: [
             Padding(
