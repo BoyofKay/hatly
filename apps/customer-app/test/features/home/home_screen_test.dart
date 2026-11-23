@@ -149,13 +149,13 @@ void main() {
   });
 
   testWidgets(
-      'the top area is light: location keeps ONE shortcut (Favorites); Profile is only in the bottom nav',
+      'Home keeps address controls while global Favorites lives above the routed pages',
       (tester) async {
     _phone(tester);
     await tester
         .pumpWidget(hatlyTestApp(const HomeScreen(), overrides: _overrides()));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
-    expect(find.byIcon(Icons.favorite_border_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.favorite_border_rounded), findsNothing);
     expect(find.byIcon(Icons.person_outline_rounded), findsNothing);
   });
 
