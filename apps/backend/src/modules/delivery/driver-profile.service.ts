@@ -42,6 +42,15 @@ export class DriverProfileService {
     return this.driversRepository.findOneOrFail({ where: { id: driver.id } });
   }
 
+  /** Name is managed by Operations through /admin/drivers/:id/profile, not editable in the Driver app. */
+  async getProfileName(userId: string): Promise<{ fullName: string }> {
+    const driver = await this.driverAuthorizationService.getDriverForUser(userId);
+    const row = await this.driversRepository.findOne({
+      where: { id: driver.id }, relations: { user: true },
+    });
+    return { fullName: row?.user?.fullName ?? '' };
+  }
+
   /** Read-only: is this driver online for dispatch right now (the server's switch, not the app's memory). */
   async getOnlineStatus(userId: string): Promise<{ isOnline: boolean }> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
