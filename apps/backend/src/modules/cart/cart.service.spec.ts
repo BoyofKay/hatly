@@ -498,7 +498,7 @@ describe('CartService — Weighted Products (Phase G)', () => {
       isAvailable: true,
       deletedAt: null,
       options: [],
-      vendorBranch: { id: vendorBranchId, isActive: true, vendor: { isActive: true } },
+      vendorBranch: { id: vendorBranchId, isActive: true, isOpen: true, vendor: { isActive: true } },
       vendorBranchId,
     };
   }
