@@ -15,10 +15,10 @@ import 'promo_cta_button.dart';
 /// promo. It is presentation-only: [onAction] decides what a CTA does.
 /// The hero banner's proportions: each card is about 1.6 : 1 (it used to be ~2 : 1, a thin strip), within a sane range so a
 /// tablet does not get a giant banner and a small phone still gets a full-size one.
-const double kPromoBannerAspect = 1.5;
-const double kPromoViewportFraction = 0.92;
-const double kPromoBannerMinHeight = 210;
-const double kPromoBannerMaxHeight = 320;
+const double kPromoBannerAspect = 2.05;
+const double kPromoViewportFraction = 0.95;
+const double kPromoBannerMinHeight = 152;
+const double kPromoBannerMaxHeight = 264;
 
 double promoBannerHeight(double availableWidth) {
   final cardWidth =
@@ -109,51 +109,47 @@ class _PromoCard extends StatelessWidget {
     final p = context.palette;
     final ctaLabel = promoCtaLabel(l10n, promo.kind);
 
-    return Container(
-      decoration: BoxDecoration(
-        // Subtle brand tint over the surface, no shadow — the calm main
-        // commercial element, not a flat orange banner.
-        color: Color.alphaBlend(p.accentSoft, p.surface),
-        borderRadius: BorderRadius.circular(HatlyRadius.promoBanner),
-      ),
-      padding: const EdgeInsets.all(HatlySpacing.md),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 5,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(promo.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: context.type.title),
-                if (promo.subtitle != null) ...[
-                  const SizedBox(height: HatlySpacing.xs),
-                  Text(promo.subtitle!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.type.small),
-                ],
-                const SizedBox(height: HatlySpacing.ms),
-                PromoCtaButton(label: ctaLabel, onPressed: onAction),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(HatlyRadius.promoBanner),
+      child: Stack(fit: StackFit.expand, children: [
+        HatlySoftImage(
+          url: promo.imageUrl,
+          width: double.infinity,
+          height: double.infinity,
+          radius: 0,
+          placeholderIcon: Icons.local_offer_outlined,
+          semanticLabel: promo.title,
+        ),
+        DecoratedBox(
+          decoration: BoxDecoration(gradient: LinearGradient(
+            begin: AlignmentDirectional.centerStart,
+            end: AlignmentDirectional.centerEnd,
+            colors: [p.surface.withValues(alpha: .97), p.surface.withValues(alpha: .78), p.surface.withValues(alpha: .03)],
+            stops: const [0, .55, 1],
+          )),
+        ),
+        PositionedDirectional(
+          start: HatlySpacing.md,
+          top: HatlySpacing.sm,
+          bottom: HatlySpacing.sm,
+          width: 180,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(promo.title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: context.type.title.copyWith(fontWeight: FontWeight.w800)),
+              if (promo.subtitle != null) ...[
+                const SizedBox(height: HatlySpacing.xs),
+                Text(promo.subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: context.type.small),
               ],
-            ),
+              const SizedBox(height: HatlySpacing.sm),
+              PromoCtaButton(label: ctaLabel, onPressed: onAction),
+            ],
           ),
-          const SizedBox(width: HatlySpacing.md),
-          Expanded(
-            flex: 5,
-            child: HatlySoftImage(
-              url: promo.imageUrl,
-              width: double.infinity,
-              height: double.infinity,
-              placeholderIcon: Icons.local_offer_outlined,
-              semanticLabel: promo.title,
-            ),
-          ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 }
