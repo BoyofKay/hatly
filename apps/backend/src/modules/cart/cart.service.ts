@@ -129,6 +129,13 @@ export class CartService {
         });
       }
 
+      if (!product.vendorBranch.isOpen) {
+        throw new BadRequestException({
+          message: 'This store is currently closed. You can browse its menu, but cannot add items to the cart.',
+          details: { code: 'STORE_CLOSED' },
+        });
+      }
+
       const groups = await manager.find(CartVendorGroup, { where: { cartId: cart.id } });
       let group = groups.find(
         (g) => g.groupType === CartGroupType.CATALOG && g.vendorBranchId === product.vendorBranchId,
