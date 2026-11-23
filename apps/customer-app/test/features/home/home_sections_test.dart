@@ -251,7 +251,7 @@ void main() {
     test(
         'about 1.6:1 on a normal phone (was a ~2:1 strip of 176), clamped for small and large screens',
         () {
-      expect(promoBannerHeight(390), inInclusiveRange(215, 235));
+      expect(promoBannerHeight(390), inInclusiveRange(225, 245));
       expect(promoBannerHeight(390), greaterThan(176 * 1.2));
       expect(promoBannerHeight(320), kPromoBannerMinHeight);
       expect(promoBannerHeight(1200), kPromoBannerMaxHeight);
