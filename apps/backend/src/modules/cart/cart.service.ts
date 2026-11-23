@@ -412,6 +412,15 @@ export class CartService {
         }
       }
 
+      // A closed branch cannot receive custom cart items either, including existing cart groups.
+      const customBranch = await this.branchesRepository.findOne({ where: { id: group.vendorBranchId }, relations: { vendor: true } });
+      if (!customBranch || !customBranch.isActive || !customBranch.vendor?.isActive || !customBranch.isOpen) {
+        throw new BadRequestException({
+          message: 'This store is currently closed or unavailable. Browse its menu and order when it reopens.',
+          details: { code: customBranch?.isOpen === false ? 'STORE_CLOSED' : 'BRANCH_UNAVAILABLE' },
+        });
+      }
+
       // The sector's admin setting is the rule, enforced here for EVERY route into this method (a new group or an existing one):
       // hiding the entry point in the app is not a control. A branch without an active, enabled sector cannot take custom requests.
       await this.assertCustomRequestsAllowed(manager, group.vendorBranchId);
