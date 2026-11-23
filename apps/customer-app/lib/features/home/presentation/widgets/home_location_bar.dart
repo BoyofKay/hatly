@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
+import '../../../../shared_widgets/hatly_logo.dart';
 import '../../../shell/presentation/shell_tab_provider.dart';
 import '../../data/home_address_provider.dart';
 import '../../../notifications/presentation/widgets/notification_bell.dart';
@@ -30,10 +31,13 @@ class HomeLocationBar extends ConsumerWidget {
     );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-          HatlySpacing.md, HatlySpacing.sm, HatlySpacing.sm, 0),
+      padding: const EdgeInsetsDirectional.fromSTEB(
+          HatlySpacing.md, HatlySpacing.sm, HatlySpacing.xs, 0),
       child: Row(
         children: [
+          // The supplied brand mark, unchanged — the header reads as Hatly at a glance.
+          const HatlyLogo(size: 44),
+          const SizedBox(width: HatlySpacing.ms),
           Expanded(
             child: Semantics(
               button: true,
@@ -46,23 +50,36 @@ class HomeLocationBar extends ConsumerWidget {
                 child: ConstrainedBox(
                   constraints:
                       const BoxConstraints(minHeight: HatlyTouch.minTarget),
-                  child: Row(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.location_on_rounded,
-                          color: p.accent, size: 22),
-                      const SizedBox(width: HatlySpacing.xs),
-                      Flexible(
-                        child: Text(
-                          displayLabel ?? l10n.selectAddressCta,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: context.type.small.copyWith(
-                              color: p.textPrimary,
-                              fontWeight: FontWeight.w700),
-                        ),
+                      Text(
+                        l10n.homeDeliverTo,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.type.caption
+                            .copyWith(color: p.textMuted, height: 1.2),
                       ),
-                      Icon(Icons.keyboard_arrow_down_rounded,
-                          size: 20, color: p.textMuted),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on_rounded,
+                              color: p.accent, size: 18),
+                          const SizedBox(width: 2),
+                          Flexible(
+                            child: Text(
+                              displayLabel ?? l10n.selectAddressCta,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.type.small.copyWith(
+                                  color: p.textPrimary,
+                                  fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          Icon(Icons.keyboard_arrow_down_rounded,
+                              size: 20, color: p.accent),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -98,6 +115,8 @@ class _RoundIconButton extends StatelessWidget {
       onPressed: onTap,
       constraints: const BoxConstraints(
           minWidth: HatlyTouch.minTarget, minHeight: HatlyTouch.minTarget),
+      style: IconButton.styleFrom(
+          backgroundColor: p.surface, side: BorderSide(color: p.border)),
       icon: Icon(icon, color: p.textPrimary, size: 22),
     );
   }

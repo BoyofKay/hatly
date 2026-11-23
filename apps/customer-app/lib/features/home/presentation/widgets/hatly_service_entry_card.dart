@@ -20,9 +20,8 @@ class HatlyServiceEntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final p = context.palette;
-    final chevron = Directionality.of(context) == TextDirection.rtl
-        ? Icons.chevron_left
-        : Icons.chevron_right;
+    // chevron_right is a directional icon: Flutter mirrors it in RTL, so it always points "forward".
+    const chevron = Icons.chevron_right;
 
     return Padding(
       padding:

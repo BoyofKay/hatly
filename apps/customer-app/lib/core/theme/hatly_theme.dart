@@ -110,7 +110,8 @@ class HatlyRadius {
   static const double dialog = 16;
   static const double imageContainer = 16;
   static const double promoBanner = 20;
-  /// Recovered Nov 13 full-width hero banners use deliberately restrained corners.
+
+  /// The Home hero banner: a deliberately subtle corner (owner, 2026-11-11 — the 20 px banner corner looked too rounded).
   static const double heroBanner = 8;
   static const double bottomSheetTop = 20;
 
@@ -217,18 +218,19 @@ class HatlyTheme {
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(HatlyRadius.button)),
-          textStyle: t(13, FontWeight.w500, color: legacyOnOrange),
+          textStyle: t(15, FontWeight.w700, color: legacyOnOrange),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: p.textPrimary,
-          side: BorderSide(color: p.textPrimary),
+          // Secondary actions: brand ink on a brand outline (reference: "تتبع الطلب" / "إعادة الطلب").
+          foregroundColor: p.link,
+          side: BorderSide(color: p.accent),
           minimumSize: const Size.fromHeight(48),
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(HatlyRadius.button)),
-          textStyle: t(13, FontWeight.w500),
+          textStyle: t(13, FontWeight.w700),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -274,6 +276,46 @@ class HatlyTheme {
             borderRadius: BorderRadius.circular(HatlyRadius.chip)),
         padding: const EdgeInsets.symmetric(
             horizontal: HatlySpacing.ms, vertical: HatlySpacing.xs),
+      ),
+      tabBarTheme: TabBarThemeData(
+        dividerColor: p.border,
+        indicatorColor: HatlyColors.primaryOrange,
+        labelColor: p.link,
+        unselectedLabelColor: p.textMuted,
+        labelStyle: t(14, FontWeight.w700),
+        unselectedLabelStyle: t(14, FontWeight.w500),
+      ),
+      // Switches: brand track when on, a quiet neutral track when off (not the seed-derived brown).
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? HatlyColors.surfaceWhite
+                : p.textMuted),
+        trackColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? HatlyColors.primaryOrange
+                : p.surfaceSoft),
+        trackOutlineColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? Colors.transparent
+                : p.border),
+      ),
+      // Delivery/pickup and the theme selector: brand-tinted selection on a neutral hairline (not Material's
+      // seed-derived brown outline).
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          side: WidgetStatePropertyAll(BorderSide(color: p.border)),
+          backgroundColor: WidgetStateProperty.resolveWith((states) =>
+              states.contains(WidgetState.selected) ? p.accentSoft : p.surface),
+          foregroundColor: WidgetStateProperty.resolveWith((states) =>
+              states.contains(WidgetState.selected) ? p.link : p.textPrimary),
+          iconColor: WidgetStateProperty.resolveWith((states) =>
+              states.contains(WidgetState.selected) ? p.link : p.textMuted),
+          minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+          shape: WidgetStatePropertyAll(RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(HatlyRadius.button))),
+          textStyle: WidgetStatePropertyAll(t(13, FontWeight.w700)),
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: p.surface,

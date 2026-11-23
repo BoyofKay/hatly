@@ -50,7 +50,11 @@ class SupportContactTile extends ConsumerStatefulWidget {
     required this.label,
     required this.messageBuilder,
     this.hideWhenUnavailable = false,
+    this.flat = false,
   });
+
+  /// Drawn as a row of a grouped list (no own border; soft icon box) — the Profile menu.
+  final bool flat;
 
   final String label;
   final String Function(AppLocalizations l10n) messageBuilder;
@@ -105,11 +109,13 @@ class _SupportContactTileState extends ConsumerState<SupportContactTile> {
       excludeSemantics: true,
       onTap: enabled ? () => _handleTap(l10n) : null,
       child: Material(
-        color: p.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(HatlyRadius.card),
-          side: BorderSide(color: p.border),
-        ),
+        color: widget.flat ? Colors.transparent : p.surface,
+        shape: widget.flat
+            ? null
+            : RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(HatlyRadius.card),
+                side: BorderSide(color: p.border),
+              ),
         child: InkWell(
           borderRadius: BorderRadius.circular(HatlyRadius.card),
           onTap: enabled ? () => _handleTap(l10n) : null,
@@ -120,8 +126,20 @@ class _SupportContactTileState extends ConsumerState<SupportContactTile> {
                   horizontal: HatlySpacing.md, vertical: HatlySpacing.ms),
               child: Row(
                 children: [
-                  Icon(Icons.chat_outlined,
-                      size: 22, color: enabled ? p.accent : p.textMuted),
+                  if (widget.flat)
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                          color: p.accentSoft,
+                          borderRadius:
+                              BorderRadius.circular(HatlyRadius.button)),
+                      child: Icon(Icons.chat_outlined,
+                          size: 22, color: enabled ? p.accent : p.textMuted),
+                    )
+                  else
+                    Icon(Icons.chat_outlined,
+                        size: 22, color: enabled ? p.accent : p.textMuted),
                   const SizedBox(width: HatlySpacing.ms),
                   Expanded(
                     child: Column(

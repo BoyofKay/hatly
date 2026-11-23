@@ -77,8 +77,15 @@ void main() {
     await tester.pumpWidget(hatlyTestApp(const HomeScreen(), overrides: [
       ..._overrides(),
       homeBannersProvider.overrideWith((ref) async => [
-            const HomeBanner(id: 'b1', title: 'Weekend offers', titleAr: 'عروض نهاية الأسبوع', imageUrl: '/uploads/files/a.png'),
-            const HomeBanner(id: 'b2', title: 'New stores', imageUrl: '/uploads/files/b.png'),
+            const HomeBanner(
+                id: 'b1',
+                title: 'Weekend offers',
+                titleAr: 'عروض نهاية الأسبوع',
+                imageUrl: '/uploads/files/a.png'),
+            const HomeBanner(
+                id: 'b2',
+                title: 'New stores',
+                imageUrl: '/uploads/files/b.png'),
           ]),
     ]));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
@@ -110,6 +117,7 @@ void main() {
       find.byType(HatlySearchBar), // 2 search
       find.byType(PromoCarousel), // 3 promo carousel
       find.text('تسوّق حسب الفئة'), // 4 categories
+      find.text('متاجر مميزة'), // featured stores (owner decision 2026-11-02)
       find.text('العروض'), // 5 offers
       find.text('الأكثر طلبًا'), // 6 most ordered
       find.text('الجديد'), // 7 new
@@ -122,22 +130,29 @@ void main() {
           reason: 'section $i must come after section ${i - 1}');
     }
     expect(find.text('بتدور على إيه؟'), findsOneWidget);
-    // three "عرض الكل ←" links: offers, most ordered, new — categories have none (≤ 12)
+    // three "عرض الكل ←" links: offers, most ordered, new — categories have none (≤ 12), featured stores have none (no listing to open)
     expect(find.text('عرض الكل'), findsNWidgets(3));
-    // Popular Near You is gone from Home, even though the snapshot still carries vendors
+    // the old full-width "Popular Near You" list stays gone; vendors appear only in the featured-stores row
     expect(find.text('الأشهر بالقرب منك'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets(
-      'Offers and Popular & New show mixed content; there is no vendor section on Home',
+      'Offers and Popular & New show mixed content; vendors appear only in the featured-stores row',
       (tester) async {
     _phone(tester);
     await tester
         .pumpWidget(hatlyTestApp(const HomeScreen(), overrides: _overrides()));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
-    expect(find.byType(VendorCoverCard), findsNothing);
+    final featured = find.byKey(const Key('home-featured-stores'));
+    expect(featured, findsOneWidget);
+    expect(find.byType(VendorCoverCard),
+        findsWidgets); // every vendor card on Home lives in that row
+    expect(
+        find.descendant(of: featured, matching: find.byType(VendorCoverCard)),
+        findsNWidgets(tester.widgetList(find.byType(VendorCoverCard)).length));
+    expect(find.text(_snapshot.popularVendors.first.nameAr!), findsWidgets);
     // offer kinds present in the row
     expect(find.text('عرض سريع'), findsWidgets);
     expect(find.text('توصيل مجاني'), findsWidgets);
@@ -191,6 +206,7 @@ void main() {
     ));
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
     expect(find.byType(PromoCarousel), findsNothing);
+    expect(find.byKey(const Key('home-featured-stores')), findsNothing);
     expect(find.text('العروض'), findsNothing);
     expect(find.text('الأكثر طلبًا'), findsNothing);
     expect(find.text('الجديد'), findsNothing);
