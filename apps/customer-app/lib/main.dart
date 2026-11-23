@@ -17,6 +17,7 @@ import 'core/theme/theme_mode_provider.dart';
 import 'core/routing/router_stack.dart';
 import 'shared_widgets/customer_global_header.dart';
 import 'shared_widgets/hero_colors.dart';
+import 'features/shell/presentation/shell_tab_provider.dart';
 
 /// Customer Push Notifications — background state. Runs in a separate
 /// background isolate with NO access to this app's Riverpod
@@ -80,6 +81,7 @@ class HatlyCustomerApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     final heroTint = ref.watch(activeHeroColorProvider);
+    final shellTab = ref.watch(shellTabIndexProvider);
 
     // Customer Push Notifications / Deep Links — the tap-to-navigate
     // wiring needs the router, which only exists here at the app
@@ -111,7 +113,7 @@ class HatlyCustomerApp extends ConsumerWidget {
         builder: (context, _) {
           final path = router.routeInformationProvider.value.uri.path;
           final fullBleedHero = path == '/vendors' || path.startsWith('/vendors/');
-          final onHome = path == '/';
+          final onHome = path == '/' && shellTab == ShellTab.home;
           final surface = Theme.of(context).scaffoldBackgroundColor;
           return Column(children: [
             if (!fullBleedHero)
