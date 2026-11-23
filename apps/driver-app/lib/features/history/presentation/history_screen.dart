@@ -70,7 +70,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
     final ar = context.isArabic;
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(title: Text(context.t('History', 'السجل')), backgroundColor: Colors.white, surfaceTintColor: Colors.transparent),
       body: Builder(builder: (context) {
         if (_items.isEmpty && _loading) return const Center(child: CircularProgressIndicator());
         if (_items.isEmpty && _failed) {
