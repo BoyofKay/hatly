@@ -1,3 +1,5 @@
 ACTION=deploy
 ARG=
-# Hatly profile/branding/shift/favorites/sector-banner release candidate; gated backup + restore drill + migration + smoke.
+# Hatly 2026-11-24: approved customer hero/sector-theme/favorites and driver shift/branding.
+# Source validated by CI run 45286667827 (commit d91d42be90d8094a3d4dabf114a16042ea2afea8).
+# Only deploy backend/admin and additive migrations; preserve existing orders, carts and finance.
