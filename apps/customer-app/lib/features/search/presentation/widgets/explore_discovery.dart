@@ -99,7 +99,8 @@ class _ExploreCategoriesSectionState
                   hasMore ? () => setState(() => _expanded = !_expanded) : null,
             ),
             const SizedBox(height: HatlySpacing.sm),
-            CategoryGrid(categories: shown),
+            // Reference board ("الأقسام"): two large photo cards per row.
+            CategoryGrid(categories: shown, columns: 2, large: true),
             if (featured.isNotEmpty) ...[
               const SizedBox(height: ExploreDiscovery.sectionGap),
               HatlySectionHeader(title: l10n.exploreSectionFeaturedCategories),

@@ -110,6 +110,8 @@ class HatlyRadius {
   static const double dialog = 16;
   static const double imageContainer = 16;
   static const double promoBanner = 20;
+  /// Recovered Nov 13 full-width hero banners use deliberately restrained corners.
+  static const double heroBanner = 8;
   static const double bottomSheetTop = 20;
 
   /// Circular controls (avatars, round icon buttons, the nav pill's ends).
