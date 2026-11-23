@@ -2651,4 +2651,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get forgotLocked => 'Too many wrong tries. Send a new request.';
+
+  @override
+  String get addressVillageLabel => 'Village / neighbourhood';
+
+  @override
+  String get addressVillageRequired => 'Choose your village or neighbourhood';
 }

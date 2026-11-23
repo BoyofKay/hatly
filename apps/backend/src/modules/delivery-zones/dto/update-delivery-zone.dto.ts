@@ -1,4 +1,4 @@
-import { IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 const NOT_BLANK = /\S/;
 
@@ -62,4 +62,12 @@ export class UpdateDeliveryZoneDto {
   @ValidateIf((_, v) => v !== undefined && v !== null)
   @IsLongitude()
   representativeLongitude?: number | null;
+
+  /** Villages / neighbourhoods inside the zone (names, Arabic). Replaces the list when sent. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(300)
+  @IsString({ each: true })
+  @MaxLength(120, { each: true })
+  areas?: string[];
 }

@@ -26,6 +26,7 @@ export class DeliveryZonesController {
         governorate: z.governorate,
         governorateAr: z.governorateAr,
         deliveryFeeMinor: z.deliveryFeeMinor,
+        areas: z.areas ?? [],
       })),
     };
   }

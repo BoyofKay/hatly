@@ -2,6 +2,8 @@ import { apiClient } from './client';
 
 /** PD-009 — a Delivery Zone as the admin API returns it. Fees are integer minor units. */
 export interface DeliveryZone {
+  /** Villages / neighbourhoods inside the zone (2026-11-23). */
+  areas?: string[];
   id: string;
   serviceAreaId: string;
   governorate: string;
@@ -18,6 +20,7 @@ export interface DeliveryZone {
 }
 
 export interface DeliveryZoneDetailsInput {
+  areas?: string[];
   serviceAreaId: string;
   governorate: string;
   governorateAr: string;

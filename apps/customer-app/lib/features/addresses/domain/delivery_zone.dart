@@ -11,6 +11,7 @@ class DeliveryZone {
     required this.governorate,
     required this.governorateAr,
     this.deliveryFeeMinor,
+    this.areas = const [],
   });
 
   final String id;
@@ -23,6 +24,9 @@ class DeliveryZone {
 
   /// The zone's current base fee (informational — only present on the zone list, never on a frozen snapshot).
   final int? deliveryFeeMinor;
+
+  /// Villages / neighbourhoods inside the zone (2026-11-23) — the customer picks one; the fee is the zone's.
+  final List<String> areas;
 
   /// The zone name in the app's language.
   String displayName(bool arabic) => arabic ? nameAr : name;
@@ -41,6 +45,7 @@ class DeliveryZone {
         governorate: json['governorate'] as String? ?? json['governorateAr'] as String? ?? '',
         governorateAr: json['governorateAr'] as String? ?? json['governorate'] as String? ?? '',
         deliveryFeeMinor: (json['deliveryFeeMinor'] as num?)?.toInt(),
+        areas: ((json['areas'] as List?) ?? const []).whereType<String>().toList(),
       );
 
   @override

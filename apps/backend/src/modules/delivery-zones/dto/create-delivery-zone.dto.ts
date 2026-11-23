@@ -1,4 +1,4 @@
-import { IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 
 /** The fee ceiling is a typo guard (100,000 EGP), not a business rule. */
 export const MAX_ZONE_DELIVERY_FEE_MINOR = 10_000_000;
@@ -58,4 +58,12 @@ export class CreateDeliveryZoneDto {
   @IsOptional()
   @IsLongitude()
   representativeLongitude?: number;
+
+  /** Villages / neighbourhoods inside the zone (names, Arabic). Replaces the list when sent. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(300)
+  @IsString({ each: true })
+  @MaxLength(120, { each: true })
+  areas?: string[];
 }

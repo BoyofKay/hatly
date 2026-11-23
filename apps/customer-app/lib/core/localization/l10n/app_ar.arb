@@ -1307,5 +1307,7 @@
         "type": "String"
       }
     }
-  }
+  },
+  "addressVillageLabel": "القرية / الحي",
+  "addressVillageRequired": "اختر قريتك أو حيّك"
 }
