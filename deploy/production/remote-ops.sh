@@ -24,6 +24,15 @@ case "$action" in
     step "migrations"; "$PD/current/deploy/production/prod.sh" plan | tail -5
     step "releases on disk"; ls -1t "$PD/releases" | head -5
     step "disk"; df -h "$PD" | tail -1
+    step "Google Routes readiness (read-only; no key printed)"
+    src="$PD/current/apps/backend/src/modules/location/providers/google-maps.provider.ts"
+    if [ -f "$src" ] && grep -q 'routes.googleapis.com/directions/v2:computeRoutes' "$src"; then
+      echo "deployed Maps backend: Routes API computeRoutes"
+    else
+      echo "deployed Maps backend: legacy/unknown — DO NOT enable Maps until a Routes-capable release is deployed"
+    fi
+    mode="$($SUDO sed -n 's/^MAPS_PROVIDER=//p' "$PD/.env.production" | tail -1)"
+    echo "MAPS_PROVIDER=${mode:-unset}"
     ;;
 
   deploy)
