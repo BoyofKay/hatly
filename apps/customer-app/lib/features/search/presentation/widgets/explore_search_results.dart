@@ -156,6 +156,7 @@ extension SearchVendorResultAsVendor on SearchVendorResult {
         etaMaxMinutes: 0,
         deliveryFeeMinor: 0,
         isOpen: isOpen,
+        openingHours: openingHours,
       );
 }
 

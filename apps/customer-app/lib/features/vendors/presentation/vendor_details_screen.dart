@@ -10,7 +10,6 @@ import '../../../shared_widgets/hatly_soft_image.dart';
 import '../../../shared_widgets/hatly_rating_inline.dart';
 import '../../../shared_widgets/availability_badge.dart';
 import '../../../shared_widgets/cart_summary_bar.dart';
-import '../../../shared_widgets/ltr_text.dart';
 import '../../../shared_widgets/sort_menu_button.dart';
 import '../../products/data/product_providers.dart';
 import '../../products/domain/product_category.dart';
@@ -20,6 +19,7 @@ import '../../products/presentation/widgets/product_list_tile.dart';
 import '../../products/presentation/widgets/product_list_tile_skeleton.dart';
 import '../data/vendor_providers.dart';
 import '../domain/vendor_branch_summary.dart';
+import '../domain/opening_hours.dart';
 import '../domain/vendor_details.dart';
 import '../../cart/presentation/widgets/cart_icon_button.dart';
 import '../../auth/presentation/auth_gate.dart';
@@ -175,6 +175,8 @@ class _VendorDetailsContent extends ConsumerWidget {
           SliverToBoxAdapter(
               child: _VendorHeader(details: details, vendorName: vendorName)),
           SliverToBoxAdapter(child: _BranchInfoSection(branch: details.branch)),
+          if (!details.branch.isOpen)
+            const SliverToBoxAdapter(child: _ClosedBanner()),
           // Visual UX (reference comparison): the menu search comes straight after the vendor/branch
           // info, then the menu sections, directly above the products they filter.
           const SliverToBoxAdapter(child: SizedBox(height: HatlySpacing.sm)),
@@ -400,7 +402,7 @@ class _BranchInfoSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final p = context.palette;
-    final todayHours = branch.openingHours[_todayKey()];
+    final hoursLabel = todayHoursLabel(branch.openingHours, l10n);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(
@@ -438,9 +440,10 @@ class _BranchInfoSection extends StatelessWidget {
                 openLabel: l10n.vendorOpenNow,
                 closedLabel: l10n.vendorClosed,
               ),
-              if (todayHours != null)
-                LtrText(
-                  '· ${todayHours.open}-${todayHours.close}',
+              if (hoursLabel != null)
+                Text(
+                  '· ${l10n.vendorHoursToday(hoursLabel)}',
+                  key: const Key('vendor-details-hours'),
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
             ],
@@ -449,10 +452,32 @@ class _BranchInfoSection extends StatelessWidget {
       ),
     );
   }
+}
 
-  static String _todayKey() {
-    const keys = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-    return keys[DateTime.now().weekday - 1];
+/// Shown under the branch info when the store is closed (switched off, temporarily closed or outside its working hours):
+/// the menu stays browsable, ordering is refused (owner request 2026-11-23).
+class _ClosedBanner extends StatelessWidget {
+  const _ClosedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final p = context.palette;
+    return Container(
+      key: const Key('vendor-closed-banner'),
+      margin: const EdgeInsets.fromLTRB(
+          HatlySpacing.md, HatlySpacing.sm, HatlySpacing.md, 0),
+      padding: const EdgeInsets.all(HatlySpacing.ms),
+      decoration: BoxDecoration(
+          color: p.surface,
+          border: Border.all(color: p.border),
+          borderRadius: BorderRadius.circular(HatlyRadius.card)),
+      child: Row(children: [
+        Icon(Icons.lock_clock_outlined, color: p.textMuted),
+        const SizedBox(width: HatlySpacing.sm),
+        Expanded(child: Text(l10n.vendorClosedBanner)),
+      ]),
+    );
   }
 }
 

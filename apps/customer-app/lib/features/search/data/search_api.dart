@@ -1,5 +1,7 @@
 import '../../../core/network/api_client.dart';
 import '../../products/domain/product.dart';
+import '../../vendors/domain/opening_hours.dart';
+import '../../vendors/domain/vendor_branch_summary.dart';
 
 /// Customer Search. Lean, dedicated result types — deliberately NOT
 /// the full `Vendor`/`Product` domain models, which carry fields
@@ -16,6 +18,7 @@ class SearchVendorResult {
     required this.isOpen,
     required this.ratingAverage,
     required this.ratingCount,
+    this.openingHours = const {},
   });
 
   /// VendorBranch.id — CONFIRMED, matches the existing Vendor Details route's id exactly.
@@ -26,6 +29,7 @@ class SearchVendorResult {
   final bool isOpen;
   final double ratingAverage;
   final int ratingCount;
+  final Map<String, OpeningHoursRange> openingHours;
 
   factory SearchVendorResult.fromJson(Map<String, dynamic> json) {
     return SearchVendorResult(
@@ -36,6 +40,7 @@ class SearchVendorResult {
       isOpen: json['isOpen'] as bool,
       ratingAverage: (json['ratingAverage'] as num).toDouble(),
       ratingCount: json['ratingCount'] as int,
+      openingHours: openingHoursFromJson(json['openingHours']),
     );
   }
 }

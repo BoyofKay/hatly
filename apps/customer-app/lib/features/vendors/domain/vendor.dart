@@ -1,3 +1,5 @@
+import 'vendor_branch_summary.dart';
+
 /// Customer-facing vendor summary, as it will eventually come from a
 /// real `GET /vendors` endpoint (not implemented on the backend yet —
 /// see FixtureVendorRepository). Field shapes deliberately mirror the
@@ -20,6 +22,7 @@ class Vendor {
     required this.isOpen,
     this.hasPromotion = false,
     this.coverImageUrl,
+    this.openingHours = const {},
   });
 
   final String id;
@@ -41,4 +44,7 @@ class Vendor {
   /// return one yet — `null` renders the soft placeholder, so the field can be
   /// wired later without touching any widget.
   final String? coverImageUrl;
+
+  /// Weekly working hours (empty = no hour limit) — today's are shown on the card and in the "closed" popup.
+  final Map<String, OpeningHoursRange> openingHours;
 }

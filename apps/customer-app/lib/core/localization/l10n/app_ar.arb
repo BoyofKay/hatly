@@ -1246,5 +1246,34 @@
   "addressOpenLocationSettings": "فتح إعدادات الموقع",
   "weightInlineLabel": "أو اكتب الوزن بالكيلوغرام",
   "weightEstimateNote": "التقدير: {price} — يُحدَّد السعر النهائي حسب الوزن الفعلي عند التجهيز.",
-  "@weightEstimateNote": {"placeholders": {"price": {"type": "String"}}}
+  "@weightEstimateNote": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "vendorClosedToday": "مغلق اليوم",
+  "vendorOpen24Hours": "مفتوح 24 ساعة",
+  "vendorHoursToday": "مواعيد اليوم: {hours}",
+  "vendorClosedDialogTitle": "{name} مغلق الآن",
+  "vendorClosedDialogBody": "يمكنك تصفّح القائمة، لكن لا يمكن الطلب حتى يفتح المتجر.",
+  "vendorClosedDialogClose": "إغلاق",
+  "vendorClosedDialogViewMenu": "عرض القائمة",
+  "vendorClosedBanner": "مغلق الآن — يمكنك تصفّح القائمة والطلب عند فتح المتجر.",
+  "checkoutErrorStoreClosed": "أحد المتاجر في سلتك مغلق الآن. احذف منتجاته أو اطلب عند فتحه.",
+  "@vendorHoursToday": {
+    "placeholders": {
+      "hours": {
+        "type": "String"
+      }
+    }
+  },
+  "@vendorClosedDialogTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  }
 }

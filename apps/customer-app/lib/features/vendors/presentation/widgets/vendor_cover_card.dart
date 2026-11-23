@@ -4,7 +4,10 @@ import '../../../../core/theme/hatly_theme.dart';
 import '../../../../shared_widgets/hatly_badge.dart';
 import '../../../../shared_widgets/hatly_soft_image.dart';
 import '../../../../shared_widgets/ltr_text.dart';
+import '../../../../shared_widgets/greyscale.dart';
+import '../../domain/opening_hours.dart';
 import '../../domain/vendor.dart';
+import 'vendor_closed_dialog.dart';
 
 /// Marketplace vendor card: cover image, overlapping logo, name, rating, ETA,
 /// open/closed and — only when the vendor has one — an offer badge.
@@ -40,6 +43,12 @@ class VendorCoverCard extends StatelessWidget {
         '\u2066${vendor.etaMinMinutes}–${vendor.etaMaxMinutes}\u2069';
     final hasRating = vendor.ratingCount > 0;
     final ratingText = vendor.ratingAverage.toStringAsFixed(1);
+    final hoursLabel = todayHoursLabel(vendor.openingHours, l10n);
+    // A closed store opens the "closed" popup first (Close / View menu) instead of the menu directly.
+    void handleTap() => vendor.isOpen
+        ? onTap()
+        : showVendorClosedDialog(context,
+            vendorName: name, hoursLabel: hoursLabel, onViewMenu: onTap);
 
     return Semantics(
       button: true,
@@ -49,9 +58,10 @@ class VendorCoverCard extends StatelessWidget {
         if (hasRating) l10n.vendorRatingSemantics(ratingText),
         if (hasEta) l10n.vendorEtaMinutes(etaRange),
         vendor.isOpen ? l10n.vendorOpenNow : l10n.vendorClosed,
+        if (hoursLabel != null) l10n.vendorHoursToday(hoursLabel),
         if (vendor.hasPromotion) l10n.badgeOffer,
       ].join('، '),
-      onTap: onTap,
+      onTap: handleTap,
       excludeSemantics: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -63,19 +73,22 @@ class VendorCoverCard extends StatelessWidget {
           type: MaterialType.transparency,
           child: InkWell(
             borderRadius: BorderRadius.circular(HatlyRadius.card),
-            onTap: onTap,
+            onTap: handleTap,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    HatlySoftImage(
-                      url: vendor.coverImageUrl,
-                      width: double.infinity,
-                      height: coverHeight,
-                      radius: HatlyRadius.card,
-                      placeholderIcon: Icons.storefront_outlined,
+                    Greyscale(
+                      enabled: !vendor.isOpen,
+                      child: HatlySoftImage(
+                        url: vendor.coverImageUrl,
+                        width: double.infinity,
+                        height: coverHeight,
+                        radius: HatlyRadius.card,
+                        placeholderIcon: Icons.storefront_outlined,
+                      ),
                     ),
                     if (vendor.hasPromotion)
                       PositionedDirectional(
@@ -91,12 +104,15 @@ class VendorCoverCard extends StatelessWidget {
                         padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
                             color: p.surface, shape: BoxShape.circle),
-                        child: HatlySoftImage(
-                          url: vendor.logoUrl,
-                          width: _logoSize,
-                          height: _logoSize,
-                          circular: true,
-                          placeholderIcon: Icons.store_outlined,
+                        child: Greyscale(
+                          enabled: !vendor.isOpen,
+                          child: HatlySoftImage(
+                            url: vendor.logoUrl,
+                            width: _logoSize,
+                            height: _logoSize,
+                            circular: true,
+                            placeholderIcon: Icons.store_outlined,
+                          ),
                         ),
                       ),
                     ),
@@ -163,6 +179,17 @@ class VendorCoverCard extends StatelessWidget {
                                 ? l10n.vendorOpenNow
                                 : l10n.vendorClosed,
                           ),
+                          if (hoursLabel != null)
+                            Row(
+                              key: Key('vendor-card-hours-${vendor.id}'),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.access_time_rounded,
+                                    size: 15, color: p.textMuted),
+                                const SizedBox(width: 4),
+                                Text(hoursLabel, style: context.type.caption),
+                              ],
+                            ),
                         ],
                       ),
                     ],

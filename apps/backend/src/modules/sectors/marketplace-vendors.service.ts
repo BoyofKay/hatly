@@ -1,4 +1,4 @@
-import { branchIdsUnderClosure, effectiveOpenSql } from '../../common/branch-availability';
+import { branchIdsUnderClosure, isWithinOpeningHours, effectiveOpenSql } from '../../common/branch-availability';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DeliveryZone } from '../delivery-zones/entities/delivery-zone.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -32,6 +32,8 @@ export interface MarketplaceVendorView {
   logoUrl: string | null;
   coverImageUrl: string | null;
   isOpen: boolean;
+  /** Weekly hours `{ sun: { open: '12:00', close: '02:00' }, … }` (Cairo time); empty = always open. */
+  openingHours: Record<string, unknown>;
   ratingAverage: number;
   ratingCount: number;
   /**
@@ -258,7 +260,9 @@ export class MarketplaceVendorsService {
       nameAr: branch.vendor.nameAr ?? null,
       logoUrl: branch.vendor.logoUrl ?? null,
       coverImageUrl: branch.vendor.coverImageUrl ?? null,
-      isOpen: branch.isOpen && !underClosure.has(branch.id),
+      // Bug 2026-11-23: 'open' must match checkout — the switch, temporary closures AND the weekly working hours.
+      isOpen: branch.isOpen && !underClosure.has(branch.id) && isWithinOpeningHours(branch.openingHours as never),
+      openingHours: branch.openingHours ?? {},
       ratingAverage: branch.ratingCount > 0 ? branch.ratingSumStars / branch.ratingCount : 0,
       ratingCount: branch.ratingCount,
       hasOffer: branchIdsWithOffer.has(branch.id),

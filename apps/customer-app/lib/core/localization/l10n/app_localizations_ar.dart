@@ -2506,4 +2506,38 @@ class AppLocalizationsAr extends AppLocalizations {
   String weightEstimateNote(String price) {
     return 'التقدير: $price — يُحدَّد السعر النهائي حسب الوزن الفعلي عند التجهيز.';
   }
+
+  @override
+  String get vendorClosedToday => 'مغلق اليوم';
+
+  @override
+  String get vendorOpen24Hours => 'مفتوح 24 ساعة';
+
+  @override
+  String vendorHoursToday(String hours) {
+    return 'مواعيد اليوم: $hours';
+  }
+
+  @override
+  String vendorClosedDialogTitle(String name) {
+    return '$name مغلق الآن';
+  }
+
+  @override
+  String get vendorClosedDialogBody =>
+      'يمكنك تصفّح القائمة، لكن لا يمكن الطلب حتى يفتح المتجر.';
+
+  @override
+  String get vendorClosedDialogClose => 'إغلاق';
+
+  @override
+  String get vendorClosedDialogViewMenu => 'عرض القائمة';
+
+  @override
+  String get vendorClosedBanner =>
+      'مغلق الآن — يمكنك تصفّح القائمة والطلب عند فتح المتجر.';
+
+  @override
+  String get checkoutErrorStoreClosed =>
+      'أحد المتاجر في سلتك مغلق الآن. احذف منتجاته أو اطلب عند فتحه.';
 }

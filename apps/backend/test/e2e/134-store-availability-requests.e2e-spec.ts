@@ -90,6 +90,16 @@ describe('E2E — store availability requests (R8/R44) and enforcement (R9)', ()
     if (t !== '03:00') {
       const refused = await order();
       expect(refused.body.error.details.code).toBe('BRANCH_OUTSIDE_OPENING_HOURS');
+      // Bug 2026-11-23: the customer screens said "Open now" while checkout refused — they now apply the same hours rule.
+      const page = expectData(await world.api('get', `/vendor-branches/${vendor.branchId}`));
+      expect(page.isOpen).toBe(false);
+      expect(page.openingHours).toEqual(closedNow);
+      const found = expectData(await world.api('get', `/search?q=${encodeURIComponent('Availability Vendor')}`));
+      const hit = (found.vendors.data as any[]).find((v) => v.id === vendor.branchId);
+      if (hit) {
+        expect(hit.isOpen).toBe(false);
+        expect(hit.openingHours).toEqual(closedNow);
+      }
     }
     await q(`UPDATE vendor_branches SET opening_hours = '{}'::jsonb WHERE id = $1`, [vendor.branchId]);
   });

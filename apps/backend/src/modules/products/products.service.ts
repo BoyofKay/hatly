@@ -1,5 +1,5 @@
 import { approveOnHatlyActivation } from './product-approval';
-import { branchIdsUnderClosure, effectiveOpenSql } from '../../common/branch-availability';
+import { branchIdsUnderClosure, isWithinOpeningHours, effectiveOpenSql } from '../../common/branch-availability';
 import { setStockContext } from '../orders/stock-context';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -112,7 +112,10 @@ export class ProductsService {
       address: branch.address,
       latitude: branch.latitude,
       longitude: branch.longitude,
-      isOpen: branch.isOpen && !(await branchIdsUnderClosure(this.branchesRepository.manager, [branch.id])).has(branch.id),
+      isOpen:
+        branch.isOpen &&
+        !(await branchIdsUnderClosure(this.branchesRepository.manager, [branch.id])).has(branch.id) &&
+        isWithinOpeningHours(branch.openingHours as never),
       openingHours: branch.openingHours,
       ratingAverage: branch.ratingCount > 0 ? branch.ratingSumStars / branch.ratingCount : 0,
       ratingCount: branch.ratingCount,

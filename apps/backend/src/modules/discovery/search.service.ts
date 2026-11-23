@@ -1,4 +1,4 @@
-import { branchIdsUnderClosure, effectiveOpenSql } from '../../common/branch-availability';
+import { branchIdsUnderClosure, isWithinOpeningHours, effectiveOpenSql } from '../../common/branch-availability';
 import { resolvePublicCatalogIds } from '../catalog/public-catalog-link';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,6 +17,7 @@ export interface SearchVendorResult {
   logoUrl: string | null;
   coverImageUrl: string | null;
   isOpen: boolean;
+  openingHours: Record<string, unknown>;
   ratingAverage: number;
   ratingCount: number;
 }
@@ -192,7 +193,8 @@ export class SearchService {
       nameAr: branch.vendor.nameAr ?? null,
       logoUrl: branch.vendor.logoUrl ?? null,
       coverImageUrl: branch.vendor.coverImageUrl ?? null,
-      isOpen: branch.isOpen && !underClosure.has(branch.id),
+      isOpen: branch.isOpen && !underClosure.has(branch.id) && isWithinOpeningHours(branch.openingHours as never),
+      openingHours: branch.openingHours ?? {},
       ratingAverage: branch.ratingCount > 0 ? branch.ratingSumStars / branch.ratingCount : 0,
       ratingCount: branch.ratingCount,
     }));

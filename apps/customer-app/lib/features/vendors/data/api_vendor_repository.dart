@@ -3,6 +3,7 @@ import '../domain/vendor.dart';
 import '../domain/vendor_details.dart';
 import '../domain/vendor_profile.dart';
 import '../domain/vendor_branch_summary.dart';
+import '../domain/opening_hours.dart';
 import 'vendor_repository.dart';
 
 /// Real implementation of [VendorRepository] for the marketplace
@@ -67,7 +68,6 @@ class ApiVendorRepository implements VendorRepository {
       (data) {
         final json = data['data'] as Map<String, dynamic>;
         final vendorJson = json['vendor'] as Map<String, dynamic>;
-        final openingHoursJson = json['openingHours'] as Map<String, dynamic>;
 
         return VendorDetails(
           vendor: VendorProfile(
@@ -90,15 +90,7 @@ class ApiVendorRepository implements VendorRepository {
             isOpen: json['isOpen'] as bool,
             allowsCustomRequests:
                 json['allowsCustomRequests'] as bool? ?? false,
-            openingHours: openingHoursJson.map(
-              (day, hours) => MapEntry(
-                day,
-                OpeningHoursRange(
-                  open: (hours as Map<String, dynamic>)['open'] as String,
-                  close: hours['close'] as String,
-                ),
-              ),
-            ),
+            openingHours: openingHoursFromJson(json['openingHours']),
           ),
           ratingAverage: (json['ratingAverage'] as num).toDouble(),
           ratingCount: json['ratingCount'] as int,
@@ -202,6 +194,7 @@ class ApiVendorRepository implements VendorRepository {
       // this branch, batch-resolved server-side. Read defensively (`?? false`) so an older cached
       // response shape (before this field existed) still degrades safely.
       hasPromotion: json['hasOffer'] as bool? ?? false,
+      openingHours: openingHoursFromJson(json['openingHours']),
     );
   }
 }

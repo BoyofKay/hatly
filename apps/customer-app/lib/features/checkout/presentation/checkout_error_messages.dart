@@ -30,6 +30,10 @@ String localizedCheckoutErrorMessage(BuildContext context, ApiException error) {
     case 'VENDOR_DOES_NOT_DELIVER':
     case 'VENDOR_OUTSIDE_DELIVERY_AREA':
       return l10n.checkoutAddressOutOfServiceArea;
+    case 'BRANCH_CLOSED':
+    case 'BRANCH_OUTSIDE_OPENING_HOURS':
+    case 'BRANCH_TEMPORARILY_CLOSED':
+      return l10n.checkoutErrorStoreClosed;
     case 'PRODUCT_UNAVAILABLE':
     case 'BRANCH_UNAVAILABLE':
       return l10n.checkoutBlockerUnavailable;

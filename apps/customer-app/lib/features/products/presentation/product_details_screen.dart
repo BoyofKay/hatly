@@ -1,3 +1,4 @@
+import '../../vendors/presentation/widgets/vendor_closed_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -229,6 +230,33 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
   Future<void> _addToCart(Product product) async {
     // A guest browses products freely, but the cart needs an account: sign in (and come back here) first.
     if (!requireSignIn(context, ref)) return;
+    // Owner request 2026-11-23: a closed store takes no order — say so here (Close / View menu) instead of letting the customer
+    // fill a cart that checkout will refuse.
+    final closedVendor = product.vendor;
+    if (closedVendor != null && !closedVendor.isOpen) {
+      final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+      final name = isArabic && closedVendor.nameAr != null
+          ? closedVendor.nameAr!
+          : closedVendor.name;
+      final storePath = '/vendors/${product.vendorBranchId}';
+      final router = GoRouter.of(context);
+      final matches = router.routerDelegate.currentConfiguration.matches;
+      final previous = matches.length >= 2
+          ? matches[matches.length - 2].matchedLocation
+          : null;
+      await showVendorClosedDialog(context,
+          vendorName: name,
+          onViewMenu: product.vendorBranchId.isEmpty
+              ? null
+              : () {
+                  if (previous == storePath && router.canPop()) {
+                    router.pop();
+                  } else {
+                    router.pushReplacement(storePath);
+                  }
+                });
+      return;
+    }
     final config = _config!;
     // Mirrors the backend's OPTION_REQUIRED rule so the customer learns it in words before a round trip.
     if (!config.isValid(product)) {
@@ -279,7 +307,9 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
       // returns to wherever they started (e.g. Home).
       final storePath = '/vendors/${product.vendorBranchId}';
       final matches = router.routerDelegate.currentConfiguration.matches;
-      final previous = matches.length >= 2 ? matches[matches.length - 2].matchedLocation : null;
+      final previous = matches.length >= 2
+          ? matches[matches.length - 2].matchedLocation
+          : null;
       if (previous == storePath && context.canPop()) {
         context.pop();
       } else {
