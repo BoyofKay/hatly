@@ -24,15 +24,14 @@ class HatlySearchBar extends StatelessWidget {
       excludeSemantics: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: p.surface,
-          borderRadius: BorderRadius.circular(HatlyRadius.circular),
-          border: Border.all(color: p.border),
-          boxShadow: HatlyShadows.soft(p),
+          color: p.surfaceSoft,
+          borderRadius: BorderRadius.circular(HatlyRadius.searchBar),
+          border: Border.all(color: p.border.withValues(alpha: .5)),
         ),
         child: Material(
           type: MaterialType.transparency,
           child: InkWell(
-            borderRadius: BorderRadius.circular(HatlyRadius.circular),
+            borderRadius: BorderRadius.circular(HatlyRadius.searchBar),
             onTap: onTap,
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 52),
@@ -41,14 +40,7 @@ class HatlySearchBar extends StatelessWidget {
                     start: HatlySpacing.ms, end: HatlySpacing.md),
                 child: Row(
                   children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                          color: p.accentSoft, shape: BoxShape.circle),
-                      child:
-                          Icon(Icons.search_rounded, color: p.accent, size: 22),
-                    ),
+                    Icon(Icons.search_rounded, color: p.textMuted, size: 22),
                     const SizedBox(width: HatlySpacing.ms),
                     Expanded(
                       child: Text(
