@@ -56,6 +56,10 @@ class HatlyServiceEntryCard extends StatelessWidget {
                 const SizedBox(width: HatlySpacing.ms),
                 Expanded(
                   child: Column(
+                    // In Scaffold.bottomNavigationBar, an unconstrained max-axis
+                    // Column would expand to the whole viewport and block taps
+                    // on vendor filters. Keep the entry content-height only.
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(l10n.hatlyServiceEntryTitle,
