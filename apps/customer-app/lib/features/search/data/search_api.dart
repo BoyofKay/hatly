@@ -12,6 +12,7 @@ import '../../vendors/domain/vendor_branch_summary.dart';
 class SearchVendorResult {
   const SearchVendorResult({
     required this.id,
+    this.vendorId,
     required this.name,
     this.nameAr,
     this.logoUrl,
@@ -23,6 +24,7 @@ class SearchVendorResult {
 
   /// VendorBranch.id — CONFIRMED, matches the existing Vendor Details route's id exactly.
   final String id;
+  final String? vendorId;
   final String name;
   final String? nameAr;
   final String? logoUrl;
@@ -34,6 +36,7 @@ class SearchVendorResult {
   factory SearchVendorResult.fromJson(Map<String, dynamic> json) {
     return SearchVendorResult(
       id: json['id'] as String,
+      vendorId: json['vendorId'] as String?,
       name: json['name'] as String,
       nameAr: json['nameAr'] as String?,
       logoUrl: json['logoUrl'] as String?,

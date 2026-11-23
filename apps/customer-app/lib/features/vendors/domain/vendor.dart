@@ -10,6 +10,7 @@ import 'vendor_branch_summary.dart';
 class Vendor {
   const Vendor({
     required this.id,
+    this.vendorId,
     required this.name,
     this.nameAr,
     required this.category,
@@ -25,7 +26,10 @@ class Vendor {
     this.openingHours = const {},
   });
 
+  /// Branch id used for navigation, cart and product loading. */
   final String id;
+  /// Owning vendor id used only for vendor-level favorites. */
+  final String? vendorId;
   final String name;
   final String? nameAr;
   final String

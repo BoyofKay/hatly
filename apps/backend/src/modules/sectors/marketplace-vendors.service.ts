@@ -27,6 +27,8 @@ export interface MarketplaceVendorView {
    * has branches in each.
    */
   id: string;
+  /** Vendor-level identity used by Favorites; id above remains the branch route. */
+  vendorId: string;
   name: string;
   nameAr: string | null;
   logoUrl: string | null;
@@ -256,6 +258,7 @@ export class MarketplaceVendorsService {
     const underClosure = await branchIdsUnderClosure(this.branchesRepository.manager, branches.map((b) => b.id));
     const data = branches.map((branch) => ({
       id: branch.id,
+      vendorId: branch.vendorId,
       name: branch.vendor.name,
       nameAr: branch.vendor.nameAr ?? null,
       logoUrl: branch.vendor.logoUrl ?? null,

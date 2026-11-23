@@ -12,6 +12,8 @@ import { OfferConsumptionService, ActiveOfferSummary } from '../offers/offer-con
 export interface SearchVendorResult {
   /** VendorBranch.id — CONFIRMED, the same addressable unit `/vendors` and `/vendor-branches/:id` already use, never a bare Vendor id. */
   id: string;
+  /** Vendor-level ID for customer favorites; id is still VendorBranch ID. */
+  vendorId: string;
   name: string;
   nameAr: string | null;
   logoUrl: string | null;
@@ -189,6 +191,7 @@ export class SearchService {
     const underClosure = await branchIdsUnderClosure(this.branchesRepository.manager, branches.map((b) => b.id));
     const data = branches.map((branch) => ({
       id: branch.id,
+      vendorId: branch.vendorId,
       name: branch.vendor.name,
       nameAr: branch.vendor.nameAr ?? null,
       logoUrl: branch.vendor.logoUrl ?? null,

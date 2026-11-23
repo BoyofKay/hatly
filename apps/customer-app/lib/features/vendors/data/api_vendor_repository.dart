@@ -177,6 +177,7 @@ class ApiVendorRepository implements VendorRepository {
   static Vendor _toVendor(Map<String, dynamic> json) {
     return Vendor(
       id: json['id'] as String,
+      vendorId: json['vendorId'] as String?,
       name: json['name'] as String,
       nameAr: json['nameAr'] as String?,
       category:

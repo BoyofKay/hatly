@@ -9,6 +9,7 @@ import '../../../../shared_widgets/availability_badge.dart';
 import '../../../../shared_widgets/hatly_rating_inline.dart';
 import '../../../auth/presentation/auth_gate.dart';
 import '../../../favorites/data/favorites_providers.dart';
+import '../../data/vendor_providers.dart';
 import '../../domain/vendor.dart';
 import '../../domain/opening_hours.dart';
 import '../../../../shared_widgets/greyscale.dart';
@@ -156,7 +157,7 @@ class VendorCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                _FavoriteHeartButton(vendorId: vendor.id),
+                _FavoriteHeartButton(vendorId: vendor.vendorId, branchId: vendor.id),
               ],
             ),
           ),
@@ -176,9 +177,10 @@ class VendorCard extends StatelessWidget {
 /// chunk's own "don't rebuild unrelated parts" guidance — a small,
 /// simple scoping choice, not a custom selector architecture.
 class _FavoriteHeartButton extends ConsumerWidget {
-  const _FavoriteHeartButton({required this.vendorId});
+  const _FavoriteHeartButton({required this.vendorId, required this.branchId});
 
-  final String vendorId;
+  final String? vendorId;
+  final String branchId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -195,7 +197,7 @@ class _FavoriteHeartButton extends ConsumerWidget {
     // this, not a functional bug — the provider itself still
     // guarantees no duplicate API call per vendorId regardless.
     final isLoading = ref.watch(favoritesControllerProvider).isLoading;
-    final isFavorited = controller.isFavorited(vendorId);
+    final isFavorited = vendorId != null && controller.isFavorited(vendorId!);
 
     return IconButton(
       // A nested IconButton has its own ink response, consuming the
@@ -217,9 +219,20 @@ class _FavoriteHeartButton extends ConsumerWidget {
           : () async {
               // Favourites belong to an account: a guest is sent to sign-in first (nothing is requested).
               if (!requireSignIn(context, ref)) return;
-              final error = isFavorited
-                  ? await controller.remove(vendorId)
-                  : await controller.add(vendorId);
+              // A branch route ID is not a vendor ID. For older cached API
+              // results without vendorId, resolve the owner before mutating.
+              String id;
+              try {
+                id = vendorId ?? (await ref.read(vendorRepositoryProvider)
+                    .getVendorDetails(branchId)).vendor.id;
+              } catch (_) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l10n.somethingWentWrong)));
+                return;
+              }
+              final error = controller.isFavorited(id)
+                  ? await controller.remove(id)
+                  : await controller.add(id);
               // The provider's own refreshed state (or its unchanged
               // state on failure) is what this widget reads on the
               // next build via `.watch` above — nothing is set

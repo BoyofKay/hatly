@@ -221,6 +221,7 @@ class _FilterChips extends StatelessWidget {
 extension SearchVendorResultAsVendor on SearchVendorResult {
   Vendor toVendor() => Vendor(
         id: id,
+        vendorId: vendorId,
         name: name,
         nameAr: nameAr,
         category: '',
