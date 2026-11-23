@@ -42,28 +42,28 @@ export class UpdateDeliveryZoneDto {
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
-  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter a single name, not a list.' })
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter a single name, not a list.' })
   zoneName?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
-  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter a single name, not a list.' })
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter a single name, not a list.' })
   zoneNameAr?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
-  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter one neighborhood/village per record.' })
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter one neighborhood/village per record.' })
   name?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
-  @Matches(/^[^,،;|\\r\\n]+$/, { message: 'Enter one neighborhood/village per record.' })
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter one neighborhood/village per record.' })
   nameAr?: string;
 
   @IsOptional()
