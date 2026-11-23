@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
+import { IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
 
 const NOT_BLANK = /\S/;
 
@@ -37,16 +37,33 @@ export class UpdateDeliveryZoneDto {
   @Matches(NOT_BLANK)
   cityAr?: string;
 
+  /** Parent delivery zone name, separate from exactly ONE child neighborhood/village. */
   @IsOptional()
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter a single name, not a list.' })
+  zoneName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter a single name, not a list.' })
+  zoneNameAr?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter one neighborhood/village per record.' })
   name?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter one neighborhood/village per record.' })
   nameAr?: string;
 
   @IsOptional()
@@ -62,12 +79,4 @@ export class UpdateDeliveryZoneDto {
   @ValidateIf((_, v) => v !== undefined && v !== null)
   @IsLongitude()
   representativeLongitude?: number | null;
-
-  /** Villages / neighbourhoods inside the zone (names, Arabic). Replaces the list when sent. */
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(300)
-  @IsString({ each: true })
-  @MaxLength(120, { each: true })
-  areas?: string[];
 }

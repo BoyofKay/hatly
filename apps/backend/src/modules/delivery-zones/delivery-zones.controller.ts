@@ -19,6 +19,8 @@ export class DeliveryZonesController {
     return {
       data: zones.map((z) => ({
         id: z.id,
+        zoneName: z.zoneName,
+        zoneNameAr: z.zoneNameAr,
         name: z.name,
         nameAr: z.nameAr,
         city: z.city,
@@ -26,6 +28,7 @@ export class DeliveryZonesController {
         governorate: z.governorate,
         governorateAr: z.governorateAr,
         deliveryFeeMinor: z.deliveryFeeMinor,
+        /** Backward compatibility for already-installed earlier customer apps. */
         areas: z.areas ?? [],
       })),
     };

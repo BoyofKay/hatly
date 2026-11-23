@@ -50,14 +50,8 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
 
   String? _governorate;
   String? _city;
+  String? _parentZoneAr;
   String? _zoneId;
-
-  /// The village / neighbourhood inside the zone (when the zone lists them). Saved at the start of the landmark line.
-  String? _village;
-  bool _showVillageError = false;
-
-  /// Filled by the zone list once loaded (the villages of the chosen zone).
-  List<String> _selectedZoneAreas = const [];
   bool _zoneInitialized = false;
 
   /// True once the customer discarded the saved area (changed method): an edited address's old zone is then not preselected again.
@@ -131,7 +125,12 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     }
     _governorate = current.governorateAr;
     _city = current.cityAr;
-    if (zones.any((z) => z.id == current.id)) _zoneId = current.id;
+    // A legacy combined parent can be hidden after safe migration while
+    // existing addresses still refer to its original ID. Never put a missing
+    // dropdown value into Flutter (which would assert and crash the editor).
+    final currentIsSelectable = zones.any((z) => z.id == current.id);
+    _parentZoneAr = currentIsSelectable ? current.parentZoneKey : null;
+    if (currentIsSelectable) _zoneId = current.id;
   }
 
   /// Data-driven, never hardcoded: when the backend offers exactly ONE governorate / city / active zone for the current
@@ -141,10 +140,14 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
     if (_governorate == null && governorates.length == 1) _governorate = governorates.first;
     final cities = zones.where((z) => z.governorateAr == _governorate).map((z) => z.cityAr).toSet();
     if (_city == null && cities.length == 1) _city = cities.first;
-    if (!includeZone || _zoneId != null || _city == null) return;
+    if (_city == null) return;
     final cityZones = zones.where((z) => z.governorateAr == _governorate && z.cityAr == _city).toList();
-    if (cityZones.length == 1) {
-      _zoneId = cityZones.single.id;
+    final parents = cityZones.map((z) => z.parentZoneKey).toSet();
+    if (_parentZoneAr == null && parents.length == 1) _parentZoneAr = parents.first;
+    if (!includeZone || _zoneId != null || _parentZoneAr == null) return;
+    final children = cityZones.where((z) => z.parentZoneKey == _parentZoneAr).toList();
+    if (children.length == 1) {
+      _zoneId = children.single.id;
       _zoneAutoSelected = true;
     }
   }
@@ -200,6 +203,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
       } else {
         _governorate = null;
         _city = null;
+        _parentZoneAr = null;
         _zoneId = null;
         _zoneAutoSelected = false;
         _zoneInitialized = false;
@@ -252,11 +256,6 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
       );
     } else {
       if (_zoneId == null || _line1.text.trim().isEmpty) return;
-      final zoneAreas = _selectedZoneAreas;
-      if (zoneAreas.isNotEmpty && _village == null) {
-        setState(() => _showVillageError = true);
-        return;
-      }
       input = AddressInput.manual(
         label: _label.text,
         line1: _line1.text.trim(),
@@ -265,7 +264,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
         buildingNumber: _building.text,
         floor: _floor.text,
         apartment: _apartment.text,
-        landmark: _village == null ? _landmark.text : [_village!, if (_landmark.text.trim().isNotEmpty) _landmark.text.trim()].join(' · '),
+        landmark: _landmark.text,
         isDefault: _isDefault ? true : null,
         includeMode: includeMode,
       );
@@ -356,18 +355,21 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
           final cities = <String, DeliveryZone>{
             for (final z in zones.where((z) => z.governorateAr == _governorate)) z.cityAr: z,
           };
-          final areaZones = zones.where((z) => z.governorateAr == _governorate && z.cityAr == _city).toList();
+          final cityZones = zones.where((z) => z.governorateAr == _governorate && z.cityAr == _city).toList();
+          final parents = <String, DeliveryZone>{
+            for (final z in cityZones) z.parentZoneKey: z,
+          };
+          final areaZones = cityZones.where((z) => z.parentZoneKey == _parentZoneAr).toList();
           DeliveryZone? selected;
           for (final z in areaZones) {
             if (z.id == _zoneId) selected = z;
           }
-          _selectedZoneAreas = selected?.areas ?? const [];
           final zoneMissing = _showErrors && _zoneId == null;
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (existing != null && existing.needsZoneSelection && _zoneId == null) ...[
+              if (existing != null && _zoneId == null) ...[
                 HatlySurface(
                   key: const Key('address-zone-banner'),
                   borderColor: p.urgent,
@@ -401,6 +403,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 onChanged: (v) => setState(() {
                   _governorate = v;
                   _city = null;
+                  _parentZoneAr = null;
                   _zoneId = null;
                   _zoneAutoSelected = false;
                   _applySingleChoices(zones);
@@ -416,6 +419,7 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 ],
                 onChanged: (v) => setState(() {
                   _city = v;
+                  _parentZoneAr = null;
                   _zoneId = null;
                   _zoneAutoSelected = false;
                   _applySingleChoices(zones);
@@ -423,8 +427,24 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
               ),
               const SizedBox(height: HatlySpacing.ms),
               _dropdown<String>(
-                key: ValueKey('address-zone-$_governorate-$_city'),
+                key: ValueKey('address-parent-zone-$_governorate-$_city'),
                 label: l10n.addressZoneLabel,
+                value: _parentZoneAr,
+                items: [
+                  for (final e in parents.entries)
+                    DropdownMenuItem(value: e.key, child: Text(e.value.displayZone(arabic))),
+                ],
+                onChanged: (v) => setState(() {
+                  _parentZoneAr = v;
+                  _zoneId = null;
+                  _zoneAutoSelected = false;
+                  _applySingleChoices(zones);
+                }),
+              ),
+              const SizedBox(height: HatlySpacing.ms),
+              _dropdown<String>(
+                key: ValueKey('address-zone-$_governorate-$_city-$_parentZoneAr'),
+                label: arabic ? 'الحي / القرية' : 'Neighborhood / Village',
                 value: _zoneId,
                 errorText: zoneMissing ? l10n.addressZoneRequired : null,
                 items: [
@@ -433,22 +453,10 @@ class _AddAddressScreenState extends ConsumerState<AddAddressScreen> {
                 ],
                 onChanged: (v) => setState(() {
                   _zoneId = v;
-                  _village = null;
                   _zoneAutoSelected = false;
                 }),
               ),
-              if (selected != null && selected.areas.isNotEmpty) ...[
-                const SizedBox(height: HatlySpacing.sm),
-                _dropdown<String>(
-                  key: ValueKey('address-village-${selected.id}'),
-                  label: l10n.addressVillageLabel,
-                  value: selected.areas.contains(_village) ? _village : null,
-                  errorText: _showVillageError && _village == null ? l10n.addressVillageRequired : null,
-                  items: [for (final a in selected.areas) DropdownMenuItem(value: a, child: Text(a))],
-                  onChanged: (v) => setState(() => _village = v),
-                ),
-              ],
-              if (_city != null && areaZones.isEmpty) ...[
+              if (_city != null && cityZones.isEmpty) ...[
                 const SizedBox(height: HatlySpacing.sm),
                 Text(l10n.addressCityNoZones,
                     key: const Key('address-city-no-zones'), style: context.type.small.copyWith(color: p.urgent)),

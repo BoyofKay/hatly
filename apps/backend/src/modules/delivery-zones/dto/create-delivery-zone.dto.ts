@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsInt, IsLatitude, IsLongitude, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 
 /** The fee ceiling is a typo guard (100,000 EGP), not a business rule. */
 export const MAX_ZONE_DELIVERY_FEE_MINOR = 10_000_000;
@@ -28,14 +28,29 @@ export class CreateDeliveryZoneDto {
   @Matches(NOT_BLANK)
   cityAr: string;
 
+  /** Parent delivery zone name, separate from exactly ONE child neighborhood/village. */
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter a single name, not a list.' })
+  zoneName: string;
+
+  @IsString()
+  @MaxLength(150)
+  @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter a single name, not a list.' })
+  zoneNameAr: string;
+
+  @IsString()
+  @MaxLength(150)
+  @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter one neighborhood/village per record.' })
   name: string;
 
   @IsString()
   @MaxLength(150)
   @Matches(NOT_BLANK)
+  @Matches(/^[^,،;|\r\n]+$/, { message: 'Enter one neighborhood/village per record.' })
   nameAr: string;
 
   /** Integer minor units. 0 is allowed (a free-delivery zone is a real business choice). */
@@ -58,12 +73,4 @@ export class CreateDeliveryZoneDto {
   @IsOptional()
   @IsLongitude()
   representativeLongitude?: number;
-
-  /** Villages / neighbourhoods inside the zone (names, Arabic). Replaces the list when sent. */
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(300)
-  @IsString({ each: true })
-  @MaxLength(120, { each: true })
-  areas?: string[];
 }

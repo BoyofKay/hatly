@@ -17,6 +17,7 @@
     "bootstrap:admin": "ts-node src/scripts/bootstrap-admin.ts",
     "seed:dev-marketplace": "ts-node src/scripts/seed-dev-marketplace.ts",
     "seed:dev-delivery-zones": "ts-node src/scripts/seed-dev-delivery-zones.ts",
+    "delivery:neighborhood-reconcile": "ts-node src/scripts/reconcile-delivery-neighborhoods.ts",
     "demo:marketplace": "ts-node src/scripts/demo-marketplace.ts",
     "assets:manifest": "ts-node src/scripts/asset-manifest.ts",
     "test:integration": "jest --config test/integration/jest-integration.json --runInBand",

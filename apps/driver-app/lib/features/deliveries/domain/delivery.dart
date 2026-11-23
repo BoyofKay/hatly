@@ -138,6 +138,7 @@ class DeliveryAddress {
     this.longitude,
     this.instructions,
     this.zoneNameAr,
+    this.zoneParentNameAr,
     this.zoneCityAr,
     this.buildingNumber,
     this.floor,
@@ -151,6 +152,7 @@ class DeliveryAddress {
   final double? longitude;
   final String? instructions;
   final String? zoneNameAr;
+  final String? zoneParentNameAr;
   final String? zoneCityAr;
   final String? buildingNumber;
   final String? floor;
@@ -162,7 +164,8 @@ class DeliveryAddress {
   /// "بلبيس — أبو نصيب", or null for an order placed before zones existed.
   String? get areaLabel {
     if (zoneNameAr == null) return null;
-    return zoneCityAr == null ? zoneNameAr : '$zoneCityAr — $zoneNameAr';
+    final parent = zoneParentNameAr ?? zoneCityAr;
+    return parent == null ? zoneNameAr : '$parent | $zoneNameAr';
   }
 
   factory DeliveryAddress.fromJson(Map<String, dynamic> json) {
@@ -183,6 +186,7 @@ class DeliveryAddress {
       longitude: lat != null && lng != null ? lng : null,
       instructions: json['instructions'] as String?,
       zoneNameAr: zone is Map ? zone['nameAr'] as String? : null,
+      zoneParentNameAr: zone is Map ? zone['zoneNameAr'] as String? : null,
       zoneCityAr: zone is Map ? zone['cityAr'] as String? : null,
       buildingNumber: json['buildingNumber'] as String?,
       floor: json['floor'] as String?,
@@ -301,8 +305,7 @@ class Delivery {
   /// "waiting for a driver") is not active — whatever any vendor part's own status says (a multi-store order is one order for the driver).
   static const activeStatuses = {'ASSIGNED_TO_DRIVER', 'PICKED_UP', 'ON_THE_WAY', 'PENDING', 'CONFIRMED', 'PREPARING'};
 
-  /// Early dispatch (2026-11-22): the driver is attached while the store still prepares the order (Confirmed / Preparing). They head to
-  /// the store; "Picked up" is offered only once the store marks the order ready.
+  /// Early dispatch: the driver is attached while the store prepares the order.
   bool get isBeingPrepared => orderStatus == 'PENDING' || orderStatus == 'CONFIRMED' || orderStatus == 'PREPARING';
   bool get isActive => activeStatuses.contains(orderStatus);
   final String fulfillmentType;

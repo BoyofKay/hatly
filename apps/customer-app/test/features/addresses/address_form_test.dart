@@ -549,7 +549,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('open')));
       await tester.pumpAndSettle();
-      expect(find.text('بلبيس — أبو نصيب'), findsOneWidget);
+      expect(find.text('بلبيس | أبو نصيب'), findsOneWidget);
       expect(find.byKey(const Key('address-needs-zone-old')), findsOneWidget);
       expect(find.byKey(const Key('address-needs-zone-z1')), findsNothing);
 
