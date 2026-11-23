@@ -62,3 +62,11 @@ After the repository secret was added, Production Ops `maps-check` run `45244749
 - User previously configured `151.254.63.33` in the Google Cloud key's IP restriction. This mismatches the server's confirmed outbound IP; likely reason for 403.
 - **Required owner action:** In Google Cloud Credentials edit the existing key's **application restriction** to `152.228.240.4`; keep Routes and Geocoding as the only allowed APIs and retain GitHub secret unchanged. Allow restrictions to propagate.
 - **After owner changes restriction:** Repeat `ACTION=maps-check`; only if that passes use `ACTION=maps-on` and verify live container mode/health. Never bypass the IP restriction or activate after a failed check.
+
+## 2026-11-23 19:31 UTC — definitive provider rejection after corrected IP
+
+- Owner reported correcting the Cloud Console key restriction. The preflight was run three times read-only, last run **45249723767**.
+- Google **Geocoding** itself returned `REQUEST_DENIED` with exact message: `This IP, site or mobile application is not authorized to use this API key. Request received from IP address 152.228.240.4, with empty referer`.
+- This independently confirms **Google observes 152.228.240.4** and **the key used by the production workflow is not allowed from that IP**, as of this run. Because Geocoding fails first, Routes is not tested in this run. Earlier Routes also returned `403 PERMISSION_DENIED / ACCESS_DENIED`.
+- Production `MAPS_PROVIDER=none` was not modified and apps were not restarted. **Do not activate**.
+- Investigate key identity (Google Cloud project/key selected must be the same secret value configured in GitHub Actions), saved application restrictions, and propagation. Do not relax security or expose the full key. Re-run `maps-check` only after confirming the above; `maps-on` may run only after both calls pass.
