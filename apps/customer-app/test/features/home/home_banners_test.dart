@@ -211,7 +211,8 @@ void main() {
       await tester.pumpAndSettle();
       final afterSwipe = tester.widget<PageView>(find.byType(PageView)).controller!.page!;
       expect(afterSwipe, isNot(start));
-      expect(kLoopingPagerGlide, const Duration(milliseconds: 900));
+      expect(tester.widget<LoopingPager>(find.byType(LoopingPager)).autoPlayGlide,
+          const Duration(milliseconds: 900));
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
       expect(tester.widget<PageView>(find.byType(PageView)).controller!.page!, isNot(afterSwipe));
