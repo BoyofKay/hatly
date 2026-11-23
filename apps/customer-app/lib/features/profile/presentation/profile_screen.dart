@@ -51,7 +51,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Reference board: a full-width orange header with the avatar centred, then one menu list.
-            _ProfileHeader(name: name),
+            _ProfileHeader(name: name, onEdit: _editName, saving: _isSavingName),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                   HatlySpacing.md, HatlySpacing.lg, HatlySpacing.md, 0),
@@ -59,18 +59,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _ProfileGroup(children: [
-                    _ProfileRow(
-                      key: const Key('profile-edit-name'),
-                      icon: Icons.badge_outlined,
-                      title: l10n.fullNameLabel,
-                      value: Text(name?.trim().isNotEmpty == true ? name! : '—',
-                        key: const Key('profile-displayed-name'),
-                        style: context.type.caption),
-                      trailing: _isSavingName
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.edit_outlined, size: 18),
-                      onTap: _isSavingName ? () {} : _editName,
-                    ),
                     _DefaultAddressCard(addressesAsync: addressesAsync),
                     _WalletCard(balanceAsync: balanceAsync),
                     _LoyaltyCard(balanceAsync: loyaltyBalanceAsync),
@@ -183,13 +171,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 /// The top of the account (reference board): a full-width orange header that runs under the status bar, with the title, a
 /// centred white avatar (the customer's initial when the name is known on this device) and the name below it.
 class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader({required this.name});
+  const _ProfileHeader({required this.name, required this.onEdit, required this.saving});
 
   final String? name;
+  final VoidCallback onEdit;
+  final bool saving;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     final p = context.palette;
     final trimmed = name?.trim() ?? '';
     final initial =
@@ -208,22 +197,14 @@ class _ProfileHeader extends StatelessWidget {
           begin: AlignmentDirectional.topStart,
           end: AlignmentDirectional.bottomEnd,
           colors: [
-            p.accent,
-            Color.lerp(p.accent, const Color(0xFFFFA65C), 0.6)!
+            Color.alphaBlend(p.accent.withValues(alpha: 0.60), p.surface),
+            Color.alphaBlend(const Color(0xFFFFA65C).withValues(alpha: 0.60), p.surface)
           ],
         ),
       ),
       child: Column(
         children: [
-          SizedBox(
-            height: 44,
-            child: Center(
-              child: Text(l10n.profile,
-                  style: context.type.title.copyWith(
-                      color: p.accentOn, fontWeight: FontWeight.w800)),
-            ),
-          ),
-          const SizedBox(height: HatlySpacing.sm),
+          const SizedBox(height: HatlySpacing.md),
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
@@ -242,15 +223,18 @@ class _ProfileHeader extends StatelessWidget {
           ),
           if (trimmed.isNotEmpty) ...[
             const SizedBox(height: HatlySpacing.ms),
-            Text(
-              trimmed,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              // Dark ink on the brand orange (7:1) — the palette's accessibility rule.
-              style: context.type.h2
-                  .copyWith(color: p.accentOn, fontWeight: FontWeight.w800),
-            ),
+            Row(mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min, children: [
+              Flexible(child: Text(trimmed,
+                key: const Key('profile-displayed-name'),
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: context.type.h2.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800))),
+              const SizedBox(width: 4),
+              if (saving) const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+              else IconButton(
+                key: const Key('profile-edit-name'), onPressed: onEdit,
+                tooltip: Localizations.localeOf(context).languageCode == 'ar' ? 'تعديل الاسم' : 'Edit name',
+                icon: Icon(Icons.edit_outlined, size: 20, color: p.textPrimary)),
+            ]),
           ],
         ],
       ),

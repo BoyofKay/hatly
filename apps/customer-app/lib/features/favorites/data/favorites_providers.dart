@@ -88,6 +88,9 @@ class FavoritesController
     try {
       await call();
       await refresh();
+      if (state.hasError) {
+        return ApiException(code: 'FAVORITES_REFRESH_FAILED', message: 'The favorite changed but the list could not be refreshed. Please retry.');
+      }
       return null;
     } on ApiException catch (e) {
       return e;

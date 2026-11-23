@@ -228,7 +228,7 @@ class _FavoriteHeartButton extends ConsumerWidget {
               // hold.
               if (error != null && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l10n.somethingWentWrong)),
+                  SnackBar(content: Text(error.message.isNotEmpty ? error.message : l10n.somethingWentWrong)),
                 );
               }
             },

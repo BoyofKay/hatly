@@ -15,8 +15,14 @@ class FavoritesApi {
       (dio) => dio.get('/favorites'),
       (data) {
         // Favorites GET returns a raw array on the current server; tolerate either envelope.
-        final list = data is List ? data : (data as Map<String, dynamic>)['data'] as List;
-        return list.map((e) => FavoriteVendor.fromJson(e as Map<String, dynamic>)).toList();
+        // API installations may return the raw array or one/two
+        // standard response envelopes; never cast an envelope to List.
+        dynamic rows = data;
+        for (var i = 0; i < 3 && rows is Map && rows.containsKey('data'); i++) {
+          rows = rows['data'];
+        }
+        if (rows is! List) throw const FormatException('Invalid favorites response');
+        return rows.map((e) => FavoriteVendor.fromJson(e as Map<String, dynamic>)).toList();
       },
     );
   }

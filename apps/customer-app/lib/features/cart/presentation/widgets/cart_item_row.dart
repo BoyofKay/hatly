@@ -150,64 +150,37 @@ class CartItemRow extends StatelessWidget {
               ],
             ),
             const SizedBox(height: HatlySpacing.sm),
-            // A Wrap (not a Row): with a wide weight control, large text or a narrow screen the actions
-            // drop to the next line instead of overflowing.
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              runSpacing: HatlySpacing.xs,
+            // Quantity, Edit and Remove remain visible together without modifying
+            // any cart/quantity/price/pending-checkout business rules.
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(child: _quantity(context, l10n, p)),
-                    if (busy) ...[
-                      const SizedBox(width: HatlySpacing.sm),
-                      Semantics(
-                        label: l10n.cartItemUpdating,
-                        liveRegion: true,
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: p.accent),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (onEdit != null)
-                      TextButton(
-                        onPressed: busy ? null : onEdit,
-                        style: TextButton.styleFrom(
-                            minimumSize: const Size(
-                                HatlyTouch.minTarget, HatlyTouch.minTarget),
-                            foregroundColor: p.link),
-                        child: Text(l10n.cartEditItem,
-                            style: context.type.small.copyWith(
-                                color: p.link, fontWeight: FontWeight.w700)),
-                      ),
-                    Semantics(
-                      button: true,
-                      enabled: !busy,
-                      label: l10n.cartRemoveItem,
-                      excludeSemantics: true,
-                      onTap: busy ? null : onRemove,
-                      child: IconButton(
-                        onPressed: busy ? null : onRemove,
-                        tooltip: l10n.cartRemoveItem,
-                        constraints: const BoxConstraints(
-                            minWidth: HatlyTouch.minTarget,
-                            minHeight: HatlyTouch.minTarget),
-                        icon: Icon(Icons.delete_outline_rounded,
-                            color: busy ? p.textMuted : p.textPrimary,
-                            size: 22),
-                      ),
-                    ),
-                  ],
+                Flexible(child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: _quantity(context, l10n, p),
+                )),
+                if (busy) ...[
+                  const SizedBox(width: 4),
+                  SizedBox(width: 16, height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: p.accent)),
+                ],
+                if (onEdit != null)
+                  TextButton(
+                    onPressed: busy ? null : onEdit,
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      foregroundColor: p.link),
+                    child: Text(l10n.cartEditItem,
+                      style: context.type.small.copyWith(
+                        color: p.link, fontWeight: FontWeight.w700)),
+                  ),
+                IconButton(
+                  onPressed: busy ? null : onRemove,
+                  tooltip: l10n.cartRemoveItem,
+                  constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                  icon: Icon(Icons.delete_outline_rounded,
+                    color: busy ? p.textMuted : p.textPrimary, size: 22),
                 ),
               ],
             ),
