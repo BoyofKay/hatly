@@ -1,0 +1,6 @@
+action=maps-check arg= commit=681093e5d2159438be4f93ed07763b69ee092523 run=45244749365 started=2026-11-23T19:02:51Z
+
+==== Google Routes + Geocoding preflight from the live backend container (no secret printed)  (19:02:54 UTC)
+FAIL Google Maps preflight: Routes HTTP 400 INVALID_ARGUMENT reason=API_KEY_INVALID message=API key not valid. Please pass a valid API key.
+REFUSED: provider validation failed — production settings unchanged
+job status: failure
