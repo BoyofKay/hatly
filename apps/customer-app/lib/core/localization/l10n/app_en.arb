@@ -172,7 +172,7 @@
       }
     }
   },
-  "customRequestEntryPoint": "Can't find what you're looking for?",
+  "customRequestEntryPoint": "Hatly Service",
   "customRequestSheetTitle": "Request an item that isn't listed",
   "customRequestSheetSubtitle": "Describe what you need and/or add a photo. It's added to your cart and sent to the store with your order. The store confirms the item and sets its price — you'll see the final amount once it does.",
   "customRequestTextHint": "e.g. Panadol Extra 500mg, any brand",
@@ -747,8 +747,8 @@
   "addressLocationPermissionPermanentlyDenied": "Location permission is permanently denied. Enable it from this app’s settings on your device.",
   "addressLocationPositionUnavailable": "Couldn't determine your current location. Try again, or enter your address manually.",
   "addressOpenSettings": "Open app settings",
-  "hatlyServiceEntryTitle": "Hatly Service",
-  "hatlyServiceEntrySubtitle": "Need something from a place we don't list? Ask Hatly to get it.",
+  "hatlyServiceEntryTitle": "Can't find the store you're looking for?",
+  "hatlyServiceEntrySubtitle": "No worries! With Hatly Service, you can request what you need from another place, and we'll get it for you.",
   "hatlyServiceScreenTitle": "Hatly Service",
   "hatlyServiceTypeSectionTitle": "What do you need?",
   "hatlyServiceTypeBuyFromPlace": "Buy from a place",
