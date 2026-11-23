@@ -37,7 +37,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text("Can't find what you're looking for?"));
+    await tester.tap(find.text('Hatly Service'));
     await tester.pumpAndSettle();
     expect(find.text("Request an item that isn't listed"), findsOneWidget);
 
