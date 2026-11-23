@@ -24,6 +24,8 @@ class _Api implements DriverApi {
   @override
   Future<bool?> getOnlineStatus() async => null;
   @override
+  Future<String?> getProfileName() async => 'Test driver';
+  @override
   Future<Delivery> acknowledgeDelivery(String id) async => throw UnimplementedError();
 
   @override
@@ -47,7 +49,7 @@ class _Api implements DriverApi {
   @override
   Future<DriverEarnings> getEarnings() async => earnings!;
   @override
-  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20}) async {
+  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20, String? scope}) async {
     pagesRequested.add(page);
     return pages[page - 1];
   }
