@@ -78,13 +78,13 @@ class _PromoCarouselState extends State<PromoCarousel> {
               // Endless in both directions; auto-play always glides forward (see LoopingPager).
               child: LoopingPager(
                 count: promos.length,
-                viewportFraction: promos.length == 1 ? 1.0 : .94,
+                viewportFraction: promos.length == 1 ? 1.0 : .90,
                 autoPlayInterval: widget.autoRotateInterval,
                 autoPlayGlide: const Duration(milliseconds: 900),
                 autoPlayCurve: Curves.easeInOutCubic,
                 itemBuilder: (context, index) => Padding(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 5),
+                      horizontal: promos.length == 1 ? kHeroBannerSideMargin : 5),
                   child: _PromoCard(
                       promo: promos[index],
                       onAction: () => widget.onAction(promos[index])),
