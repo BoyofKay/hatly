@@ -390,7 +390,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get customRequestEntryPoint => 'Can\'t find what you\'re looking for?';
+  String get customRequestEntryPoint => 'Hatly Service';
 
   @override
   String get customRequestSheetTitle => 'Request an item that isn\'t listed';
@@ -1543,11 +1543,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addressOpenSettings => 'Open app settings';
 
   @override
-  String get hatlyServiceEntryTitle => 'Hatly Service';
+  String get hatlyServiceEntryTitle => 'Can\'t find the store you\'re looking for?';
 
   @override
   String get hatlyServiceEntrySubtitle =>
-      'Need something from a place we don\'t list? Ask Hatly to get it.';
+      'No worries! With Hatly Service, you can request what you need from another place, and we\'ll get it for you.';
 
   @override
   String get hatlyServiceScreenTitle => 'Hatly Service';
