@@ -167,28 +167,103 @@ SELECT to_char(ad.created_at, 'YYYY-MM-DD HH24:MI') AS saved, coalesce(ad.mode, 
 SQL
     ;;
 
-  maps-on|maps-off)
-    # maps-on: the key was uploaded by the workflow to $PD/.maps-key (mode 600) — never on a command line or in a log.
+  maps-check|maps-on|maps-off)
+    # Never enable a legacy client or deploy an untested/restricted key. maps-check is a read-only
+    # preflight against BOTH APIs, from the actual backend container/network, with no production env change.
+    if [ "$action" != maps-off ]; then
+      SRC="$PD/current/apps/backend/src/modules/location/providers/google-maps.provider.ts"
+      [ -f "$SRC" ] && grep -q 'routes.googleapis.com/directions/v2:computeRoutes' "$SRC" || {
+        echo "REFUSED: live release still uses legacy/unknown Maps endpoint — deploy Routes-capable backend first"
+        exit 2
+      }
+      KEYF="$PD/.maps-key"
+      [ -s "$KEYF" ] || { echo "REFUSED: Google API key was not supplied by GitHub Actions secret"; exit 2; }
+      KEY="$(cat "$KEYF")"; rm -f "$KEYF"
+      [[ "$KEY" =~ ^[A-Za-z0-9_-]{30,60}$ ]] || { echo "REFUSED: invalid Google API key format"; exit 2; }
+      step "Google Routes + Geocoding preflight from the live backend container (no secret printed)"
+      # The secret is piped via stdin, never passed as a shell argument, URL in process args,
+      # GitHub file, or stdout. Do not turn on Maps if either API rejects the server's IP/key.
+      if ! printf '%s' "$KEY" | $SUDO docker exec -i hatly-prod-backend-1 node -e '
+        (async () => {
+          const key = require("fs").readFileSync(0, "utf8").trim();
+          const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": key,
+              "X-Goog-FieldMask": "routes.distanceMeters,routes.duration"
+            },
+            body: JSON.stringify({
+              origin: {location:{latLng:{latitude:30.0444,longitude:31.2357}}},
+              destination: {location:{latLng:{latitude:30.058,longitude:31.246}}},
+              travelMode: "DRIVE",
+              routingPreference: "TRAFFIC_UNAWARE"
+            }),
+            signal: AbortSignal.timeout(15000)
+          });
+          if (!response.ok) throw new Error("Routes HTTP " + response.status);
+          const body = await response.json();
+          const route = body.routes?.[0];
+          if (!Number.isFinite(route?.distanceMeters) || !Number.isFinite(Number.parseFloat(route?.duration)))
+            throw new Error("Routes returned no valid road distance/duration");
+          const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+          url.searchParams.set("latlng", "30.0444,31.2357");
+          url.searchParams.set("region", "eg");
+          url.searchParams.set("language", "ar");
+          url.searchParams.set("key", key);
+          const geocode = await fetch(url, {signal: AbortSignal.timeout(15000)});
+          if (!geocode.ok) throw new Error("Geocoding HTTP " + geocode.status);
+          const geoResult = await geocode.json();
+          if (geoResult.status !== "OK" || !geoResult.results?.length)
+            throw new Error("Geocoding status " + String(geoResult.status));
+          console.log("PASS Routes distance/duration + Geocoding from production backend network");
+        })().catch((e) => {
+          console.error("FAIL Google Maps preflight: " + e.message.replace(/AIza[0-9A-Za-z_-]+/g, "[REDACTED]"));
+          process.exitCode = 1;
+        });
+      '; then
+        echo "REFUSED: provider validation failed — production settings unchanged"
+        exit 2
+      fi
+      if [ "$action" = maps-check ]; then
+        echo "MAPS CHECK PASSED — provider remains unchanged (no restart)"
+        exit 0
+      fi
+    fi
+
     ENVF="$PD/.env.production"
-    BAK="$ENVF.bak-$(date -u +%Y%m%dT%H%M%SZ)"; $SUDO cp -p "$ENVF" "$BAK"
+    BAK="$ENVF.bak-$(date -u +%Y%m%dT%H%M%SZ)"
+    $SUDO cp -p "$ENVF" "$BAK"
     $SUDO sed -i '/^MAPS_PROVIDER=/d; /^GOOGLE_MAPS_API_KEY=/d' "$ENVF"
     if [ "$action" = maps-on ]; then
-      KEYF="$PD/.maps-key"; [ -s "$KEYF" ] || { echo "no key uploaded"; exit 2; }
-      KEY="$(cat "$KEYF")"; rm -f "$KEYF"
-      [[ "$KEY" =~ ^[A-Za-z0-9_-]{30,60}$ ]] || { echo "that does not look like a Google API key"; exit 2; }
       printf 'MAPS_PROVIDER=google\nGOOGLE_MAPS_API_KEY=%s\n' "$KEY" | $SUDO tee -a "$ENVF" >/dev/null
-      echo "Google Maps: ON (key ending …${KEY: -4})"
+      unset KEY
+      echo "Google Maps enabled in server environment (key hidden)"
     else
       echo 'MAPS_PROVIDER=none' | $SUDO tee -a "$ENVF" >/dev/null
-      echo "Google Maps: OFF (delivery fees come from zones only)"
+      echo "Google Maps disabled — delivery zones remain the documented fallback"
     fi
     step "env check"
     if ! "$PD/current/deploy/production/prod.sh" env-check; then
-      echo "ENV CHECK FAILED — the previous settings are restored and nothing was restarted"; $SUDO cp -p "$BAK" "$ENVF"; exit 1
+      echo "ENV CHECK FAILED — restoring previous settings (no restart)"
+      $SUDO cp -p "$BAK" "$ENVF"
+      exit 1
     fi
-    step "restart apps"; "$PD/current/deploy/production/prod.sh" apps
-    sleep 20; "$PD/current/deploy/production/prod.sh" status
+    step "restart apps"
+    if ! "$PD/current/deploy/production/prod.sh" apps; then
+      echo "RESTART FAILED — restoring previous Maps settings and restarting"
+      $SUDO cp -p "$BAK" "$ENVF"
+      "$PD/current/deploy/production/prod.sh" apps || true
+      exit 1
+    fi
+    sleep 10
+    if ! $SUDO docker exec hatly-prod-backend-1 curl -fsS -m 5 http://127.0.0.1:3000/api/v1/health/ready >/dev/null 2>&1; then
+      echo "BACKEND UNHEALTHY — restoring previous Maps settings and restarting"
+      $SUDO cp -p "$BAK" "$ENVF"
+      "$PD/current/deploy/production/prod.sh" apps || true
+      exit 1
+    fi
+    "$PD/current/deploy/production/prod.sh" status
     ;;
-
   *) echo "unknown action $action"; exit 2;;
 esac
