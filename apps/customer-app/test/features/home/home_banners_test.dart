@@ -177,17 +177,17 @@ void main() {
           await pump(tester, () async => [_banner('b1'), _banner('b2'), _banner('b3')], width: width, locale: locale);
           await tester.pumpAndSettle();
           final card = tester.getRect(find.byKey(const Key('home-banner-b1')));
-          expect(card.width, closeTo(width * .90 - 10, 0.5));
-          expect(card.left, greaterThan(0));
-          expect(width - card.right, greaterThan(0));
-          expect(card.height, closeTo(bannerHeight(width) - 12, 0.5));
+          expect(card.width, closeTo(width, 0.5));
+          expect(card.left, closeTo(0, 0.5));
+          expect(width - card.right, closeTo(0, 0.5));
+          expect(card.height, closeTo(bannerHeight(width), 0.5));
           expect(tester.takeException(), isNull);
         });
       }
     }
 
         testWidgets('the new wide hero stays within compact height bounds and preserves cover-fit', (tester) async {
-      expect(bannerHeight(390), closeTo(174.6, 0.5));
+      expect(bannerHeight(390), closeTo(190.24, 0.5));
       expect(bannerHeight(320), 156); // compact minimum for narrow phones
       await pump(tester, () async => [_banner('b1')]);
       await tester.pumpAndSettle();

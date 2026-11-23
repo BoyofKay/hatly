@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../../shared_widgets/hatly_soft_image.dart';
+import '../../../../shared_widgets/hero_colors.dart';
+import '../../../sectors/data/sectors_providers.dart';
 import '../../../../shared_widgets/looping_pager.dart';
 import '../../../../shared_widgets/skeleton_box.dart';
 import '../../data/home_banners_providers.dart';
@@ -19,7 +21,7 @@ const double kBannerAspect = 2.05;
 double bannerHeight(double availableWidth) {
   // The card spans the content width (page margin on both sides); the height follows the card, as before (~210 pt on a 390 pt phone).
   final cardWidth = heroBannerCardWidth(availableWidth);
-  return (cardWidth / kBannerAspect).clamp(156.0, 272.0);
+  return (availableWidth / kBannerAspect).clamp(156.0, 272.0);
 }
 
 /// The hero slot at the top of Home. Admin banners win when there are any; otherwise the offer-derived promos (the previous
@@ -45,6 +47,20 @@ class HomeBannerSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final banners = ref.watch(homeBannersProvider);
+    final sectors = ref.watch(sectorsProvider).valueOrNull ?? [];
+    Color tintFor(HomeBanner b) {
+      final linkedId = b.sectorId ?? (b.action == HomeBannerAction.sector ? b.targetId : null);
+      for (final sector in sectors) {
+        if (sector.id == linkedId) return colorForSector(sector.slug, sector.accentColor);
+      }
+      return const Color(0xFFFFA768);
+    }
+    void setTint(HomeBanner b) {
+      final color = tintFor(b);
+      if (ref.read(activeHeroColorProvider) != color) {
+        ref.read(activeHeroColorProvider.notifier).state = color;
+      }
+    }
     return banners.when(
       loading: () => const Padding(
         padding: EdgeInsets.only(bottom: _gap),
@@ -53,9 +69,11 @@ class HomeBannerSection extends ConsumerWidget {
       error: (_, __) => _fallback(),
       data: (list) {
         if (list.isEmpty) return _fallback();
+        WidgetsBinding.instance.addPostFrameCallback((_) { if (context.mounted) setTint(list.first); });
         return Column(children: [
           HomeBannerCarousel(
             banners: list,
+            onIndexChanged: (i) => setTint(list[i]),
             onTap: (banner) {
               final arabic =
                   Localizations.localeOf(context).languageCode == 'ar';
@@ -97,10 +115,12 @@ class HomeBannerCarousel extends StatefulWidget {
     required this.banners,
     required this.onTap,
     this.autoRotateInterval = const Duration(seconds: 5),
+    this.onIndexChanged,
   });
 
   final List<HomeBanner> banners;
   final ValueChanged<HomeBanner> onTap;
+  final ValueChanged<int>? onIndexChanged;
   final Duration autoRotateInterval;
 
   @override
@@ -126,7 +146,8 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
               // Endless in both directions; auto-play always glides forward (see LoopingPager).
               child: LoopingPager(
                 count: banners.length,
-                viewportFraction: banners.length == 1 ? 1.0 : .90,
+                viewportFraction: 1.0,
+                onIndexChanged: widget.onIndexChanged,
                 autoPlayInterval: widget.autoRotateInterval,
                 autoPlayGlide: const Duration(milliseconds: 900),
                 autoPlayCurve: Curves.easeInOutCubic,
@@ -135,28 +156,20 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                   final title = banner.displayTitle(arabic);
                   return Padding(
                     // Full-width page; the card is inset by exactly the page margin, so it lines up with the content below.
-                    padding: EdgeInsets.symmetric(
-                        horizontal: banners.length == 1 ? kHeroBannerSideMargin : 5, vertical: 6),
+                    padding: EdgeInsets.zero,
                     child: Semantics(
                       button: banner.isTappable,
                       label: title,
                       excludeSemantics: true,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          borderRadius:
-                              BorderRadius.circular(HatlyRadius.heroBanner),
+                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
                           // A whisper of elevation — soft and restrained, not a floating card.
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3)),
-                          ],
+                          boxShadow: const [],
                         ),
                         child: Material(
                           color: Colors.transparent,
-                          borderRadius:
-                              BorderRadius.circular(HatlyRadius.heroBanner),
+                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
                             key: Key('home-banner-${banner.id}'),
@@ -171,7 +184,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                                   url: banner.imageUrl,
                                   width: double.infinity,
                                   height: double.infinity,
-                                  radius: HatlyRadius.heroBanner,
+                                  radius: 0,
                                   placeholderIcon: Icons.local_offer_outlined,
                                 ),
                                 if (title.isNotEmpty) ...[

@@ -78,13 +78,13 @@ class _PromoCarouselState extends State<PromoCarousel> {
               // Endless in both directions; auto-play always glides forward (see LoopingPager).
               child: LoopingPager(
                 count: promos.length,
-                viewportFraction: promos.length == 1 ? 1.0 : .90,
+                viewportFraction: 1.0,
                 autoPlayInterval: widget.autoRotateInterval,
                 autoPlayGlide: const Duration(milliseconds: 900),
                 autoPlayCurve: Curves.easeInOutCubic,
                 itemBuilder: (context, index) => Padding(
                   padding: EdgeInsets.symmetric(
-                      horizontal: promos.length == 1 ? kHeroBannerSideMargin : 5),
+                      horizontal: 0),
                   child: _PromoCard(
                       promo: promos[index],
                       onAction: () => widget.onAction(promos[index])),
@@ -115,7 +115,7 @@ class _PromoCard extends StatelessWidget {
         // Subtle brand tint over the surface, no shadow — the calm main
         // commercial element, not a flat orange banner.
         color: Color.alphaBlend(p.accentSoft, p.surface),
-        borderRadius: BorderRadius.circular(HatlyRadius.heroBanner),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
       ),
       padding: const EdgeInsets.all(HatlySpacing.md),
       child: Row(
