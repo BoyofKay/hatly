@@ -18,6 +18,12 @@ class ProfileScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          SectionTitle(context.t('Driver profile', 'بيانات المندوب')),
+          DriverCard(child: ListTile(
+            leading: const Icon(Icons.badge_outlined),
+            title: Text(ref.watch(driverProfileNameProvider).valueOrNull ?? context.t('Driver', 'المندوب')),
+            subtitle: Text(context.t('Your name is managed by Hatly Admin.', 'يتم تعديل اسمك بواسطة إدارة هاتلي.')),
+          )),
           SectionTitle(context.t('Language', 'اللغة')),
           DriverCard(
             child: SegmentedButton<String>(
