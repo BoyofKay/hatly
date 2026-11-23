@@ -15,14 +15,21 @@ class PhoneVerificationStatus {
 
 /// Token pair returned by the customer password endpoints.
 class AuthTokens {
-  const AuthTokens({required this.accessToken, required this.refreshToken});
+  const AuthTokens(
+      {required this.accessToken,
+      required this.refreshToken,
+      this.mustChangePassword = false});
   final String accessToken;
   final String refreshToken;
+
+  /// Signed in with a temporary password set by Hatly operations — a new one must be chosen first.
+  final bool mustChangePassword;
 
   factory AuthTokens.fromJson(Map<String, dynamic> json) {
     return AuthTokens(
       accessToken: json['accessToken'] as String,
       refreshToken: json['refreshToken'] as String,
+      mustChangePassword: json['mustChangePassword'] == true,
     );
   }
 }
@@ -101,7 +108,8 @@ class AuthApi {
   /// `ACCOUNT_HAS_ACTIVE_ORDERS` / `ACCOUNT_HAS_WALLET_BALANCE` (409) or `PASSWORD_INVALID` (403).
   Future<void> deleteAccount({required String password}) {
     return _client.request(
-      (dio) => dio.post('/auth/customer/delete-account', data: {'password': password}),
+      (dio) => dio
+          .post('/auth/customer/delete-account', data: {'password': password}),
       (_) {},
     );
   }

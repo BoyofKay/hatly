@@ -4549,6 +4549,54 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'أحد المتاجر في سلتك مغلق الآن. احذف منتجاته أو اطلب عند فتحه.'**
   String get checkoutErrorStoreClosed;
+
+  /// No description provided for @tempPasswordTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر كلمة مرور جديدة'**
+  String get tempPasswordTitle;
+
+  /// No description provided for @tempPasswordExplanation.
+  ///
+  /// In ar, this message translates to:
+  /// **'دخلت بكلمة مرور مؤقتة من هتلي. اختر كلمة مرور خاصة بك للمتابعة.'**
+  String get tempPasswordExplanation;
+
+  /// No description provided for @tempPasswordCurrentLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمة المرور المؤقتة'**
+  String get tempPasswordCurrentLabel;
+
+  /// No description provided for @tempPasswordConfirmLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'أعد كتابة كلمة المرور الجديدة'**
+  String get tempPasswordConfirmLabel;
+
+  /// No description provided for @tempPasswordSave.
+  ///
+  /// In ar, this message translates to:
+  /// **'حفظ ومتابعة'**
+  String get tempPasswordSave;
+
+  /// No description provided for @tempPasswordSignOut.
+  ///
+  /// In ar, this message translates to:
+  /// **'تسجيل الخروج'**
+  String get tempPasswordSignOut;
+
+  /// No description provided for @tempPasswordMismatch.
+  ///
+  /// In ar, this message translates to:
+  /// **'كلمتا المرور الجديدتان غير متطابقتين.'**
+  String get tempPasswordMismatch;
+
+  /// No description provided for @tempPasswordSameAsTemporary.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر كلمة مرور مختلفة عن المؤقتة.'**
+  String get tempPasswordSameAsTemporary;
 }
 
 class _AppLocalizationsDelegate

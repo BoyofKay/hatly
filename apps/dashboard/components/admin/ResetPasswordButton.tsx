@@ -15,7 +15,8 @@ function suggestPassword(): string {
 }
 
 /**
- * "Reset password" for someone who forgot theirs (drivers, store staff): the admin sets a temporary password and tells the person
+ * "Reset password" for someone who forgot theirs (customers, drivers, store staff). The password is TEMPORARY: after signing in with it
+ * the person must choose their own (server: users.must_change_password): the admin sets a temporary password and tells the person
  * (phone / WhatsApp). Every open session of that person ends. `path` is the reset endpoint, e.g. /admin/drivers/:id/reset-password.
  */
 export function ResetPasswordButton({ path, name, size = 'sm' }: { path: string; name: string; size?: 'sm' | 'md' }) {
@@ -69,7 +70,7 @@ export function ResetPasswordButton({ path, name, size = 'sm' }: { path: string;
           </div>
         ) : (
           <div className="space-y-2">
-            <p className="text-sm text-gray-600">{t('For', 'لـ')} <bdi className="font-medium">{name}</bdi>. {t('They are signed out everywhere and sign in with this password.', 'سيتم تسجيل خروجه من كل الأجهزة ويدخل بكلمة المرور هذه.')}</p>
+            <p className="text-sm text-gray-600">{t('For', 'لـ')} <bdi className="font-medium">{name}</bdi>. {t('They are signed out everywhere, sign in with this temporary password, and must then choose their own.', 'سيتم تسجيل خروجه من كل الأجهزة، ويدخل بكلمة المرور المؤقتة هذه، ثم يُطلب منه اختيار كلمة مرور خاصة به.')}</p>
             <LabeledInput label={t('Temporary password (8+ characters)', 'كلمة مرور مؤقتة (8 أحرف أو أكثر)')} dir="ltr" value={value} onChange={(e) => setValue(e.target.value)} />
             {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
           </div>

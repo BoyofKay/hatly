@@ -2,8 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/providers.dart';
 
 class AuthState {
-  const AuthState({required this.isAuthenticated});
+  const AuthState({required this.isAuthenticated, this.mustChangePassword = false});
   final bool isAuthenticated;
+
+  /// Signed in with a temporary password set by Hatly operations: only "choose a new password" is shown until it is changed.
+  final bool mustChangePassword;
 }
 
 class AuthStateNotifier extends StateNotifier<AuthState> {
@@ -22,11 +25,23 @@ class AuthStateNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  void setAuthenticated(bool value) {
-    state = AuthState(isAuthenticated: value);
+  void setAuthenticated(bool value, {bool mustChangePassword = false}) {
+    state = AuthState(isAuthenticated: value, mustChangePassword: value && mustChangePassword);
     if (value) {
       _initializePushNotifications();
     }
+  }
+
+  /// The server answered PASSWORD_CHANGE_REQUIRED (e.g. a session restored before the temporary password was changed).
+  void requirePasswordChange() {
+    if (state.isAuthenticated && !state.mustChangePassword) {
+      state = const AuthState(isAuthenticated: true, mustChangePassword: true);
+    }
+  }
+
+  /// The driver chose their own password: the app opens normally.
+  void passwordChanged() {
+    if (state.mustChangePassword) state = const AuthState(isAuthenticated: true);
   }
 
   /// Driver Push Notifications (Section 5). Fires after BOTH a fresh

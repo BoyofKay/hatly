@@ -62,6 +62,11 @@ apiClient.interceptors.response.use(
       if (window.location.pathname !== '/security') window.location.href = '/security';
       return Promise.reject(error);
     }
+    // Signed in with a temporary password: the only place that works is choosing a new one.
+    if (status === 403 && error.response?.data?.error?.details?.code === 'PASSWORD_CHANGE_REQUIRED') {
+      if (window.location.pathname !== '/change-password') window.location.href = '/change-password';
+      return Promise.reject(error);
+    }
     if (status === 403 && error.response?.data?.error?.details?.code === 'CSRF_TOKEN_INVALID' && !config._csrfRetried) {
       config._csrfRetried = true;
       delete config.headers['X-CSRF-Token'];

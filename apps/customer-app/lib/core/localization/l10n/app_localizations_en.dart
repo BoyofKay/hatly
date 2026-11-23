@@ -2568,4 +2568,30 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get checkoutErrorStoreClosed =>
       'A store in your cart is closed right now. Remove its items or order when it opens.';
+
+  @override
+  String get tempPasswordTitle => 'Choose a new password';
+
+  @override
+  String get tempPasswordExplanation =>
+      'You signed in with a temporary password from Hatly. Choose your own password to continue.';
+
+  @override
+  String get tempPasswordCurrentLabel => 'Temporary password';
+
+  @override
+  String get tempPasswordConfirmLabel => 'Repeat the new password';
+
+  @override
+  String get tempPasswordSave => 'Save and continue';
+
+  @override
+  String get tempPasswordSignOut => 'Sign out';
+
+  @override
+  String get tempPasswordMismatch => 'The two new passwords do not match.';
+
+  @override
+  String get tempPasswordSameAsTemporary =>
+      'Choose a password different from the temporary one.';
 }

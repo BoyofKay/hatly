@@ -68,7 +68,9 @@ function LoginForm() {
         if (remember) rememberAccount({ phone: phone.trim(), fullName: user.fullName ?? null, role: user.role });
         else forgetAccount(phone.trim());
       }
-      if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+      if (allowed && user.mustChangePassword) {
+        router.push('/change-password'); // a temporary password set by a manager: choose your own first
+      } else if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
         // An admin the policy requires to have an authenticator is taken straight to enrolling it.
         router.push(user.mfa.enrollmentRequired ? '/security' : '/home');
       } else if (user.role === 'VENDOR' || user.role === 'VENDOR_MANAGER') {

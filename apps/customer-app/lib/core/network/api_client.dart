@@ -26,7 +26,8 @@ class ApiClient {
   ApiClient(
       {required this.baseUrl,
       required this.tokenStorage,
-      this.onSessionExpired}) {
+      this.onSessionExpired,
+      this.onPasswordChangeRequired}) {
     _dio = Dio(BaseOptions(
         baseUrl: baseUrl,
         connectTimeout: const Duration(seconds: 10),
@@ -48,6 +49,17 @@ class ApiClient {
           final alreadyRetried =
               error.requestOptions.extra['retriedAfterRefresh'] == true;
           final isAuthEndpoint = error.requestOptions.path.startsWith('/auth/');
+
+          // Signed in with a temporary password set by Hatly (owner decision 2026-11-23): the server refuses everything except
+          // the password change until the customer chooses a new one — send them to that screen.
+          final body = error.response?.data;
+          if (error.response?.statusCode == 403 &&
+              body is Map &&
+              body['error'] is Map &&
+              ((body['error'] as Map)['details'] as Map?)?['code'] ==
+                  'PASSWORD_CHANGE_REQUIRED') {
+            onPasswordChangeRequired?.call();
+          }
 
           if (error.response?.statusCode == 401 &&
               !alreadyRetried &&
@@ -75,6 +87,9 @@ class ApiClient {
   final String baseUrl;
   final TokenStorage tokenStorage;
   final void Function()? onSessionExpired;
+
+  /// Called when the server answers PASSWORD_CHANGE_REQUIRED (temporary password still in force).
+  final void Function()? onPasswordChangeRequired;
   late final Dio _dio;
 
   Dio get dio => _dio;
@@ -105,7 +120,8 @@ class ApiClient {
     return _inFlightSessionExpiry ??= (() async {
       await tokenStorage.clear();
       onSessionExpired?.call();
-    })().whenComplete(() => _inFlightSessionExpiry = null);
+    })()
+        .whenComplete(() => _inFlightSessionExpiry = null);
   }
 
   Future<bool> _performRefresh() async {

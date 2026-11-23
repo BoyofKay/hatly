@@ -2540,4 +2540,29 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get checkoutErrorStoreClosed =>
       'أحد المتاجر في سلتك مغلق الآن. احذف منتجاته أو اطلب عند فتحه.';
+
+  @override
+  String get tempPasswordTitle => 'اختر كلمة مرور جديدة';
+
+  @override
+  String get tempPasswordExplanation =>
+      'دخلت بكلمة مرور مؤقتة من هتلي. اختر كلمة مرور خاصة بك للمتابعة.';
+
+  @override
+  String get tempPasswordCurrentLabel => 'كلمة المرور المؤقتة';
+
+  @override
+  String get tempPasswordConfirmLabel => 'أعد كتابة كلمة المرور الجديدة';
+
+  @override
+  String get tempPasswordSave => 'حفظ ومتابعة';
+
+  @override
+  String get tempPasswordSignOut => 'تسجيل الخروج';
+
+  @override
+  String get tempPasswordMismatch => 'كلمتا المرور الجديدتان غير متطابقتين.';
+
+  @override
+  String get tempPasswordSameAsTemporary => 'اختر كلمة مرور مختلفة عن المؤقتة.';
 }

@@ -28,6 +28,8 @@ interface SessionResponse {
   user: { id: string; role: DashboardUser['role']; phone: string; fullName: string | null };
   csrfToken: string;
   mfa: DashboardMfaState;
+  /** Signed in with a temporary password set by a manager: only /change-password works until it is changed. */
+  mustChangePassword?: boolean;
 }
 
 let csrfToken: string | null = null;
@@ -66,10 +68,10 @@ export function clearLocalSession(): void {
 }
 
 /** Phone + password (+ the authenticator code when the account has one). Throws the API's error — `MFA_REQUIRED` means "ask for the code". */
-export async function loginWithPassword(phone: string, password: string, mfaCode?: string): Promise<DashboardUser & { mfa: DashboardMfaState }> {
+export async function loginWithPassword(phone: string, password: string, mfaCode?: string): Promise<DashboardUser & { mfa: DashboardMfaState; mustChangePassword: boolean }> {
   const response = await apiClient.post('/auth/dashboard/login', { phone, password, ...(mfaCode ? { mfaCode } : {}) });
   const session = response.data.data as SessionResponse;
-  return { ...remember(session), mfa: session.mfa };
+  return { ...remember(session), mfa: session.mfa, mustChangePassword: session.mustChangePassword === true };
 }
 
 /** Who is signed in according to the cookie session (also recovers the CSRF token after a reload / new tab). */

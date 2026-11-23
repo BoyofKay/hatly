@@ -65,7 +65,7 @@ void main() {
           todayHoursLabel({
             'mon': const OpeningHoursRange(open: '12:00', close: '02:00')
           }, l10n, now: monday),
-          '⁦12:00–02:00⁩');
+          '\u206612:00–02:00\u2069');
       expect(
           todayHoursLabel({
             'mon': const OpeningHoursRange(open: '00:00', close: '00:00')

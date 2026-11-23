@@ -429,7 +429,7 @@ describe('E2E — authentication', () => {
       expect(res.status).toBe(200);
       expect(Object.keys(res.body)).toEqual(['message']); // verification is not authentication
       expect(await verified(c.phone)).toBe(true);
-      expect(expectData(await world.api('get', '/auth/customer/me', { token: c.accessToken }))).toEqual({ isPhoneVerified: true, phoneVerificationAvailable: true });
+      expect(expectData(await world.api('get', '/auth/customer/me', { token: c.accessToken }))).toEqual({ isPhoneVerified: true, phoneVerificationAvailable: true, mustChangePassword: false });
       expect(await world.redis.get(`otp:${c.phone}`)).toBeNull();
 
       const replay = await confirm(c.accessToken, code);
@@ -520,7 +520,7 @@ describe('E2E — authentication', () => {
       expectData(await passwordLogin(c.phone, DEFAULT_PASSWORD)); // password sign-in and the existing session are untouched
       // OTP off: the phone is NOT verified (nothing proved it), and the app is told verification is not possible right now — so it
       // shows no "verify your phone" prompt that could not be followed.
-      expect(expectData(await world.api('get', '/auth/customer/me', { token: c.accessToken }))).toEqual({ isPhoneVerified: false, phoneVerificationAvailable: false });
+      expect(expectData(await world.api('get', '/auth/customer/me', { token: c.accessToken }))).toEqual({ isPhoneVerified: false, phoneVerificationAvailable: false, mustChangePassword: false });
       expect(await verified(c.phone)).toBe(false);
 
       await s.setConfig('CUSTOMER_OTP_ENABLED', true); // and verification works once the Admin turns OTP back on

@@ -91,6 +91,7 @@ export const AR_ERRORS: Record<string, Entry> = {
   CURRENT_PASSWORD_INVALID: 'كلمة المرور الحالية غير صحيحة، أو الجديدة مطابقة لها.',
   CURRENT_PASSWORD_REQUIRED: 'أدخل كلمة المرور الحالية لتغييرها.',
   PASSWORD_UNCHANGED: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية.',
+  PASSWORD_CHANGE_REQUIRED: 'اختر كلمة مرور جديدة أولاً.',
   PASSWORD_INVALID: 'كلمة المرور غير صحيحة.',
   PASSWORD_REQUIRED: 'أدخل كلمة المرور.',
   WEAK_PASSWORD: 'كلمة المرور يجب أن تكون من 10 إلى 128 حرفًا وتحتوي على حرف ورقم على الأقل.',

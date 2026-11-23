@@ -18,7 +18,8 @@ class DriverAuthApi {
   /// failure. On success, persists both tokens via the existing
   /// [TokenStorage] — the same storage the rest of the app already
   /// relies on for session restore.
-  Future<void> login({required String phone, required String password}) async {
+  /// Returns true when the password was a TEMPORARY one set by Hatly operations — the driver must choose a new one first.
+  Future<bool> login({required String phone, required String password}) async {
     final response = await _apiClient.dio.post(
       '/auth/driver/login',
       data: {'phone': phone, 'password': password},
@@ -28,5 +29,12 @@ class DriverAuthApi {
       accessToken: data['accessToken'] as String,
       refreshToken: data['refreshToken'] as String,
     );
+    return data['mustChangePassword'] == true;
+  }
+
+  /// The driver's own password change (`POST auth/driver/password`). Throws [DioException] on a refusal
+  /// (CURRENT_PASSWORD_INVALID, PASSWORD_UNCHANGED, WEAK_PASSWORD, …).
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    await _apiClient.dio.post('/auth/driver/password', data: {'currentPassword': currentPassword, 'newPassword': newPassword});
   }
 }

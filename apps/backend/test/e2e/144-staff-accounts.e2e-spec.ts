@@ -107,7 +107,12 @@ describe('E2E — staff accounts and hierarchy', () => {
       expect((await api('patch', `/admin/staff/${teamMember.id}`, supervisorToken, { level: 'OPS_SUPERVISOR' })).status).toBe(403);
       expect((await api('post', `/admin/staff/${teamMember.id}/reset-password`, supervisorToken, { newPassword: 'Reset-Pass-456' })).status).toBe(201);
       expect((await signIn(teamMember.phone)).status).toBe(401);
-      expect((await signIn(teamMember.phone, 'Reset-Pass-456')).status).toBe(200);
+      const temp = await signIn(teamMember.phone, 'Reset-Pass-456');
+      expect(temp.status).toBe(200);
+      // 2026-11-23: a reset password is temporary — the member chooses their own before anything else.
+      expect(temp.body.data.mustChangePassword).toBe(true);
+      expect((await api('get', '/admin/me/permissions', temp.body.data.accessToken)).status).toBe(403);
+      expect((await api('post', '/auth/dashboard/password', temp.body.data.accessToken, { currentPassword: 'Reset-Pass-456', newPassword: 'Reset-Pass-789' })).status).toBe(200);
     });
 
     it('cannot create a supervisor or an admin', async () => {
@@ -123,7 +128,7 @@ describe('E2E — staff accounts and hierarchy', () => {
     });
 
     it('deactivating ends access at once; activating restores it; deleting removes the account and frees its phone', async () => {
-      const memberToken = await tokenFor(teamMember.phone).catch(async () => (await signIn(teamMember.phone, 'Reset-Pass-456')).body.data.accessToken);
+      const memberToken = await tokenFor(teamMember.phone).catch(async () => (await signIn(teamMember.phone, 'Reset-Pass-789')).body.data.accessToken);
       expect((await api('get', '/admin/me/permissions', memberToken)).status).toBe(200);
       expectData(await api('patch', `/admin/staff/${teamMember.id}/deactivate`, supervisorToken));
       expect((await api('get', '/admin/me/permissions', memberToken)).status).toBe(401);
@@ -132,7 +137,7 @@ describe('E2E — staff accounts and hierarchy', () => {
       expect((await api('delete', `/admin/staff/${teamMember.id}`, supervisorToken)).status).toBe(403);
       expect((await api('delete', `/admin/staff/${teamMember.id}`, superAdmin.accessToken)).status).toBe(200);
       expect((await api('get', '/admin/me/permissions', memberToken)).status).toBe(401);
-      expect((await signIn(teamMember.phone, 'Reset-Pass-456')).status).toBe(401);
+      expect((await signIn(teamMember.phone, 'Reset-Pass-789')).status).toBe(401);
       const list = (await api('get', '/admin/staff', supervisorToken)).body.data as any[];
       expect(list.some((r) => r.id === teamMember.id)).toBe(false);
       expect((await createAs(supervisorToken, { level: 'OPS_TEAM', phone: teamMember.phone })).status).toBe(201);

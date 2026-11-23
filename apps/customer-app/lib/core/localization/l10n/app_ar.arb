@@ -1275,5 +1275,13 @@
         "type": "String"
       }
     }
-  }
+  },
+  "tempPasswordTitle": "اختر كلمة مرور جديدة",
+  "tempPasswordExplanation": "دخلت بكلمة مرور مؤقتة من هتلي. اختر كلمة مرور خاصة بك للمتابعة.",
+  "tempPasswordCurrentLabel": "كلمة المرور المؤقتة",
+  "tempPasswordConfirmLabel": "أعد كتابة كلمة المرور الجديدة",
+  "tempPasswordSave": "حفظ ومتابعة",
+  "tempPasswordSignOut": "تسجيل الخروج",
+  "tempPasswordMismatch": "كلمتا المرور الجديدتان غير متطابقتين.",
+  "tempPasswordSameAsTemporary": "اختر كلمة مرور مختلفة عن المؤقتة."
 }
