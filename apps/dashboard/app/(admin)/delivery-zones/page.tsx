@@ -34,6 +34,8 @@ interface FormState {
   governorateAr: string;
   city: string;
   cityAr: string;
+  zoneName: string;
+  zoneNameAr: string;
   name: string;
   nameAr: string;
   displayOrder: string;
@@ -48,6 +50,8 @@ const EMPTY_FORM: FormState = {
   governorateAr: 'الشرقية',
   city: '',
   cityAr: '',
+  zoneName: '',
+  zoneNameAr: '',
   name: '',
   nameAr: '',
   displayOrder: '0',
@@ -66,11 +70,17 @@ function validateZoneForm(form: FormState, opts: { requireFee: boolean }): Valid
     ['governorateAr', 'Governorate (AR)'],
     ['city', 'City (EN)'],
     ['cityAr', 'City (AR)'],
-    ['name', 'Zone name (EN)'],
-    ['nameAr', 'Zone name (AR)'],
+    ['zoneName', 'Delivery Zone (EN)'],
+    ['zoneNameAr', 'Delivery Zone (AR)'],
+    ['name', 'Neighborhood / Village (EN)'],
+    ['nameAr', 'Neighborhood / Village (AR)'],
   ];
   for (const [key, label] of required) {
     if (!form[key].trim()) return { ok: false, error: `${label} is required.` };
+  }
+  // A priced row represents ONE child: never accept a comma/newline-separated list.
+  for (const key of ['zoneName', 'zoneNameAr', 'name', 'nameAr'] as const) {
+    if (/[,،;|\r\n]/.test(form[key])) return { ok: false, error: 'Add each neighborhood/village separately, with its own English name, Arabic name and fee.' };
   }
   const displayOrder = Number(form.displayOrder.trim() || '0');
   if (!Number.isInteger(displayOrder) || displayOrder < 0) return { ok: false, error: 'Display order must be a whole number ≥ 0.' };
@@ -103,6 +113,8 @@ function validateZoneForm(form: FormState, opts: { requireFee: boolean }): Valid
       governorateAr: form.governorateAr.trim(),
       city: form.city.trim(),
       cityAr: form.cityAr.trim(),
+      zoneName: form.zoneName.trim(),
+      zoneNameAr: form.zoneNameAr.trim(),
       name: form.name.trim(),
       nameAr: form.nameAr.trim(),
       displayOrder,
@@ -119,6 +131,8 @@ function toForm(zone: DeliveryZone): FormState {
     governorateAr: zone.governorateAr,
     city: zone.city,
     cityAr: zone.cityAr,
+    zoneName: zone.zoneName ?? '',
+    zoneNameAr: zone.zoneNameAr ?? '',
     name: zone.name,
     nameAr: zone.nameAr,
     displayOrder: String(zone.displayOrder),
@@ -196,8 +210,10 @@ function ZoneForm({
         <Field label="Governorate (AR)" value={form.governorateAr} onChange={set('governorateAr')} testId="zone-governorate-ar" dir="rtl" />
         <Field label="City (EN)" value={form.city} onChange={set('city')} testId="zone-city" placeholder="Belbeis" />
         <Field label="City (AR)" value={form.cityAr} onChange={set('cityAr')} testId="zone-city-ar" dir="rtl" placeholder="بلبيس" />
-        <Field label="Zone name (EN)" value={form.name} onChange={set('name')} testId="zone-name" placeholder="Abu Naseeb" />
-        <Field label="Zone name (AR)" value={form.nameAr} onChange={set('nameAr')} testId="zone-name-ar" dir="rtl" placeholder="أبو نصيب" />
+        <Field label="Delivery Zone (EN)" value={form.zoneName} onChange={set('zoneName')} testId="parent-zone-name" placeholder="Central Belbeis" />
+        <Field label="Delivery Zone (AR)" value={form.zoneNameAr} onChange={set('zoneNameAr')} testId="parent-zone-name-ar" dir="rtl" placeholder="وسط بلبيس" />
+        <Field label="Neighborhood / Village (EN)" value={form.name} onChange={set('name')} testId="zone-name" placeholder="Abu Naseeb" />
+        <Field label="Neighborhood / Village (AR)" value={form.nameAr} onChange={set('nameAr')} testId="zone-name-ar" dir="rtl" placeholder="أبو نصيب" />
         <Field label="Display order" value={form.displayOrder} onChange={set('displayOrder')} testId="zone-display-order" />
         {showFee && <Field label="Delivery fee (EGP)" value={form.fee} onChange={set('fee')} testId="zone-fee" placeholder="15.00" />}
       </div>
@@ -297,6 +313,7 @@ export default function DeliveryZonesPage() {
   const [areas, setAreas] = useState<ServiceArea[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [createPrefill, setCreatePrefill] = useState<FormState | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const canManage = useAdminPermission(MANAGE_SERVICE_AREAS);
   const canPrice = useAdminPermission(MANAGE_DELIVERY_FEE_MULTIPLIER);
@@ -323,10 +340,20 @@ export default function DeliveryZonesPage() {
   const sorted = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return [...(zones ?? [])]
-      .filter((z) => (!stateFilter || (stateFilter === 'active') === z.isActive) && (!needle || [z.name, z.nameAr, z.city, z.cityAr, z.governorate, z.governorateAr].some((v) => (v ?? '').toLowerCase().includes(needle))))
-      .sort((a, b) => a.cityAr.localeCompare(b.cityAr) || a.displayOrder - b.displayOrder || a.nameAr.localeCompare(b.nameAr));
+      .filter((z) => (!stateFilter || (stateFilter === 'active') === z.isActive) && (!needle || [z.zoneName ?? '', z.zoneNameAr ?? '', z.name, z.nameAr, z.city, z.cityAr, z.governorate, z.governorateAr].some((v) => (v ?? '').toLowerCase().includes(needle))))
+      .sort((a, b) => a.cityAr.localeCompare(b.cityAr) || (a.zoneNameAr ?? '').localeCompare(b.zoneNameAr ?? '') || a.displayOrder - b.displayOrder || a.nameAr.localeCompare(b.nameAr));
   }, [zones, q, stateFilter]);
   const activeCount = (zones ?? []).filter((z) => z.isActive).length;
+  const legacyCount = (zones ?? []).filter((z) => !z.zoneName || !z.zoneNameAr).length;
+  function createChildOf(zone: DeliveryZone) {
+    setEditingId(null);
+    setCreatePrefill({
+      ...toForm(zone),
+      name: '', nameAr: '', fee: formatMinor(zone.deliveryFeeMinor), displayOrder: String(zone.displayOrder + 1),
+    });
+    setCreating(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   async function toggle(zone: DeliveryZone) {
     setError(null);
@@ -344,7 +371,7 @@ export default function DeliveryZonesPage() {
         <div className="min-w-0"><h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{tl('Delivery Zones', 'مناطق التوصيل')}</h1><p className="mt-1 max-w-3xl text-sm text-gray-500">{tl('The areas you deliver to and the delivery fee of each.', 'المناطق التي توصّل إليها ورسوم التوصيل لكل منها.')}</p></div>
         <button
           data-testid="zone-new"
-          onClick={() => setCreating((v) => !v)}
+          onClick={() => { setCreatePrefill(null); setCreating((v) => !v); }}
           disabled={!canCreate}
           title={canCreate ? undefined : 'Requires MANAGE_SERVICE_AREAS and MANAGE_DELIVERY_FEE_MULTIPLIER'}
           className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
@@ -365,19 +392,31 @@ export default function DeliveryZonesPage() {
 
       {creating && (
         <ZoneForm
-          initial={{ ...EMPTY_FORM, serviceAreaId: areas.length === 1 ? areas[0].id : '' }}
+          key={createPrefill ? `child-${createPrefill.serviceAreaId}-${createPrefill.zoneNameAr}` : 'new-zone'}
+          initial={createPrefill ?? { ...EMPTY_FORM, serviceAreaId: areas.length === 1 ? areas[0].id : '' }}
           areas={areas}
           showFee
-          submitLabel="Create zone"
+          submitLabel="Add neighborhood / village"
           onCancel={() => setCreating(false)}
           onSubmit={async (v) => {
             await createDeliveryZone({ ...v.details, deliveryFeeMinor: v.feeMinor! });
             setCreating(false);
+            setCreatePrefill(null);
             await refresh();
           }}
         />
       )}
 
+      <div className="mt-4 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-600">
+        One row = one neighborhood/village, with one Arabic name, one English name and its own delivery fee.
+        Existing delivery zones can contain multiple separately priced neighborhoods.
+        {legacyCount > 0 && (
+          <p className="mt-1 text-amber-700" data-testid="legacy-zone-review">
+            {legacyCount} legacy item(s) still need an explicit parent delivery zone.
+            All original names, fees and customer references have been preserved; check combined names before separating them.
+          </p>
+        )}
+      </div>
       <div className="mt-6">
         {error && (
           <div data-testid="zones-error" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -391,7 +430,7 @@ export default function DeliveryZonesPage() {
         {!error && zones !== null && zones.length === 0 && <p className="text-gray-500">No delivery zones yet.</p>}
         {zones !== null && zones.length > 0 && (
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" data-testid="zones-toolbar">
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl('Search zone, city or governorate', 'ابحث بالمنطقة أو المدينة أو المحافظة')} aria-label={tl('Search zones', 'البحث في المناطق')} className="min-h-[44px] w-full rounded-lg border border-gray-300 px-3 text-sm sm:max-w-sm" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl('Search delivery zone, neighborhood, city or governorate', 'ابحث بالمنطقة أو المدينة أو المحافظة')} aria-label={tl('Search zones', 'البحث في المناطق')} className="min-h-[44px] w-full rounded-lg border border-gray-300 px-3 text-sm sm:max-w-sm" />
             <select value={stateFilter} onChange={(e) => setStateFilter(e.target.value as typeof stateFilter)} aria-label={tl('Status', 'الحالة')} className="min-h-[44px] rounded-lg border border-gray-300 px-2 text-sm">
               <option value="">{tl('Any status', 'أي حالة')}</option>
               <option value="active">{tl('Active', 'نشط')}</option>
@@ -406,8 +445,8 @@ export default function DeliveryZonesPage() {
           <table data-testid="zones-table" className="mt-2 w-full divide-y rounded border bg-white text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 tracking-wide">
               <tr>
-                <th className="px-3 py-2 text-start font-medium">Zone</th>
-                <th className="px-3 py-2 text-start font-medium">City / service area</th>
+                <th className="px-3 py-2 text-start font-medium">Delivery Zone</th>
+                <th className="px-3 py-2 text-start font-medium">Neighborhood / Village</th>
                 <th className="px-3 py-2 text-start font-medium">Delivery fee</th>
                 <th className="px-3 py-2 text-start font-medium">Order</th>
                 <th className="px-3 py-2 text-start font-medium">Point</th>
@@ -437,16 +476,13 @@ export default function DeliveryZonesPage() {
                 ) : (
                   <tr key={z.id} data-testid={`zone-row-${z.id}`}>
                     <td className="px-3 py-2">
-                      <div className="font-medium" dir="rtl">
-                        {z.nameAr}
-                      </div>
-                      <div className="text-xs text-gray-500">{z.name}</div>
+                      <div className="font-medium" dir="rtl">{z.zoneNameAr ?? z.cityAr}</div>
+                      <div className="text-xs text-gray-500">{z.zoneName ?? z.city}</div>
+                      {!z.zoneName && <div className="text-xs text-amber-700">Legacy: review parent</div>}
                     </td>
                     <td className="px-3 py-2">
-                      <div dir="rtl">
-                        {z.governorateAr} — {z.cityAr}
-                      </div>
-                      <div className="text-xs text-gray-500">{areaName.get(z.serviceAreaId) ?? z.serviceAreaId}</div>
+                      <div className="font-medium" dir="rtl">{z.nameAr}</div>
+                      <div className="text-xs text-gray-500">{z.name}</div>
                     </td>
                     <td className="px-3 py-2">
                       <FeeEditor zone={z} canEdit={canPrice === true && canManage === true} onSaved={refresh} />
@@ -461,6 +497,7 @@ export default function DeliveryZonesPage() {
                       </span>
                     </td>
                     <td className="space-x-2 px-3 py-2 text-right">
+                      <button data-testid="add-neighborhood" disabled={!canCreate || !z.zoneName} onClick={() => createChildOf(z)} className="text-xs text-hatly-orangeDark underline disabled:opacity-40">Add child</button>
                       <button data-testid="zone-edit" disabled={canManage !== true} onClick={() => setEditingId(z.id)} className="text-xs text-gray-600 underline disabled:opacity-40">
                         Edit
                       </button>
@@ -485,8 +522,9 @@ export default function DeliveryZonesPage() {
                   <>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-semibold" dir="rtl">{z.nameAr}</p>
-                        <p className="text-xs text-gray-500">{z.name}</p>
+                        <p className="font-semibold" dir="rtl">{z.zoneNameAr ?? z.cityAr} | {z.nameAr}</p>
+                        <p className="text-xs text-gray-500">{z.zoneName ?? z.city} | {z.name}</p>
+                        {!z.zoneName && <p className="text-xs text-amber-700">Legacy: review parent</p>
                         <p className="mt-1 text-xs text-gray-600" dir="rtl">{z.governorateAr} — {z.cityAr}</p>
                         <p className="text-xs text-gray-400">{areaName.get(z.serviceAreaId) ?? z.serviceAreaId}</p>
                       </div>
@@ -495,6 +533,7 @@ export default function DeliveryZonesPage() {
                     <div className="mt-2 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
                       <FeeEditor zone={z} canEdit={canPrice === true && canManage === true} onSaved={refresh} />
                       <span className="flex gap-2">
+                        <button disabled={!canCreate || !z.zoneName} onClick={() => createChildOf(z)} className="min-h-[44px] px-2 text-sm font-medium text-hatly-orangeDark disabled:opacity-40">{tl('Add child', 'إضافة حي/قرية')}</button>
                         <button disabled={canManage !== true} onClick={() => setEditingId(z.id)} className="min-h-[44px] px-2 text-sm font-medium text-hatly-orangeDark disabled:opacity-40">{tl('Edit', 'تعديل')}</button>
                         <button disabled={canManage !== true} onClick={() => toggle(z)} className="min-h-[44px] px-2 text-sm font-medium text-gray-700 disabled:opacity-40">{z.isActive ? tl('Deactivate', 'إيقاف') : tl('Activate', 'تفعيل')}</button>
                       </span>
