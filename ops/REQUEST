@@ -1,3 +1,3 @@
 ACTION=deploy
 ARG=
-# owner go 2026-11-23: early dispatch (off), shifts, closed stores, temporary passwords, Routes API 4fe06ce
+# owner go 2026-11-23: daily driver allowance, automatic re-offer retry be276c3
