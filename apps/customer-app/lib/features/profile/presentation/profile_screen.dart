@@ -8,6 +8,7 @@ import '../../../shared_widgets/hatly_button.dart';
 import '../../addresses/data/addresses_providers.dart';
 import '../../addresses/domain/saved_address.dart';
 import '../../auth/presentation/display_name_provider.dart';
+import '../../auth/data/auth_providers.dart';
 import '../../auth/presentation/session_controller.dart';
 import '../../support/presentation/support_contact_action.dart';
 import '../../wallet/data/wallet_providers.dart';
@@ -33,6 +34,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isLoggingOut = false;
+  bool _isSavingName = false;
 
   @override
   Widget build(BuildContext context) {
@@ -40,6 +42,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final addressesAsync = ref.watch(savedAddressesProvider);
     final balanceAsync = ref.watch(walletBalanceProvider);
     final loyaltyBalanceAsync = ref.watch(loyaltyBalanceProvider);
+    final name = ref.watch(displayNameProvider).valueOrNull;
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -48,7 +51,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Reference board: a full-width orange header with the avatar centred, then one menu list.
-            _ProfileHeader(name: ref.watch(displayNameProvider).valueOrNull),
+            _ProfileHeader(name: name),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                   HatlySpacing.md, HatlySpacing.lg, HatlySpacing.md, 0),
@@ -56,6 +59,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _ProfileGroup(children: [
+                    _ProfileRow(
+                      key: const Key('profile-edit-name'),
+                      icon: Icons.badge_outlined,
+                      title: l10n.fullNameLabel,
+                      value: Text(name?.trim().isNotEmpty == true ? name! : '—',
+                        key: const Key('profile-displayed-name'),
+                        style: context.type.caption),
+                      trailing: _isSavingName
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.edit_outlined, size: 18),
+                      onTap: _isSavingName ? () {} : _editName,
+                    ),
                     _DefaultAddressCard(addressesAsync: addressesAsync),
                     _WalletCard(balanceAsync: balanceAsync),
                     _LoyaltyCard(balanceAsync: loyaltyBalanceAsync),
@@ -105,6 +120,52 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _editName() async {
+    final current = ref.read(displayNameProvider).valueOrNull ?? '';
+    final controller = TextEditingController(text: current);
+    final ar = Localizations.localeOf(context).languageCode == 'ar';
+    final submitted = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(ar ? 'تعديل الاسم' : 'Edit name'),
+        content: TextField(
+          key: const Key('customer-name-input'),
+          controller: controller,
+          autofocus: true,
+          maxLength: 150,
+          textCapitalization: TextCapitalization.words,
+          decoration: InputDecoration(labelText: ar ? 'الاسم الكامل' : 'Full name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext),
+            child: Text(ar ? 'إلغاء' : 'Cancel')),
+          FilledButton(
+            key: const Key('customer-name-save'),
+            onPressed: () {
+              final name = controller.text.trim();
+              if (name.length >= 2) Navigator.pop(dialogContext, name);
+            },
+            child: Text(ar ? 'حفظ' : 'Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (!mounted || submitted == null || submitted == current) return;
+    setState(() => _isSavingName = true);
+    try {
+      await ref.read(authRepositoryProvider).updateDisplayName(submitted);
+      ref.invalidate(displayNameProvider);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ar ? 'تم تحديث الاسم' : 'Name updated')));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ar ? 'تعذّر حفظ الاسم. حاول مرة أخرى.' : 'Could not save your name. Try again.')));
+    } finally {
+      if (mounted) setState(() => _isSavingName = false);
+    }
   }
 
   Future<void> _logout() async {
