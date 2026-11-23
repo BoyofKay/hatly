@@ -3,8 +3,8 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/auth_state_provider.dart';
 import '../../features/auth/presentation/forced_password_change_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
-import '../../features/earnings/presentation/earnings_screen.dart';
-import '../../features/history/presentation/history_screen.dart';
+import '../../features/overview/earnings_tabs_screen.dart';
+import '../../features/overview/orders_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/shell/driver_shell.dart';
@@ -32,8 +32,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state, shell) => DriverShell(shell: shell),
         branches: [
           StatefulShellBranch(routes: [GoRoute(path: '/', builder: (context, state) => const HomeScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/history', builder: (context, state) => const HistoryScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/earnings', builder: (context, state) => const EarningsScreen())]),
+          StatefulShellBranch(routes: [GoRoute(path: '/history', builder: (context, state) => const OrdersScreen())]),
+          StatefulShellBranch(routes: [GoRoute(path: '/earnings', builder: (context, state) => const EarningsTabsScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen())]),
         ],
       ),
