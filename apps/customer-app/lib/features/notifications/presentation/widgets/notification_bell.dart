@@ -9,7 +9,10 @@ import '../../data/notifications_providers.dart';
 /// The bell: opens the notifications list and shows the server's unread count — a badge ONLY when that count is above zero
 /// (never a placeholder). A guest has no notifications, so no bell is drawn for them.
 class NotificationBell extends ConsumerStatefulWidget {
-  const NotificationBell({super.key});
+  const NotificationBell({super.key, this.onOpen});
+
+  /// Root-level header has no go_router BuildContext; use its router directly.
+  final Future<void> Function()? onOpen;
 
   @override
   ConsumerState<NotificationBell> createState() => _NotificationBellState();
@@ -38,7 +41,11 @@ class _NotificationBellState extends ConsumerState<NotificationBell>
   }
 
   Future<void> _open() async {
-    await context.push('/notifications');
+    if (widget.onOpen != null) {
+      await widget.onOpen!();
+    } else {
+      await context.push('/notifications');
+    }
     if (mounted) ref.invalidate(unreadNotificationsCountProvider);
   }
 
