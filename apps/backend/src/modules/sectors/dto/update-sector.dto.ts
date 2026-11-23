@@ -31,6 +31,11 @@ export class UpdateSectorDto {
   @MaxLength(500)
   imageUrl?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  bannerUrl?: string | null;
+
   /** May customers send custom (free-text / photo) requests to vendors of this sector? */
   @IsOptional()
   @IsBoolean()

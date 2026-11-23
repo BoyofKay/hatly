@@ -12,6 +12,11 @@ export interface AdminSector {
   imageUrl?: string | null;
   /** May customers send a free-text / photo custom request ("لا تجد ما تبحث عنه؟") to vendors of this sector? Off by default. */
   customRequestsEnabled: boolean;
+  bannerUrl?: string | null;
+}
+
+export async function setSectorBanner(id: string, bannerUrl: string | null): Promise<AdminSector> {
+  return (await apiClient.patch(`/admin/sectors/${id}`, { bannerUrl })).data.data;
 }
 
 export const MANAGE_MARKETPLACE_SECTORS = 'MANAGE_MARKETPLACE_SECTORS';
