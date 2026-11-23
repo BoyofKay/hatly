@@ -32,6 +32,10 @@ class EarningsScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
                 SectionTitle(context.t('Current shift (not closed yet)', 'الوردية الحالية (لم تُقفل بعد)')),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                  child: Text('${context.t('Shift duration', 'مدة الوردية')}: ${shiftDurationLabel(open.periodStart, arabic: ar)}', key: const Key('earnings-shift-duration')),
+                ),
                 DriverCard(
                   key: const Key('earnings-open'),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -123,6 +127,7 @@ class _ClosedPeriodCard extends StatelessWidget {
           if (period.reference != null) Text(period.reference!, textDirection: TextDirection.ltr, style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
         ]),
         const SizedBox(height: 8),
+        Text('${context.t('Shift duration', 'مدة الوردية')}: ${shiftDurationLabel(period.periodStart, arabic: ar, end: period.periodEnd)}'),
         if (period.breakdown != null)
           MoneyBreakdownView(b: period.breakdown!)
         else ...[
