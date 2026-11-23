@@ -173,30 +173,22 @@ void main() {
 
     for (final width in [320.0, 360.0, 375.0, 390.0, 430.0]) {
       for (final locale in const [Locale('ar'), Locale('en')]) {
-        testWidgets('the banner card fills the content width with equal 16 pt page margins (${width.toInt()} pt, ${locale.languageCode}); no neighbour peeks in', (tester) async {
+        testWidgets('the carousel uses a compact image-first card with room for an adjacent preview (\u0024{width.toInt()} pt, \u0024{locale.languageCode})', (tester) async {
           await pump(tester, () async => [_banner('b1'), _banner('b2'), _banner('b3')], width: width, locale: locale);
           await tester.pumpAndSettle();
           final card = tester.getRect(find.byKey(const Key('home-banner-b1')));
-          expect(card.left, closeTo(HatlySpacing.screenPadding, 0.5));
-          expect(width - card.right, closeTo(HatlySpacing.screenPadding, 0.5));
-          expect(card.width, closeTo(width - 2 * HatlySpacing.screenPadding, 0.5));
-          expect(card.height, closeTo(bannerHeight(width) - 12, 0.5)); // the page height minus 6 pt top and bottom
-          // the neighbouring banners are entirely off screen (no peeking card, no gap at the edges)
-          for (final other in ['home-banner-b2', 'home-banner-b3']) {
-            final f = find.byKey(Key(other));
-            if (f.evaluate().isNotEmpty) {
-              final r = tester.getRect(f);
-              expect(r.right <= 0 || r.left >= width, isTrue, reason: '$other must not show at the edge');
-            }
-          }
+          expect(card.width, closeTo(width * .90 - 10, 0.5));
+          expect(card.left, greaterThan(0));
+          expect(width - card.right, greaterThan(0));
+          expect(card.height, closeTo(bannerHeight(width) - 12, 0.5));
           expect(tester.takeException(), isNull);
         });
       }
     }
 
-    testWidgets('the height is about what it was before (≈1.7 : 1 of the card, ~210 pt on a 390 pt phone) and the image is cover-fitted, never stretched', (tester) async {
-      expect(bannerHeight(390), closeTo(210.6, 0.5));
-      expect(bannerHeight(320), 190); // the minimum keeps small phones readable
+        testWidgets('the new wide hero stays within compact height bounds and preserves cover-fit', (tester) async {
+      expect(bannerHeight(390), closeTo(174.6, 0.5));
+      expect(bannerHeight(320), 156); // compact minimum for narrow phones
       await pump(tester, () async => [_banner('b1')]);
       await tester.pumpAndSettle();
       final image = tester.widget<HatlySoftImage>(find.byType(HatlySoftImage));
