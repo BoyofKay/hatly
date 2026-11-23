@@ -14,12 +14,12 @@ import 'promo_carousel.dart';
 
 /// The hero banner is the biggest thing on Home: banner images are wide (2 : 1, 1200×600 recommended) and are shown cover-cropped in a
 /// taller card (about 1.7 : 1) so the promotion is prominent on a phone, within a sane range so a tablet does not get a giant one.
-const double kBannerAspect = 1.7;
+const double kBannerAspect = 2.05;
 
 double bannerHeight(double availableWidth) {
   final cardWidth =
       availableWidth * kPromoViewportFraction - 2 * HatlySpacing.xs;
-  return (cardWidth / kBannerAspect).clamp(190.0, 330.0);
+  return (cardWidth / kBannerAspect).clamp(152.0, 264.0);
 }
 
 /// The hero slot at the top of Home. Admin banners win when there are any; otherwise the offer-derived promos (the previous
