@@ -209,7 +209,7 @@ SQL
             // key-shaped string; show at most 220 chars, never a URL or unredacted provider payload.
             const safeMessage = String(errorInfo.message || "").replaceAll(key, "[REDACTED]")
               .replace(/AIza[0-9A-Za-z_-]+/g, "[REDACTED]")
-              .replace(/https?:\\/\\/\\S+/g, "[URL]").slice(0, 220);
+              .slice(0, 220);
             throw new Error("Routes HTTP " + response.status + " " + String(errorInfo.status || "unknown") +
               " reason=" + reasons.join(",").slice(0, 80) + " message=" + safeMessage);
           }
