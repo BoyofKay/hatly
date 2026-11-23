@@ -28,6 +28,9 @@ class FakeDriverApi implements DriverApi {
   int onlineStatusReads = 0;
 
   @override
+  Future<String?> getProfileName() async => 'Test driver';
+
+  @override
   Future<bool?> getOnlineStatus() async {
     onlineStatusReads++;
     return serverOnline;
@@ -44,7 +47,7 @@ class FakeDriverApi implements DriverApi {
   Future<DriverEarnings> getEarnings() async => throw UnimplementedError();
 
   @override
-  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20}) async => throw UnimplementedError();
+  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20, String? scope}) async => throw UnimplementedError();
 
   @override
   Future<T> retryTransient<T>(Future<T> Function() op, {int attempts = 3, Duration pause = const Duration(milliseconds: 800)}) => op();
