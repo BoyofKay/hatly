@@ -145,3 +145,8 @@ final driverPollingServiceProvider =
 
 /// The driver's recorded money (open-period preview + closed periods). Re-read when the screen is opened or refreshed.
 final earningsProvider = FutureProvider.autoDispose<DriverEarnings>((ref) => ref.watch(driverApiProvider).getEarnings());
+
+/// Read-only Admin-managed driver display name. Refreshed across navigation/session reloads.
+final driverProfileNameProvider = FutureProvider.autoDispose<String?>((ref) async {
+  return ref.watch(driverApiProvider).getProfileName();
+});
