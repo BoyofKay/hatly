@@ -3,7 +3,7 @@
 ## Scope and provenance
 - Recovered from `wip/customer-app-settings-locale` commit `fc782e158203b42f551aa0d777df315a4c08965b`.
 - Integration branch: `fix/recover-two-column-sectors-hero-banners-20261123`, based on `app-build` commit `1bc63df2f53e334bca537b92a95079fc0d1567d2`.
-- Restore **only** the approved two-column Home/Explore sector cards and full-width, dot-free Home hero banners, plus associated regression tests and the small `heroBanner` theme radius constant.
+- Restore **only** the approved two-column Home/Explore sector cards and full-width, dot-free Home hero banners, plus associated regression tests, the small `heroBanner` theme radius constant, and an optional per-pager animation override so unrelated pagers keep their existing behavior.
 - Do not merge the recovered WIP branch wholesale: it predates the current address, delivery-zone, cart, checkout and vendor business logic.
 - No backend, production dashboard, database, driver-app, or production operations change is needed for these Flutter presentation adjustments.
 
@@ -15,7 +15,7 @@
 - Keep the previous release/tag and artifact available throughout the pilot.
 
 ## Pre-release gates (must all pass)
-1. Confirm diff relative to source baseline touches only the intended eight/nine Customer Flutter UI and test files plus this runbook; no API models, cart, address, order, backend or driver files.
+1. Confirm diff relative to source baseline touches only the reviewed Customer Flutter UI/theme/pager and regression-test files plus this runbook; no API models, cart, address, order, backend or driver files.
 2. GitHub CI: Customer Flutter analyze and tests pass. Resolve failures on the recovery branch, not on Production.
 3. Verify Home and Explore **exactly two cards per row**, including Arabic RTL, English LTR, long text at 2x font size, small phones, and odd counts.
 4. Verify banner: full-width page-content alignment, 5-second auto-advance, swiping, correct tap target, reduced-motion behavior, zero indicator dots; confirm eligible Admin banners still win over offer-derived fallback.
