@@ -198,6 +198,20 @@ SQL
       if ! printf '%s' "$KEY" | $SUDO docker exec -i hatly-prod-backend-1 node -e '
         (async () => {
           const key = require("fs").readFileSync(0, "utf8").trim();
+          const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+          url.searchParams.set("latlng", "30.0444,31.2357");
+          url.searchParams.set("region", "eg");
+          url.searchParams.set("language", "ar");
+          url.searchParams.set("key", key);
+          const geocode = await fetch(url, {signal: AbortSignal.timeout(15000)});
+          if (!geocode.ok) throw new Error("Geocoding HTTP " + geocode.status);
+          const geoResult = await geocode.json();
+          if (geoResult.status !== "OK" || !geoResult.results?.length) {
+            const safeDetail = String(geoResult.error_message || "").replaceAll(key, "[REDACTED]")
+              .replace(/AIza[0-9A-Za-z_-]+/g, "[REDACTED]").slice(0, 220);
+            throw new Error("Geocoding " + String(geoResult.status) + " " + safeDetail);
+          }
+          console.log("PASS Geocoding from production backend network");
           const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
             method: "POST",
             headers: {
@@ -229,16 +243,6 @@ SQL
           const route = body.routes?.[0];
           if (!Number.isFinite(route?.distanceMeters) || !Number.isFinite(Number.parseFloat(route?.duration)))
             throw new Error("Routes returned no valid road distance/duration");
-          const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
-          url.searchParams.set("latlng", "30.0444,31.2357");
-          url.searchParams.set("region", "eg");
-          url.searchParams.set("language", "ar");
-          url.searchParams.set("key", key);
-          const geocode = await fetch(url, {signal: AbortSignal.timeout(15000)});
-          if (!geocode.ok) throw new Error("Geocoding HTTP " + geocode.status);
-          const geoResult = await geocode.json();
-          if (geoResult.status !== "OK" || !geoResult.results?.length)
-            throw new Error("Geocoding status " + String(geoResult.status));
           console.log("PASS Routes distance/duration + Geocoding from production backend network");
         })().catch((e) => {
           console.error("FAIL Google Maps preflight: " + e.message.replace(/AIza[0-9A-Za-z_-]+/g, "[REDACTED]"));
