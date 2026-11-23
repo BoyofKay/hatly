@@ -8,9 +8,9 @@ import '../../../../shared_widgets/availability_badge.dart';
 import '../../../../shared_widgets/hatly_rating_inline.dart';
 import '../../../auth/presentation/auth_gate.dart';
 import '../../../favorites/data/favorites_providers.dart';
-import '../../../../shared_widgets/greyscale.dart';
-import '../../domain/opening_hours.dart';
 import '../../domain/vendor.dart';
+import '../../domain/opening_hours.dart';
+import '../../../../shared_widgets/greyscale.dart';
 import 'vendor_closed_dialog.dart';
 
 /// Vendor summary card used both in Home's preview row and the full
@@ -47,14 +47,15 @@ class VendorCard extends StatelessWidget {
         isArabic && vendor.nameAr != null ? vendor.nameAr! : vendor.name;
 
     final p = context.palette;
-    const logoSize = 52.0;
+    // Preserve Nov 23 store-closure behavior: visually mute the image,
+    // present the closure dialog and allow browsing without ordering.
     final hoursLabel = todayHoursLabel(vendor.openingHours, l10n);
     void handleTap() => vendor.isOpen
         ? onTap()
         : showVendorClosedDialog(context,
             vendorName: displayName, hoursLabel: hoursLabel, onViewMenu: onTap);
-    // Image-first: the cover leads, the logo overlaps its lower edge, the heart and the offer badge sit ON the cover. Closed vendors stay
-    // visible but muted (the cover only — the name and status must stay readable).
+    // Reference board ("قائمة المتاجر"): a compact white row — the store photo at the start, name, rating and status beside
+    // it, the heart at the end. Closed vendors stay visible but their photo is muted (name and status stay readable).
     final card = DecoratedBox(
       decoration: BoxDecoration(
         color: p.surface,
@@ -66,110 +67,98 @@ class VendorCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(HatlyRadius.card),
           onTap: handleTap,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Greyscale(
-                    enabled: !vendor.isOpen,
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(HatlyRadius.card)),
-                      child: HatlySoftImage(
-                        url: vendor.coverImageUrl ?? vendor.logoUrl,
-                        width: double.infinity,
-                        height: 108,
-                        radius: 0,
-                        placeholderIcon: Icons.storefront_outlined,
-                        placeholderIconSize: 40,
-                      ),
-                    ),
-                  ),
-                  if (vendor.hasPromotion)
-                    PositionedDirectional(
-                      top: HatlySpacing.sm,
-                      start: HatlySpacing.sm,
-                      child: HatlyBadge(
-                          kind: HatlyBadgeKind.offer, label: l10n.badgeOffer),
-                    ),
-                  PositionedDirectional(
-                    top: 2,
-                    end: 2,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                          color: p.surface.withValues(alpha: 0.92),
-                          shape: BoxShape.circle),
-                      child: _FavoriteHeartButton(vendorId: vendor.id),
-                    ),
-                  ),
-                  PositionedDirectional(
-                    bottom: -(logoSize / 2),
-                    start: HatlySpacing.md,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                          color: p.surface, shape: BoxShape.circle),
-                      child: HatlySoftImage(
-                        url: vendor.logoUrl,
-                        width: logoSize,
-                        height: logoSize,
-                        circular: true,
-                        placeholderIcon: Icons.store_outlined,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              Padding(
-                padding: const EdgeInsetsDirectional.fromSTEB(
-                    HatlySpacing.md,
-                    logoSize / 2 + HatlySpacing.sm,
-                    HatlySpacing.md,
-                    HatlySpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.type.title,
-                    ),
-                    const SizedBox(height: HatlySpacing.xs),
-                    Wrap(
-                      spacing: HatlySpacing.ms,
-                      runSpacing: HatlySpacing.xs,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (vendor.ratingCount > 0)
-                          HatlyRatingInline(
-                              key: Key('vendor-card-rating-${vendor.id}'),
-                              average: vendor.ratingAverage,
-                              count: vendor.ratingCount),
-                        AvailabilityBadge(
-                          isOpen: vendor.isOpen,
-                          openLabel: l10n.vendorOpenNow,
-                          closedLabel: l10n.vendorClosed,
+          child: Padding(
+            padding: const EdgeInsets.all(HatlySpacing.ms),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Opacity(
+                  opacity: vendor.isOpen ? 1.0 : 0.55,
+                  child: Stack(
+                    children: [
+                      Greyscale(
+                        enabled: !vendor.isOpen,
+                        child: HatlySoftImage(
+                          url: vendor.coverImageUrl ?? vendor.logoUrl,
+                          width: 92, height: 92, radius: 14,
+                          placeholderIcon: Icons.storefront_outlined,
+                          placeholderIconSize: 34,
                         ),
-                        if (hoursLabel != null)
-                          Row(
-                            key: Key('vendor-card-hours-${vendor.id}'),
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.access_time_rounded,
-                                  size: 15, color: p.textMuted),
-                              const SizedBox(width: 4),
-                              Text(hoursLabel, style: context.type.caption),
-                            ],
+                      ),
+                      if (vendor.coverImageUrl != null &&
+                          vendor.logoUrl != null)
+                        PositionedDirectional(
+                          bottom: 4,
+                          start: 4,
+                          child: Container(
+                            padding: const EdgeInsets.all(1.5),
+                            decoration: BoxDecoration(
+                                color: p.surface, shape: BoxShape.circle),
+                            child: HatlySoftImage(
+                              url: vendor.logoUrl,
+                              width: 28,
+                              height: 28,
+                              circular: true,
+                              placeholderIcon: Icons.store_outlined,
+                            ),
                           ),
-                      ],
-                    ),
-                  ],
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: HatlySpacing.ms),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: context.type.title
+                            .copyWith(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: HatlySpacing.xs),
+                      if (vendor.ratingCount > 0) ...[
+                        HatlyRatingInline(
+                            key: Key('vendor-card-rating-${vendor.id}'),
+                            average: vendor.ratingAverage,
+                            count: vendor.ratingCount),
+                        const SizedBox(height: HatlySpacing.xs),
+                      ],
+                      Wrap(
+                        spacing: HatlySpacing.sm,
+                        runSpacing: HatlySpacing.xs,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          AvailabilityBadge(
+                            isOpen: vendor.isOpen,
+                            openLabel: l10n.vendorOpenNow,
+                            closedLabel: l10n.vendorClosed,
+                          ),
+                          if (vendor.hasPromotion)
+                            HatlyBadge(
+                                kind: HatlyBadgeKind.offer,
+                                label: l10n.badgeOffer),
+                          if (hoursLabel != null)
+                            Row(
+                              key: Key('vendor-card-hours-${vendor.id}'),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.access_time_rounded,
+                                  size: 15, color: p.textMuted),
+                                const SizedBox(width: 4),
+                                Text(hoursLabel, style: context.type.caption),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                _FavoriteHeartButton(vendorId: vendor.id),
+              ],
+            ),
           ),
         ),
       ),

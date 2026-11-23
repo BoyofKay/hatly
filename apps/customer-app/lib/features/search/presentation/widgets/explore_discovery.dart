@@ -11,6 +11,7 @@ import '../../../home/presentation/widgets/home_category_section.dart';
 import '../../../home/presentation/widgets/home_horizontal_row.dart';
 import '../../../home/presentation/widgets/home_offers_section.dart';
 import '../../../home/presentation/widgets/home_promo_actions.dart';
+import '../../../home/presentation/widgets/hatly_service_entry_card.dart';
 import '../../../products/presentation/widgets/product_card.dart';
 import '../../../vendors/domain/vendor.dart';
 import '../../../vendors/presentation/widgets/vendor_cover_card.dart';
@@ -37,6 +38,8 @@ class ExploreDiscovery extends StatelessWidget {
           const EdgeInsets.only(top: HatlySpacing.md, bottom: HatlySpacing.lg),
       children: const [
         ExploreCategoriesSection(),
+        HatlyServiceEntryCard(), // Full Hatly + Wasaly choices on Explore.
+        SizedBox(height: HatlySpacing.lg),
         _LowerSections(),
       ],
     );
