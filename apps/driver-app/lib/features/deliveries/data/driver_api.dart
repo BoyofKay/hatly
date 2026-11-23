@@ -58,8 +58,8 @@ class DriverApi {
     return DriverEarnings.fromJson(response.data['data'] as Map<String, dynamic>);
   }
 
-  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20}) async {
-    final response = await retryTransient(() => _apiClient.dio.get('/driver/transactions', queryParameters: {'page': page, 'limit': limit}));
+  Future<TransactionsPage> getTransactions({int page = 1, int limit = 20, String? scope}) async {
+    final response = await retryTransient(() => _apiClient.dio.get('/driver/transactions', queryParameters: {'page': page, 'limit': limit, if (scope != null) 'scope': scope}));
     final meta = response.data['meta'] as Map<String, dynamic>;
     return TransactionsPage(
       items: (response.data['data'] as List).map((e) => DriverTransaction.fromJson(e as Map<String, dynamic>)).toList(),
