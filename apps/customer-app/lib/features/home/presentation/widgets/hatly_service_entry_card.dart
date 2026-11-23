@@ -14,7 +14,10 @@ import '../../../../core/theme/hatly_theme.dart';
 /// adding this), so this is a new, additive section — it does not
 /// replace or reorder anything in the approved Home structure.
 class HatlyServiceEntryCard extends StatelessWidget {
-  const HatlyServiceEntryCard({super.key});
+  const HatlyServiceEntryCard({super.key, this.buyFromPlaceOnly = false});
+
+  /// UI entry context only. No change to Hatly/Wasaly cart or order workflows.
+  final bool buyFromPlaceOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -32,9 +35,11 @@ class HatlyServiceEntryCard extends StatelessWidget {
             '${l10n.hatlyServiceEntryTitle}. ${l10n.hatlyServiceEntrySubtitle}',
         excludeSemantics: true,
         child: InkWell(
-          key: const Key('home-hatly-service-entry'),
+          key: Key(buyFromPlaceOnly ? 'sector-hatly-service-entry' : 'home-hatly-service-entry'),
           borderRadius: BorderRadius.circular(HatlyRadius.card),
-          onTap: () => context.push('/hatly-service'),
+          onTap: () => context.push(buyFromPlaceOnly
+              ? '/hatly-service?entry=sector'
+              : '/hatly-service'),
           child: Container(
             padding: const EdgeInsets.all(HatlySpacing.md),
             decoration: BoxDecoration(

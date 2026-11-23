@@ -14,6 +14,7 @@ import 'widgets/vendor_card.dart';
 import 'widgets/vendor_card_skeleton.dart';
 import 'widgets/subcategory_chip_row.dart';
 import 'widgets/vendor_filter_sheet.dart';
+import '../../home/presentation/widgets/hatly_service_entry_card.dart';
 
 class VendorListScreen extends ConsumerStatefulWidget {
   const VendorListScreen({super.key, this.category, this.categoryName});
@@ -83,6 +84,15 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(title)),
+      // Sector pages always offer the standalone Hatly purchase service,
+      // including when no vendors are returned. Not linked to any store.
+      bottomNavigationBar: const SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.only(bottom: HatlySpacing.sm),
+          child: HatlyServiceEntryCard(buyFromPlaceOnly: true),
+        ),
+      ),
       body: Column(
         children: [
           Padding(
