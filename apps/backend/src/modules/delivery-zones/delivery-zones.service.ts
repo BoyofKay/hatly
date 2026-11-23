@@ -18,7 +18,7 @@ export class DeliveryZonesService {
   /** Customer-facing: active zones of active service areas, in display order. */
   async listActive(): Promise<DeliveryZone[]> {
     const zones = await this.zonesRepository.find({
-      where: { isActive: true, isSelectable: true },
+      where: { isActive: true, isSelectable: true, parentIsActive: true },
       relations: { serviceArea: true },
       order: { governorateAr: 'ASC', cityAr: 'ASC', displayOrder: 'ASC', nameAr: 'ASC' },
     });
@@ -151,7 +151,8 @@ export class DeliveryZonesService {
           zone.name = entry.name.trim(); zone.nameAr = entry.nameAr.trim();
           zone.deliveryFeeMinor = entry.deliveryFeeMinor;
           zone.displayOrder = dto.displayOrder;
-          zone.isActive = entry.isActive && dto.isActive;
+          zone.isActive = entry.isActive;
+          zone.parentIsActive = dto.isActive;
           zone.isSelectable = true;
           results.push(await zones.save(zone));
         }
@@ -159,6 +160,7 @@ export class DeliveryZonesService {
         for (const old of originals) {
           if (!retainedIds.has(old.id) && old.isSelectable) {
             old.isActive = false;
+            old.parentIsActive = false;
             old.isSelectable = false;
             await zones.save(old);
           }
@@ -180,7 +182,7 @@ export class DeliveryZonesService {
       const rows = await repo.find({where:{serviceAreaId,zoneName,zoneNameAr}});
       if (!rows.some(z=>z.isSelectable)) throw new NotFoundException('Delivery Zone not found.');
       for (const row of rows) {
-        row.isActive = false;
+        row.parentIsActive = false;
         row.isSelectable = false;
         await repo.save(row);
       }
