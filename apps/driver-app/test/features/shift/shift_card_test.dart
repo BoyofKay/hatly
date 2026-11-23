@@ -54,7 +54,9 @@ void main() {
   testWidgets('on duty: since when, the "take new orders" switch, and "End shift"', (tester) async {
     final api = _FakeShiftApi();
     await _pump(tester, _state(), api);
-    expect(find.textContaining('On duty · since 09:05'), findsOneWidget);
+    expect(find.textContaining('On duty since 09:05'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('shift-card-toggle')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('accepting-switch')));
     await tester.pumpAndSettle();
     expect(api.calls, ['accepting:false']);
@@ -63,6 +65,8 @@ void main() {
   testWidgets('End shift refused while carrying orders explains why', (tester) async {
     final api = _FakeShiftApi(refuseEndWith: 'SHIFT_HAS_ACTIVE_ORDERS');
     await _pump(tester, _state(active: 2), api);
+    await tester.tap(find.byKey(const Key('shift-card-toggle')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('end-shift')));
     await tester.pumpAndSettle();
     expect(api.calls, ['end']);
@@ -72,6 +76,8 @@ void main() {
   testWidgets('End shift refused with unsettled money sends the driver to the office closing', (tester) async {
     final api = _FakeShiftApi(refuseEndWith: 'SHIFT_NOT_SETTLED');
     await _pump(tester, _state(unsettled: 3), api);
+    await tester.tap(find.byKey(const Key('shift-card-toggle')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('end-shift')));
     await tester.pumpAndSettle();
     expect(find.textContaining('at the office'), findsOneWidget);
@@ -81,6 +87,8 @@ void main() {
     final api = _FakeShiftApi(refuseEndWith: 'SHIFT_ALLOWANCE_OUT');
     await _pump(tester, _state(allowance: 50000), api);
     expect(find.textContaining('500.00 EGP'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('shift-card-toggle')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('end-shift')));
     await tester.pumpAndSettle();
     expect(find.textContaining('Return it at the office'), findsOneWidget);
