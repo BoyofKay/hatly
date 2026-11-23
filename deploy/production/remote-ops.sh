@@ -131,7 +131,12 @@ case "$action" in
 \echo '== service areas'
 SELECT name, is_active, round(center_latitude::numeric, 5) AS lat, round(center_longitude::numeric, 5) AS lng, radius_meters FROM service_areas WHERE deleted_at IS NULL ORDER BY name;
 \echo '== delivery zones'
-SELECT z.name, z.is_active, z.delivery_fee_minor / 100.0 AS fee_egp, a.name AS area FROM delivery_zones z JOIN service_areas a ON a.id = z.service_area_id ORDER BY a.name, z.display_order;
+SELECT z.id AS zone_id, z.name AS zone_en, z.name_ar AS zone_ar,
+       coalesce(to_jsonb(z)->'areas', '[]'::jsonb) AS existing_neighborhoods_ar,
+       z.is_active, z.delivery_fee_minor / 100.0 AS fee_egp, a.name AS service_area,
+       (SELECT count(*) FROM addresses ad WHERE ad.delivery_zone_id = z.id) AS linked_addresses
+  FROM delivery_zones z JOIN service_areas a ON a.id = z.service_area_id
+ ORDER BY a.name, z.display_order;
 \echo '== active store branches: delivery on? in which service area?'
 SELECT v.name AS store, b.name AS branch, b.is_active, b.is_open, b.delivery_enabled, b.pickup_enabled, coalesce(a.name, '(none)') AS service_area
   FROM vendor_branches b JOIN vendors v ON v.id = b.vendor_id LEFT JOIN service_areas a ON a.id = b.service_area_id
