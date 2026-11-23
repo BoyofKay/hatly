@@ -4,6 +4,7 @@ import '../../../core/localization/bilingual.dart';
 import '../../../shared_widgets/driver_ui.dart';
 import '../../auth/presentation/auth_state_provider.dart';
 import '../../deliveries/data/driver_providers.dart';
+import '../../overview/overview_api.dart';
 
 /// Language and sign-out. There is deliberately nothing here about accepting or rejecting orders: Hatly assigns them.
 class ProfileScreen extends ConsumerWidget {
@@ -12,12 +13,29 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final locale = ref.watch(localeProvider);
+    final name = ref.watch(driverProfileNameProvider);
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(title: Text(context.t('Profile', 'حسابي')), backgroundColor: Colors.white, surfaceTintColor: Colors.transparent),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          SectionTitle(context.t('Driver name', 'اسم المندوب')),
+          DriverCard(
+            child: ListTile(
+              key: const Key('driver-profile-name'),
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.badge_outlined),
+              title: Text(name.when(
+                data: (value) => value.isNotEmpty ? value : context.t('Name unavailable', 'الاسم غير متاح'),
+                loading: () => context.t('Loading...', 'جاري التحميل...'),
+                error: (_, __) => context.t('Unable to load name', 'تعذّر تحميل الاسم'),
+              )),
+              subtitle: Text(context.t('To change your name, contact Hatly operations.',
+                  'لتغيير اسمك، تواصل مع إدارة هاتلي.')),
+              trailing: const Icon(Icons.lock_outline, size: 18),
+            ),
+          ),
           SectionTitle(context.t('Language', 'اللغة')),
           DriverCard(
             child: SegmentedButton<String>(
