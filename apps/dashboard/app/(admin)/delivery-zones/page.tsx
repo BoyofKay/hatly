@@ -55,7 +55,7 @@ const EMPTY_FORM: FormState = {
   name: '',
   nameAr: '',
   displayOrder: '0',
-  fee: '',
+  fee: '15.00',
   lat: '',
   lng: '',
 };
@@ -349,7 +349,7 @@ export default function DeliveryZonesPage() {
     setEditingId(null);
     setCreatePrefill({
       ...toForm(zone),
-      name: '', nameAr: '', fee: '', lat: '', lng: '', displayOrder: String(zone.displayOrder + 1),
+      name: '', nameAr: '', fee: '15.00', lat: '', lng: '', displayOrder: String(zone.displayOrder + 1),
     });
     setCreating(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
