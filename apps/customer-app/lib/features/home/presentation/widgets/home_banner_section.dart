@@ -126,7 +126,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
               // Endless in both directions; auto-play always glides forward (see LoopingPager).
               child: LoopingPager(
                 count: banners.length,
-                viewportFraction: banners.length == 1 ? 1.0 : .94,
+                viewportFraction: banners.length == 1 ? 1.0 : .90,
                 autoPlayInterval: widget.autoRotateInterval,
                 autoPlayGlide: const Duration(milliseconds: 900),
                 autoPlayCurve: Curves.easeInOutCubic,
@@ -136,7 +136,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                   return Padding(
                     // Full-width page; the card is inset by exactly the page margin, so it lines up with the content below.
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 6),
+                        horizontal: banners.length == 1 ? kHeroBannerSideMargin : 5, vertical: 6),
                     child: Semantics(
                       button: banner.isTappable,
                       label: title,
