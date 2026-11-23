@@ -108,7 +108,7 @@ void main() {
       expect(snap.latitude, isNull);
       expect(snap.deliveryZone!.nameAr, 'أبو نصيب');
       expect(snap.detailLinesFor(true).first, 'بلبيس | أبو نصيب');
-      expect(snap.detailLinesFor(false).first, 'Belbeis — Abu Naseeb');
+      expect(snap.detailLinesFor(false).first, 'Belbeis | Abu Naseeb');
       expect(q.eligibility!.pricingSource, 'DELIVERY_ZONE');
       expect(q.delivery!.pricedByZone, isTrue);
       expect(q.delivery!.distanceMeters, isNull);
