@@ -1,0 +1,6 @@
+action=maps-check arg= commit=7003f285773b98f1bcf67b41c0ba13e3fdb2ecbc run=45249723767 started=2026-11-23T19:31:02Z
+
+==== Google Routes + Geocoding preflight from the live backend container (no secret printed)  (19:31:06 UTC)
+FAIL Google Maps preflight: Geocoding REQUEST_DENIED This IP, site or mobile application is not authorized to use this API key. Request received from IP address 152.228.240.4, with empty referer
+REFUSED: provider validation failed — production settings unchanged
+job status: failure
