@@ -33,6 +33,8 @@ const dto = (over: any = {}) => ({
   governorateAr: 'الشرقية',
   city: 'Belbeis',
   cityAr: 'بلبيس',
+  zoneName: 'Central Belbeis',
+  zoneNameAr: 'وسط بلبيس',
   name: ' Abu Naseeb ',
   nameAr: ' أبو نصيب ',
   deliveryFeeMinor: 1500,
@@ -42,7 +44,7 @@ const dto = (over: any = {}) => ({
 describe('DeliveryZonesService', () => {
   it('creates an active zone with trimmed names and NO coordinates unless given (none are invented)', async () => {
     const z = await harness().service.create(dto());
-    expect(z).toMatchObject({ name: 'Abu Naseeb', nameAr: 'أبو نصيب', isActive: true, displayOrder: 0, deliveryFeeMinor: 1500, representativeLatitude: null, representativeLongitude: null });
+    expect(z).toMatchObject({ zoneName: 'Central Belbeis', zoneNameAr: 'وسط بلبيس', name: 'Abu Naseeb', nameAr: 'أبو نصيب', isActive: true, displayOrder: 0, deliveryFeeMinor: 1500, representativeLatitude: null, representativeLongitude: null });
   });
 
   it('refuses an unknown service area, and half a representative point', async () => {
