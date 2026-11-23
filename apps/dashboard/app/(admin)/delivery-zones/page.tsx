@@ -349,7 +349,7 @@ export default function DeliveryZonesPage() {
     setEditingId(null);
     setCreatePrefill({
       ...toForm(zone),
-      name: '', nameAr: '', fee: formatMinor(zone.deliveryFeeMinor), displayOrder: String(zone.displayOrder + 1),
+      name: '', nameAr: '', fee: '', lat: '', lng: '', displayOrder: String(zone.displayOrder + 1),
     });
     setCreating(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
