@@ -20,6 +20,7 @@ class ShiftCard extends ConsumerStatefulWidget {
 class _ShiftCardState extends ConsumerState<ShiftCard> {
   bool _busy = false;
   String? _message;
+  bool _expanded = false;
 
   String _reason(BuildContext context, String? code, ShiftState s) {
     switch (code) {
@@ -73,7 +74,6 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
     final s = widget.state;
     final api = ref.read(shiftApiProvider);
     final green = const Color(0xFF2E7D32);
-    final since = s.startedAt?.toLocal();
     // A Material (not a decorated box) so the switch row's tap ink shows on the coloured card.
     return Padding(
       key: const Key('shift-card'),
@@ -91,24 +91,19 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(children: [
-                Icon(s.onDuty ? Icons.badge : Icons.badge_outlined,
+              InkWell(
+                key: const Key('shift-card-toggle'),
+                onTap: s.onDuty ? () => setState(() => _expanded = !_expanded) : null,
+                child: Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [
+                  Icon(s.onDuty ? Icons.badge : Icons.badge_outlined,
                     color: s.onDuty ? green : Colors.grey),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    s.onDuty
-                        ? '${context.t('On duty', 'في الخدمة')}${since == null ? '' : ' · ${context.t('since', 'منذ')} ${since.hour.toString().padLeft(2, '0')}:${since.minute.toString().padLeft(2, '0')}'}'
-                        : context.t('Off duty', 'خارج الخدمة'),
-                    key: const Key('shift-status'),
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: s.onDuty
-                            ? const Color(0xFF1B5E20)
-                            : const Color(0xFF424242)),
-                  ),
-                ),
-              ]),
+                  const SizedBox(width: 8),
+                  Expanded(child: s.onDuty ? const ShiftDurationLabel() : Text(context.t('Off duty', 'خارج الخدمة'),
+                    style: const TextStyle(fontWeight: FontWeight.w800))),
+                  if (s.onDuty) Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    key: const Key('shift-card-chevron'), color: green),
+                ])),
+              ),
               if (s.allowanceOutMinor > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -125,8 +120,7 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
                     ),
                   ]),
                 ),
-              if (s.onDuty) ...[
-                const ShiftDurationLabel(),
+              if (s.onDuty && _expanded) ...[
                 SwitchListTile(
                   key: const Key('accepting-switch'),
                   contentPadding: EdgeInsets.zero,
