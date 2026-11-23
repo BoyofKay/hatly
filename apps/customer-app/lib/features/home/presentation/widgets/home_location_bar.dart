@@ -2,19 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
-import '../../../shell/presentation/shell_tab_provider.dart';
 import '../../data/home_address_provider.dart';
-import '../../../notifications/presentation/widgets/notification_bell.dart';
 import 'address_selection_sheet.dart';
 
-/// Compact location row: pin + the active/selected address + chevron (opens
-/// the existing address-selection sheet), with a single Favorites shortcut on
-/// the far side. Deliberately one line, no map. (Profile is already a bottom
-/// navigation tab, so it gets no second entry here.)
-///
-/// The Favorites shortcut exists because the redesigned bottom navigation
-/// (Home · Explore · Cart · Orders · Profile) no longer has a Favorites tab;
-/// the Favorites screen itself is unchanged and still lives in the shell.
+/// Compact address row only. Notification and Favorites now belong to the persistent global header, so they never duplicate on Home.
 class HomeLocationBar extends ConsumerWidget {
   const HomeLocationBar({super.key});
 
@@ -69,36 +60,9 @@ class HomeLocationBar extends ConsumerWidget {
               ),
             ),
           ),
-          const NotificationBell(),
-          _RoundIconButton(
-            icon: Icons.favorite_border_rounded,
-            tooltip: l10n.homeFavoritesShortcut,
-            onTap: () => ref.read(shellTabIndexProvider.notifier).state =
-                ShellTab.favorites,
-          ),
         ],
       ),
     );
   }
 }
 
-class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton(
-      {required this.icon, required this.tooltip, required this.onTap});
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onTap,
-      constraints: const BoxConstraints(
-          minWidth: HatlyTouch.minTarget, minHeight: HatlyTouch.minTarget),
-      icon: Icon(icon, color: p.textPrimary, size: 22),
-    );
-  }
-}
