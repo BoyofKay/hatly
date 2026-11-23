@@ -34,7 +34,7 @@ class HatlySearchField extends StatelessWidget {
             Padding(
               padding: const EdgeInsetsDirectional.only(
                   start: HatlySpacing.md, end: HatlySpacing.ms),
-              child: Icon(Icons.search_rounded, color: p.textMuted, size: 22),
+              child: const Icon(Icons.search_rounded, color: Color(0xFF666666), size: 22),
             ),
             Expanded(
               child: TextField(
@@ -42,7 +42,7 @@ class HatlySearchField extends StatelessWidget {
                 autofocus: autofocus,
                 onChanged: onChanged,
                 textInputAction: TextInputAction.search,
-                style: context.type.body.copyWith(color: p.textPrimary),
+                style: context.type.body.copyWith(color: const Color(0xFF222222)),
                 cursorColor: p.accent,
                 decoration: InputDecoration(
                   isCollapsed: true,
@@ -53,7 +53,7 @@ class HatlySearchField extends StatelessWidget {
                   contentPadding:
                       const EdgeInsets.symmetric(vertical: HatlySpacing.ms),
                   hintText: hintText,
-                  hintStyle: context.type.body.copyWith(color: p.textMuted),
+                  hintStyle: context.type.body.copyWith(color: const Color(0xFF777777)),
                 ),
               ),
             ),

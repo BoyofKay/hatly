@@ -40,14 +40,14 @@ class HatlySearchBar extends StatelessWidget {
                     start: HatlySpacing.md, end: HatlySpacing.md),
                 child: Row(
                   children: [
-                    Icon(Icons.search_rounded, color: p.textMuted, size: 22),
+                    const Icon(Icons.search_rounded, color: Color(0xFF666666), size: 22),
                     const SizedBox(width: HatlySpacing.ms),
                     Expanded(
                       child: Text(
                         hintText,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: context.type.body.copyWith(color: p.textMuted),
+                        style: context.type.body.copyWith(color: const Color(0xFF666666)),
                       ),
                     ),
                   ],

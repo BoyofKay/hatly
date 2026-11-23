@@ -67,7 +67,12 @@ test('local datetime ⇄ ISO round-trips the same wall-clock minute in any time 
 
 test('an edit sends null for an emptied optional value so it is really cleared', () => {
   const r = buildUpdateBody(form({ titleAr: '', startsAt: '', endsAt: '', actionType: 'NONE' }));
-  assert.deepEqual(r, { ok: true, body: { title: 'Eid sale', titleAr: null, actionType: 'NONE', actionTargetId: null, sortOrder: 0, startsAt: null, endsAt: null } });
+  assert.deepEqual(r, { ok: true, body: { title: 'Eid sale', titleAr: null, actionType: 'NONE', actionTargetId: null, sectorId: null, sortOrder: 0, startsAt: null, endsAt: null } });
+});
+
+test('a promotion has a visual sector independently of the destination', () => {
+  const r = buildCreateBody(form({ linkedSectorId: UUID, actionType: 'NONE' }));
+  assert.deepEqual(r, { ok: true, body: { title: 'Eid sale', sortOrder: 0, actionType: 'NONE', sectorId: UUID } });
 });
 
 test('image files: only JPEG/PNG/WebP, not empty, not over 5 MB', () => {
