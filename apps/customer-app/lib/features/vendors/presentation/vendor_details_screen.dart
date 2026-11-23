@@ -188,12 +188,6 @@ class _VendorDetailsContent extends ConsumerWidget {
       },
       child: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            toolbarHeight: 44,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-          ),
           SliverToBoxAdapter(
               child: _VendorHeader(details: details, vendorName: vendorName)),
           if (!details.branch.isOpen)
@@ -323,42 +317,59 @@ class _VendorHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Padding(
-      padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 16, 12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Stack(clipBehavior: Clip.none, children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(HatlyRadius.promoBanner),
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
           child: StoreCoverImage(
             coverUrl: details.vendor.coverImageUrl,
             logoUrl: details.vendor.logoUrl,
-            width: double.infinity,
-            height: 178,
-            radius: 0,
+            width: double.infinity, height: 226, radius: 0,
           ),
         ),
-        const SizedBox(height: HatlySpacing.sm),
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          HatlySoftImage(url: details.vendor.logoUrl, width: 72, height: 72,
-            circular: true, placeholderIcon: Icons.store_outlined),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(child: Text(vendorName, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
-              _FavoriteHeartButton(vendorId: details.vendor.id),
-            ]),
-            _BranchInfoSection(branch: details.branch),
-            if (details.ratingCount > 0) Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: HatlyRatingInline(
-                key: const Key('vendor-details-rating'),
-                average: details.ratingAverage,
-                count: details.ratingCount),
+        PositionedDirectional(
+          start: 12, top: MediaQuery.viewPaddingOf(context).top + 6,
+          child: Material(color: const Color(0xAA000000), shape: const CircleBorder(),
+            child: IconButton(
+              key: const Key('store-hero-back'),
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+              onPressed: () => Navigator.of(context).maybePop(),
             ),
-          ])),
-        ]),
+          ),
+        ),
+        PositionedDirectional(
+          end: 12, top: MediaQuery.viewPaddingOf(context).top + 6,
+          child: Material(color: const Color(0xAA000000), shape: const CircleBorder(),
+            child: _FavoriteHeartButton(vendorId: details.vendor.id)),
+        ),
+        PositionedDirectional(
+          start: 20, bottom: -40,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(color: p.surface, shape: BoxShape.circle,
+              boxShadow: const [BoxShadow(color: Color(0x30000000), blurRadius: 10)]),
+            child: HatlySoftImage(
+              url: details.vendor.logoUrl, width: 78, height: 78,
+              circular: true, placeholderIcon: Icons.store_outlined),
+          ),
+        ),
       ]),
-    );
+      const SizedBox(height: 49),
+      Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 20, 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(vendorName, maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 5),
+          _BranchInfoSection(branch: details.branch),
+          if (details.ratingCount > 0)
+            Padding(padding: const EdgeInsets.only(top: 5), child: HatlyRatingInline(
+              key: const Key('vendor-details-rating'),
+              average: details.ratingAverage, count: details.ratingCount)),
+        ]),
+      ),
+    ]);
   }
 }
 
@@ -662,7 +673,7 @@ class _FavoriteHeartButton extends ConsumerWidget {
     return IconButton(
       icon: Icon(
         isFavorited ? Icons.favorite : Icons.favorite_border,
-        color: isFavorited ? HatlyColors.primaryOrange : null,
+        color: isFavorited ? HatlyColors.primaryOrange : Colors.white,
       ),
       tooltip:
           isFavorited ? l10n.favoritesRemoveAction : l10n.favoritesAddAction,

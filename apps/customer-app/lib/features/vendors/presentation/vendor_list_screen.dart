@@ -7,6 +7,7 @@ import '../../../shared_widgets/filter_action_button.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/hatly_text_field.dart';
 import '../../../shared_widgets/hatly_soft_image.dart';
+import '../../../shared_widgets/hero_colors.dart';
 import '../../sectors/data/sectors_providers.dart';
 import '../../../shared_widgets/sort_menu_button.dart';
 import '../data/vendor_providers.dart';
@@ -58,6 +59,7 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
     final sectors = ref.watch(sectorsProvider).valueOrNull ?? const [];
     final match = sectors.where((s) => s.id == sectorId);
     final bannerUrl = match.isEmpty ? null : match.first.bannerUrl;
+    final sectorTint = match.isEmpty ? colorForSector(null, null) : colorForSector(match.first.slug, match.first.accentColor);
 
     // No sector to scope a paginated/sortable/searchable query to —
     // falls back to the original simple unfiltered preview shape
@@ -88,7 +90,6 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
     final vendorsAsync = ref.watch(vendorListControllerProvider(key));
 
     return Scaffold(
-      appBar: AppBar(toolbarHeight: 44, backgroundColor: Theme.of(context).scaffoldBackgroundColor, surfaceTintColor: Colors.transparent, elevation: 0),
       // Sector pages always offer the standalone Hatly purchase service,
       // including when no vendors are returned. Not linked to any store.
       bottomNavigationBar: const SafeArea(
@@ -100,17 +101,36 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
       ),
       body: Column(
         children: [
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6), child: ClipRRect(
-            borderRadius: BorderRadius.circular(20), child: SizedBox(height: 132, width: double.infinity,
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+            child: SizedBox(
+              height: 230,
+              width: double.infinity,
               child: Stack(fit: StackFit.expand, children: [
-                if (bannerUrl == null) ColoredBox(color: context.palette.accentSoft)
-                else HatlySoftImage(url: bannerUrl, width: double.infinity, height: 132, radius: 0, placeholderIcon: Icons.storefront_outlined),
-                if (bannerUrl != null) const DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0x88000000)]))),
-                PositionedDirectional(start: 16, end: 16, bottom: 14, child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800, color: bannerUrl == null ? context.palette.textPrimary : Colors.white))),
+                ColoredBox(color: translucentHero(sectorTint, Theme.of(context).scaffoldBackgroundColor)),
+                if (bannerUrl != null)
+                  HatlySoftImage(url: bannerUrl, width: double.infinity, height: 230,
+                    radius: 0, placeholderIcon: Icons.storefront_outlined),
+                const DecoratedBox(decoration: BoxDecoration(
+                  gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    stops: [0, 0.45, 1],
+                    colors: [Color(0x66000000), Color(0x00000000), Color(0x88000000)]))),
+                PositionedDirectional(
+                  start: 12, top: MediaQuery.viewPaddingOf(context).top + 6,
+                  child: Material(color: const Color(0xAA000000), shape: const CircleBorder(),
+                    child: IconButton(
+                      key: const Key('sector-hero-back'), tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    )),
+                ),
+                PositionedDirectional(start: 20, end: 20, bottom: 16,
+                  child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800, color: Colors.white))),
               ]),
             ),
-          )),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: HatlySpacing.sm),
             child: SubcategoryChipRow(
