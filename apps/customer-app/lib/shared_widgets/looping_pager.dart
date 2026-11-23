@@ -14,6 +14,8 @@ class LoopingPager extends StatefulWidget {
     this.onIndexChanged,
     this.viewportFraction = 1.0,
     this.autoPlayInterval = const Duration(seconds: 5),
+    this.autoPlayGlide = const Duration(milliseconds: 450),
+    this.autoPlayCurve = Curves.easeOutCubic,
     this.controllerForTest,
   });
 
@@ -22,6 +24,9 @@ class LoopingPager extends StatefulWidget {
   final ValueChanged<int>? onIndexChanged;
   final double viewportFraction;
   final Duration autoPlayInterval;
+  /// Optional motion override for hero banners; other pagers retain their existing animation.
+  final Duration autoPlayGlide;
+  final Curve autoPlayCurve;
   final PageController? controllerForTest;
 
   /// Far enough from 0 that nobody swipes to either end in a lifetime, and divisible by every realistic [count].
@@ -76,7 +81,7 @@ class _LoopingPagerState extends State<LoopingPager> {
     if (_reduceMotion || !_loops) return;
     _timer = Timer.periodic(widget.autoPlayInterval, (_) {
       if (!mounted || !_controller.hasClients) return;
-      _controller.nextPage(duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
+      _controller.nextPage(duration: widget.autoPlayGlide, curve: widget.autoPlayCurve);
     });
   }
 
