@@ -84,6 +84,40 @@ describe('E2E — dispatch owner rules (2026-11-22)', () => {
     expect(alert?.detail).toContain('offered to the next driver');
   });
 
+  it('no other driver free → stays with the silent driver; offered again automatically once a driver is free (owner 2026-11-23)', async () => {
+    const silent = await s.driver({ ...near });
+    const order = await readyOrder();
+    expectData(await world.api('post', `/admin/orders/${order.id}/assign-driver`, { token: superAdmin.accessToken, body: { driverId: silent.driverId } }), 201);
+    await world.ds.query("UPDATE deliveries SET accept_deadline_at = NOW() - INTERVAL '1 minute' WHERE order_id = $1", [order.id]);
+    await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true);
+    await dispatch().alertUnacknowledgedAssignments();
+    expect(await carrierOf(order.id)).toBe(silent.driverId); // nobody else to give it to
+
+    const freed = await s.driver({ ...mid }); // a driver comes free
+    await dispatch().retryOpenAlerts();
+    expect(await carrierOf(order.id)).toBe(silent.driverId); // not before a minute has passed since the last try
+
+    await world.ds.query(`UPDATE dispatch_alerts SET updated_at = now() - interval '2 minutes' WHERE order_id = $1`, [order.id]);
+    await dispatch().retryOpenAlerts();
+    expect(await carrierOf(order.id)).toBe(freed.driverId);
+  });
+
+  it('an order Operations reassigned by hand is not moved by the automatic retry', async () => {
+    const silent = await s.driver({ ...near });
+    const order = await readyOrder();
+    expectData(await world.api('post', `/admin/orders/${order.id}/assign-driver`, { token: superAdmin.accessToken, body: { driverId: silent.driverId } }), 201);
+    await world.ds.query("UPDATE deliveries SET accept_deadline_at = NOW() - INTERVAL '1 minute' WHERE order_id = $1", [order.id]);
+    await s.setConfig('AUTOMATIC_DISPATCH_ENABLED', true);
+    await dispatch().alertUnacknowledgedAssignments();
+
+    const chosen = await s.driver({ lat: 30.43, lng: 31.59 });
+    await s.driver({ ...mid }); // a better-ranked free driver exists too
+    expectData(await world.api('post', `/admin/orders/${order.id}/reassign-driver`, { token: superAdmin.accessToken, body: { driverId: chosen.driverId } }), 201);
+    await world.ds.query(`UPDATE dispatch_alerts SET updated_at = now() - interval '2 minutes' WHERE order_id = $1`, [order.id]);
+    await dispatch().retryOpenAlerts();
+    expect(await carrierOf(order.id)).toBe(chosen.driverId);
+  });
+
   it('with automatic assignment OFF the order stays with the silent driver (Operations decide)', async () => {
     const silent = await s.driver({ ...near });
     await s.driver({ ...mid });

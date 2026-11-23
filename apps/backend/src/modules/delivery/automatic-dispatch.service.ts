@@ -260,7 +260,42 @@ export class AutomaticDispatchService implements OnModuleInit, OnModuleDestroy {
       await this.attemptAutomaticDispatch(alert.orderId);
       retried++;
     }
-    return { retried };
+    return { retried: retried + (await this.retryUnacknowledgedOffers()) };
+  }
+
+  /**
+   * Owner decision 2026-11-23: an order its driver has not acknowledged, that could not be moved because no other driver was free, is
+   * offered again automatically — at most once a minute per order — until another driver is free, the driver acknowledges, or
+   * Operations act. Operations acting (assign / reassign / release) resolves the order's open alerts, so an order a person has taken
+   * over is never moved by this. Cheap: one indexed query over OPEN acknowledgement alerts only (usually none).
+   */
+  async retryUnacknowledgedOffers(): Promise<number> {
+    const cutoff = new Date(Date.now() - AutomaticDispatchService.ALERT_RETRY_INTERVAL_MS);
+    const rows: Array<{ alert_id: string; order_id: string; driver_id: string }> = await this.dispatchAlertsRepository.query(
+      `SELECT a.id AS alert_id, a.order_id, d.driver_id
+         FROM dispatch_alerts a
+         JOIN deliveries d ON d.order_id = a.order_id AND d.deleted_at IS NULL
+        WHERE a.reason = 'ACKNOWLEDGEMENT_OVERDUE' AND a.resolved_at IS NULL AND a.deleted_at IS NULL AND a.updated_at < $1
+          AND d.driver_id IS NOT NULL AND d.acknowledged_at IS NULL AND d.picked_up_at IS NULL
+        ORDER BY a.updated_at ASC
+        LIMIT $2`,
+      [cutoff, this.sweepBatchLimit],
+    );
+    let moved = 0;
+    for (const row of rows) {
+      // Touch first: a failing or slow attempt is not retried again before the interval has passed.
+      await this.dispatchAlertsRepository.update({ id: row.alert_id }, { updatedAt: new Date() });
+      const movedTo = await this.offerToNextDriver(row.order_id, row.driver_id);
+      if (movedTo) {
+        moved++;
+        await this.raiseAlert(
+          row.order_id,
+          'ACKNOWLEDGEMENT_OVERDUE',
+          'The first driver did not acknowledge in time; the order was offered to the next driver automatically once one was free. Check with the first driver.',
+        );
+      }
+    }
+    return moved;
   }
 
   /**

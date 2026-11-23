@@ -85,14 +85,21 @@ export function installExternalBoundary(): void {
           ? json({ status: 'ZERO_RESULTS', results: [] })
           : json({ status: 'OK', results: [{ geometry: { location: { lat: 30.425, lng: 31.565 } } }] });
       }
-      const [oLat, oLng] = (url.searchParams.get('origins') ?? '').split(',').map(Number);
-      const [dLat, dLng] = (url.searchParams.get('destinations') ?? '').split(',').map(Number);
+      return json({ status: 'NOT_FOUND' }, 404);
+    }
+
+    // Routes API computeRoutes (road distance since 2026-11-23): POST JSON, key in the X-Goog-Api-Key header.
+    if (url.hostname === 'routes.googleapis.com') {
+      boundary.mapsCalls += 1;
+      if (boundary.mapsOutage) return json({ error: { code: 503, status: 'UNAVAILABLE' } }, 503);
+      const headers = new Headers(init?.headers);
+      if (headers.get('X-Goog-Api-Key') !== DUMMY_MAPS_KEY) return json({ error: { code: 403, status: 'PERMISSION_DENIED' } }, 403);
+      const req = JSON.parse(String(init?.body ?? '{}'));
+      const o = req.origin?.location?.latLng ?? {};
+      const d = req.destination?.location?.latLng ?? {};
       // Deterministic "driving" distance: straight line x1.3, rounded to whole metres; 30 km/h.
-      const meters = Math.round(haversineMeters(oLat, oLng, dLat, dLng) * 1.3);
-      return json({
-        status: 'OK',
-        rows: [{ elements: [{ status: 'OK', distance: { value: meters }, duration: { value: Math.round(meters / 8.33) } }] }],
-      });
+      const meters = Math.round(haversineMeters(o.latitude, o.longitude, d.latitude, d.longitude) * 1.3);
+      return json({ routes: [{ distanceMeters: meters, duration: `${Math.round(meters / 8.33)}s` }] });
     }
 
     boundary.forbiddenCalls.push(`${init?.method ?? 'GET'} ${url.origin}${url.pathname}`);
