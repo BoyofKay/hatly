@@ -32,7 +32,7 @@ class DriverGlobalHeader extends ConsumerWidget {
           ),
         ),
         if (authenticated)
-          const Expanded(child: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: ShiftDurationLabel()))
+          const Expanded(child: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Align(alignment: AlignmentDirectional.centerEnd, child: ShiftDurationLabel(compact: true))))
         else const Spacer(),
         if (initial != null)
           Semantics(

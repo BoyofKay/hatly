@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../core/utils/egypt_phone_number.dart';
 import '../../../core/localization/bilingual.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/providers.dart';
@@ -24,6 +27,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isSubmitting = false;
   bool _showPassword = false;
   String? _error;
+  static const _savedPhoneKey = 'hatly_driver_last_phone';
+  final _storage = const FlutterSecureStorage();
+
+  @override
+  void initState() {
+    super.initState();
+    _restorePhone();
+  }
+
+  Future<void> _restorePhone() async {
+    try {
+      final saved = await _storage.read(key: _savedPhoneKey);
+      if (mounted && saved != null && _phoneController.text.isEmpty) {
+        _phoneController.text = saved.startsWith('+20') ? saved.substring(3) : saved;
+      }
+    } catch (_) { /* Local storage is optional; login must still work. */ }
+  }
+
 
   @override
   void dispose() {
@@ -34,6 +55,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handleLogin() async {
     if (_isSubmitting) return;
+    final phone = EgyptPhoneNumber.normalize(_phoneController.text);
+    if (phone == null) {
+      setState(() => _error = context.t('Enter a valid Egyptian mobile number.', 'أدخل رقم هاتف مصري صحيح.'));
+      return;
+    }
     setState(() {
       _isSubmitting = true;
       _error = null;
@@ -43,8 +69,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final api = DriverAuthApi(
           ref.read(apiClientProvider), ref.read(tokenStorageProvider));
       final mustChange = await api.login(
-          phone: _phoneController.text.trim(),
+          phone: phone,
           password: _passwordController.text);
+      try { await _storage.write(key: _savedPhoneKey, value: phone); } catch (_) {}
+      if (!mounted) return;
+      TextInput.finishAutofillContext(shouldSave: true);
       ref.read(authStateProvider.notifier).setAuthenticated(true, mustChangePassword: mustChange);
     } on DioException catch (error) {
       // The server explains in English; the driver always sees their own language.
@@ -72,7 +101,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Reset password) and send it to the driver, who signs in with it.
   /// Request-based "Forgot password?" (owner decision 2026-11-23): its own screen — request, then the temporary password + a new one.
   void _showForgotPassword(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ForgotPasswordScreen(initialPhone: _phoneController.text.trim())));
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ForgotPasswordScreen(initialPhone: EgyptPhoneNumber.normalize(_phoneController.text) ?? _phoneController.text.trim())));
   }
 
   @override
@@ -81,13 +110,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
+          child: AutofillGroup(child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // The supplied Hatly logo, bundled unchanged (assets/images/hatly-logo.jpg — the same file the Customer app uses).
+                // The supplied Hatly logo, bundled unchanged (assets/images/hatly-driver-icon.png — the same file the Customer app uses).
                 Center(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
@@ -110,18 +139,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 32),
-                TextField(
+                Directionality(textDirection: TextDirection.ltr, child: TextField(
+                  key: const Key('login-phone'),
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
+                  autofillHints: const [AutofillHints.username, AutofillHints.telephoneNumberNational],
                   decoration: InputDecoration(
-                      labelText: context.t('Phone number', 'رقم الهاتف'),
-                      border: const OutlineInputBorder()),
-                ),
+                    prefixIcon: const SizedBox(width: 86, child: Center(child: Text('🇪🇬 +20', style: TextStyle(fontWeight: FontWeight.w700)))),
+                    labelText: context.t('Phone number', 'رقم الهاتف'),
+                    hintText: '10XXXXXXXX',
+                    border: const OutlineInputBorder()),
+                )),
                 const SizedBox(height: 16),
                 TextField(
                   key: const Key('login-password'),
                   controller: _passwordController,
                   obscureText: !_showPassword,
+                  enableSuggestions: false,
+                  autocorrect: false,
+                  autofillHints: const [AutofillHints.password],
                   decoration: InputDecoration(
                     labelText: context.t('Password', 'كلمة المرور'),
                     border: const OutlineInputBorder(),
@@ -165,7 +201,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ],
             ),
-          ),
+          )),
         ),
       ),
     );

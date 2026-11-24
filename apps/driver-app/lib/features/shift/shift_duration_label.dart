@@ -7,7 +7,8 @@ import 'shift_api.dart';
 /// Live elapsed shift time; based exclusively on the server's current shift
 /// start timestamp, not today's date or any inferred clock-in.
 class ShiftDurationLabel extends ConsumerStatefulWidget {
-  const ShiftDurationLabel({super.key, this.state});
+  const ShiftDurationLabel({super.key, this.state, this.compact = false});
+  final bool compact;
   final ShiftState? state;
   @override
   ConsumerState<ShiftDurationLabel> createState() => _ShiftDurationLabelState();
@@ -52,10 +53,10 @@ class _ShiftDurationLabelState extends ConsumerState<ShiftDurationLabel> {
       const Icon(Icons.schedule_outlined, size: 16, color: Color(0xFF1B5E20)),
       const SizedBox(width: 5),
       Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart,
-        child: Text(context.t('Since $sinceText · ${hours}h ${mins}m',
+        child: Text(widget.compact ? context.t('${hours}h ${mins}m', '${hours}س ${mins}د') : context.t('Since $sinceText · ${hours}h ${mins}m',
           'منذ $sinceText · ${hours}س ${mins}د'),
           key: const Key('shift-duration'), maxLines: 1,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20))))),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20), decoration: TextDecoration.none)))),
     ]);
   }
 }
