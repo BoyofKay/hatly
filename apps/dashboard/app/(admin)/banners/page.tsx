@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { AssetHint } from '../../../components/admin/AssetHint';
 import {
   BANNER_IMAGE_MAX_BYTES,
   BANNER_IMAGE_TYPES,
@@ -364,7 +365,7 @@ export default function HomeBannersPage() {
       <div className="mt-2 space-y-1 text-sm text-gray-600">
         <p data-testid="banners-rule">
           Banners appear in the carousel at the top of the customer app&apos;s Home, lowest display order first (at most 10). A new banner is a draft: add an
-          image (JPEG, PNG or WebP, up to 5 MB, wide about 2:1 and at least 800×320 pixels — 1200×600 recommended), then publish it. Only published banners inside their schedule whose destination
+          image (JPEG, PNG or WebP, up to 5 MB, square 1080×1080 recommended; top 35% clear), then publish it. Only published banners inside their schedule whose destination
           still exists are shown.
         </p>
       </div>
@@ -455,9 +456,9 @@ export default function HomeBannersPage() {
                     <td className="px-3 py-2">
                       {b.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img data-testid="banner-thumb" src={resolveMediaUrl(b.imageUrl)} alt={b.title} className="h-16 w-28 rounded border object-cover" />
+                        <img data-testid="banner-thumb" src={resolveMediaUrl(b.imageUrl)} alt={b.title} className="h-16 w-16 rounded border object-cover" />
                       ) : (
-                        <div data-testid="banner-no-image" className="flex h-16 w-28 items-center justify-center rounded border border-dashed text-xs text-gray-400">
+                        <div data-testid="banner-no-image" className="flex h-16 w-16 items-center justify-center rounded border border-dashed text-xs text-gray-400">
                           No image
                         </div>
                       )}
@@ -484,9 +485,10 @@ export default function HomeBannersPage() {
                     <td className="space-x-2 px-3 py-2 text-right whitespace-nowrap">
                       <button data-testid="banner-image" disabled={!canManage || busyId === b.id} onClick={() => chooseImage(b)} className="text-xs text-gray-600 underline disabled:opacity-40">
                         {b.imageUrl ? 'Change image' : 'Upload image'}
-                        <span className="block text-[10px] text-gray-500">1080 × 1080 px (1:1) · top 35% clear</span>
+                        
                       </button>
-                      <button data-testid="banner-edit" disabled={!canManage || busyId === b.id} onClick={() => { setCreating(false); setEditingId(b.id); }} className="text-xs text-gray-600 underline disabled:opacity-40">
+                      <AssetHint text={tl('Recommended: 1080 × 1080 px (1:1). Keep the top 35% (378 px) free of text and important objects for the pinned header and search.', 'المقاس المقترح: 1080 × 1080 بكسل (1:1). اترك أعلى 35% (378 بكسل) دون نص أو تفاصيل مهمة للهيدر والبحث.')} />
+                       <button data-testid="banner-edit" disabled={!canManage || busyId === b.id} onClick={() => { setCreating(false); setEditingId(b.id); }} className="text-xs text-gray-600 underline disabled:opacity-40">
                         Edit
                       </button>
                       <button
@@ -534,9 +536,9 @@ export default function HomeBannersPage() {
                   <>
                     {b.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={resolveMediaUrl(b.imageUrl)} alt={b.title} className="aspect-[2/1] w-full object-cover" />
+                      <img src={resolveMediaUrl(b.imageUrl)} alt={b.title} className="aspect-square w-full object-cover" />
                     ) : (
-                      <div className="flex aspect-[2/1] w-full items-center justify-center border-b border-dashed bg-gray-50 text-sm text-gray-400">{tl('No image yet', 'لا توجد صورة بعد')}</div>
+                      <div className="flex aspect-square w-full items-center justify-center border-b border-dashed bg-gray-50 text-sm text-gray-400">{tl('No image yet', 'لا توجد صورة بعد')}</div>
                     )}
                     <div className="space-y-2 p-3">
                       <div className="flex items-start justify-between gap-2">
@@ -546,7 +548,7 @@ export default function HomeBannersPage() {
                       <p className="text-xs text-gray-600">{label(b)} · #{b.sortOrder}</p>
                       <p className="text-xs text-gray-500">{formatWhen(b.startsAt)} → {formatWhen(b.endsAt)}</p>
                       <div className="flex flex-wrap gap-2 pt-1">
-                        <button disabled={!canManage || busyId === b.id} onClick={() => chooseImage(b)} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{b.imageUrl ? tl('Change image', 'تغيير الصورة') : tl('Upload image', 'رفع صورة')}</button><p className="w-full text-xs text-gray-500">{tl('1080 × 1080 px (1:1). Keep top 35% free of important details.', '1080 × 1080 بكسل (1:1). اترك أعلى 35% دون تفاصيل مهمة.')}</p>
+                        <button disabled={!canManage || busyId === b.id} onClick={() => chooseImage(b)} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{b.imageUrl ? tl('Change image', 'تغيير الصورة') : tl('Upload image', 'رفع صورة')}</button><AssetHint text={tl('1080 × 1080 px (1:1) recommended. Top 35% clear for pinned header/search.', 'يفضل 1080 × 1080 بكسل (1:1). اترك أعلى 35% خاليًا للهيدر والبحث.')} />
                         <button disabled={!canManage || busyId === b.id} onClick={() => { setCreating(false); setEditingId(b.id); }} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{tl('Edit', 'تعديل')}</button>
                         <button disabled={!canManage || busyId === b.id || (!b.isActive && !b.imageUrl)} onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), 'Failed to update the banner.')} className="min-h-[44px] rounded-lg bg-hatly-orange px-3 text-sm font-medium text-white disabled:opacity-40">{b.isActive ? tl('Unpublish', 'إلغاء النشر') : tl('Publish', 'نشر')}</button>
                         <button disabled={!canManage || busyId === b.id} onClick={() => { if (window.confirm(`Delete the banner "${b.title}"? Customers stop seeing it immediately.`)) run(b, () => deleteHomeBanner(b.id), 'Failed to delete the banner.'); }} className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-red-600 disabled:opacity-40">{tl('Delete', 'حذف')}</button>

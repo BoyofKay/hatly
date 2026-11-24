@@ -264,7 +264,7 @@ export default function VendorDetailPage() {
               <span className="mb-1 block text-xs font-medium text-gray-700">{t('Logo', 'الشعار')}</span>
               <input ref={logoInput} data-testid="vendor-logo-file" type="file" accept={LOGO_TYPES.join(',')} onChange={handleLogoChosen} className="hidden" />
               <Button type="button" onClick={() => logoInput.current?.click()} loading={isUploadingLogo}>{isUploadingLogo ? t('Uploading...', 'جارٍ الرفع...') : vendor.logoUrl ? t('Change logo', 'تغيير الشعار') : t('Upload logo', 'رفع شعار')}</Button>
-              <p className="mt-1 text-xs text-gray-500">{t('Recommended: 512 × 512 px (1:1), centered for circular crop. JPEG, PNG or WebP, up to 5 MB. It is saved immediately.', 'المقاس المقترح 512 × 512 بكسل (1:1)، الشعار في المنتصف. JPEG أو PNG أو WebP حتى 5 ميجابايت. يُحفظ فورًا.')}</p>
+              <p className="mt-1 text-xs text-gray-500">{t('Recommended: 512 × 512 px (1:1), centered with padding for circular crop. JPEG, PNG or WebP, up to 5 MB. It is saved immediately.', 'المقاس المقترح 512 × 512 بكسل (1:1)، الشعار في المنتصف مع مساحة حوله للقص الدائري. JPEG أو PNG أو WebP حتى 5 ميجابايت. يُحفظ فورًا.')}</p>
               {logoError && <p role="alert" className="mt-1 text-sm text-red-600">{logoError}</p>}
             </div>
             <div>
@@ -278,7 +278,7 @@ export default function VendorDetailPage() {
                 <Button type="button" onClick={() => coverInput.current?.click()} loading={coverBusy}>{vendor.coverImageUrl ? t('Change banner', 'تغيير البانر') : t('Upload banner', 'رفع بانر')}</Button>
                 {vendor.coverImageUrl && <Button type="button" variant="ghost" disabled={coverBusy} onClick={() => void handleCoverRemove()}>{t('Remove', 'إزالة')}</Button>}
               </div>
-              <p className="mt-1 text-xs text-gray-500">{t('Recommended: 1280 × 720 px (16:9). Keep the lower leading corner clear for the logo. JPEG, PNG or WebP, up to 5 MB. Saved immediately. Without a banner the app shows the logo.', 'المقاس المقترح 1280 × 720 بكسل (16:9). اترك الركن السفلي للشعار. JPEG أو PNG أو WebP حتى 5 ميجا. تُحفظ فورًا. بدون بانر يعرض التطبيق الشعار.')}</p>
+              <p className="mt-1 text-xs text-gray-500">{t('Recommended: 1280 × 720 px (16:9). Keep the lower leading corner clear for the store-name label and overlapping logo. JPEG, PNG or WebP, up to 5 MB. Saved immediately. Without a banner the app shows the logo.', 'المقاس المقترح 1280 × 720 بكسل (16:9). اترك الركن السفلي لاسم المتجر والشعار المتداخل. JPEG أو PNG أو WebP حتى 5 ميجا. تُحفظ فورًا. بدون بانر يعرض التطبيق الشعار.')}</p>
               {coverError && <p role="alert" className="mt-1 text-sm text-red-600">{coverError}</p>}
             </div>
             <LabeledInput label={t('Logo URL (optional — an external https address)', 'رابط الشعار (اختياري — عنوان https خارجي)')} dir="ltr" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />

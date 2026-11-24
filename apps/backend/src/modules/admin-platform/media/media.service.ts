@@ -292,6 +292,7 @@ export class MediaService {
             await m.query(`UPDATE ${t.table} SET ${t.urlColumn} = NULL WHERE id = $1 AND ${t.urlColumn} IN (SELECT url FROM media_variants WHERE asset_id = $2)`, [entityId, cur.asset_id]);
           }
         }
+        if (entity === 'sector') await m.query(`UPDATE marketplace_sectors SET image_url = NULL WHERE id = $1`, [entityId]);
         if (entity === 'product') await m.query(`DELETE FROM product_media WHERE product_id = $1 AND is_primary`, [entityId]);
         return { entity, entityId, assetId: null };
       }

@@ -26,7 +26,7 @@ export function ProductImages({ productId, onChanged }: { productId?: string; on
   return (
     <div className="space-y-3">
       <p className="text-xs text-gray-500">{t('The first image is the primary one shown in lists. Up to 8 images. Use the arrows to reorder.', 'الصورة الأولى هي الرئيسية في القوائم. حتى 8 صور. استخدم الأسهم لإعادة الترتيب.')}</p>
-      <p className="text-xs text-gray-500">{t('Recommended: 1000 × 1000 px (1:1). Center the item for thumbnail and landscape crops.', 'المقاس المقترح 1000 × 1000 بكسل (1:1). ضع المنتج في المنتصف.')}</p>
+      <p className="text-xs text-gray-500">{t('Recommended: 1000 × 1000 px (1:1). Center the item with padding; keep important details away from the edges for thumbnail and landscape crops.', 'المقاس المقترح 1000 × 1000 بكسل (1:1). ضع المنتج في المنتصف مع مساحة حوله بعيدًا عن الحواف للقص المربع والأفقي.')}</p>
       {current.loading && !current.data && <p className="text-sm text-gray-500">{t('Loading…', 'جارٍ التحميل…')}</p>}
       {current.error && <p role="alert" className="text-sm text-red-700">{t('Could not load the images.', 'تعذّر تحميل الصور.')}</p>}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
