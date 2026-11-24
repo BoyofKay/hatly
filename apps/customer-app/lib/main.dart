@@ -16,7 +16,9 @@ import 'core/theme/hatly_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
 import 'core/routing/router_stack.dart';
 import 'shared_widgets/customer_global_header.dart';
-import 'shared_widgets/hero_colors.dart';
+import 'shared_widgets/home_hero_artwork.dart';
+import 'features/home/data/home_banners_providers.dart';
+import 'features/home/presentation/widgets/home_search_entry.dart';
 import 'features/shell/presentation/shell_tab_provider.dart';
 
 /// Customer Push Notifications — background state. Runs in a separate
@@ -80,7 +82,10 @@ class HatlyCustomerApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
-    final heroTint = ref.watch(activeHeroColorProvider);
+    final selectedArtwork = ref.watch(activeHeroArtworkProvider);
+    final banners = ref.watch(homeBannersProvider).valueOrNull ?? const [];
+    final artwork = banners.any((b) => b.imageUrl == selectedArtwork)
+        ? selectedArtwork : (banners.isEmpty ? null : banners.first.imageUrl);
     final shellTab = ref.watch(shellTabIndexProvider);
 
     // Customer Push Notifications / Deep Links — the tap-to-navigate
@@ -109,25 +114,34 @@ class HatlyCustomerApp extends ConsumerWidget {
       themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
       builder: (context, child) => AnimatedBuilder(
-        animation: router.routeInformationProvider,
+        animation: router.routerDelegate,
         builder: (context, _) {
-          final path = router.routeInformationProvider.value.uri.path;
-          final fullBleedHero = path == '/vendors' || path.startsWith('/vendors/');
-          final onHome = path == '/' && shellTab == ShellTab.home;
+          final matches = router.routerDelegate.currentConfiguration.matches;
+          final onHome = matches.length == 1 &&
+              router.routerDelegate.currentConfiguration.uri.path == '/' &&
+              shellTab == ShellTab.home;
           final surface = Theme.of(context).scaffoldBackgroundColor;
           return Column(children: [
-            if (!fullBleedHero)
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 420),
-                decoration: BoxDecoration(
-                  color: onHome ? translucentHero(heroTint, surface) : surface,
-                ),
-                child: SafeArea(bottom: false,
-                  child: CustomerGlobalHeader(router: router, showLocation: onHome)),
-              ),
+            ColoredBox(
+              color: surface,
+              child: Stack(children: [
+                if (onHome && artwork != null)
+                  Positioned.fill(child: HomeHeroArtwork(url: artwork, alignment: Alignment.topCenter)),
+                SafeArea(bottom: false, child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  CustomerGlobalHeader(router: router),
+                  if (onHome) Padding(
+                    padding: const EdgeInsets.only(top: 6, bottom: 8),
+                    child: HomeSearchEntry(onTap: () => router.push('/search')),
+                  ),
+                ])),
+              ]),
+            ),
             Expanded(child: MediaQuery.removePadding(
               context: context, removeTop: true,
-              child: child ?? const SizedBox.shrink(),
+              child: HomePinnedSearchScope(
+                pinned: onHome,
+                child: child ?? const SizedBox.shrink(),
+              ),
             )),
           ]);
         },

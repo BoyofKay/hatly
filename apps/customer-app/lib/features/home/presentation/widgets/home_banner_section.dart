@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
-import '../../../../shared_widgets/hatly_soft_image.dart';
-import '../../../../shared_widgets/hero_colors.dart';
-import '../../../sectors/data/sectors_providers.dart';
+import '../../../../shared_widgets/home_hero_artwork.dart';
 import '../../../../shared_widgets/looping_pager.dart';
 import '../../../../shared_widgets/skeleton_box.dart';
 import '../../data/home_banners_providers.dart';
@@ -16,12 +14,11 @@ import 'promo_carousel.dart';
 
 /// The hero banner is the biggest thing on Home: banner images are wide (2 : 1, 1200×600 recommended) and are shown cover-cropped in a
 /// taller card (about 1.7 : 1) so the promotion is prominent on a phone, within a sane range so a tablet does not get a giant one.
-const double kBannerAspect = 2.05;
+const double kBannerAspect = 1.55;
 
 double bannerHeight(double availableWidth) {
   // The card spans the content width (page margin on both sides); the height follows the card, as before (~210 pt on a 390 pt phone).
-  final cardWidth = heroBannerCardWidth(availableWidth);
-  return (availableWidth / kBannerAspect).clamp(156.0, 272.0);
+  return (availableWidth / kBannerAspect).clamp(156.0, 330.0);
 }
 
 /// The hero slot at the top of Home. Admin banners win when there are any; otherwise the offer-derived promos (the previous
@@ -35,45 +32,25 @@ class HomeBannerSection extends ConsumerWidget {
   final List<HomePromo> fallbackPromos;
   final ValueChanged<HomePromo> onPromoAction;
 
-  static const double _gap = HatlySpacing.xl;
 
   Widget _fallback() => fallbackPromos.isEmpty
       ? const SizedBox.shrink()
       : Column(children: [
           PromoCarousel(promos: fallbackPromos, onAction: onPromoAction),
-          const SizedBox(height: _gap),
         ]);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final banners = ref.watch(homeBannersProvider);
-    final sectors = ref.watch(sectorsProvider).valueOrNull ?? [];
-    Color tintFor(HomeBanner b) {
-      final linkedId = b.sectorId ?? (b.action == HomeBannerAction.sector ? b.targetId : null);
-      for (final sector in sectors) {
-        if (sector.id == linkedId) return colorForSector(sector.slug, sector.accentColor);
-      }
-      return const Color(0xFFFFA768);
-    }
-    void setTint(HomeBanner b) {
-      final color = tintFor(b);
-      if (ref.read(activeHeroColorProvider) != color) {
-        ref.read(activeHeroColorProvider.notifier).state = color;
-      }
-    }
     return banners.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.only(bottom: _gap),
-        child: HomeBannerSkeleton(),
-      ),
+      loading: () => const HomeBannerSkeleton(),
       error: (_, __) => _fallback(),
       data: (list) {
         if (list.isEmpty) return _fallback();
-        WidgetsBinding.instance.addPostFrameCallback((_) { if (context.mounted) setTint(list.first); });
         return Column(children: [
           HomeBannerCarousel(
             banners: list,
-            onIndexChanged: (i) => setTint(list[i]),
+            onIndexChanged: (i) => ref.read(activeHeroArtworkProvider.notifier).state = list[i].imageUrl,
             onTap: (banner) {
               final arabic =
                   Localizations.localeOf(context).languageCode == 'ar';
@@ -81,7 +58,6 @@ class HomeBannerSection extends ConsumerWidget {
               if (route != null) context.push(route);
             },
           ),
-          const SizedBox(height: _gap),
         ]);
       },
     );
@@ -180,13 +156,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                               fit: StackFit.expand,
                               children: [
                                 // A failed or missing image shows the quiet placeholder (never a broken-image icon or an exception).
-                                HatlySoftImage(
-                                  url: banner.imageUrl,
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  radius: 0,
-                                  placeholderIcon: Icons.local_offer_outlined,
-                                ),
+                                HomeHeroArtwork(url: banner.imageUrl, alignment: Alignment.bottomCenter),
                                 if (title.isNotEmpty) ...[
                                   // A soft scrim so the title stays readable on any picture.
                                   const Positioned.fill(

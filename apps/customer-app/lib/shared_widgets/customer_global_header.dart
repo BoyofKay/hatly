@@ -7,14 +7,13 @@ import '../features/notifications/presentation/widgets/notification_bell.dart';
 import '../features/shell/presentation/shell_tab_provider.dart';
 import '../features/auth/presentation/auth_gate.dart';
 import '../features/cart/data/cart_providers.dart';
-import '../features/home/presentation/widgets/home_location_bar.dart';
+
 
 
 /// Pinned across the entire customer Navigator (not a scrolling Home sliver).
 /// All actions reuse the existing notification and Favorites destinations.
 class CustomerGlobalHeader extends ConsumerWidget {
-  const CustomerGlobalHeader({super.key, required this.router, this.showLocation = false});
-  final bool showLocation;
+  const CustomerGlobalHeader({super.key, required this.router});
   final GoRouter router;
 
   @override
@@ -32,10 +31,7 @@ class CustomerGlobalHeader extends ConsumerWidget {
           child: ClipRRect(borderRadius: BorderRadius.circular(14),
             child: Image.asset('assets/images/hatly-app-icon.png', width: 48, height: 48, fit: BoxFit.contain)),
         ),
-        if (showLocation) ...[
-          const SizedBox(width: 4),
-          const Expanded(child: HomeLocationBar()),
-        ] else const Spacer(),
+        const Spacer(),
         NotificationBell(router: router),
         Stack(clipBehavior: Clip.none, children: [
           IconButton(key: const Key('customer-header-cart'), tooltip: l10n.cart, onPressed: () => router.push('/cart'), icon: const Icon(Icons.shopping_bag_outlined)),

@@ -67,7 +67,6 @@ class HomeSectionProductsScreen extends ConsumerWidget {
                     _OfferBannerCard(banner: banner),
                     const SizedBox(height: HatlySpacing.md),
                   ],
-                  SizedBox(height: 220, child: empty),
                 ],
               );
             }
