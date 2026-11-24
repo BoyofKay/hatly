@@ -6,7 +6,8 @@ import { send } from '../../../lib/ui/api';
 import { MediaPicker } from '../../../components/media/MediaPicker';
 import { resolveMediaUrl } from '../../../lib/media-url';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AdminSector, MANAGE_MARKETPLACE_SECTORS, createSector, listAdminSectors, setSectorActive, setSectorCustomRequests, setSectorBanner } from '../../../lib/api/admin-sectors';
 import { EMPTY_SECTOR_FORM, SectorFormState, buildCreateSectorBody, suggestSlug } from '../../../lib/sectors/sector-form';
 import { apiErrorMessage } from '../../../lib/api/errors';
@@ -37,7 +38,34 @@ export default function SectorsPage() {
   const [saving, setSaving] = useState(false);
 
   const [actionsId, setActionsId] = useState<string | null>(null);
+  const [actionPoint, setActionPoint] = useState({ top: 0, left: 0 });
+  const actionTrigger = useRef<HTMLButtonElement | null>(null);
+  const actionPanel = useRef<HTMLDivElement | null>(null);
   const actionSector = sectors?.find(s => s.id === actionsId) ?? null;
+  const closeActions = () => { setActionsId(null); actionTrigger.current?.focus(); };
+  function openActions(sector: AdminSector, button: HTMLButtonElement) {
+    if (actionsId === sector.id) { closeActions(); return; }
+    actionTrigger.current = button;
+    const rect = button.getBoundingClientRect();
+    const width = 208;
+    const left = document.documentElement.dir === 'rtl' ? rect.left : rect.right - width;
+    setActionPoint({ left: Math.max(8, Math.min(left, window.innerWidth - width - 8)), top: rect.bottom + 112 < window.innerHeight ? rect.bottom + 4 : Math.max(8, rect.top - 112) });
+    setActionsId(sector.id);
+  }
+  useEffect(() => {
+    if (!actionsId) return;
+    const dismiss = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (!actionPanel.current?.contains(target) && !actionTrigger.current?.contains(target)) closeActions();
+    };
+    const escape = (e: KeyboardEvent) => { if (e.key === 'Escape' && !actionPanel.current?.querySelector('[role="dialog"]')) closeActions(); };
+    const moved = () => { if (!actionPanel.current?.querySelector('[role="dialog"]')) closeActions(); };
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', escape);
+    window.addEventListener('resize', moved);
+    window.addEventListener('scroll', moved, true);
+    return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', escape); window.removeEventListener('resize', moved); window.removeEventListener('scroll', moved, true); };
+  }, [actionsId]);
   const [editing, setEditing] = useState<AdminSector | null>(null);
   const [assetsId, setAssetsId] = useState<string | null>(null);
   const [assetSlot, setAssetSlot] = useState<'photo' | 'en' | 'ar' | null>(null);
@@ -212,7 +240,7 @@ export default function SectorsPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <Button size="sm" onClick={() => { setAssetsId(s.id); setAssetSlot(null); }}>{t('Assets', 'الأصول')}</Button>
                         {canManage && <Button size="sm" onClick={() => setEditing(s)}>{t('Edit', 'تعديل')}</Button>}
-                        {canManage && <Button size="sm" aria-label={t('More actions', 'إجراءات إضافية')} aria-haspopup="dialog" onClick={() => setActionsId(s.id)}>⋯</Button>}
+                        {canManage && <Button size="sm" aria-label={t('More actions', 'إجراءات إضافية')} aria-expanded={actionsId === s.id} onClick={(e) => openActions(s, e.currentTarget)}>⋯</Button>}
 
                       </div>
                     </td>
@@ -223,13 +251,13 @@ export default function SectorsPage() {
           </div>
         </>
       )}
-      {canManage && actionSector && (
-        <Modal open title={t('Sector actions', 'إجراءات القطاع') + ' — ' + actionSector.name} onClose={() => setActionsId(null)}>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button disabled={busyId === actionSector.id} data-testid={`sector-active-toggle-${actionSector.id}`} onClick={() => { void toggleActive(actionSector); setActionsId(null); }}>{actionSector.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</Button>
-            <DeleteRecordButton path={`/admin/sectors/${actionSector.id}`} name={actionSector.name} what={['Sector', 'القطاع']} consequence={['Only a sector with no stores can be deleted: move its stores to another sector first.', 'يمكن حذف القطاع الذي لا يحتوي متاجر فقط: انقل متاجره أولًا.']} onDeleted={async () => { setActionsId(null); await refresh(); }} disabled={busyId === actionSector.id} />
+      {canManage && actionSector && createPortal(
+        <div ref={actionPanel} data-testid="sector-actions-popover" className="fixed z-40 w-52 rounded-xl border border-gray-200 bg-white p-2 shadow-lg" style={actionPoint}>
+          <div className="flex flex-col gap-2">
+            <Button disabled={busyId === actionSector.id} data-testid={`sector-active-toggle-${actionSector.id}`} onClick={() => { void toggleActive(actionSector); closeActions(); }}>{actionSector.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</Button>
+            <DeleteRecordButton path={`/admin/sectors/${actionSector.id}`} name={actionSector.name} what={['Sector', 'القطاع']} consequence={['Only a sector with no stores can be deleted: move its stores to another sector first.', 'يمكن حذف القطاع الذي لا يحتوي متاجر فقط: انقل متاجره أولًا.']} onDeleted={async () => { closeActions(); await refresh(); }} disabled={busyId === actionSector.id} />
           </div>
-        </Modal>
+        </div>, document.body
       )}
       {editing && (
         <SimpleEditModal

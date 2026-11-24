@@ -22,6 +22,22 @@ test.describe('Admin — Sectors', () => {
     await expect(restaurants.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
   });
 
+  test('three-dot actions do not expand the table row and dismiss with Escape', async ({ page }) => {
+    await page.goto('/sectors');
+    const row = page.getByTestId('sectors-table').locator('tbody tr').first();
+    const trigger = row.getByRole('button', { name: 'More actions' });
+    await expect(trigger).toBeVisible();
+    const before = await row.boundingBox();
+    await trigger.click();
+    const menu = page.getByTestId('sector-actions-popover');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('button', { name: /^(Activate|Deactivate)$/ })).toBeVisible();
+    expect((await row.boundingBox())?.height).toBe(before?.height);
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+
   test('toggling a sector persists through the real API (on, reload, off)', async ({ page }) => {
     await page.goto('/sectors');
     const row = page.getByTestId('sectors-table').getByRole('row').filter({ hasText: 'bakery' }).first();

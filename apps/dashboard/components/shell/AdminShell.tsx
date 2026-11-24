@@ -218,14 +218,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const seenSub = new Set<string>();
   const mainTabs = here.group
     ? here.group.items.filter((i) => {
-        if (!settingsTabs && i.more && here.item?.href !== i.href) return false;
+        if (i.more && here.item?.href !== i.href) return false;
         if (!i.sub) return true;
         if (seenSub.has(i.sub.id)) return false;
         seenSub.add(i.sub.id);
         return true;
       })
     : [];
-  const moreTabs = here.group && !settingsTabs ? here.group.items.filter((i) => i.more && here.item?.href !== i.href) : [];
+  const moreTabs = here.group ? here.group.items.filter((i) => i.more && here.item?.href !== i.href) : [];
   const subItems = here.group && here.item?.sub ? here.group.items.filter((i) => i.sub?.id === here.item!.sub!.id) : [];
   const subTabs = subItems.length > 1 ? (
     <nav aria-label={t('Section sub-pages', 'صفحات فرعية')} data-testid="section-subtabs" className="-mt-4 mb-5">

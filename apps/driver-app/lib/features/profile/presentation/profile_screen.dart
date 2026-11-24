@@ -19,7 +19,7 @@ class ProfileScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
       body: RefreshIndicator(
-        onRefresh: () async { await ref.refresh(driverFinancialPositionProvider.future); },
+        onRefresh: () async { try { await ref.refresh(driverFinancialPositionProvider.future); } catch (_) { /* Provider renders its retry state. */ } },
         child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),

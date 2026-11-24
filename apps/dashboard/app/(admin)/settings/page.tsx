@@ -319,7 +319,7 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
       const raw = await getBusinessConfigValue<unknown>(field.key);
       if (!edited.current) setValue(raw === null || raw === undefined ? '' : field.type === 'money' ? minorToEgpInput(Number(raw)) : String(raw));
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to load.'));
+      setError(apiErrorMessage(err, t('Failed to load.', 'تعذّر التحميل.')));
     } finally {
       setLoaded(true);
     }
@@ -365,7 +365,7 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
       await setBusinessConfigValue(field.key, parsed);
       setSaved(true);
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to save.'));
+      setError(apiErrorMessage(err, t('Failed to save.', 'تعذّر الحفظ.')));
     } finally {
       setIsSaving(false);
     }
@@ -382,14 +382,14 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
       setValue('');
       setSaved(true);
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to clear.'));
+      setError(apiErrorMessage(err, t('Failed to clear.', 'تعذّر المسح.')));
     } finally {
       setIsSaving(false);
     }
   }
 
   return (
-    <div className="grid min-w-0 gap-2 border-b py-3 last:border-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,auto)] lg:items-center">
+    <div data-testid={`config-row-${field.key}`} className="grid min-w-0 gap-2 border-b py-3 last:border-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,auto)] lg:items-center">
       <div className="min-w-0">
         <p className="text-sm font-medium">{t(field.label, field.labelAr)}</p>
         <p className="mt-1 break-words text-xs text-gray-500">{t(field.help, field.helpAr)}</p>
