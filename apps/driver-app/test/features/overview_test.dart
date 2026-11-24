@@ -5,6 +5,7 @@ import 'package:hatly_driver/features/earnings/domain/earnings.dart';
 import 'package:hatly_driver/features/overview/earnings_tabs_screen.dart';
 import 'package:hatly_driver/features/overview/orders_screen.dart';
 import 'package:hatly_driver/features/overview/overview_api.dart';
+import 'package:hatly_driver/features/shift/shift_api.dart';
 
 /// Driver app round 2 (owner decision 2026-11-22): Orders (Today | Previous) and Earnings (Current shift | Previous) with KPIs.
 class _Api implements OverviewApi {
@@ -75,14 +76,14 @@ Future<void> _pump(WidgetTester tester, _Api api, Widget screen) async {
   tester.view.physicalSize = const Size(420, 1400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(ProviderScope(overrides: [overviewApiProvider.overrideWithValue(api)], child: MaterialApp(home: screen)));
+  await tester.pumpWidget(ProviderScope(overrides: [overviewApiProvider.overrideWithValue(api), shiftStateProvider.overrideWith((ref) async => null)], child: MaterialApp(home: screen)));
   await tester.pumpAndSettle();
 }
 
 void main() {
   testWidgets('Current shift quick filters and search; History has concluded shifts only', (tester) async {
     final api = _Api();
-    await _pump(tester, api, ShiftOrdersList(tab: 'today', onUnavailable: () {}));
+    await _pump(tester, api, Scaffold(body: ShiftOrdersList(tab: 'today', onUnavailable: () {})));
     expect(find.text('HT-100'), findsOneWidget);
     expect(find.text('3 / 1 · 75%'), findsNothing);
     expect(find.text('25.00 EGP'), findsOneWidget);
@@ -101,7 +102,7 @@ void main() {
 
   testWidgets('Current shift: status filter reaches the server', (tester) async {
     final api = _Api();
-    await _pump(tester, api, ShiftOrdersList(tab: 'today', onUnavailable: () {}));
+    await _pump(tester, api, Scaffold(body: ShiftOrdersList(tab: 'today', onUnavailable: () {})));
     await tester.tap(find.byKey(const Key('orders-filter-today')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('orders-status-cancelled')));
@@ -136,7 +137,7 @@ void main() {
 
   testWidgets('older server (no overview endpoints) → the previous screens are shown, not an error', (tester) async {
     final api = _Api()..unavailable = true;
-    await tester.pumpWidget(ProviderScope(overrides: [overviewApiProvider.overrideWithValue(api)], child: const MaterialApp(home: OrdersScreen())));
+    await tester.pumpWidget(ProviderScope(overrides: [overviewApiProvider.overrideWithValue(api), shiftStateProvider.overrideWith((ref) async => null)], child: const MaterialApp(home: OrdersScreen())));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.byKey(const Key('orders-tab-today')), findsNothing); // the previous History screen took over

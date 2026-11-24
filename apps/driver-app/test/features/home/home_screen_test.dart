@@ -10,6 +10,7 @@ import 'package:hatly_driver/features/earnings/domain/earnings.dart';
 import 'package:hatly_driver/features/deliveries/presentation/driver_location_service.dart';
 import 'package:hatly_driver/features/deliveries/presentation/driver_polling_service.dart';
 import 'package:hatly_driver/features/home/presentation/home_screen.dart';
+import 'package:hatly_driver/features/shift/shift_api.dart';
 
 /// Driver Core + Dispatch Foundation milestone. `HomeScreen` was implemented (availability toggle +
 /// assigned-deliveries list) without a dedicated test — this closes that gap. Reuses the exact
@@ -152,6 +153,7 @@ Future<(FakeDriverApi, FakeLocationService, FakePollingService)> pump(WidgetTest
     ProviderScope(
       overrides: [
         driverApiProvider.overrideWithValue(fakeApi),
+        shiftStateProvider.overrideWith((ref) async => null),
         driverLocationServiceProvider.overrideWithValue(fakeLocation),
         driverPollingServiceProvider.overrideWithValue(fakePolling),
       ],
@@ -238,6 +240,7 @@ void main() {
         ProviderScope(
           overrides: [
             driverApiProvider.overrideWithValue(fakeApi),
+        shiftStateProvider.overrideWith((ref) async => null),
             driverLocationServiceProvider.overrideWithValue(fakeLocation),
             driverPollingServiceProvider.overrideWithValue(FakePollingService()),
           ],
@@ -281,6 +284,7 @@ void main() {
         ProviderScope(
           overrides: [
             driverApiProvider.overrideWithValue(fakeApi),
+        shiftStateProvider.overrideWith((ref) async => null),
             driverLocationServiceProvider.overrideWithValue(FakeLocationService()),
             driverPollingServiceProvider.overrideWithValue(FakePollingService()),
           ],
