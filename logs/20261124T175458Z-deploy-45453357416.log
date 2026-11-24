@@ -1,0 +1,555 @@
+action=deploy arg= commit=e62ba7d219729b8f745e4ff75bdb8f1f4125e00c run=45453357416 started=2026-11-24T17:52:46Z
+bundle OK: /home/runner/work/_temp/rel/hatly-prod-src.tar.gz  (30658606 bytes, 1964 entries, 101 migrations)
+release id: 20261124T175244Z-bad0f1541688
+uploaded 20261124T175244Z-bad0f1541688
+current release (rollback target): 20261124T154947Z-08ddf56327cc
+
+==== 1. verify + extract  (17:52:57 UTC)
+incoming/20261124T175244Z-bad0f1541688.tar.gz: OK
+
+==== 2. build images (the live release keeps serving)  (17:52:58 UTC)
+ Image hatly-prod-dashboard:20261124T175244Z-bad0f1541688 Building 
+ Image hatly-prod-backend:20261124T175244Z-bad0f1541688 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 1.29kB done
+#1 DONE 0.0s
+
+#2 [prod-dashboard internal] load build definition from dashboard.Dockerfile
+#2 transferring dockerfile: 2.02kB done
+#2 DONE 0.0s
+
+#3 [prod-backend internal] load build definition from backend.Dockerfile
+#3 transferring dockerfile: 2.58kB done
+#3 DONE 0.0s
+
+#4 [prod-backend internal] load metadata for docker.io/library/node:22-bookworm-slim
+#4 DONE 0.6s
+
+#5 [prod-dashboard build  1/10] FROM docker.io/library/node:22-bookworm-slim@sha256:be979e5523c76fa4d5ca4ebd3099078f220aa47ec39c48ad5b5df9314debd6eb
+#5 resolve docker.io/library/node:22-bookworm-slim@sha256:be979e5523c76fa4d5ca4ebd3099078f220aa47ec39c48ad5b5df9314debd6eb 0.0s done
+#5 CACHED
+
+#6 [prod-backend runtime 2/9] WORKDIR /repo/apps/backend
+#6 DONE 0.1s
+
+#7 [prod-backend internal] load build context
+#7 transferring context: 24B
+#7 transferring context: 9.68MB 0.2s done
+#7 DONE 0.2s
+
+#8 [prod-dashboard internal] load build context
+#8 transferring context: 3.18MB 0.1s done
+#8 DONE 0.1s
+
+#9 [prod-dashboard build  6/10] COPY packages packages
+#9 CACHED
+
+#10 [prod-dashboard build  2/10] WORKDIR /repo
+#10 CACHED
+
+#11 [prod-dashboard build  3/10] COPY package.json package-lock.json ./
+#11 CACHED
+
+#12 [prod-dashboard build  4/10] COPY apps/backend/package.json apps/backend/package.json
+#12 CACHED
+
+#13 [prod-dashboard build  5/10] COPY apps/dashboard/package.json apps/dashboard/package.json
+#13 CACHED
+
+#14 [prod-dashboard build  7/10] RUN npm ci --workspace=apps/dashboard --include-workspace-root
+#14 CACHED
+
+#15 [prod-dashboard build  8/10] COPY apps/dashboard apps/dashboard
+#15 DONE 0.1s
+
+#10 [prod-backend build  2/10] WORKDIR /repo
+#10 CACHED
+
+#16 [prod-backend build 4/9] COPY apps/backend/package.json apps/backend/package.json
+#16 CACHED
+
+#17 [prod-backend build 6/9] COPY packages packages
+#17 CACHED
+
+#18 [prod-backend build 3/9] COPY package.json package-lock.json ./
+#18 CACHED
+
+#19 [prod-backend build 5/9] COPY apps/dashboard/package.json apps/dashboard/package.json
+#19 CACHED
+
+#9 [prod-dashboard build  6/10] COPY packages packages
+#9 CACHED
+
+#20 [prod-dashboard build  9/10] RUN test -f apps/dashboard/postcss.config.js
+#20 DONE 0.2s
+
+#21 [prod-backend runtime 3/9] RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+#21 0.220 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#21 0.245 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#21 0.251 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [34.8 kB]
+#21 0.331 Get:4 http://deb.debian.org/debian bookworm/main amd64 Packages [8790 kB]
+#21 0.419 Get:5 http://deb.debian.org/debian bookworm-updates/main amd64 Packages [6924 B]
+#21 0.490 Get:6 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages [380 kB]
+#21 1.183 Fetched 9419 kB in 1s (9614 kB/s)
+#21 1.183 Reading package lists...
+#21 1.688 Reading package lists...
+#21 2.139 Building dependency tree...
+#21 2.246 Reading state information...
+#21 2.341 The following additional packages will be installed:
+#21 2.341   libbrotli1 libcurl4 libgssapi-krb5-2 libk5crypto3 libkeyutils1 libkrb5-3
+#21 2.342   libkrb5support0 libldap-2.5-0 libnghttp2-14 libpsl5 librtmp1 libsasl2-2
+#21 2.342   libsasl2-modules-db libssh2-1 libssl3
+#21 2.342 Suggested packages:
+#21 2.342   krb5-doc krb5-user
+#21 2.342 Recommended packages:
+#21 2.342   ca-certificates krb5-locales libldap-common publicsuffix libsasl2-modules
+#21 2.431 The following NEW packages will be installed:
+#21 2.432   curl libbrotli1 libcurl4 libgssapi-krb5-2 libk5crypto3 libkeyutils1
+#21 2.432   libkrb5-3 libkrb5support0 libldap-2.5-0 libnghttp2-14 libpsl5 librtmp1
+#21 2.432   libsasl2-2 libsasl2-modules-db libssh2-1 libssl3
+#21 2.475 0 upgraded, 16 newly installed, 0 to remove and 0 not upgraded.
+#21 2.475 Need to get 4243 kB of archives.
+#21 2.475 After this operation, 12.0 MB of additional disk space will be used.
+#21 2.475 Get:1 http://deb.debian.org/debian-security bookworm-security/main amd64 libbrotli1 amd64 1.0.9-2+deb12u1 [275 kB]
+#21 2.501 Get:2 http://deb.debian.org/debian bookworm/main amd64 libkrb5support0 amd64 1.20.1-2+deb12u5 [33.2 kB]
+#21 2.502 Get:3 http://deb.debian.org/debian bookworm/main amd64 libk5crypto3 amd64 1.20.1-2+deb12u5 [79.7 kB]
+#21 2.505 Get:4 http://deb.debian.org/debian bookworm/main amd64 libkeyutils1 amd64 1.6.3-2 [8808 B]
+#21 2.505 Get:5 http://deb.debian.org/debian-security bookworm-security/main amd64 libssl3 amd64 3.0.22-1~deb12u2 [2040 kB]
+#21 2.528 Get:6 http://deb.debian.org/debian bookworm/main amd64 libkrb5-3 amd64 1.20.1-2+deb12u5 [332 kB]
+#21 2.531 Get:7 http://deb.debian.org/debian bookworm/main amd64 libgssapi-krb5-2 amd64 1.20.1-2+deb12u5 [135 kB]
+#21 2.533 Get:8 http://deb.debian.org/debian-security bookworm-security/main amd64 libsasl2-modules-db amd64 2.1.28+dfsg-10+deb12u1 [20.5 kB]
+#21 2.533 Get:9 http://deb.debian.org/debian-security bookworm-security/main amd64 libsasl2-2 amd64 2.1.28+dfsg-10+deb12u1 [59.9 kB]
+#21 2.534 Get:10 http://deb.debian.org/debian bookworm/main amd64 libldap-2.5-0 amd64 2.5.13+dfsg-5 [183 kB]
+#21 2.535 Get:11 http://deb.debian.org/debian bookworm/main amd64 libnghttp2-14 amd64 1.52.0-1+deb12u3 [72.4 kB]
+#21 2.536 Get:12 http://deb.debian.org/debian bookworm/main amd64 libpsl5 amd64 0.21.2-1 [58.7 kB]
+#21 2.537 Get:13 http://deb.debian.org/debian bookworm/main amd64 librtmp1 amd64 2.4+20151223.gitfa8646d.1-2+b2 [60.8 kB]
+#21 2.538 Get:14 http://deb.debian.org/debian-security bookworm-security/main amd64 libssh2-1 amd64 1.10.0-3+deb12u1 [176 kB]
+#21 2.538 Get:15 http://deb.debian.org/debian bookworm/main amd64 libcurl4 amd64 7.88.1-10+deb12u15 [392 kB]
+#21 2.540 Get:16 http://deb.debian.org/debian bookworm/main amd64 curl amd64 7.88.1-10+deb12u15 [316 kB]
+#21 2.654 debconf: delaying package configuration, since apt-utils is not installed
+#21 2.689 Fetched 4243 kB in 0s (40.5 MB/s)
+#21 2.713 Selecting previously unselected package libbrotli1:amd64.
+#21 2.713 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6096 files and directories currently installed.)
+#21 2.718 Preparing to unpack .../00-libbrotli1_1.0.9-2+deb12u1_amd64.deb ...
+#21 2.723 Unpacking libbrotli1:amd64 (1.0.9-2+deb12u1) ...
+#21 2.784 Selecting previously unselected package libkrb5support0:amd64.
+#21 2.786 Preparing to unpack .../01-libkrb5support0_1.20.1-2+deb12u5_amd64.deb ...
+#21 2.791 Unpacking libkrb5support0:amd64 (1.20.1-2+deb12u5) ...
+#21 2.833 Selecting previously unselected package libk5crypto3:amd64.
+#21 2.835 Preparing to unpack .../02-libk5crypto3_1.20.1-2+deb12u5_amd64.deb ...
+#21 2.840 Unpacking libk5crypto3:amd64 (1.20.1-2+deb12u5) ...
+#21 2.896 Selecting previously unselected package libkeyutils1:amd64.
+#21 2.903 Preparing to unpack .../03-libkeyutils1_1.6.3-2_amd64.deb ...
+#21 2.905 Unpacking libkeyutils1:amd64 (1.6.3-2) ...
+#21 2.949 Selecting previously unselected package libssl3:amd64.
+#21 2.951 Preparing to unpack .../04-libssl3_3.0.22-1~deb12u2_amd64.deb ...
+#21 2.953 Unpacking libssl3:amd64 (3.0.22-1~deb12u2) ...
+#21 3.132 Selecting previously unselected package libkrb5-3:amd64.
+#21 3.134 Preparing to unpack .../05-libkrb5-3_1.20.1-2+deb12u5_amd64.deb ...
+#21 3.136 Unpacking libkrb5-3:amd64 (1.20.1-2+deb12u5) ...
+#21 3.206 Selecting previously unselected package libgssapi-krb5-2:amd64.
+#21 3.206 Preparing to unpack .../06-libgssapi-krb5-2_1.20.1-2+deb12u5_amd64.deb ...
+#21 3.210 Unpacking libgssapi-krb5-2:amd64 (1.20.1-2+deb12u5) ...
+#21 3.255 Selecting previously unselected package libsasl2-modules-db:amd64.
+#21 3.255 Preparing to unpack .../07-libsasl2-modules-db_2.1.28+dfsg-10+deb12u1_amd64.deb ...
+#21 3.259 Unpacking libsasl2-modules-db:amd64 (2.1.28+dfsg-10+deb12u1) ...
+#21 3.339 Selecting previously unselected package libsasl2-2:amd64.
+#21 3.340 Preparing to unpack .../08-libsasl2-2_2.1.28+dfsg-10+deb12u1_amd64.deb ...
+#21 3.343 Unpacking libsasl2-2:amd64 (2.1.28+dfsg-10+deb12u1) ...
+#21 3.374 Selecting previously unselected package libldap-2.5-0:amd64.
+#21 3.376 Preparing to unpack .../09-libldap-2.5-0_2.5.13+dfsg-5_amd64.deb ...
+#21 3.378 Unpacking libldap-2.5-0:amd64 (2.5.13+dfsg-5) ...
+#21 3.428 Selecting previously unselected package libnghttp2-14:amd64.
+#21 3.430 Preparing to unpack .../10-libnghttp2-14_1.52.0-1+deb12u3_amd64.deb ...
+#21 3.451 Unpacking libnghttp2-14:amd64 (1.52.0-1+deb12u3) ...
+#21 3.485 Selecting previously unselected package libpsl5:amd64.
+#21 3.485 Preparing to unpack .../11-libpsl5_0.21.2-1_amd64.deb ...
+#21 3.486 Unpacking libpsl5:amd64 (0.21.2-1) ...
+#21 3.525 Selecting previously unselected package librtmp1:amd64.
+#21 3.526 Preparing to unpack .../12-librtmp1_2.4+20151223.gitfa8646d.1-2+b2_amd64.deb ...
+#21 3.529 Unpacking librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b2) ...
+#21 3.574 Selecting previously unselected package libssh2-1:amd64.
+#21 3.577 Preparing to unpack .../13-libssh2-1_1.10.0-3+deb12u1_amd64.deb ...
+#21 3.581 Unpacking libssh2-1:amd64 (1.10.0-3+deb12u1) ...
+#21 3.648 Selecting previously unselected package libcurl4:amd64.
+#21 3.649 Preparing to unpack .../14-libcurl4_7.88.1-10+deb12u15_amd64.deb ...
+#21 3.654 Unpacking libcurl4:amd64 (7.88.1-10+deb12u15) ...
+#21 3.720 Selecting previously unselected package curl.
+#21 3.720 Preparing to unpack .../15-curl_7.88.1-10+deb12u15_amd64.deb ...
+#21 3.723 Unpacking curl (7.88.1-10+deb12u15) ...
+#21 3.810 Setting up libkeyutils1:amd64 (1.6.3-2) ...
+#21 3.824 Setting up libpsl5:amd64 (0.21.2-1) ...
+#21 3.830 Setting up libbrotli1:amd64 (1.0.9-2+deb12u1) ...
+#21 3.835 Setting up libssl3:amd64 (3.0.22-1~deb12u2) ...
+#21 3.841 Setting up libnghttp2-14:amd64 (1.52.0-1+deb12u3) ...
+#21 3.861 Setting up libkrb5support0:amd64 (1.20.1-2+deb12u5) ...
+#21 3.865 Setting up libsasl2-modules-db:amd64 (2.1.28+dfsg-10+deb12u1) ...
+#21 3.870 Setting up librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b2) ...
+#21 3.875 Setting up libk5crypto3:amd64 (1.20.1-2+deb12u5) ...
+#21 3.890 Setting up libsasl2-2:amd64 (2.1.28+dfsg-10+deb12u1) ...
+#21 3.917 Setting up libssh2-1:amd64 (1.10.0-3+deb12u1) ...
+#21 3.935 Setting up libkrb5-3:amd64 (1.20.1-2+deb12u5) ...
+#21 3.950 Setting up libldap-2.5-0:amd64 (2.5.13+dfsg-5) ...
+#21 3.960 Setting up libgssapi-krb5-2:amd64 (1.20.1-2+deb12u5) ...
+#21 3.975 Setting up libcurl4:amd64 (7.88.1-10+deb12u15) ...
+#21 3.992 Setting up curl (7.88.1-10+deb12u15) ...
+#21 4.005 Processing triggers for libc-bin (2.36-9+deb12u14) ...
+#21 DONE 4.3s
+
+#22 [prod-dashboard build 10/10] RUN test -n "https://api.hatly.dev/api/v1" && cd apps/dashboard && npx next build
+#22 1.277    ▲ Next.js 15.5.27
+#22 1.277 
+#22 1.320    Creating an optimized production build ...
+#22 ...
+
+#23 [prod-backend prod-deps 7/7] RUN npm ci --omit=dev --workspace=apps/backend --include-workspace-root
+#23 4.429 npm warn deprecated jpeg-exif@1.1.4: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+#23 4.447 npm warn deprecated crypto-js@4.2.0: Active development of CryptoJS has been discontinued. This library is no longer maintained.
+#23 4.454 npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+#23 5.351 npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#23 5.465 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#23 5.478 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#23 5.595 npm warn deprecated uuid@10.0.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#23 ...
+
+#24 [prod-backend build 7/9] RUN npm ci --workspace=apps/backend --include-workspace-root
+#24 4.165 npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+#24 5.876 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#24 5.954 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#24 5.976 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#24 6.035 npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#24 6.152 npm warn deprecated jpeg-exif@1.1.4: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
+#24 6.255 npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+#24 6.511 npm warn deprecated crypto-js@4.2.0: Active development of CryptoJS has been discontinued. This library is no longer maintained.
+#24 7.832 npm warn deprecated glob@10.4.5: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#24 8.036 npm warn deprecated uuid@9.0.1: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#24 8.040 npm warn deprecated uuid@10.0.0: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
+#24 8.140 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#24 8.171 npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+#24 ...
+
+#23 [prod-backend prod-deps 7/7] RUN npm ci --omit=dev --workspace=apps/backend --include-workspace-root
+#23 10.40 
+#23 10.40 added 453 packages, and audited 455 packages in 10s
+#23 10.40 
+#23 10.40 112 packages are looking for funding
+#23 10.40   run `npm fund` for details
+#23 10.44 
+#23 10.44 20 vulnerabilities (1 low, 15 moderate, 4 high)
+#23 10.44 
+#23 10.44 To address issues that do not require attention, run:
+#23 10.44   npm audit fix
+#23 10.44 
+#23 10.44 To address all issues (including breaking changes), run:
+#23 10.44   npm audit fix --force
+#23 10.44 
+#23 10.44 Run `npm audit` for details.
+#23 10.45 npm notice
+#23 10.45 npm notice New major version of npm available! 10.9.9 -> 12.2.3
+#23 10.45 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#23 10.45 npm notice To update run: npm install -g npm@12.2.3
+#23 10.45 npm notice
+#23 DONE 11.3s
+
+#24 [prod-backend build 7/9] RUN npm ci --workspace=apps/backend --include-workspace-root
+#24 ...
+
+#25 [prod-backend runtime 4/9] COPY --from=prod-deps /repo/node_modules /repo/node_modules
+#25 ...
+
+#24 [prod-backend build 7/9] RUN npm ci --workspace=apps/backend --include-workspace-root
+#24 15.93 
+#24 15.93 added 888 packages, and audited 890 packages in 16s
+#24 15.93 
+#24 15.93 169 packages are looking for funding
+#24 15.93   run `npm fund` for details
+#24 16.03 
+#24 16.03 34 vulnerabilities (4 low, 21 moderate, 8 high, 1 critical)
+#24 16.03 
+#24 16.03 To address issues that do not require attention, run:
+#24 16.03   npm audit fix
+#24 16.03 
+#24 16.03 To address all issues (including breaking changes), run:
+#24 16.03   npm audit fix --force
+#24 16.03 
+#24 16.03 Run `npm audit` for details.
+#24 16.03 npm notice
+#24 16.03 npm notice New major version of npm available! 10.9.9 -> 12.2.3
+#24 16.03 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+#24 16.03 npm notice To update run: npm install -g npm@12.2.3
+#24 16.03 npm notice
+#24 DONE 16.7s
+
+#26 [prod-backend build 8/9] COPY apps/backend apps/backend
+#26 DONE 0.6s
+
+#25 [prod-backend runtime 4/9] COPY --from=prod-deps /repo/node_modules /repo/node_modules
+#25 DONE 3.9s
+
+#27 [prod-backend build 9/9] RUN cd apps/backend && npx nest build
+#27 ...
+
+#28 [prod-backend runtime 5/9] COPY --from=prod-deps /repo/apps/backend/node_modules ./node_modules
+#28 DONE 1.0s
+
+#27 [prod-backend build 9/9] RUN cd apps/backend && npx nest build
+#27 ...
+
+#22 [prod-dashboard build 10/10] RUN test -n "https://api.hatly.dev/api/v1" && cd apps/dashboard && npx next build
+#22 20.97  ✓ Compiled successfully in 16.7s
+#22 20.98    Linting and checking validity of types ...
+#22 33.02    Collecting page data ...
+#22 ...
+
+#27 [prod-backend build 9/9] RUN cd apps/backend && npx nest build
+#27 DONE 18.0s
+
+#22 [prod-dashboard build 10/10] RUN test -n "https://api.hatly.dev/api/v1" && cd apps/dashboard && npx next build
+#22 ...
+
+#29 [prod-backend runtime 6/9] COPY --from=build /repo/apps/backend/dist ./dist
+#29 DONE 0.5s
+
+#22 [prod-dashboard build 10/10] RUN test -n "https://api.hatly.dev/api/v1" && cd apps/dashboard && npx next build
+#22 35.51    Generating static pages (0/83) ...
+#22 ...
+
+#30 [prod-backend runtime 7/9] COPY apps/backend/assets ./assets
+#30 DONE 0.0s
+
+#31 [prod-backend runtime 8/9] COPY apps/backend/package.json ./package.json
+#31 DONE 0.0s
+
+#32 [prod-backend runtime 9/9] RUN mkdir -p /data/uploads && chown -R node:node /data /repo/apps/backend
+#32 DONE 4.3s
+
+#22 [prod-dashboard build 10/10] RUN test -n "https://api.hatly.dev/api/v1" && cd apps/dashboard && npx next build
+#22 36.22    Generating static pages (20/83) 
+#22 36.30    Generating static pages (41/83) 
+#22 36.30    Generating static pages (62/83) 
+#22 36.41  ✓ Generating static pages (83/83)
+#22 37.03    Finalizing page optimization ...
+#22 37.03    Collecting build traces ...
+#22 44.43 
+#22 44.43 Route (app)                                 Size  First Load JS
+#22 44.43 ┌ ○ /                                      136 B         103 kB
+#22 44.43 ├ ○ /_not-found                             1 kB         103 kB
+#22 44.43 ├ ○ /access/templates                     3.7 kB         157 kB
+#22 44.43 ├ ○ /account-deletion                    5.36 kB         126 kB
+#22 44.43 ├ ○ /account-deletion-requests           3.69 kB         152 kB
+#22 44.43 ├ ○ /alerts                              2.75 kB         160 kB
+#22 44.43 ├ ○ /audiences                           3.58 kB         157 kB
+#22 44.43 ├ ○ /audit-log                           3.38 kB         151 kB
+#22 44.43 ├ ○ /banners                             8.86 kB         149 kB
+#22 44.43 ├ ○ /branch-requests                     2.51 kB         150 kB
+#22 44.43 ├ ○ /branches                            4.84 kB         162 kB
+#22 44.43 ├ ƒ /branches/[id]                       10.7 kB         187 kB
+#22 44.43 ├ ○ /broadcasts                          4.28 kB         161 kB
+#22 44.43 ├ ƒ /broadcasts/[id]                     5.64 kB         162 kB
+#22 44.43 ├ ○ /campaigns                            3.3 kB         160 kB
+#22 44.43 ├ ƒ /campaigns/[id]                      5.57 kB         162 kB
+#22 44.43 ├ ○ /cash-remainders                     2.27 kB         154 kB
+#22 44.43 ├ ○ /catalog                             7.84 kB         175 kB
+#22 44.43 ├ ○ /change-password                     2.98 kB         145 kB
+#22 44.43 ├ ○ /config                               3.9 kB         161 kB
+#22 44.43 ├ ○ /control-tower                       14.2 kB         165 kB
+#22 44.43 ├ ○ /customers                           4.07 kB         161 kB
+#22 44.43 ├ ƒ /customers/[id]                      9.86 kB         167 kB
+#22 44.43 ├ ○ /delivery-zones                      5.78 kB         139 kB
+#22 44.43 ├ ○ /dispatch                              497 B         106 kB
+#22 44.43 ├ ○ /drivers                             11.7 kB         160 kB
+#22 44.43 ├ ○ /drivers-today                       11.3 kB         168 kB
+#22 44.43 ├ ○ /earnings                            3.09 kB         160 kB
+#22 44.43 ├ ○ /employee-loans                      4.74 kB         158 kB
+#22 44.43 ├ ○ /exceptions                           9.3 kB         166 kB
+#22 44.43 ├ ○ /executive                            8.2 kB         165 kB
+#22 44.43 ├ ○ /exports                              3.9 kB         157 kB
+#22 44.43 ├ ○ /failed-deliveries                   3.49 kB         155 kB
+#22 44.43 ├ ƒ /failed-deliveries/[id]              6.03 kB         157 kB
+#22 44.43 ├ ○ /finance                             4.93 kB         162 kB
+#22 44.43 ├ ○ /finance/ledger                      7.29 kB         164 kB
+#22 44.43 ├ ○ /finance/liabilities                  4.6 kB         158 kB
+#22 44.43 ├ ○ /finance/receivables                 2.85 kB         156 kB
+#22 44.43 ├ ○ /finance/reconciliation              3.29 kB         157 kB
+#22 44.43 ├ ○ /finance/revenue                     4.38 kB         158 kB
+#22 44.43 ├ ○ /fleet                               5.81 kB         163 kB
+#22 44.43 ├ ○ /growth                              2.54 kB         156 kB
+#22 44.43 ├ ○ /home                                10.2 kB         189 kB
+#22 44.43 ├ ○ /inbox                                2.3 kB         176 kB
+#22 44.43 ├ ○ /insights                            3.08 kB         156 kB
+#22 44.43 ├ ○ /inventory                           2.16 kB         159 kB
+#22 44.43 ├ ○ /login                               6.23 kB         148 kB
+#22 44.43 ├ ○ /manual-transfer                     7.06 kB         158 kB
+#22 44.43 ├ ○ /media                               4.67 kB         163 kB
+#22 44.43 ├ ○ /my-branches                         5.54 kB         163 kB
+#22 44.43 ├ ○ /notification-setup                  5.93 kB         172 kB
+#22 44.43 ├ ○ /notifications                         392 B         156 kB
+#22 44.43 ├ ○ /offers                              9.73 kB         167 kB
+#22 44.43 ├ ○ /operations                          2.07 kB         169 kB
+#22 44.43 ├ ○ /order-history                       3.33 kB         160 kB
+#22 44.43 ├ ○ /order-management                    10.3 kB         183 kB
+#22 44.43 ├ ○ /order-search                        5.07 kB         156 kB
+#22 44.43 ├ ƒ /order-search/[id]                     393 B         173 kB
+#22 44.43 ├ ○ /orders                              7.63 kB         165 kB
+#22 44.43 ├ ƒ /orders/[id]                           377 B         148 kB
+#22 44.43 ├ ○ /overview                            6.97 kB         167 kB
+#22 44.43 ├ ○ /password-requests                   2.81 kB         156 kB
+#22 44.43 ├ ○ /payments                             6.1 kB         163 kB
+#22 44.43 ├ ○ /privacy                               136 B         103 kB
+#22 44.43 ├ ○ /product-requests                    3.73 kB         152 kB
+#22 44.43 ├ ○ /products                            9.88 kB         162 kB
+#22 44.43 ├ ○ /refunds                             2.25 kB         159 kB
+#22 44.43 ├ ○ /reports                             2.26 kB         159 kB
+#22 44.43 ├ ƒ /reports/[id]                        4.41 kB         161 kB
+#22 44.43 ├ ○ /reviews                             2.53 kB         156 kB
+#22 44.43 ├ ○ /sectors                             8.37 kB         167 kB
+#22 44.43 ├ ○ /security                            2.87 kB         151 kB
+#22 44.43 ├ ○ /service-areas                       3.65 kB         152 kB
+#22 44.43 ├ ○ /settings                              12 kB         154 kB
+#22 44.43 ├ ○ /settlement                          10.5 kB         167 kB
+#22 44.43 ├ ○ /settlement-statements               7.75 kB         165 kB
+#22 44.43 ├ ○ /settlements                          5.3 kB         162 kB
+#22 44.43 ├ ƒ /settlements/[party]/[id]            10.5 kB         167 kB
+#22 44.43 ├ ○ /stock                               3.11 kB         151 kB
+#22 44.43 ├ ○ /stock-history                        7.1 kB         155 kB
+#22 44.43 ├ ○ /stores-now                          6.55 kB         163 kB
+#22 44.43 ├ ○ /system                              3.25 kB         160 kB
+#22 44.43 ├ ○ /system/jobs                         2.68 kB         159 kB
+#22 44.43 ├ ○ /system/metrics                      3.01 kB         156 kB
+#22 44.43 ├ ○ /team                                 6.3 kB         160 kB
+#22 44.43 ├ ○ /users                               6.36 kB         154 kB
+#22 44.43 ├ ○ /vehicle-types                        4.3 kB         152 kB
+#22 44.43 ├ ○ /vendor-staff                        7.42 kB         155 kB
+#22 44.43 ├ ○ /vendors                             5.48 kB         162 kB
+#22 44.43 ├ ƒ /vendors/[id]                        11.1 kB         162 kB
+#22 44.43 └ ○ /wallet-adjustments                   3.3 kB         160 kB
+#22 44.43 + First Load JS shared by all             102 kB
+#22 44.43   ├ chunks/1255-8dc91b756d944555.js      46.2 kB
+#22 44.43   ├ chunks/4bd1b696-100b9d70ed4e49c1.js  54.2 kB
+#22 44.43   └ other shared chunks (total)          1.94 kB
+#22 44.43 
+#22 44.43 
+#22 44.43 ○  (Static)   prerendered as static content
+#22 44.43 ƒ  (Dynamic)  server-rendered on demand
+#22 44.43 
+#22 DONE 44.6s
+
+#33 [prod-backend] exporting to image
+#33 exporting layers
+#33 exporting layers 7.0s done
+#33 exporting manifest sha256:291a4b4bd182cffbd060c4cb3ab57b23b848772541f7160f2670821b1d0ec1ce done
+#33 exporting config sha256:cf85720ffea21930cdd3fc1b9103a32c9125dc7dc3be41badd9f10178dcfa981 done
+#33 exporting attestation manifest sha256:6c917b6c2e6c358b758ebe921fde03ee9d9f48a6352c615f7a360e52a79b2cba done
+#33 exporting manifest list sha256:c6b7633cc9be3b41eef76d3b4eb9ffe11890d1184372d57502113d17de491e53 done
+#33 naming to docker.io/library/hatly-prod-backend:20261124T175244Z-bad0f1541688 done
+#33 unpacking to docker.io/library/hatly-prod-backend:20261124T175244Z-bad0f1541688
+#33 ...
+
+#34 [prod-dashboard runtime 3/5] RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+#34 CACHED
+
+#35 [prod-dashboard runtime 4/5] COPY --from=build /repo /repo
+#35 ...
+
+#33 [prod-backend] exporting to image
+#33 unpacking to docker.io/library/hatly-prod-backend:20261124T175244Z-bad0f1541688 5.0s done
+#33 DONE 12.0s
+
+#36 [prod-backend] resolving provenance for metadata file
+#36 DONE 0.0s
+
+#35 [prod-dashboard runtime 4/5] COPY --from=build /repo /repo
+#35 DONE 3.9s
+
+#37 [prod-dashboard runtime 5/5] WORKDIR /repo/apps/dashboard
+#37 DONE 0.2s
+
+#38 [prod-dashboard] exporting to image
+#38 exporting layers
+#38 exporting layers 29.4s done
+#38 exporting manifest sha256:09f457dae387e78fead15d603244e5ff166329bcddec402e1038a629dd4a758b done
+#38 exporting config sha256:eff56a9727d3c478a2a4d385a1a42d8f5a7d18e578b812f133c32ea6a1583222 done
+#38 exporting attestation manifest sha256:e760dcf8da877c5be9864d53d77ea7b6091dc7b70a6a494dfdfd311d8e692908 done
+#38 exporting manifest list sha256:dc8bd470a34ff502b55d8947e7783a8010ebd3146c4829f28dcab3e3a025fe16 done
+#38 naming to docker.io/library/hatly-prod-dashboard:20261124T175244Z-bad0f1541688 done
+#38 unpacking to docker.io/library/hatly-prod-dashboard:20261124T175244Z-bad0f1541688
+#38 unpacking to docker.io/library/hatly-prod-dashboard:20261124T175244Z-bad0f1541688 5.4s done
+#38 DONE 34.8s
+
+#39 [prod-dashboard] resolving provenance for metadata file
+#39 DONE 0.0s
+ Image hatly-prod-backend:20261124T175244Z-bad0f1541688 Built 
+ Image hatly-prod-dashboard:20261124T175244Z-bad0f1541688 Built 
+
+==== 3. env check with the new image  (17:54:27 UTC)
+ Container hatly-prod-prod-backend-run-93c27795d6d7 Creating 
+ Container hatly-prod-prod-backend-run-93c27795d6d7 Created 
+WARN   REDIS_URL is not TLS (redis://): acceptable only on a private network (e.g. the staging compose network); use rediss:// for a managed/remote Redis.
+WARN   MAPS_PROVIDER=none: Google Maps is disabled — delivery fees and serviceability come from the selected Delivery Zone only, address search/suggestions are off, and dispatch ranks drivers by straight-line distance (bicycle drivers are not auto-ranked).
+WARN   SMS provider (Unifonic) is not configured (ALLOW_MISSING_SMS_PROVIDER=true): OTP/phone-verification messages cannot be sent.
+WARN   Firebase push (FCM) is not configured (ALLOW_MISSING_PUSH_PROVIDER=true): push notifications are disabled.
+ENV CHECK PASSED (4 warnings)
+
+==== 4. migration plan  (17:54:28 UTC)
+ Container hatly-prod-prod-backend-run-c34452087203 Creating 
+ Container hatly-prod-prod-backend-run-c34452087203 Created 
+ Container hatly-prod-prod-backend-run-a95e7ae27277 Creating 
+ Container hatly-prod-prod-backend-run-a95e7ae27277 Created 
+[X] 94 DeliveryZoneNeighborhoods1700009300000
+[X] 95 DeliveryZoneParentStatus1700009400000
+[X] 96 SectorHeroBanner1700009500000
+[X] 97 SectorAccentAndBannerAssociation1700009600000
+[X] 98 LocalizedSectorBanner1700009700000
+[X] 99 LocalizedPromotionArtwork1700009800000
+[X] 100 DriverShiftReconciliations1700009900000
+[X] 101 DriverShiftAssignments1700010000000
+pending migrations: 0
+
+==== 5. backup + restore drill  (17:54:30 UTC)
+backup OK: hatly-prod-20261124T175430Z.dump 1939287 bytes, 111 table-data sections, sha256 17cc3e0b895e…, off-site: NOT CONFIGURED
+uploads backup OK: hatly-prod-uploads-20261124T175431Z.tar.gz 24858928 bytes, 175 files, sha256 d04ec505659b…, off-site: NOT CONFIGURED
+newest dump: hatly-prod-20261124T175430Z.dump
+drill database hatly_drill_20261124175433 restored from hatly-prod-20261124T175430Z.dump: 111 tables, 101 migrations recorded, 22 users
+restore drill OK
+
+==== 6. no migrations to run  (17:54:35 UTC)
+
+==== 7. switch release + start the new apps  (17:54:35 UTC)
+ Container hatly-prod-postgres-1 Running 
+ Container hatly-prod-redis-1 Running 
+ Container hatly-prod-backend-1 Recreate 
+ Container hatly-prod-backend-1 Recreated 
+ Container hatly-prod-dashboard-1 Recreate 
+ Container hatly-prod-dashboard-1 Recreated 
+ Container hatly-prod-redis-1 Waiting 
+ Container hatly-prod-postgres-1 Waiting 
+ Container hatly-prod-redis-1 Healthy 
+ Container hatly-prod-postgres-1 Healthy 
+ Container hatly-prod-backend-1 Starting 
+ Container hatly-prod-backend-1 Started 
+ Container hatly-prod-backend-1 Waiting 
+ Container hatly-prod-backend-1 Healthy 
+ Container hatly-prod-dashboard-1 Starting 
+ Container hatly-prod-dashboard-1 Started 
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED         STATUS                                     PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261124T175244Z-bad0f1541688     "docker-entrypoint.s…"   prod-backend     7 seconds ago   Up 5 seconds (healthy)                     3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261124T175244Z-bad0f1541688   "docker-entrypoint.s…"   prod-dashboard   7 seconds ago   Up Less than a second (health: starting)   3001/tcp
+
+==== 8. health  (17:54:43 UTC)
+NAME                     IMAGE                                                COMMAND                  SERVICE          CREATED          STATUS                    PORTS
+hatly-prod-backend-1     hatly-prod-backend:20261124T175244Z-bad0f1541688     "docker-entrypoint.s…"   prod-backend     12 seconds ago   Up 11 seconds (healthy)   3000/tcp
+hatly-prod-dashboard-1   hatly-prod-dashboard:20261124T175244Z-bad0f1541688   "docker-entrypoint.s…"   prod-dashboard   12 seconds ago   Up 5 seconds (healthy)    3001/tcp
+hatly-prod-postgres-1    postgres:16-alpine                                   "docker-entrypoint.s…"   postgres         4 weeks ago      Up 2 weeks (healthy)      5432/tcp
+hatly-prod-redis-1       redis:7-alpine                                       "docker-entrypoint.s…"   redis            4 weeks ago      Up 2 weeks (healthy)      6379/tcp
+{"data":{"status":"ok","checks":{"database":"up","redis":"up"}}}
+dashboard /privacy 200
+
+==== 9. recent backend errors  (17:54:49 UTC)
+0
+
+==== 10. tidy disk (keeps the 3 newest releases + their images; build cache capped at 5 GB)  (17:54:49 UTC)
+/dev/sda1        96G   22G   75G  22% /
+DEPLOYED 20261124T175244Z-bad0f1541688 (previous: 20261124T154947Z-08ddf56327cc — rollback: request ACTION=rollback RELEASE=20261124T154947Z-08ddf56327cc)
+200  https://api.hatly.dev/api/v1/health/ready
+307  https://admin.hatly.dev/
+job status: success
