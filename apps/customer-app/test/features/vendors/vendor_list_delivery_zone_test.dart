@@ -71,6 +71,17 @@ void main() {
     expect(find.text('Hatly Service'), findsOneWidget);
   });
 
+  testWidgets('short, wide sector viewport retains the search and fixed Hatly Service action without overflow', (tester) async {
+    tester.view.physicalSize = const Size(800, 480);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _pump(tester, null);
+    expect(find.byKey(const Key('sector-hero-back')), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byKey(const Key('sector-hatly-service-entry')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a manual address (zone, no coordinates) sends its delivery zone and no coordinates', (tester) async {
     final repo = await _pump(
       tester,

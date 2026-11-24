@@ -248,15 +248,17 @@ void main() {
 
   group('Product Details — content', () {
     testWidgets(
-        'shows the selling store: name, real rating + count, open state; CTA is in the content (not sticky)',
+        'shows the linked store logo, not the old store summary; CTA remains in scrolling content',
         (tester) async {
       _phone(tester);
       await _open(tester, _app(_product(), cartApi: _FakeCartApi()));
       expect(find.text('كولا'), findsOneWidget);
-      expect(find.text('ماركت وان'), findsOneWidget);
-      expect(find.text('4.5'), findsOneWidget);
-      expect(find.text('(12)'), findsOneWidget);
-      expect(find.text('مفتوح الآن'), findsOneWidget);
+      expect(find.byKey(const Key('product-vendor-link')), findsOneWidget);
+      expect(find.text('ماركت وان'), findsNothing);
+      expect(find.text('4.5'), findsNothing);
+      expect(find.text('(12)'), findsNothing);
+      expect(find.text('مفتوح الآن'), findsNothing);
+      expect(tester.widget<HatlyCtaButton>(find.byType(HatlyCtaButton)).onPressed, isNotNull);
       expect(find.text('أضف للسلة'), findsOneWidget);
       final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
       expect(scaffold.bottomNavigationBar, isNull,
@@ -264,7 +266,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('no rating is invented for a store without ratings',
+    testWidgets('closed store remains unorderable without the old summary card',
         (tester) async {
       _phone(tester);
       const noRating = ProductVendorSummary(
@@ -275,11 +277,17 @@ void main() {
           isOpen: false,
           ratingAverage: 0,
           ratingCount: 0);
+      final api = _FakeCartApi();
       await _open(
-          tester, _app(_product(vendor: noRating), cartApi: _FakeCartApi()));
+          tester, _app(_product(vendor: noRating), cartApi: api));
+      expect(find.byKey(const Key('product-vendor-link')), findsOneWidget);
       expect(find.text('0.0'), findsNothing);
       expect(find.text('(0)'), findsNothing);
-      expect(find.text('مغلق'), findsOneWidget);
+      expect(find.text('مغلق'), findsNothing);
+      expect(tester.widget<HatlyCtaButton>(find.byType(HatlyCtaButton)).onPressed, isNull);
+      await _tapAdd(tester);
+      expect(api.calls, isEmpty, reason: 'a closed store cannot receive cart additions');
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets(
@@ -642,7 +650,7 @@ void main() {
 
   group('vendor link', () {
     testWidgets(
-        'tapping the vendor name opens THAT vendor page, by the listing\'s own vendorBranchId (never by the displayed name)',
+        'tapping the vendor logo opens THAT vendor page, by the listing\'s own vendorBranchId (never by the displayed name)',
         (tester) async {
       _phone(tester);
       final visited = <String>[];

@@ -99,17 +99,24 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
           child: HatlyServiceEntryCard(buyFromPlaceOnly: true),
         ),
       ),
-      body: Column(
+      body: LayoutBuilder(builder: (context, constraints) {
+        // Keep the 16:9 artwork target on phones, but cap its rendered height
+        // on wide/short viewports so search, filters and the vendor list retain space.
+        final heroHeight = (constraints.maxWidth * 9 / 16)
+            .clamp(0.0, 230.0)
+            .clamp(0.0, constraints.maxHeight * 0.42)
+            .toDouble();
+        return Column(
         children: [
           ClipRRect(
             borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
             child: SizedBox(
-              height: MediaQuery.sizeOf(context).width * 9 / 16,
+              height: heroHeight,
               width: double.infinity,
               child: Stack(fit: StackFit.expand, children: [
                 ColoredBox(color: translucentHero(sectorTint, Theme.of(context).scaffoldBackgroundColor)),
                 if (bannerUrl != null)
-                  HatlySoftImage(url: bannerUrl, width: double.infinity, height: MediaQuery.sizeOf(context).width * 9 / 16,
+                  HatlySoftImage(url: bannerUrl, width: double.infinity, height: heroHeight,
                     radius: 0, placeholderIcon: Icons.storefront_outlined),
                 const DecoratedBox(decoration: BoxDecoration(
                   gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
@@ -236,7 +243,8 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
             ),
           ),
         ],
-      ),
+        );
+      }),
     );
   }
 }

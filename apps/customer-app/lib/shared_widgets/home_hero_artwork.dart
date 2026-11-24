@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'hatly_soft_image.dart';
+import '../core/media/media_url.dart';
 
 /// Active banner artwork, not a sector-derived tint.
 final activeHeroArtworkProvider = StateProvider<String?>((ref) => null);
@@ -14,12 +15,21 @@ class HomeHeroArtwork extends StatelessWidget {
   Widget build(BuildContext context) => ClipRect(child: LayoutBuilder(
     builder: (context, constraints) {
       final extent = constraints.maxWidth;
+      // A missing/invalid image must not request the network or crop the
+      // placeholder out of the visible carousel. The header remains decorative.
+      final placeholderSize = alignment == Alignment.topCenter ? 0.0 : 28.0;
+      if (resolveMediaUrl(url) == null) {
+        return HatlySoftImage(url: url, width: extent, height: constraints.maxHeight,
+          radius: 0, placeholderIcon: Icons.local_offer_outlined,
+          placeholderIconSize: placeholderSize);
+      }
       return OverflowBox(
         alignment: alignment,
         minWidth: extent, maxWidth: extent,
         minHeight: extent, maxHeight: extent,
         child: HatlySoftImage(url: url, width: extent, height: extent,
-          radius: 0, placeholderIconSize: 0),
+          radius: 0, placeholderIcon: Icons.local_offer_outlined,
+          placeholderIconSize: placeholderSize),
       );
     },
   ));

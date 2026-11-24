@@ -234,6 +234,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(CachedNetworkImage), findsNothing, reason: bad);
         expect(find.byIcon(Icons.local_offer_outlined), findsOneWidget, reason: bad);
+        expect(tester.widget<Icon>(find.byIcon(Icons.local_offer_outlined)).size, greaterThan(0), reason: 'fallback must be visible: $bad');
         expect(tester.takeException(), isNull, reason: bad);
       }
     });
