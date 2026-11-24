@@ -97,6 +97,9 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
         : null;
     final unit = product.isWeighted ? ' /kg' : '';
     final total = config.estimatedTotalMinor(product);
+    final vendor = product.vendor;
+    final VoidCallback? openVendor = vendor == null || vendor.vendorBranchId.isEmpty
+        ? null : () => context.push('/vendors/${vendor.vendorBranchId}');
 
     return Scaffold(
       body: SafeArea(
@@ -107,7 +110,9 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
             // Reference board ("تفاصيل المنتج"): the photo fills the width on a soft panel with rounded lower corners, then the
             // name and price are centred under it.
             Stack(clipBehavior: Clip.none, children: [
-              ClipRRect(
+              Padding(
+                padding: EdgeInsets.only(bottom: vendor != null ? 28 : 0),
+                child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(HatlyRadius.promoBanner + 8)),
                 child: AspectRatio(
                   aspectRatio: 1.9,
@@ -115,7 +120,7 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                     height: double.infinity, radius: 0, placeholderIcon: Icons.shopping_basket_outlined,
                     placeholderIconSize: 64, semanticLabel: name),
                 ),
-              ),
+              )),
               PositionedDirectional(start: 12, top: 8,
                 child: Material(color: const Color(0xAA000000), shape: const CircleBorder(),
                   child: IconButton(
@@ -125,21 +130,26 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                   ),
                 ),
               ),
-              if (product.vendor != null)
-                PositionedDirectional(start: 18, bottom: -28,
-                  child: Material(color: p.surface, shape: const CircleBorder(), elevation: 3,
-                    child: InkWell(key: const Key('product-vendor-link'), customBorder: const CircleBorder(),
-                      onTap: product.vendor!.vendorBranchId.isEmpty ? null
-                        : () => context.push('/vendors/${product.vendor!.vendorBranchId}'),
-                      child: Padding(padding: const EdgeInsets.all(4),
-                        child: HatlySoftImage(url: product.vendor!.logoUrl, width: 56, height: 56,
-                          circular: true, placeholderIcon: Icons.storefront_outlined),
+              if (vendor != null)
+                PositionedDirectional(start: 18, bottom: 0,
+                  child: Semantics(
+                    key: const Key('product-vendor-link'),
+                    button: true,
+                    label: isArabic && vendor.nameAr != null ? vendor.nameAr! : vendor.name,
+                    excludeSemantics: true,
+                    onTap: openVendor,
+                    child: Material(color: p.surface, shape: const CircleBorder(), elevation: 3,
+                      child: InkWell(customBorder: const CircleBorder(),
+                        onTap: openVendor,
+                        child: Padding(padding: const EdgeInsets.all(4),
+                          child: HatlySoftImage(url: vendor.logoUrl, width: 56, height: 56,
+                            circular: true, placeholderIcon: Icons.storefront_outlined),
+                        ),
                       ),
                     ),
                   ),
                 ),
             ]),
-            if (product.vendor != null) const SizedBox(height: 24),
             Padding(
               padding: const EdgeInsets.fromLTRB(HatlySpacing.screenPadding,
                   HatlySpacing.lg, HatlySpacing.screenPadding, 0),

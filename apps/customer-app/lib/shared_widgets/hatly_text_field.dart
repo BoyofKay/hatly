@@ -44,7 +44,7 @@ class HatlyTextField extends StatelessWidget {
         errorText: errorText,
         prefixIcon: isSearch ? const Icon(Icons.search, size: 18) : null,
         prefixIconConstraints: isSearch ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
-        isDense: isSearch,
+        isDense: isSearch ? true : null,
         hintStyle: isSearch ? const TextStyle(fontSize: 12) : null,
         contentPadding: isSearch ? const EdgeInsets.symmetric(vertical: 8, horizontal: 10) : null,
         border: isSearch

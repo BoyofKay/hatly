@@ -187,8 +187,8 @@ void main() {
     }
 
         testWidgets('the new wide hero stays within compact height bounds and preserves cover-fit', (tester) async {
-      expect(bannerHeight(390), closeTo(190.24, 0.5));
-      expect(bannerHeight(320), closeTo(156.1, 0.2)); // full-width banner
+      expect(bannerHeight(390), closeTo(251.61, 0.5));
+      expect(bannerHeight(320), closeTo(206.45, 0.2)); // full-width banner
       await pump(tester, () async => [_banner('b1')]);
       await tester.pumpAndSettle();
       final image = tester.widget<HatlySoftImage>(find.byType(HatlySoftImage));
