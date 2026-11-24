@@ -7,7 +7,6 @@ import '../earnings/presentation/earnings_screen.dart';
 import '../earnings/presentation/money_breakdown_view.dart';
 import 'overview_api.dart';
 import 'overview_widgets.dart';
-import '../shift/shift_duration_label.dart';
 
 /// Driver app round 2 (owner decision 2026-11-22): Earnings in two tabs, every amount the server's (the same figures the office closes with).
 ///  - Current shift: cash in pocket · revenue (earned after Hatly's commission) · loan · daily allowance · balance · unsettled orders, and
@@ -31,7 +30,7 @@ class _EarningsTabsScreenState extends ConsumerState<EarningsTabsScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFFAFAFA),
         appBar: AppBar(
-          title: Text(context.t('Earnings', 'الأرباح')),
+          toolbarHeight: 0,
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
           bottom: TabBar(tabs: [
@@ -93,13 +92,13 @@ class _CurrentTabState extends ConsumerState<_CurrentTab> with AutomaticKeepAliv
         key: const Key('earnings-current-list'),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          const ShiftDurationLabel(),
-          if (d.shiftStartedAt != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(context.t('Shift since ${shortDateTime(d.shiftStartedAt!)}', 'الوردية منذ ${shortDateTime(d.shiftStartedAt!)}'),
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
-            ),
+          ExpansionTile(
+            key: const Key('earnings-kpi-toggle'),
+            initiallyExpanded: false,
+            tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+            title: Text(context.t('Current wallet balance', 'رصيد المحفظة الحالي')),
+            subtitle: Text('${money(d.balanceMinor.abs())} · ${owedToYou ? context.t('Hatly pays you', 'هاتلي تدفع لك') : context.t('You hand over', 'تسلّمه أنت')}'),
+            children: [
           Wrap(key: const Key('earnings-current-kpis'), spacing: 8, runSpacing: 8, children: [
             MiniKpi(label: context.t('Cash in pocket', 'نقدية معك'), value: money(d.cashInPocketMinor), width: 150),
             MiniKpi(label: context.t('Revenue (after commission)', 'الإيراد (بعد العمولة)'), value: money(d.revenueMinor), color: const Color(0xFF1B7F3B), width: 150),
@@ -119,6 +118,8 @@ class _CurrentTabState extends ConsumerState<_CurrentTab> with AutomaticKeepAliv
             context.t('Balance = what changes hands at the closing (orders, minus the allowance you return). Loans are repaid separately.',
                 'الرصيد = ما يُسلَّم في التقفيل (الطلبات ناقص العهدة التي تردّها). السلف تُسدَّد منفصلة.'),
             style: const TextStyle(fontSize: 11, color: Color(0xFF6B6B6B)),
+          ),
+            ],
           ),
           const SizedBox(height: 12),
           if (d.items.isEmpty)
@@ -169,6 +170,7 @@ class _PreviousTabState extends ConsumerState<_PreviousTab> with AutomaticKeepAl
   bool _failed = false;
   DateTimeRange? _range;
   String? _status; // null | paid | unpaid
+  String _search = '';
   @override
   bool get wantKeepAlive => true;
 
@@ -192,6 +194,21 @@ class _PreviousTabState extends ConsumerState<_PreviousTab> with AutomaticKeepAl
     } catch (_) {
       if (mounted) setState(() => _failed = true);
     }
+  }
+
+  Future<void> _openSearch() async {
+    String query = _search;
+    final value = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(ctx.t('Search closings', 'البحث عن التقفيلات')),
+      content: TextFormField(initialValue: query, autofocus: true,
+        decoration: InputDecoration(hintText: ctx.t('Closing reference', 'رقم التقفيلة')),
+        onChanged: (v) => query = v, onFieldSubmitted: (v) => Navigator.pop(ctx, v)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, ''), child: Text(ctx.t('Clear', 'مسح'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, query), child: Text(ctx.t('Search', 'بحث'))),
+      ],
+    ));
+    if (value != null && mounted) setState(() => _search = value.trim());
   }
 
   Future<void> _openFilter() async {
@@ -256,9 +273,9 @@ class _PreviousTabState extends ConsumerState<_PreviousTab> with AutomaticKeepAl
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
           Row(children: [
-            Expanded(
-              child: Text(d.range == null ? '' : '${prettyYmd(d.range!.from)} – ${prettyYmd(d.range!.to)}', style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
-            ),
+            Expanded(child: DateRangeBox(from: d.range?.from, to: d.range?.to)),
+            IconButton(onPressed: _openSearch, tooltip: context.t('Search', 'بحث'),
+              icon: Badge(isLabelVisible: _search.isNotEmpty, child: const Icon(Icons.search))),
             IconButton.filledTonal(
               key: const Key('earnings-filter'),
               tooltip: context.t('Filter', 'تصفية'),
@@ -267,18 +284,18 @@ class _PreviousTabState extends ConsumerState<_PreviousTab> with AutomaticKeepAl
             ),
           ]),
           const SizedBox(height: 8),
-          Wrap(key: const Key('earnings-previous-kpis'), spacing: 8, runSpacing: 8, children: [
-            MiniKpi(label: context.t('Revenue', 'الإيراد'), value: money(d.revenueMinor), color: const Color(0xFF1B7F3B), width: 120),
-            MiniKpi(label: context.t('Orders', 'الطلبات'), value: '${d.orders}', width: 90),
-            MiniKpi(label: context.t('Time worked', 'ساعات العمل'), value: hoursMinutes(context, d.minutesWorked), width: 120),
-          ]),
+          LayoutBuilder(builder: (context, constraints) => Wrap(key: const Key('earnings-previous-kpis'), spacing: 4, runSpacing: 4, children: [
+            MiniKpi(label: context.t('Revenue', 'الإيراد'), value: money(d.revenueMinor), color: const Color(0xFF1B7F3B), width: (constraints.maxWidth - 8) / 3),
+            MiniKpi(label: context.t('Orders', 'الطلبات'), value: '${d.orders}', width: (constraints.maxWidth - 8) / 3),
+            MiniKpi(label: context.t('Time worked', 'ساعات العمل'), value: hoursMinutes(context, d.minutesWorked), width: (constraints.maxWidth - 8) / 3),
+          ])),
           const SizedBox(height: 12),
           if (d.items.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 24),
               child: Center(child: Text(context.t('No closings in these dates.', 'لا توجد تقفيلات في هذه الفترة.'), key: const Key('earnings-previous-empty'), style: const TextStyle(color: Color(0xFF6B6B6B)))),
             ),
-          for (final c in d.items)
+          for (final c in d.items.where((c) => _search.isEmpty || (c.reference ?? '').toLowerCase().contains(_search.toLowerCase())))
             Card(
               margin: const EdgeInsets.only(bottom: 8),
               elevation: 0,

@@ -9,7 +9,6 @@ import '../../shared_widgets/driver_ui.dart';
 import '../history/presentation/history_screen.dart';
 import 'overview_api.dart';
 import 'overview_widgets.dart';
-import '../shift/shift_duration_label.dart';
 import '../shift/shift_api.dart';
 
 /// Driver app round 2 (owner decision 2026-11-22): the order history in two tabs.
@@ -33,7 +32,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFFAFAFA),
         appBar: AppBar(
-          title: Text(context.t('My orders', 'طلباتي')),
+          toolbarHeight: 0,
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
           bottom: TabBar(tabs: [
@@ -116,6 +115,21 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
         _loading = false;
       });
     }
+  }
+
+  Future<void> _openSearch() async {
+    String query = _search.text;
+    final value = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(ctx.t('Search orders', 'البحث عن الطلبات')),
+      content: TextFormField(initialValue: query, autofocus: true,
+        decoration: InputDecoration(hintText: ctx.t('Order number or store', 'رقم الطلب أو المتجر')),
+        onChanged: (v) => query = v, onFieldSubmitted: (v) => Navigator.pop(ctx, v)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, ''), child: Text(ctx.t('Clear', 'مسح'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, query), child: Text(ctx.t('Search', 'بحث'))),
+      ],
+    ));
+    if (value != null && mounted) { _search.text = value; await _load(reset: true); }
   }
 
   void _onSearch(String _) {
@@ -206,22 +220,30 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
         key: Key('orders-list-${widget.tab}'),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
-          if (widget.tab == 'today') const ShiftDurationLabel(),
           Row(children: [
-            Expanded(
+            if (widget.tab == 'today') Expanded(
               child: TextField(
                 key: Key('orders-search-${widget.tab}'),
                 controller: _search,
                 onChanged: _onSearch,
                 textInputAction: TextInputAction.search,
+                style: const TextStyle(fontSize: 13),
                 decoration: InputDecoration(
                   isDense: true,
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 40),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
+                  hintStyle: const TextStyle(fontSize: 12),
                   hintText: context.t('Order number or store', 'رقم الطلب أو المتجر'),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(999)),
                 ),
               ),
             ),
+            if (widget.tab == 'previous') ...[
+              Expanded(child: DateRangeBox(from: d?.range?.from, to: d?.range?.to)),
+              IconButton(key: const Key('orders-search-previous'), onPressed: _openSearch,
+                tooltip: context.t('Search', 'بحث'), icon: Badge(isLabelVisible: _search.text.isNotEmpty, child: const Icon(Icons.search))),
+            ],
             const SizedBox(width: 8),
             IconButton.filledTonal(
               key: Key('orders-filter-${widget.tab}'),
@@ -230,23 +252,18 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
               icon: Badge(isLabelVisible: filtered, child: const Icon(Icons.tune)),
             ),
           ]),
-          if (widget.tab == 'previous' && d?.range != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text('${prettyYmd(d!.range!.from)} – ${prettyYmd(d.range!.to)}', style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
-            ),
           const SizedBox(height: 12),
           if (k != null)
-            Wrap(key: Key('orders-kpis-${widget.tab}'), spacing: 8, runSpacing: 8, children: [
-              MiniKpi(label: context.t('Completed', 'مكتمل'), value: '${k.completed}', color: const Color(0xFF1B7F3B)),
-              MiniKpi(label: context.t('Cancelled', 'ملغي'), value: '${k.cancelled}'),
-              MiniKpi(label: context.t('Ignored', 'متجاهَل'), value: '${k.ignored}', color: k.ignored > 0 ? const Color(0xFFB3261E) : null),
+            LayoutBuilder(builder: (context, constraints) => Wrap(key: Key('orders-kpis-${widget.tab}'), spacing: 4, runSpacing: 4, children: [
+              MiniKpi(label: context.t('Completed', 'مكتمل'), value: '${k.completed}', width: (constraints.maxWidth - 12) / 4, color: const Color(0xFF1B7F3B)),
+              MiniKpi(label: context.t('Cancelled', 'ملغي'), value: '${k.cancelled}', width: (constraints.maxWidth - 12) / 4),
+              MiniKpi(label: context.t('Ignored', 'متجاهَل'), value: '${k.ignored}', width: (constraints.maxWidth - 12) / 4, color: k.ignored > 0 ? const Color(0xFFB3261E) : null),
               MiniKpi(
                 label: context.t('Accepted / ignored', 'مقبول / متجاهَل'),
                 value: '${k.accepted} / ${k.ignored}${k.acceptanceRatePercent == null ? '' : ' · ${k.acceptanceRatePercent}%'}',
-                width: 150,
+                width: (constraints.maxWidth - 12) / 4,
               ),
-            ]),
+            ])),
           const SizedBox(height: 12),
           if (_failed && _items.isEmpty)
             MessageView(icon: Icons.cloud_off_outlined, message: context.t('Could not load your orders.', 'تعذّر تحميل طلباتك.'), onRetry: () => _load(reset: true))

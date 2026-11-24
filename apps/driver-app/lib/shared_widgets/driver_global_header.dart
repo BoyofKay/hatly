@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/presentation/auth_state_provider.dart';
 import '../features/overview/overview_api.dart';
+import '../features/shift/shift_duration_label.dart';
 
 /// Global, pinned driver-app brand. Also shows the name managed by Admin,
 /// on Orders, History, Earnings, Profile and pushed detail pages.
@@ -30,7 +31,9 @@ class DriverGlobalHeader extends ConsumerWidget {
             errorBuilder: (_, __, ___) => const Icon(Icons.local_shipping, size: 36),
           ),
         ),
-        const Spacer(),
+        if (authenticated)
+          const Expanded(child: Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: ShiftDurationLabel()))
+        else const Spacer(),
         if (initial != null)
           Semantics(
             label: trimmed,

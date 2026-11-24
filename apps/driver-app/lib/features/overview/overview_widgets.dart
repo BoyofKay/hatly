@@ -11,16 +11,16 @@ class MiniKpi extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         width: width,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
         decoration: BoxDecoration(color: const Color(0xFFF4F4F4), borderRadius: BorderRadius.circular(12)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: AlignmentDirectional.centerStart,
-            child: Text(value, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: color ?? const Color(0xFF1A1A1A))),
+            child: Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: color ?? const Color(0xFF1A1A1A))),
           ),
           const SizedBox(height: 2),
-          Text(label, maxLines: 2, style: const TextStyle(fontSize: 11, color: Color(0xFF6B6B6B))),
+          Text(label, maxLines: 2, style: const TextStyle(fontSize: 10, color: Color(0xFF6B6B6B))),
         ]),
       );
 }
@@ -77,5 +77,19 @@ Future<DateTimeRange?> pickRange(BuildContext context, {DateTimeRange? initial})
     firstDate: DateTime(now.year - 2),
     lastDate: DateTime(now.year, now.month, now.day),
     initialDateRange: initial,
+  );
+}
+
+class DateRangeBox extends StatelessWidget {
+  const DateRangeBox({super.key, this.from, this.to});
+  final String? from;
+  final String? to;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+    decoration: BoxDecoration(border: Border.all(color: const Color(0xFFE0E0E0)),
+      borderRadius: BorderRadius.circular(12)),
+    child: Text('${context.t('Dates', 'التاريخ')}: ${from == null ? '—' : prettyYmd(from!)} – ${to == null ? '—' : prettyYmd(to!)}',
+      style: const TextStyle(fontSize: 12)),
   );
 }

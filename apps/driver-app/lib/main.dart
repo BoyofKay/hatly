@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/api_config.dart';
@@ -61,14 +62,16 @@ class HatlyDriverApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: HatlyTheme.light(),
       routerConfig: router,
-      builder: (context, child) => Column(children: [
-        const SafeArea(bottom: false, child: DriverGlobalHeader()),
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.white),
+        child: Column(children: [
+        const ColoredBox(color: Colors.white, child: SafeArea(bottom: false, child: DriverGlobalHeader())),
         Expanded(child: MediaQuery.removePadding(
           context: context,
           removeTop: true,
           child: child ?? const SizedBox.shrink(),
         )),
-      ]),
+      ])),
       locale: ref.watch(localeProvider),
       supportedLocales: const [Locale('ar'), Locale('en')],
       localizationsDelegates: const [
