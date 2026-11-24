@@ -7,7 +7,6 @@ import '../../../shared_widgets/filter_action_button.dart';
 import '../../../shared_widgets/hatly_state_view.dart';
 import '../../../shared_widgets/hatly_text_field.dart';
 import '../../../shared_widgets/hatly_soft_image.dart';
-import '../../../shared_widgets/hero_colors.dart';
 import '../../sectors/data/sectors_providers.dart';
 import '../../../shared_widgets/sort_menu_button.dart';
 import '../data/vendor_providers.dart';
@@ -58,8 +57,7 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
     final sectorId = widget.category;
     final sectors = ref.watch(sectorsProvider).valueOrNull ?? const [];
     final match = sectors.where((s) => s.id == sectorId);
-    final bannerUrl = match.isEmpty ? null : match.first.bannerUrl;
-    final sectorTint = match.isEmpty ? colorForSector(null, null) : colorForSector(match.first.slug, match.first.accentColor);
+    final bannerUrl = match.isEmpty ? null : match.first.localizedBanner(arabic: Localizations.localeOf(context).languageCode == 'ar');
 
     // No sector to scope a paginated/sortable/searchable query to —
     // falls back to the original simple unfiltered preview shape
@@ -114,7 +112,7 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
               height: heroHeight,
               width: double.infinity,
               child: Stack(fit: StackFit.expand, children: [
-                ColoredBox(color: translucentHero(sectorTint, Theme.of(context).scaffoldBackgroundColor)),
+                ColoredBox(color: Theme.of(context).scaffoldBackgroundColor),
                 if (bannerUrl != null)
                   HatlySoftImage(url: bannerUrl, width: double.infinity, height: heroHeight,
                     radius: 0, placeholderIcon: Icons.storefront_outlined),

@@ -33,8 +33,9 @@ export const PURPOSES: Record<string, PurposePolicy> = {
   VENDOR_LOGO: { permission: Permission.MANAGE_VENDORS, minWidth: 200, minHeight: 200, maxEdge: 4000, square: true },
   BRANCH_COVER: { permission: Permission.MANAGE_VENDORS, minWidth: 800, minHeight: 400, maxEdge: 6000 },
   SECTOR_IMAGE: { permission: Permission.MANAGE_MARKETPLACE_SECTORS, minWidth: 200, minHeight: 200, maxEdge: 4000 },
+  SECTOR_BANNER: { permission: Permission.MANAGE_MARKETPLACE_SECTORS, minWidth: 320, minHeight: 320, maxEdge: 6000 },
   SUBCATEGORY_IMAGE: { permission: Permission.MANAGE_MARKETPLACE_SECTORS, minWidth: 200, minHeight: 200, maxEdge: 4000 },
-  HOME_BANNER: { permission: Permission.MANAGE_HOME_BANNERS, minWidth: 800, minHeight: 320, maxEdge: 6000, aspect: { min: 1.6, max: 2.6 } },
+  HOME_BANNER: { permission: Permission.MANAGE_HOME_BANNERS, minWidth: 320, minHeight: 320, maxEdge: 6000 },
   PRODUCT_PRIMARY: { permission: Permission.MANAGE_CATALOG, minWidth: 300, minHeight: 300, maxEdge: 6000 },
   PRODUCT_ADDITIONAL: { permission: Permission.MANAGE_CATALOG, minWidth: 300, minHeight: 300, maxEdge: 6000 },
   CATALOG_PRODUCT: { permission: Permission.MANAGE_CATALOG, minWidth: 300, minHeight: 300, maxEdge: 6000 },
@@ -183,7 +184,7 @@ export class MediaService {
     if (finalW < policy.minWidth || finalH < policy.minHeight) throw err(400, 'MEDIA_TOO_SMALL', `The image is ${finalW}×${finalH}; this purpose needs at least ${policy.minWidth}×${policy.minHeight} px.`);
     if (policy.aspect) {
       const ratio = finalW / finalH;
-      if (ratio < policy.aspect.min || ratio > policy.aspect.max) throw err(400, 'MEDIA_BAD_ASPECT', `The image is ${finalW}×${finalH} (ratio ${ratio.toFixed(2)}); this purpose needs a ratio between ${policy.aspect.min} and ${policy.aspect.max} (about 2:1). Crop it first.`);
+      if (ratio < policy.aspect.min || ratio > policy.aspect.max) throw err(400, 'MEDIA_BAD_ASPECT', `The image is ${finalW}×${finalH} (ratio ${ratio.toFixed(2)}); this purpose needs a ratio between ${policy.aspect.min} and ${policy.aspect.max}. Crop it first.`);
     }
     const display = await pipeline.clone().resize({ width: DISPLAY_EDGE, height: DISPLAY_EDGE, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer({ resolveWithObject: true });
     const thumb = await pipeline.clone().resize({ width: THUMB_EDGE, height: THUMB_EDGE, fit: 'inside', withoutEnlargement: true }).webp({ quality: 78 }).toBuffer({ resolveWithObject: true });
@@ -218,7 +219,7 @@ export class MediaService {
     where.push(`a.status = $${params.length}`);
     if (q.purpose) { params.push(q.purpose); where.push(`a.purpose = $${params.length}`); }
     if (q.q) { params.push(likeTerm(q.q)); where.push(`(a.original_name ILIKE $${params.length} ESCAPE '\\' OR a.alt_en ILIKE $${params.length} ESCAPE '\\' OR a.alt_ar ILIKE $${params.length} ESCAPE '\\')`); }
-    const usedSql = `(EXISTS (SELECT 1 FROM vendors x WHERE x.logo_media_asset_id = a.id) OR EXISTS (SELECT 1 FROM vendor_branches x WHERE x.cover_media_asset_id = a.id) OR EXISTS (SELECT 1 FROM marketplace_sectors x WHERE x.media_asset_id = a.id)
+    const usedSql = `(EXISTS (SELECT 1 FROM vendors x WHERE x.logo_media_asset_id = a.id) OR EXISTS (SELECT 1 FROM vendor_branches x WHERE x.cover_media_asset_id = a.id) OR EXISTS (SELECT 1 FROM marketplace_sectors x WHERE x.media_asset_id = a.id OR EXISTS (SELECT 1 FROM media_variants v WHERE v.asset_id = a.id AND v.url IN (x.banner_url, x.banner_url_ar)) OR a.legacy_source_url IN (x.banner_url, x.banner_url_ar))
       OR EXISTS (SELECT 1 FROM marketplace_subcategories x WHERE x.media_asset_id = a.id) OR EXISTS (SELECT 1 FROM home_banners x WHERE x.media_asset_id = a.id) OR EXISTS (SELECT 1 FROM products x WHERE x.media_asset_id = a.id)
       OR EXISTS (SELECT 1 FROM catalog_products x WHERE x.media_asset_id = a.id) OR EXISTS (SELECT 1 FROM product_media x WHERE x.media_asset_id = a.id))`;
     if (q.used === 'true') where.push(usedSql);
@@ -257,7 +258,8 @@ export class MediaService {
       `SELECT 'vendor' AS type, id, name AS label, 'logo' AS field FROM vendors WHERE (logo_media_asset_id = $1 OR logo_url = ANY($2)) AND deleted_at IS NULL
        UNION ALL SELECT 'branch_cover', id, name, 'cover' FROM vendor_branches WHERE cover_media_asset_id = $1 AND deleted_at IS NULL
        UNION ALL SELECT 'sector', id, name, 'image' FROM marketplace_sectors WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL
-       UNION ALL SELECT 'sector', id, name, 'banner' FROM marketplace_sectors WHERE banner_url = ANY($2) AND deleted_at IS NULL
+       UNION ALL SELECT 'sector', id, name, 'banner (EN)' FROM marketplace_sectors WHERE banner_url = ANY($2) AND deleted_at IS NULL
+       UNION ALL SELECT 'sector', id, name, 'banner (AR)' FROM marketplace_sectors WHERE banner_url_ar = ANY($2) AND deleted_at IS NULL
        UNION ALL SELECT 'subcategory', id, name, 'image' FROM marketplace_subcategories WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL
        UNION ALL SELECT 'banner', id, title, 'image' FROM home_banners WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL
        UNION ALL SELECT 'product', id, name, 'primary image' FROM products WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL

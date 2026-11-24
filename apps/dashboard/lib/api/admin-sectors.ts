@@ -13,11 +13,12 @@ export interface AdminSector {
   /** May customers send a free-text / photo custom request ("لا تجد ما تبحث عنه؟") to vendors of this sector? Off by default. */
   customRequestsEnabled: boolean;
   bannerUrl?: string | null;
+  bannerUrlAr?: string | null;
   accentColor?: string | null;
 }
 
-export async function setSectorBanner(id: string, bannerUrl: string | null): Promise<AdminSector> {
-  return (await apiClient.patch(`/admin/sectors/${id}`, { bannerUrl })).data.data;
+export async function setSectorBanner(id: string, bannerUrl: string | null, language: 'en' | 'ar' = 'en'): Promise<AdminSector> {
+  return (await apiClient.patch(`/admin/sectors/${id}`, language === 'ar' ? { bannerUrlAr: bannerUrl } : { bannerUrl })).data.data;
 }
 
 export async function setSectorAccentColor(id: string, accentColor: string): Promise<AdminSector> {

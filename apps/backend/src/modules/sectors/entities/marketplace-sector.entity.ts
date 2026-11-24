@@ -58,6 +58,10 @@ export class MarketplaceSector extends BaseEntity {
   @Column({ name: 'banner_url', type: 'varchar', length: 500, nullable: true })
   bannerUrl?: string | null;
 
+  /** Independently authored Arabic banner; the existing banner is the English/legacy fallback. */
+  @Column({ name: 'banner_url_ar', type: 'varchar', length: 500, nullable: true })
+  bannerUrlAr?: string | null;
+
   @Column({ name: 'accent_color', type: 'varchar', length: 7, nullable: true })
   accentColor?: string | null;
 

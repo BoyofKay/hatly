@@ -8,9 +8,9 @@ import { Button, LabeledInput, LabeledSelect } from '../ui';
 
 export const PURPOSE_LABELS: Record<string, [string, string]> = {
   GENERAL: ['General', 'عام'], VENDOR_LOGO: ['Vendor logo (square)', 'شعار مورد (مربع)'], SECTOR_IMAGE: ['Sector image', 'صورة قطاع'], SUBCATEGORY_IMAGE: ['Subcategory image', 'صورة فئة فرعية'],
-  HOME_BANNER: ['Home banner (about 2:1)', 'لافتة الرئيسية (تقريبًا 2:1)'], PRODUCT_PRIMARY: ['Product image', 'صورة منتج'], PRODUCT_ADDITIONAL: ['Product additional image', 'صورة إضافية للمنتج'], CATALOG_PRODUCT: ['Catalog product', 'منتج الكتالوج'], BRANCH_COVER: ['Branch cover', 'غلاف فرع'],
+  HOME_BANNER: ['Home promotion (1:1 recommended)', 'عرض الرئيسية (يفضل 1:1)'], SECTOR_BANNER: ['Sector banner (16:9 recommended)', 'بانر القطاع (يفضل 16:9)'], PRODUCT_PRIMARY: ['Product image', 'صورة منتج'], PRODUCT_ADDITIONAL: ['Product additional image', 'صورة إضافية للمنتج'], CATALOG_PRODUCT: ['Catalog product', 'منتج الكتالوج'], BRANCH_COVER: ['Branch cover', 'غلاف فرع'],
 };
-const ASPECT: Record<string, number | null> = { VENDOR_LOGO: 1, HOME_BANNER: 2 };
+const ASPECT: Record<string, number | null> = { VENDOR_LOGO: 1, HOME_BANNER: 1, SECTOR_BANNER: 16 / 9, BRANCH_COVER: 16 / 9, SECTOR_IMAGE: 1, PRODUCT_PRIMARY: 1, PRODUCT_ADDITIONAL: 1, CATALOG_PRODUCT: 1 };
 const MAX_BYTES = 5 * 1024 * 1024;
 
 type Status = 'queued' | 'uploading' | 'done' | 'error' | 'cancelled';

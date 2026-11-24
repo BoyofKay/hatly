@@ -119,20 +119,14 @@ export function checkImageFile(file: { type: string; size: number }, allowed: st
   return null;
 }
 
-export const BANNER_MIN_WIDTH = 800;
+export const BANNER_MIN_WIDTH = 320;
 export const BANNER_MIN_HEIGHT = 320;
-export const BANNER_MIN_ASPECT = 1.6;
-export const BANNER_MAX_ASPECT = 2.6;
 
-/** A banner is a wide image (shown 2 : 1; recommended 1200×600). Mirrors the server's rule so the problem is shown before uploading. */
+/** 1080×1080 is recommended; aspect ratio is advisory, including legacy artwork. Mirrors the server minimum size. */
 export function checkBannerShape(width: number, height: number): string | null {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return 'The size of this image could not be read.';
   if (width < BANNER_MIN_WIDTH || height < BANNER_MIN_HEIGHT) {
-    return `The image is ${width}×${height}. A banner must be at least ${BANNER_MIN_WIDTH}×${BANNER_MIN_HEIGHT} pixels (recommended 1200×600).`;
-  }
-  const aspect = width / height;
-  if (aspect < BANNER_MIN_ASPECT || aspect > BANNER_MAX_ASPECT) {
-    return `The image is ${width}×${height}. A banner must be wide, about 2:1 (recommended 1200×600).`;
+    return `The image is ${width}×${height}. A banner must be at least ${BANNER_MIN_WIDTH}×${BANNER_MIN_HEIGHT} pixels (recommended 1080×1080).`;
   }
   return null;
 }

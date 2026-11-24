@@ -35,7 +35,10 @@ void main() {
       'validation behaviour is unchanged: empty submit shows the phone error, in the new notice',
       (tester) async {
     await tester.pumpWidget(hatlyTestApp(const PhoneEntryScreen()));
-    await tester.tap(find.text('متابعة'));
+    final submit = find.text('متابعة');
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    await tester.tap(submit, warnIfMissed: true);
     await tester.pump();
     expect(find.byIcon(Icons.error_outline_rounded), findsOneWidget);
     expect(find.textContaining('رقم'), findsWidgets);

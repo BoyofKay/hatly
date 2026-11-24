@@ -1,6 +1,6 @@
 /**
  * Reads the pixel size of a PNG, JPEG or WebP from its header bytes — no decoding, no dependency. Used where an image's SHAPE matters
- * (a Home banner is wide); the type itself is still established by `detectImageType`. Returns null for anything it cannot read, and the
+ * (a Home promotion has recommended square artwork); the type itself is still established by `detectImageType`. Returns null for anything it cannot read, and the
  * caller then refuses the image rather than guessing.
  */
 export interface ImageDimensions {
@@ -71,11 +71,9 @@ function readWebp(b: Buffer): ImageDimensions | null {
   return null;
 }
 
-/** A Home banner is a wide image (the carousel shows it 2 : 1). Too small looks blurry; the wrong shape is cropped badly. */
-export const BANNER_MIN_WIDTH = 800;
+/** Square 1080×1080 is recommended, not a mandatory aspect ratio. Keep the minimum quality floor without rejecting legacy artwork. */
+export const BANNER_MIN_WIDTH = 320;
 export const BANNER_MIN_HEIGHT = 320;
-export const BANNER_MIN_ASPECT = 1.6;
-export const BANNER_MAX_ASPECT = 2.6;
 
 export type BannerImageProblem = 'BANNER_IMAGE_UNREADABLE' | 'BANNER_IMAGE_TOO_SMALL' | 'BANNER_IMAGE_WRONG_SHAPE';
 
@@ -83,11 +81,7 @@ export function checkBannerDimensions(buffer: Buffer): { ok: true; dimensions: I
   const d = readImageDimensions(buffer);
   if (!d) return { ok: false, code: 'BANNER_IMAGE_UNREADABLE', message: 'The size of this image could not be read. Use a standard JPEG, PNG or WebP.' };
   if (d.width < BANNER_MIN_WIDTH || d.height < BANNER_MIN_HEIGHT) {
-    return { ok: false, code: 'BANNER_IMAGE_TOO_SMALL', message: `The image is ${d.width}×${d.height}. A banner must be at least ${BANNER_MIN_WIDTH}×${BANNER_MIN_HEIGHT} pixels (recommended 1200×600).` };
-  }
-  const aspect = d.width / d.height;
-  if (aspect < BANNER_MIN_ASPECT || aspect > BANNER_MAX_ASPECT) {
-    return { ok: false, code: 'BANNER_IMAGE_WRONG_SHAPE', message: `The image is ${d.width}×${d.height}. A banner must be wide, about 2:1 (recommended 1200×600).` };
+    return { ok: false, code: 'BANNER_IMAGE_TOO_SMALL', message: `The image is ${d.width}×${d.height}. A banner must be at least ${BANNER_MIN_WIDTH}×${BANNER_MIN_HEIGHT} pixels (recommended 1080×1080).` };
   }
   return { ok: true, dimensions: d };
 }

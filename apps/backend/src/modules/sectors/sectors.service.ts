@@ -33,6 +33,7 @@ export class SectorsService {
         isActive: dto.isActive ?? true,
         imageUrl: dto.imageUrl ?? null,
         bannerUrl: dto.bannerUrl ?? null,
+        bannerUrlAr: dto.bannerUrlAr ?? null,
         accentColor: dto.accentColor ?? null,
         customRequestsEnabled: dto.customRequestsEnabled ?? false,
       }),
@@ -72,6 +73,7 @@ export class SectorsService {
     if (dto.sortOrder !== undefined) sector.sortOrder = dto.sortOrder;
     if (dto.imageUrl !== undefined) sector.imageUrl = dto.imageUrl;
     if (dto.bannerUrl !== undefined) sector.bannerUrl = dto.bannerUrl;
+    if (dto.bannerUrlAr !== undefined) sector.bannerUrlAr = dto.bannerUrlAr;
     if (dto.accentColor !== undefined) sector.accentColor = dto.accentColor;
     if (dto.customRequestsEnabled !== undefined) sector.customRequestsEnabled = dto.customRequestsEnabled;
     return this.sectorsRepository.save(sector);

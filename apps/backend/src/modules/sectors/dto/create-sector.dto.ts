@@ -46,6 +46,11 @@ export class CreateSectorDto {
   bannerUrl?: string | null;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  bannerUrlAr?: string | null;
+
+  @IsOptional()
   @Matches(/^#[0-9a-fA-F]{6}$/)
   accentColor?: string;
 
