@@ -37,90 +37,273 @@ type ConfigFieldType = 'boolean' | 'integer' | 'decimal' | 'enum' | 'string' | '
 interface ConfigFieldDef {
   key: string;
   label: string;
+  labelAr: string;
   type: ConfigFieldType;
   options?: string[];
   unit?: string;
-  help?: string;
+  unitAr?: string;
+  help: string;
+  helpAr: string;
   /** The setting may be cleared (its absence has a defined meaning, e.g. a default or "off"). */
   clearable?: boolean;
 }
 
 const CONFIG_FIELDS: ConfigFieldDef[] = [
-  { key: 'AUTOMATIC_DISPATCH_ENABLED', label: 'Automatic Dispatch', type: 'boolean', help: 'OFF: orders wait for manual assignment on the Dispatch page instead of auto-assigning.' },
-  { key: 'MULTI_VENDOR_ORDERS_ENABLED', label: 'Multi-Vendor Orders', type: 'boolean', help: 'OFF: checkout rejects a cart with more than one vendor group.' },
-  { key: 'VENDOR_SETTLEMENT_FREQUENCY', label: 'Vendor Settlement Frequency', type: 'enum', options: ['WEEKLY', 'MONTHLY'] },
-  { key: 'DRIVER_SETTLEMENT_FREQUENCY', label: 'Driver Settlement Frequency', type: 'enum', options: ['WEEKLY', 'MONTHLY'] },
-  { key: 'REGISTERED_VENDOR_PRICE_PER_100M_MINOR', label: 'Registered-Vendor Price per 100m', type: 'money', unit: 'EGP' },
-  { key: 'REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR', label: 'Registered-Vendor Minimum Delivery Fee', type: 'money', unit: 'EGP' },
-  { key: 'REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR', label: 'Registered-Vendor Additional-Vendor Fee', type: 'money', unit: 'EGP' },
-  // Hatly AND Wasally: base fee by the customer's address method, then this multiplier once. Replaces the retired HATLY_SERVICE_DISTANCE_MULTIPLIER (never read).
   {
-    key: 'HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER',
-    label: 'Hatly & Wasally Delivery Fee Multiplier',
-    type: 'decimal',
-    unit: '× base fee',
-    help: "Applies to BOTH Hatly and Wasally, once, after the ordinary base delivery fee: Hatly / Wasally fee = base fee × this multiplier. The base fee is the selected delivery area's fixed fee (manual address) or the road-distance fee from the price per 100 m and minimum above (GPS address). It is never applied to the per-100 m price itself. Approved default 1.5. Positive, up to 10. New quotes/orders only — placed orders keep the fee they were frozen with.",
-  },
-  { key: 'DRIVER_CASH_WARNING_MINOR', label: 'Driver cash exposure warning / تنبيه النقدية المستحقة', type: 'money', unit: 'EGP', help: 'Notify Operations when unclosed plus closed-uncollected cash reaches this limit. Must not exceed the hard cap.' },
-  { key: 'DRIVER_CASH_CAP_MINOR', label: 'Driver maximum cash exposure / الحد الأقصى للنقدية', type: 'money', unit: 'EGP', help: 'Blocks new assignments at the cap or if projected COD collections exceed it. Existing orders can be completed.' },
-  { key: 'DRIVER_ALLOWANCE_CAP_MINOR', label: 'Maximum outstanding daily allowance / الحد الأقصى للعهدة', type: 'money', unit: 'EGP', help: 'Block additional allowances when outstanding plus new amount exceeds the limit. Zero prevents issuance.' },
-  { key: 'EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR', label: 'Maximum a driver may owe in loans', type: 'money', unit: 'EGP', clearable: true, help: 'The most one employee (driver) may owe in loans at a time. Empty = no cap: the operations supervisor decides each loan.' },
-  { key: 'MAX_BICYCLE_PICKUP_DISTANCE_METERS', label: 'Max Bicycle Pickup Distance', type: 'integer', unit: 'meters' },
-  {
-    key: 'DISPATCH_PREFERRED_RADIUS_METERS',
-    label: 'Dispatch: preferred driver radius',
-    type: 'integer',
-    unit: 'meters',
-    help: 'Automatic assignment prefers the driver with the FEWEST active orders among drivers within this distance of the store (then the nearest). Drivers farther away are used only when nobody is this close. Empty = 3000 m. Allowed 300 to 50000.',
-    clearable: true,
+    "key": "AUTOMATIC_DISPATCH_ENABLED",
+    "label": "Automatic dispatch",
+    "labelAr": "التوزيع التلقائي للطلبات",
+    "type": "boolean",
+    "help": "On: eligible orders are assigned automatically. Off: Operations assigns them manually from Dispatch. Unset defaults to On.",
+    "helpAr": "عند التفعيل تُسند الطلبات المؤهلة تلقائيًا. عند الإيقاف يتولى فريق العمليات إسنادها يدويًا من صفحة التوزيع. الإعداد الافتراضي عند عدم التحديد: مفعّل."
   },
   {
-    key: 'EARLY_DISPATCH_ENABLED',
-    label: 'Early dispatch (driver while the store prepares)',
-    type: 'boolean',
-    help: 'ON: a driver is attached when the store accepts the order, or the lead time below before the expected ready time — whichever is later; the driver heads to the store and marks Picked up once it is ready. Needs Automatic Dispatch ON. Switch it on only after the drivers have driver app 1.0.2 (build 11) or newer.',
+    "key": "MULTI_VENDOR_ORDERS_ENABLED",
+    "label": "Multi-vendor orders",
+    "labelAr": "الطلبات متعددة المتاجر",
+    "type": "boolean",
+    "help": "On: checkout accepts up to three vendor groups. Off: checkout rejects carts with more than one group without deleting cart contents. Unset defaults to On.",
+    "helpAr": "عند التفعيل يُسمح بإتمام طلب يضم حتى ثلاث مجموعات متاجر. عند الإيقاف يُرفض إتمام طلب يضم أكثر من مجموعة دون حذف محتويات السلة. الافتراضي عند عدم التحديد: مفعّل."
   },
   {
-    key: 'DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES',
-    label: 'Early dispatch lead time',
-    type: 'integer',
-    unit: 'minutes',
-    help: 'With early dispatch on: attach the driver this many minutes before the order is expected to be ready (never before the store accepts). Empty = 10. Allowed 0 to 120.',
-    clearable: true,
+    "key": "VENDOR_SETTLEMENT_FREQUENCY",
+    "label": "Default vendor settlement frequency",
+    "labelAr": "دورة تسوية المتاجر الافتراضية",
+    "type": "enum",
+    "options": [
+      "WEEKLY",
+      "MONTHLY"
+    ],
+    "help": "Weekly or monthly fallback for vendors without their own contractual frequency. Vendor-specific terms override it for all branches. New closings record the effective frequency; no automatic closing or change to closed periods. Required if no vendor override exists.",
+    "helpAr": "الدورة الأسبوعية أو الشهرية الافتراضية للمتاجر التي لا تملك دورة تعاقدية خاصة. شروط المتجر الخاصة لها الأولوية لجميع فروعه. يُسجَّل الإعداد الفعلي عند التقفيل الجديد، دون تقفيل تلقائي أو تعديل الفترات المغلقة. يلزم تحديده إذا لم توجد شروط خاصة."
   },
   {
-    key: 'DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES',
-    label: 'Driver Acknowledgement Window',
-    type: 'integer',
-    unit: 'minutes',
-    help: 'How long a driver has to acknowledge an assignment (manual or automatic). Default 5 when empty; allowed 1 to 30. When it passes, Operations get an alert and — when automatic assignment is on — the order is offered to the next driver automatically. Applies to new assignments only.',
-    clearable: true,
+    "key": "DRIVER_SETTLEMENT_FREQUENCY",
+    "label": "Driver settlement frequency (legacy)",
+    "labelAr": "دورة تسوية المندوبين (إعداد سابق)",
+    "type": "enum",
+    "options": [
+      "WEEKLY",
+      "MONTHLY"
+    ],
+    "help": "Weekly/monthly legacy setting. Current courier closings are recorded as daily financial closings, independent of starting or ending a shift. This setting does not schedule or control current closings.",
+    "helpAr": "إعداد سابق أسبوعي أو شهري. تُسجَّل التقفيلات المالية الحالية للمندوبين كتقفيلات يومية مستقلة عن بدء الوردية أو إنهائها. لا يتحكم هذا الإعداد في توقيت التقفيلات الحالية."
   },
   {
-    key: 'DRIVER_PRESENCE_STALE_MINUTES',
-    label: 'Driver App Silent Alert',
-    type: 'integer',
-    unit: 'minutes',
-    help: 'If a driver holding an active order has not been heard from by the driver app for this long, Operations get an alert ("assignment may not have reached the driver"). Empty = this alert is off (a driver switching to offline still alerts). Allowed 2 to 240. Nothing is reassigned or cancelled automatically.',
-    clearable: true,
+    "key": "REGISTERED_VENDOR_PRICE_PER_100M_MINOR",
+    "label": "Delivery price per 100 m",
+    "labelAr": "سعر التوصيل لكل 100 متر",
+    "type": "money",
+    "unit": "EGP",
+    "unitAr": "ج.م",
+    "help": "Required EGP rate for road-distance pricing, applied to the rounded route distance per 100 m. Also used to calculate the GPS base fee for Hatly and Wasally. Not applied to fixed delivery-area fees.",
+    "helpAr": "سعر إلزامي بالجنيه المصري لكل 100 متر من مسافة الطريق بعد التقريب. يُستخدم أيضًا لحساب أساس رسوم هاتلي ووصّلي عند اختيار الموقع على الخريطة. لا يُطبَّق على الرسوم الثابتة لمنطقة التوصيل."
   },
   {
-    key: 'MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES',
-    label: 'Transfer Verification Window',
-    type: 'integer',
-    unit: 'minutes',
-    help: 'An InstaPay / Vodafone Cash order whose money is not verified within this time after it was placed is cancelled automatically and its stock released. Money that arrives later is reviewed and refunded; the order is not reactivated. Empty = never cancelled automatically. Allowed 15 to 10080 (7 days).',
-    clearable: true,
+    "key": "REGISTERED_VENDOR_MINIMUM_DELIVERY_FEE_MINOR",
+    "label": "Minimum distance-based delivery fee",
+    "labelAr": "الحد الأدنى لرسوم التوصيل حسب المسافة",
+    "type": "money",
+    "unit": "EGP",
+    "unitAr": "ج.م",
+    "help": "Required EGP floor for the distance-based base fee; the larger of distance charge and minimum is used. Fixed area fees are not raised to this minimum.",
+    "helpAr": "حد أدنى إلزامي بالجنيه المصري لأجرة التوصيل حسب المسافة؛ يُستخدم الأكبر من أجرة المسافة والحد الأدنى. لا تُرفع الرسوم الثابتة للمنطقة إلى هذا الحد."
   },
-  { key: 'LOYALTY_POINTS_PER_EGP', label: 'Loyalty Points per EGP', type: 'integer', unit: 'points' },
-  { key: 'LOYALTY_WALLET_CONVERSION_POINTS_PER_EGP', label: 'Loyalty→Wallet Conversion Rate', type: 'integer', unit: 'points per EGP' },
-  { key: 'CHECKOUT_QUOTE_TTL_SECONDS', label: 'Checkout Quote TTL', type: 'integer', unit: 'seconds' },
-  { key: 'ETA_RANGE_BUFFER_MINUTES', label: 'ETA Range Buffer', type: 'integer', unit: 'minutes' },
-  { key: 'CUSTOMER_SERVICE_WHATSAPP_NUMBER', label: 'Customer Service WhatsApp Number', type: 'string' },
-  { key: 'OPERATIONS_CONTACT_PHONE', label: 'Operations Phone (for drivers)', type: 'string', help: 'The number the driver app\'s "Call Operations" button dials. Empty: the Customer Service number above is used; if both are empty the button is hidden.', clearable: true },
+  {
+    "key": "REGISTERED_VENDOR_ADDITIONAL_VENDOR_FEE_MINOR",
+    "label": "Additional vendor delivery fee",
+    "labelAr": "رسوم التوصيل لكل متجر إضافي",
+    "type": "money",
+    "unit": "EGP",
+    "unitAr": "ج.م",
+    "help": "Required EGP surcharge for each additional registered-vendor group after the first, on both fixed-area and GPS orders. Zero permits additional groups without a surcharge.",
+    "helpAr": "رسوم إلزامية بالجنيه المصري لكل مجموعة متجر مسجل إضافية بعد الأولى، سواء بالتسعير الثابت للمنطقة أو حسب المسافة. الصفر يعني عدم إضافة رسوم."
+  },
+  {
+    "key": "HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER",
+    "label": "Hatly & Wasally delivery fee multiplier",
+    "labelAr": "معامل رسوم توصيل هاتلي ووصّلي",
+    "type": "decimal",
+    "unit": "× base fee",
+    "unitAr": "× الرسم الأساسي",
+    "help": "Applies once to the base delivery fee for both services: fixed delivery-area fee for manual addresses or road-distance base fee for GPS. Approved seeded value 1.5; positive, up to 10. Required. New quotes only; existing orders keep frozen fees.",
+    "helpAr": "يُطبّق مرة واحدة على أساس رسوم الخدمتين: رسوم منطقة التوصيل الثابتة للعنوان اليدوي أو رسوم الطريق الأساسية للموقع على الخريطة. القيمة المعتمدة عند التهيئة 1.5، ويجب أن تكون موجبة ولا تتجاوز 10. إلزامي. يسري على عروض الأسعار الجديدة فقط وتظل رسوم الطلبات القائمة كما هي."
+  },
+  {
+    "key": "DRIVER_CASH_WARNING_MINOR",
+    "label": "Driver cash exposure warning",
+    "labelAr": "حد التنبيه للنقدية المستحقة على المندوب",
+    "type": "money",
+    "unit": "EGP",
+    "unitAr": "ج.م",
+    "help": "Alerts Operations when unclosed plus closed-uncollected cash reaches the warning limit. Must not exceed the hard cap.",
+    "helpAr": "يُرسل تنبيهًا للعمليات عند بلوغ مجموع النقدية غير المقفلة والنقدية المقفلة غير المحصّلة حد التنبيه. يجب ألا يتجاوز الحد الأقصى."
+  },
+  {
+    "key": "DRIVER_CASH_CAP_MINOR",
+    "label": "Maximum driver cash exposure",
+    "labelAr": "الحد الأقصى للنقدية المستحقة على المندوب",
+    "type": "money",
+    "unit": "EGP",
+    "unitAr": "ج.م",
+    "help": "Blocks new assignments at the cap or when projected COD collections would exceed it. Existing orders may be completed.",
+    "helpAr": "يمنع إسناد طلبات جديدة عند بلوغ الحد أو إذا كانت التحصيلات النقدية المتوقعة ستتجاوزه. يمكن إتمام الطلبات القائمة."
+  },
+  {
+    "key": "DRIVER_ALLOWANCE_CAP_MINOR",
+    "label": "Maximum outstanding daily allowance",
+    "labelAr": "الحد الأقصى للعهدة اليومية القائمة",
+    "type": "money",
+    "unit": "EGP",
+    "unitAr": "ج.م",
+    "help": "Blocks additional allowance issuance if the current outstanding allowance plus the new amount would exceed the cap. Zero prevents issuance.",
+    "helpAr": "يمنع صرف عهدة إضافية إذا تجاوز مجموع العهدة القائمة والمبلغ الجديد الحد الأقصى. الصفر يمنع الصرف."
+  },
+  {
+    "key": "EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR",
+    "label": "Maximum outstanding driver loans",
+    "labelAr": "الحد الأقصى للسلف القائمة للمندوب",
+    "type": "money",
+    "unit": "EGP",
+    "unitAr": "ج.م",
+    "help": "Limits a driver's outstanding loans plus any new loan. Blank means no configured cap; Operations decides each loan. Loans remain separate from financial closing.",
+    "helpAr": "يحدد الحد الأقصى لمجموع السلف القائمة والسلفة الجديدة للمندوب. عدم التحديد يعني عدم وجود حد مبرمج، وتُقرر العمليات كل سلفة. تظل السلف منفصلة عن التقفيل المالي.",
+    "clearable": true
+  },
+  {
+    "key": "MAX_BICYCLE_PICKUP_DISTANCE_METERS",
+    "label": "Maximum bicycle pickup distance",
+    "labelAr": "أقصى مسافة لاستلام الطلب بالدراجة",
+    "type": "integer",
+    "unit": "meters",
+    "unitAr": "متر",
+    "help": "Maximum eligible pickup distance for bicycle drivers, in meters. If unset, bicycle drivers are excluded from automatic ranking.",
+    "helpAr": "أقصى مسافة مؤهلة لاستلام الطلب لمندوبي الدراجات بالمتر. عند عدم التحديد يُستبعد مندوبو الدراجات من الترتيب التلقائي."
+  },
+  {
+    "key": "DISPATCH_PREFERRED_RADIUS_METERS",
+    "label": "Preferred dispatch radius",
+    "labelAr": "نطاق التوزيع المفضّل",
+    "type": "integer",
+    "unit": "meters",
+    "unitAr": "متر",
+    "help": "Among eligible drivers within this radius of the first pickup, prefer the fewest active orders, then the nearest. If none is within the radius, use the nearest eligible driver. Blank = 3000 m; allowed 300–50000 m.",
+    "helpAr": "يفضّل النظام من بين المندوبين المؤهلين داخل هذا النطاق من نقطة الاستلام الأولى الأقل في الطلبات النشطة، ثم الأقرب. عند عدم وجود مندوب داخله يختار أقرب مندوب مؤهل. الافتراضي 3000 متر؛ المسموح 300–50000 متر.",
+    "clearable": true
+  },
+  {
+    "key": "EARLY_DISPATCH_ENABLED",
+    "label": "Early dispatch",
+    "labelAr": "التوزيع المبكر",
+    "type": "boolean",
+    "help": "On: assign while the store prepares, at the later of store acceptance and expected ready time minus the lead time. Requires automatic dispatch. Unset defaults to Off. Requires a compatible driver app (build 11 or later).",
+    "helpAr": "عند التفعيل يُسند الطلب أثناء التجهيز في الوقت الأبعد بين قبول المتجر وموعد الجاهزية المتوقع ناقص مهلة التوزيع المبكر. يتطلب التوزيع التلقائي. الافتراضي متوقف. يتطلب إصدارًا متوافقًا من تطبيق المندوب (البناء 11 أو أحدث)."
+  },
+  {
+    "key": "DISPATCH_ASSIGNMENT_LEAD_TIME_MINUTES",
+    "label": "Early dispatch lead time",
+    "labelAr": "مهلة التوزيع المبكر",
+    "type": "integer",
+    "unit": "minutes",
+    "unitAr": "دقيقة",
+    "help": "Minutes before expected readiness when early dispatch is enabled; never before store acceptance. Blank = 10; allowed 0–120 minutes.",
+    "helpAr": "عدد الدقائق قبل موعد الجاهزية المتوقع عند تفعيل التوزيع المبكر؛ لا يتم الإسناد قبل قبول المتجر. الافتراضي 10 دقائق؛ المسموح 0–120 دقيقة.",
+    "clearable": true
+  },
+  {
+    "key": "DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES",
+    "label": "Driver acknowledgement window",
+    "labelAr": "مهلة تأكيد استلام الإسناد",
+    "type": "integer",
+    "unit": "minutes",
+    "unitAr": "دقيقة",
+    "help": "Time for a driver to acknowledge a manual or automatic assignment. Overdue assignments alert Operations; with automatic dispatch enabled, eligible unacknowledged orders can be reoffered to another available driver. Blank = 5; allowed 1–30 minutes. New assignments only.",
+    "helpAr": "مهلة تأكيد المندوب للإسناد اليدوي أو التلقائي. عند تجاوزها تُنبّه العمليات؛ ومع تفعيل التوزيع التلقائي يمكن إعادة إسناد الطلب المؤهل غير المؤكّد إلى مندوب آخر متاح. الافتراضي 5 دقائق؛ المسموح 1–30 دقيقة. للإسنادات الجديدة فقط.",
+    "clearable": true
+  },
+  {
+    "key": "DRIVER_PRESENCE_STALE_MINUTES",
+    "label": "Driver app silent alert",
+    "labelAr": "تنبيه انقطاع اتصال تطبيق المندوب",
+    "type": "integer",
+    "unit": "minutes",
+    "unitAr": "دقيقة",
+    "help": "Alerts Operations when a driver with an active order has not contacted the server for this many minutes. Blank disables the inactivity alert; switching offline can still alert. Allowed 2–240 minutes. Does not cancel or reassign orders.",
+    "helpAr": "يُنبه العمليات عند انقطاع اتصال تطبيق مندوب لديه طلب نشط بالخادم لهذه المدة. عدم التحديد يوقف تنبيه الانقطاع، وقد يظل تغيير الحالة إلى غير متصل سببًا للتنبيه. المسموح 2–240 دقيقة. لا يُلغى الطلب أو يُعاد إسناده تلقائيًا بسبب هذا التنبيه.",
+    "clearable": true
+  },
+  {
+    "key": "MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES",
+    "label": "Transfer verification window",
+    "labelAr": "مهلة التحقق من التحويل",
+    "type": "integer",
+    "unit": "minutes",
+    "unitAr": "دقيقة",
+    "help": "Unverified InstaPay/Vodafone Cash orders are automatically cancelled after this time from placement; stock is released. Late money is reviewed for refund, not order reactivation. Blank disables automatic cancellation; allowed 15–10080 minutes.",
+    "helpAr": "تُلغى تلقائيًا طلبات إنستاباي أو فودافون كاش غير المتحقق من تحويلها بعد هذه المدة من إنشاء الطلب، ويُحرّر المخزون. تُراجع التحويلات المتأخرة لاستردادها لا لإعادة تنشيط الطلب. عدم التحديد يوقف الإلغاء التلقائي؛ المسموح 15–10080 دقيقة.",
+    "clearable": true
+  },
+  {
+    "key": "LOYALTY_POINTS_PER_EGP",
+    "label": "Loyalty points per EGP",
+    "labelAr": "نقاط الولاء لكل جنيه",
+    "type": "integer",
+    "unit": "points",
+    "unitAr": "نقطة",
+    "help": "Points earned per EGP of eligible product spending. Blank = 1 point per EGP; separate from the wallet conversion rate.",
+    "helpAr": "عدد النقاط المكتسبة لكل جنيه من قيمة المنتجات المؤهلة. الافتراضي نقطة واحدة لكل جنيه؛ وهو مستقل عن معدل التحويل إلى المحفظة."
+  },
+  {
+    "key": "LOYALTY_WALLET_CONVERSION_POINTS_PER_EGP",
+    "label": "Loyalty-to-wallet conversion rate",
+    "labelAr": "معدل تحويل نقاط الولاء للمحفظة",
+    "type": "integer",
+    "unit": "points per EGP",
+    "unitAr": "نقطة لكل جنيه",
+    "help": "Number of points needed to obtain 1 EGP of wallet credit; also the minimum conversion threshold. Blank = 100 points per EGP.",
+    "helpAr": "عدد النقاط اللازمة للحصول على جنيه واحد في المحفظة، وهو أيضًا الحد الأدنى للتحويل. الافتراضي 100 نقطة لكل جنيه."
+  },
+  {
+    "key": "CHECKOUT_QUOTE_TTL_SECONDS",
+    "label": "Checkout quote validity",
+    "labelAr": "مدة صلاحية عرض سعر الطلب",
+    "type": "integer",
+    "unit": "seconds",
+    "unitAr": "ثانية",
+    "help": "How long a checkout delivery quote remains valid, in seconds. Blank = 900 seconds (15 minutes). A new quote is needed after expiry.",
+    "helpAr": "مدة صلاحية عرض رسوم التوصيل عند إتمام الطلب بالثواني. الافتراضي 900 ثانية (15 دقيقة). يلزم عرض جديد بعد انتهاء الصلاحية."
+  },
+  {
+    "key": "ETA_RANGE_BUFFER_MINUTES",
+    "label": "Estimated delivery time buffer",
+    "labelAr": "هامش نطاق وقت التوصيل المتوقع",
+    "type": "integer",
+    "unit": "minutes",
+    "unitAr": "دقيقة",
+    "help": "Adds minutes to the estimated delivery time to form its upper bound. Blank means show one estimate rather than invent a range.",
+    "helpAr": "عدد الدقائق المضافة إلى وقت التوصيل المتوقع لتحديد الحد الأعلى للنطاق. عدم التحديد يعني عرض وقت تقديري واحد دون اختلاق نطاق."
+  },
+  {
+    "key": "CUSTOMER_SERVICE_WHATSAPP_NUMBER",
+    "label": "Customer service WhatsApp number",
+    "labelAr": "رقم واتساب خدمة العملاء",
+    "type": "string",
+    "help": "Customer support contact; required alongside the transfer destination for manual transfer. Also the fallback contact for drivers if no Operations phone is set.",
+    "helpAr": "رقم التواصل مع خدمة العملاء؛ يلزم مع بيانات وجهة التحويل لتفعيل التحويل اليدوي. ويُستخدم أيضًا بديلًا لرقم العمليات للمندوبين إذا لم يُحدَّد."
+  },
+  {
+    "key": "OPERATIONS_CONTACT_PHONE",
+    "label": "Operations phone for drivers",
+    "labelAr": "رقم العمليات للمندوبين",
+    "type": "string",
+    "help": "Number dialed by Call Operations in the driver app. Blank uses customer service contact; if both are absent the action is hidden.",
+    "helpAr": "الرقم الذي يتصل به المندوب من زر الاتصال بالعمليات. عند عدم التحديد يُستخدم رقم خدمة العملاء؛ وإذا لم يتوفر الرقمان يُخفى الزر.",
+    "clearable": true
+  }
 ];
 
 function ConfigRow({ field }: { field: ConfigFieldDef }) {
+  const { t } = useLang();
   const [value, setValue] = useState<string>('');
   const [loaded, setLoaded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -155,25 +338,26 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
     if (field.type === 'integer') {
       const n = Number(value);
       if (value.trim() === '' || !Number.isFinite(n)) {
-        setError('Enter a valid number.');
+        setError(t('Enter a valid number.', 'أدخل رقمًا صالحًا.'));
         return;
       }
       parsed = n;
     } else if (field.type === 'money') {
       const p = parseEgpToMinorAllowZero(value);
       if (!p.ok) {
-        setError('Enter an amount in EGP, e.g. 10 or 10.50.');
+        setError(t('Enter an amount in EGP, e.g. 10 or 10.50.', 'أدخل مبلغًا بالجنيه المصري، مثل 10 أو 10.50.'));
         return;
       }
       parsed = p.minor;
     } else if (field.type === 'decimal') {
       const n = Number(value);
       if (!/^\d+(\.\d{1,4})?$/.test(value.trim()) || !(n > 0) || n > 10) {
-        setError('Enter a positive number up to 10 (e.g. 1.5).');
+        setError(t('Enter a positive number up to 10 (e.g. 1.5).', 'أدخل رقمًا موجبًا لا يتجاوز 10 (مثل 1.5).'));
         return;
       }
       parsed = n;
     } else if (field.type === 'boolean') {
+      if (!value) { setError(t('Select On or Off.', 'اختر التفعيل أو الإيقاف.')); return; }
       parsed = value === 'true';
     }
     setIsSaving(true);
@@ -205,22 +389,23 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
   }
 
   return (
-    <div className="flex flex-col gap-1 border-b py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-sm font-medium">{field.label}</p>
-        {field.help && <p className="text-xs text-gray-500">{field.help}</p>}
+    <div className="grid min-w-0 gap-2 border-b py-3 last:border-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,auto)] lg:items-center">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{t(field.label, field.labelAr)}</p>
+        <p className="mt-1 break-words text-xs text-gray-500">{t(field.help, field.helpAr)}</p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         {!loaded ? (
-          <span className="text-xs text-gray-400">Loading...</span>
+          <span className="text-xs text-gray-400">{t('Loading...', 'جارٍ التحميل...')}</span>
         ) : field.type === 'boolean' ? (
           <select
-            value={value || 'false'}
+            value={value}
             onChange={(e) => { edited.current = true; setValue(e.target.value); setSaved(false); }}
             className="min-h-[40px] rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
           >
-            <option value="true">ON</option>
-            <option value="false">OFF</option>
+            <option value="">{t('Unset', 'غير محدد')}</option>
+            <option value="true">{t('ON', 'مفعّل')}</option>
+            <option value="false">{t('OFF', 'متوقف')}</option>
           </select>
         ) : field.type === 'enum' && field.options ? (
           <select
@@ -228,10 +413,10 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
             onChange={(e) => { edited.current = true; setValue(e.target.value); setSaved(false); }}
             className="min-h-[40px] rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
           >
-            <option value="">Unset</option>
+            <option value="">{t('Unset', 'غير محدد')}</option>
             {field.options.map((o) => (
               <option key={o} value={o}>
-                {o}
+                {o === 'WEEKLY' ? t('Weekly', 'أسبوعيًا') : o === 'MONTHLY' ? t('Monthly', 'شهريًا') : o}
               </option>
             ))}
           </select>
@@ -245,13 +430,13 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
             className="min-h-[40px] w-40 rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
           />
         )}
-        {field.unit && <span className="text-xs text-gray-400">{field.unit}</span>}
+        {field.unit && <span className="text-xs text-gray-400">{t(field.unit, field.unitAr ?? field.unit)}</span>}
         <button
           onClick={handleSave}
           disabled={isSaving || !loaded}
           className="min-h-[40px] rounded-lg bg-hatly-orange px-4 py-1 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
         >
-          {isSaving ? 'Saving...' : 'Save'}
+          {isSaving ? t('Saving...', 'جارٍ الحفظ...') : t('Save', 'حفظ')}
         </button>
         {field.clearable && (
           <button
@@ -260,10 +445,10 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
             data-testid={`config-clear-${field.key}`}
             className="min-h-[40px] rounded-lg border border-gray-300 px-3 py-1 text-sm text-gray-700 disabled:opacity-50 hover:bg-gray-50"
           >
-            Clear
+            {t('Clear', 'مسح')}
           </button>
         )}
-        {saved && <span className="text-xs text-green-700">Saved</span>}
+        {saved && <span className="text-xs text-green-700">{t('Saved', 'تم الحفظ')}</span>}
         {error && <span className="text-xs text-red-600">{error}</span>}
       </div>
     </div>
@@ -558,7 +743,7 @@ export default function SettingsPage() {
     <div className="max-w-6xl">
       <div className="min-w-0"><h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{tl('Settings', 'الإعدادات')}</h1><p className="mt-1 max-w-3xl text-sm text-gray-500">{tl('Platform-wide settings. A change applies immediately to every customer and vendor.', 'إعدادات على مستوى المنصة. يسري أي تغيير فورًا على كل العملاء والمتاجر.')}</p></div>
 
-      <nav aria-label={tl('Settings sections', 'أقسام الإعدادات')} className="sticky top-0 z-10 -mx-1 mt-4 flex gap-2 overflow-x-auto bg-gray-50/95 px-1 py-2 backdrop-blur" data-testid="settings-nav">
+      <nav aria-label={tl('Settings sections', 'أقسام الإعدادات')} className="-mx-1 mt-4 flex flex-wrap gap-2 bg-gray-50/95 px-1 py-2 backdrop-blur" data-testid="settings-nav">
         {([['sec-auth', tl('Authentication', 'تسجيل الدخول')], ['sec-config', tl('Operational configuration', 'الإعدادات التشغيلية')], ['sec-routes', tl('Hatly & Wasally routes', 'مسارات هاتلي ووصّلي')], ['sec-payments', tl('Manual transfer', 'التحويل اليدوي')]] as const).map(([id, label]) => (
           <a key={id} href={`#${id}`} className="inline-flex min-h-[40px] shrink-0 items-center rounded-full border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50">{label}</a>
         ))}
@@ -567,18 +752,16 @@ export default function SettingsPage() {
       <div id="sec-auth" className="mt-4 scroll-mt-16 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="font-medium">Customer Authentication — OTP</p>
+            <p className="font-medium">{tl('Customer Authentication — OTP', 'التحقق من هاتف العميل برمز لمرة واحدة')}</p>
             <p className="mt-1 text-sm text-gray-500">
-              OTP is used only to verify a customer&apos;s phone number the first time, during registration. It is not used to
-              sign in: customers always sign in with phone + password, and every account has a password.
+              {tl('OTP is used only for first-time phone verification during registration. Sign-in always uses phone + password.', 'يُستخدم رمز التحقق لمرة واحدة لتأكيد رقم الهاتف عند التسجيل أول مرة فقط. تسجيل الدخول دائمًا برقم الهاتف وكلمة المرور.')}
             </p>
             {otpEnabled === true && (
-              <p className="mt-1 text-sm text-gray-500">ON: new customers are asked to verify their phone number with a code.</p>
+              <p className="mt-1 text-sm text-gray-500">{tl('ON: new customers verify their phone number with a code.', 'مفعّل: يُطلب من العملاء الجدد تأكيد رقم الهاتف برمز.')}</p>
             )}
             {otpEnabled === false && (
               <p className="mt-1 text-sm text-gray-500">
-                OFF: new customers register with phone + password and are not asked for a code; their phone stays unverified until
-                verification is turned back on and they complete it.
+                {tl('OFF: new customers register with phone + password without a code; the number remains unverified until verification is enabled and completed.', 'متوقف: يسجل العملاء الجدد برقم الهاتف وكلمة المرور دون رمز؛ ويظل الرقم غير مؤكد إلى أن يُعاد تفعيل التحقق ويُستكمل.')}
               </p>
             )}
           </div>
@@ -590,7 +773,7 @@ export default function SettingsPage() {
                 otpEnabled ? 'bg-hatly-orange' : 'bg-gray-500'
               }`}
             >
-              {isSaving ? 'Saving...' : otpEnabled ? 'ON' : 'OFF'}
+              {isSaving ? tl('Saving...', 'جارٍ الحفظ...') : otpEnabled ? tl('ON', 'مفعّل') : tl('OFF', 'متوقف')}
             </button>
           )}
         </div>
@@ -606,10 +789,9 @@ export default function SettingsPage() {
       </div>
 
       <div id="sec-config" className="mt-6 scroll-mt-16 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
-        <h2 className="font-semibold">Operational Configuration</h2>
+        <h2 className="font-semibold">{tl('Operational Configuration', 'الإعدادات التشغيلية')}</h2>
         <p className="mt-1 text-xs text-gray-500">
-          Each value is saved independently. An unset value shown blank means the backend has no value yet — the
-          relevant feature fails closed until it is set (never a fabricated default).
+          {tl('Each setting is saved independently. Blank means no stored value. The instructions below explain the actual default or restriction for each setting.', 'يُحفظ كل إعداد بشكل مستقل. عدم التحديد يعني عدم وجود قيمة محفوظة. توضح التعليمات أدناه القيمة الافتراضية الفعلية أو القيد الخاص بكل إعداد.')}
         </p>
         <div className="mt-2">
           {CONFIG_FIELDS.map((field) => (
@@ -621,8 +803,8 @@ export default function SettingsPage() {
       <div id="sec-routes" className="scroll-mt-16"><RouteDefaultsCard /></div>
 
       <div id="sec-payments" className="mt-6 scroll-mt-16 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
-        <h2 className="font-semibold">Manual Transfer Destination</h2>
-        <p className="mt-1 text-xs text-gray-500">Until set, Manual Transfer payments fail closed.</p>
+        <h2 className="font-semibold">{tl('Manual Transfer Destination', 'وجهة التحويل اليدوي')}</h2>
+        <p className="mt-1 text-xs text-gray-500">{tl('Manual transfer requires a configured destination and customer support number.', 'يتطلب التحويل اليدوي تحديد وجهة التحويل ورقم خدمة العملاء.')}</p>
         <div className="mt-2">
           <ManualTransferDestinationForm />
         </div>
