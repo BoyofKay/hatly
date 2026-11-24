@@ -13,8 +13,9 @@ function buildHarness(opts: {
     closeDriverPeriod: jest.fn(opts.closeDriverPeriodImpl ?? (async () => ({ id: 'dp-1', status: 'CLOSED' }))),
   };
   const closing = { courierPreview: jest.fn(async () => ({ lines: [] })), vendorPreview: jest.fn(async () => ({ lines: [] })), courierStatement: jest.fn(async () => ({})), vendorStatement: jest.fn(async () => ({})), openCouriers: jest.fn(async () => []), openVendorBranches: jest.fn(async () => []) };
-  const controller = new AdminSettlementController(settlementService as any, closing as any);
-  return { controller, settlementService, closing };
+  const repairs = { preview: jest.fn(async () => ({ previewToken: 'repair-token' })), apply: jest.fn(async () => ({ repaired: 1 })) };
+  const controller = new AdminSettlementController(settlementService as any, closing as any, repairs as any);
+  return { controller, settlementService, closing, repairs };
 }
 
 const adminUser = { id: 'admin-1', role: 'ADMIN' };
@@ -75,6 +76,26 @@ describe('AdminSettlementController', () => {
         AdminSettlementController.prototype.closeDriverPeriod,
       );
       expect(permissions).toEqual([Permission.CLOSE_DRIVER_SETTLEMENTS]);
+    });
+  });
+
+  describe('commission repair', () => {
+    it('passes the acting admin, driver, order numbers and rate through to preview', async () => {
+      const { controller, repairs } = buildHarness({});
+      const result = await controller.commissionRepairPreview(adminUser as any, 'driver-1', { orderNumbers: ['ORD-1'], rateBasisPoints: 1500 });
+      expect(repairs.preview).toHaveBeenCalledWith(adminUser, 'driver-1', ['ORD-1'], 1500);
+      expect(result.data).toEqual({ previewToken: 'repair-token' });
+    });
+
+    it('passes the exact preview token and reason through to apply', async () => {
+      const { controller, repairs } = buildHarness({});
+      const result = await controller.commissionRepair(adminUser as any, 'driver-1', { orderNumbers: ['ORD-1'], rateBasisPoints: 1500, previewToken: 'repair-token', reason: 'Correct missing commission' });
+      expect(repairs.apply).toHaveBeenCalledWith(adminUser, 'driver-1', ['ORD-1'], 1500, 'repair-token', 'Correct missing commission');
+      expect(result.data).toEqual({ repaired: 1 });
+    });
+
+    it.each(['commissionRepairPreview', 'commissionRepair'])('%s requires both existing finance permissions', (method) => {
+      expect(Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, (AdminSettlementController.prototype as any)[method])).toEqual([Permission.ADJUST_DRIVER_FINANCES, Permission.CLOSE_DRIVER_SETTLEMENTS]);
     });
   });
 
