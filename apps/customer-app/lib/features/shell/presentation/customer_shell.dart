@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/localization/l10n/app_localizations.dart';
@@ -21,7 +22,7 @@ import 'shell_tab_provider.dart';
 /// look changed to the approved floating design, with these destinations:
 /// Home · Explore (the existing Search tab) · Cart (pushes `/cart`) · Orders ·
 /// Profile. Favorites keeps its tab slot but is reached from Home's shortcut.
-class CustomerShell extends ConsumerWidget {
+class CustomerShell extends ConsumerStatefulWidget {
   const CustomerShell({super.key});
 
   /// Home and Explore are public. Orders / Favorites / Profile need an account: a GUEST gets a sign-in prompt in their place
@@ -52,7 +53,14 @@ class CustomerShell extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CustomerShell> createState() => _CustomerShellState();
+}
+
+class _CustomerShellState extends ConsumerState<CustomerShell> {
+  DateTime? _lastBack;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final tab = ref.watch(shellTabIndexProvider);
     final signedIn = ref.watch(isSignedInProvider);
@@ -67,12 +75,34 @@ class CustomerShell extends ConsumerWidget {
       }
     });
 
-    return Scaffold(
-      body: IndexedStack(index: tab, children: tabsFor(signedIn: signedIn)),
+    return PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (tab != ShellTab.home) {
+          ref.read(shellTabIndexProvider.notifier).state = ShellTab.home;
+          _lastBack = null;
+          return;
+        }
+        final now = DateTime.now();
+        if (_lastBack != null && now.difference(_lastBack!) < const Duration(seconds: 3)) {
+          _lastBack = null;
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBack = now;
+        ScaffoldMessenger.of(context)..hideCurrentSnackBar()..showSnackBar(SnackBar(
+          content: Text(Localizations.localeOf(context).languageCode == 'ar' ? 'اضغط رجوع مرة أخرى للخروج' : 'Press back again to exit'),
+          duration: const Duration(seconds: 3),
+        ));
+      },
+      child: Scaffold(
+      body: IndexedStack(index: tab, children: CustomerShell.tabsFor(signedIn: signedIn)),
       bottomNavigationBar: HatlyFloatingNavBar(
-        selectedIndex: barIndexForTab(tab),
+        selectedIndex: CustomerShell.barIndexForTab(tab),
         onTap: (barIndex) {
-          final target = barToTab[barIndex];
+          final target = CustomerShell.barToTab[barIndex];
+          _lastBack = null;
           if (target == null) {
             context.push('/cart');
           } else {
@@ -109,6 +139,6 @@ class CustomerShell extends ConsumerWidget {
               activeIcon: Icons.person_rounded),
         ],
       ),
-    );
+    ));
   }
 }

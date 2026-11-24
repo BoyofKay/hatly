@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/localization/locale_provider.dart';
@@ -82,11 +83,9 @@ class HatlyCustomerApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
-    final selectedArtwork = ref.watch(activeHeroArtworkProvider);
     final banners = ref.watch(homeBannersProvider).valueOrNull ?? const [];
-    final artwork = banners.any((b) => b.imageUrl == selectedArtwork)
-        ? selectedArtwork : (banners.isEmpty ? null : banners.first.imageUrl);
     final shellTab = ref.watch(shellTabIndexProvider);
+    final homeScrolled = ref.watch(homeHeroScrolledProvider);
 
     // Customer Push Notifications / Deep Links — the tap-to-navigate
     // wiring needs the router, which only exists here at the app
@@ -121,29 +120,38 @@ class HatlyCustomerApp extends ConsumerWidget {
               router.routerDelegate.currentConfiguration.uri.path == '/' &&
               shellTab == ShellTab.home;
           final surface = Theme.of(context).scaffoldBackgroundColor;
-          return Column(children: [
-            ColoredBox(
-              color: surface,
-              child: Stack(children: [
-                if (onHome && artwork != null)
-                  Positioned.fill(child: HomeHeroArtwork(url: artwork, alignment: Alignment.topCenter)),
-                SafeArea(bottom: false, child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  CustomerGlobalHeader(router: router),
-                  if (onHome) Padding(
-                    padding: const EdgeInsets.only(top: 6, bottom: 8),
-                    child: HomeSearchEntry(onTap: () => router.push('/search')),
-                  ),
-                ])),
-              ]),
+          final dark = Theme.of(context).brightness == Brightness.dark;
+          final topInset = MediaQuery.viewPaddingOf(context).top;
+          final routeContent = MediaQuery.removePadding(
+            context: context, removeTop: true,
+            child: HomePinnedSearchScope(
+              pinned: onHome, hasArtwork: banners.isNotEmpty,
+              child: child ?? const SizedBox.shrink(),
             ),
-            Expanded(child: MediaQuery.removePadding(
-              context: context, removeTop: true,
-              child: HomePinnedSearchScope(
-                pinned: onHome,
-                child: child ?? const SizedBox.shrink(),
-              ),
-            )),
+          );
+          final header = Column(mainAxisSize: MainAxisSize.min, children: [
+            CustomerGlobalHeader(router: router),
+            if (onHome) Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 8),
+              child: HomeSearchEntry(onTap: () => router.push('/search')),
+            ),
           ]);
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(statusBarColor: surface),
+            child: Column(children: [
+              ColoredBox(color: surface, child: SizedBox(width: double.infinity, height: topInset)),
+              if (!onHome) ColoredBox(color: surface, child: header),
+              Expanded(child: onHome
+                ? Stack(children: [
+                    Positioned.fill(child: routeContent),
+                    Positioned(top: 0, left: 0, right: 0, child: ColoredBox(
+                      color: banners.isNotEmpty && !homeScrolled ? Colors.transparent : surface,
+                      child: header,
+                    )),
+                  ])
+                : routeContent),
+            ]),
+          );
         },
       ),
 

@@ -50,6 +50,8 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final snapshotAsync = ref.watch(homeSnapshotProvider);
+    final extended = HomePinnedSearchScope.extendedOf(context);
+    final pinned = HomePinnedSearchScope.of(context);
 
     return Scaffold(
       bottomNavigationBar: const CartSummaryBar(),
@@ -76,10 +78,22 @@ class HomeScreen extends ConsumerWidget {
                       promos: [],
                     ));
           },
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (pinned && n.depth == 0 && n.metrics.axis == Axis.vertical) {
+                final scrolled = n.metrics.pixels > 1;
+                if (ref.read(homeHeroScrolledProvider) != scrolled) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (context.mounted) ref.read(homeHeroScrolledProvider.notifier).state = scrolled;
+                  });
+                }
+              }
+              return false;
+            },
           child: ListView(
-            padding: const EdgeInsets.only(bottom: HatlySpacing.lg),
+            padding: EdgeInsets.only(top: pinned && !extended ? kHomePinnedHeaderHeight : 0, bottom: HatlySpacing.lg),
             children: [
-              const PhoneVerificationBanner(),
+              if (!extended) const PhoneVerificationBanner(),
               // 3. Rotating promo carousel — INDEPENDENT of the product rows below: its own request starts with the screen, and a slow
               // or failed product load can never hold it back. Admin banners when there are any, otherwise the offer-derived promos
               // (available once the snapshot is); nothing → no space.
@@ -88,6 +102,7 @@ class HomeScreen extends ConsumerWidget {
                 onPromoAction: (promo) =>
                     handlePromoAction(context, ref, promo),
               ),
+              if (extended) const PhoneVerificationBanner(),
               // 4. Shop by category — needs only the sectors request, so it appears as soon as that answers.
               const HomeCategorySection(),
               const SizedBox(height: _sectionGap),
@@ -181,7 +196,7 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
             ],
-          ))),
+          )))),
         ]),
       ),
     );

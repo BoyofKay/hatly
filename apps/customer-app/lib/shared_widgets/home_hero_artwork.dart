@@ -4,7 +4,8 @@ import 'hatly_soft_image.dart';
 import '../core/media/media_url.dart';
 
 /// Active banner artwork, not a sector-derived tint.
-final activeHeroArtworkProvider = StateProvider<String?>((ref) => null);
+final homeHeroScrolledProvider = StateProvider<bool>((ref) => false);
+const double kHomePinnedHeaderHeight = 110;
 
 /// Square source shared between the pinned header and lower carousel.
 class HomeHeroArtwork extends StatelessWidget {
@@ -36,10 +37,12 @@ class HomeHeroArtwork extends StatelessWidget {
 }
 
 class HomePinnedSearchScope extends InheritedWidget {
-  const HomePinnedSearchScope({super.key, required this.pinned, required super.child});
+  const HomePinnedSearchScope({super.key, required this.pinned, this.hasArtwork = false, required super.child});
+  final bool hasArtwork;
+  static bool extendedOf(BuildContext context) { final scope = context.dependOnInheritedWidgetOfExactType<HomePinnedSearchScope>(); return scope != null && scope.pinned && scope.hasArtwork; }
   final bool pinned;
   static bool of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<HomePinnedSearchScope>()?.pinned ?? false;
   @override
-  bool updateShouldNotify(HomePinnedSearchScope oldWidget) => pinned != oldWidget.pinned;
+  bool updateShouldNotify(HomePinnedSearchScope oldWidget) => pinned != oldWidget.pinned || hasArtwork != oldWidget.hasArtwork;
 }

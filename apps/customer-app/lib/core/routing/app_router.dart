@@ -1,8 +1,6 @@
 import '../../features/auth/presentation/screens/forced_password_change_screen.dart';
 import 'package:flutter/material.dart';
 import '../../features/favorites/presentation/favorites_screen.dart';
-import '../../features/auth/presentation/auth_gate.dart' as gate;
-import '../localization/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared_widgets/hatly_state_view.dart';
@@ -275,6 +273,6 @@ class FavoritesRouteView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     appBar: AppBar(title: Text(AppLocalizations.of(context).homeFavoritesShortcut)),
-    body: ref.watch(gate.isSignedInProvider) ? const FavoritesScreen() : const gate.SignInRequiredView(),
+    body: ref.watch(isSignedInProvider) ? const FavoritesScreen() : const SignInRequiredView(),
   );
 }

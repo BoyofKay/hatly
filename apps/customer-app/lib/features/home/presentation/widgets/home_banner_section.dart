@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
 import '../../../../core/theme/hatly_theme.dart';
 import '../../../../shared_widgets/home_hero_artwork.dart';
+import '../../../../shared_widgets/hatly_soft_image.dart';
 import '../../../../shared_widgets/looping_pager.dart';
 import '../../../../shared_widgets/skeleton_box.dart';
 import '../../data/home_banners_providers.dart';
@@ -50,7 +51,7 @@ class HomeBannerSection extends ConsumerWidget {
         return Column(children: [
           HomeBannerCarousel(
             banners: list,
-            onIndexChanged: (i) => ref.read(activeHeroArtworkProvider.notifier).state = list[i].imageUrl,
+            fullArtwork: HomePinnedSearchScope.extendedOf(context),
             onTap: (banner) {
               final arabic =
                   Localizations.localeOf(context).languageCode == 'ar';
@@ -92,8 +93,10 @@ class HomeBannerCarousel extends StatefulWidget {
     required this.onTap,
     this.autoRotateInterval = const Duration(seconds: 5),
     this.onIndexChanged,
+    this.fullArtwork = false,
   });
 
+  final bool fullArtwork;
   final List<HomeBanner> banners;
   final ValueChanged<HomeBanner> onTap;
   final ValueChanged<int>? onIndexChanged;
@@ -118,7 +121,7 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
         children: [
           LayoutBuilder(
             builder: (context, constraints) => SizedBox(
-              height: bannerHeight(constraints.maxWidth),
+              height: widget.fullArtwork ? constraints.maxWidth.clamp(240.0, 440.0).toDouble() : bannerHeight(constraints.maxWidth),
               // Endless in both directions; auto-play always glides forward (see LoopingPager).
               child: LoopingPager(
                 count: banners.length,
@@ -156,7 +159,9 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                               fit: StackFit.expand,
                               children: [
                                 // A failed or missing image shows the quiet placeholder (never a broken-image icon or an exception).
-                                HomeHeroArtwork(url: banner.imageUrl, alignment: Alignment.bottomCenter),
+                                if (widget.fullArtwork)
+                                  HatlySoftImage(url: banner.imageUrl, width: double.infinity, height: double.infinity, radius: 0, placeholderIcon: Icons.local_offer_outlined)
+                                else HomeHeroArtwork(url: banner.imageUrl, alignment: Alignment.bottomCenter),
                                 if (title.isNotEmpty) ...[
                                   // A soft scrim so the title stays readable on any picture.
                                   const Positioned.fill(
