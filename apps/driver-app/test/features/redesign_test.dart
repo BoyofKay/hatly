@@ -16,6 +16,7 @@ import 'package:hatly_driver/features/earnings/domain/earnings.dart';
 import 'package:hatly_driver/features/earnings/presentation/earnings_screen.dart';
 import 'package:hatly_driver/features/history/presentation/history_screen.dart';
 import 'package:hatly_driver/features/profile/presentation/profile_screen.dart';
+import 'package:hatly_driver/features/overview/overview_api.dart';
 import 'package:hatly_driver/features/shell/driver_shell.dart';
 
 const _delegates = [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate];
@@ -298,9 +299,21 @@ void main() {
   });
 
   group('Profile', () {
+    // Profile now loads financial position as well as the driver name.
+    // Stub both providers so widget tests never wait on a real HTTP request.
+    final profileOverrides = <Override>[
+      driverProfileNameProvider.overrideWith((ref) async => 'Test Driver'),
+      driverFinancialPositionProvider.overrideWith((ref) async => const CurrentEarnings(
+        cashInPocketMinor: 0, revenueMinor: 0, loanMinor: 0, allowanceMinor: 0,
+        balanceMinor: 0, unsettledOrders: 0, items: [], held: [], totalPositionMinor: 0,
+      )),
+    ];
     testWidgets('switching the language is immediate and there is no accept/reject anywhere', (tester) async {
+      tester.view.physicalSize = const Size(420, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       await tester.pumpWidget(ProviderScope(
-        overrides: [driverApiProvider.overrideWithValue(_Api()), localeProvider.overrideWith((ref) => LocaleController(initial: const Locale('ar')))],
+        overrides: [...profileOverrides, driverApiProvider.overrideWithValue(_Api()), localeProvider.overrideWith((ref) => LocaleController(initial: const Locale('ar')))],
         child: Consumer(builder: (context, ref, _) => MaterialApp(locale: ref.watch(localeProvider), supportedLocales: const [Locale('ar'), Locale('en')], localizationsDelegates: _delegates, home: const ProfileScreen())),
       ));
       await tester.pumpAndSettle();
@@ -314,7 +327,10 @@ void main() {
     testWidgets('sign out stops the location timer and clears the stored session', (tester) async {
       final tokens = _Tokens();
       final gps = _Gps();
-      await tester.pumpWidget(_app(_Api(), const ProfileScreen(), extra: [tokenStorageProvider.overrideWithValue(tokens), driverLocationServiceProvider.overrideWithValue(gps)]));
+      tester.view.physicalSize = const Size(420, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(_app(_Api(), const ProfileScreen(), extra: [...profileOverrides, tokenStorageProvider.overrideWithValue(tokens), driverLocationServiceProvider.overrideWithValue(gps)]));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('logout-button')));
       await tester.pumpAndSettle();
