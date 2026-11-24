@@ -36,6 +36,8 @@ export default function SectorsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const [actionsId, setActionsId] = useState<string | null>(null);
+  const actionSector = sectors?.find(s => s.id === actionsId) ?? null;
   const [editing, setEditing] = useState<AdminSector | null>(null);
   const [assetsId, setAssetsId] = useState<string | null>(null);
   const [assetSlot, setAssetSlot] = useState<'photo' | 'en' | 'ar' | null>(null);
@@ -210,13 +212,8 @@ export default function SectorsPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <Button size="sm" onClick={() => { setAssetsId(s.id); setAssetSlot(null); }}>{t('Assets', 'الأصول')}</Button>
                         {canManage && <Button size="sm" onClick={() => setEditing(s)}>{t('Edit', 'تعديل')}</Button>}
-                        {canManage && <details className="relative">
-                          <summary className="cursor-pointer list-none rounded-lg border border-gray-200 px-3 py-2 text-sm" aria-label={t('More actions', 'إجراءات إضافية')}>⋯</summary>
-                          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border bg-white p-2">
-                            <button type="button" data-testid={`sector-active-toggle-${s.id}`} disabled={busyId === s.id} onClick={() => void toggleActive(s)} className="px-2 py-1 text-xs font-medium text-hatly-orangeDark disabled:opacity-40">{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</button>
-                            <DeleteRecordButton path={`/admin/sectors/${s.id}`} name={s.name} what={['Section', 'القسم']} consequence={['Only a section with no stores can be deleted: move its stores to another section first.', 'يمكن حذف القسم الذي لا يحتوي متاجر فقط: انقل متاجره أولًا.']} onDeleted={refresh} />
-                          </div>
-                        </details>}
+                        {canManage && <Button size="sm" aria-label={t('More actions', 'إجراءات إضافية')} aria-haspopup="dialog" onClick={() => setActionsId(s.id)}>⋯</Button>}
+
                       </div>
                     </td>
                   </tr>
@@ -225,6 +222,14 @@ export default function SectorsPage() {
             </table>
           </div>
         </>
+      )}
+      {canManage && actionSector && (
+        <Modal open title={t('Sector actions', 'إجراءات القطاع') + ' — ' + actionSector.name} onClose={() => setActionsId(null)}>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button disabled={busyId === actionSector.id} data-testid={`sector-active-toggle-${actionSector.id}`} onClick={() => { void toggleActive(actionSector); setActionsId(null); }}>{actionSector.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</Button>
+            <DeleteRecordButton path={`/admin/sectors/${actionSector.id}`} name={actionSector.name} what={['Sector', 'القطاع']} consequence={['Only a sector with no stores can be deleted: move its stores to another sector first.', 'يمكن حذف القطاع الذي لا يحتوي متاجر فقط: انقل متاجره أولًا.']} onDeleted={async () => { setActionsId(null); await refresh(); }} disabled={busyId === actionSector.id} />
+          </div>
+        </Modal>
       )}
       {editing && (
         <SimpleEditModal

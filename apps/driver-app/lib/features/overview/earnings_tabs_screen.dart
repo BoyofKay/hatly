@@ -124,19 +124,6 @@ class _CurrentTabState extends ConsumerState<_CurrentTab> with AutomaticKeepAliv
           ),
             ],
           ),
-          if (d.totalPositionMinor != null)
-            Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(context.t('Financial position', 'الموقف المالي'), style: const TextStyle(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              Text(context.t('Current unclosed: ${money(d.balanceMinor)}', 'الرصيد غير المقفل: ${money(d.balanceMinor)}')),
-              Text(context.t('Previous unpaid payouts: ${money(d.unpaidPayoutMinor)}', 'مستحقات سابقة لك: ${money(d.unpaidPayoutMinor)}')),
-              Text(context.t('Previous uncollected amounts: ${money(d.unpaidCollectionMinor)}', 'مستحقات سابقة عليك: ${money(d.unpaidCollectionMinor)}')),
-              const Divider(),
-              Text(context.t('Total net position: ${money(d.totalPositionMinor!)}', 'صافي الموقف المالي: ${money(d.totalPositionMinor!)}'),
-                style: TextStyle(fontWeight: FontWeight.w800, color: d.totalPositionMinor! < 0 ? Colors.red.shade700 : Colors.green.shade800)),
-              Text(context.t('Positive: Hatly owes you. Negative: you owe Hatly. Loans are separate.', 'الموجب: هاتلي تدين لك. السالب: أنت مدين لهاتلي. السلف منفصلة.'), style: const TextStyle(fontSize: 11)),
-            ]))),
           const SizedBox(height: 12),
           if (d.items.isEmpty)
             Padding(

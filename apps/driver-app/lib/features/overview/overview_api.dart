@@ -234,3 +234,7 @@ final overviewApiProvider = Provider<OverviewApi>((ref) => OverviewApi(ref.watch
 /// Re-read on navigation/session changes; never store the driver's name separately on this device.
 final driverProfileNameProvider = FutureProvider.autoDispose<String>((ref) =>
     ref.watch(overviewApiProvider).driverProfileName());
+
+// Read the same server-calculated wallet and prior unpaid amounts on Profile.
+final driverFinancialPositionProvider = FutureProvider.autoDispose<CurrentEarnings>((ref) =>
+    ref.watch(overviewApiProvider).currentEarnings());
