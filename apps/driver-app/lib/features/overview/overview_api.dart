@@ -19,14 +19,16 @@ class DateRange {
 
 /// Driver app round 2 — Orders tab (Today | Previous).
 class OrdersKpis {
-  const OrdersKpis({required this.completed, required this.cancelled, required this.ignored, required this.accepted, this.acceptanceRatePercent});
+  const OrdersKpis({required this.completed, required this.cancelled, required this.ignored, required this.accepted, this.acceptanceRatePercent, this.all = 0, this.acknowledge = 0, this.ready = 0, this.onWay = 0, this.failed = 0});
   final int completed, cancelled, ignored, accepted;
+  final int all, acknowledge, ready, onWay, failed;
   final int? acceptanceRatePercent;
 }
 
 class OrderRow {
-  const OrderRow({required this.deliveryId, required this.orderNumber, required this.status, this.vendors, this.at, this.earnedMinor, this.settlementState, this.settlementReference});
+  const OrderRow({required this.deliveryId, required this.orderNumber, required this.status, this.vendors, this.at, this.earnedMinor, this.settlementState, this.settlementReference, this.canOpen = true});
   final String deliveryId, orderNumber, status;
+  final bool canOpen;
   final String? vendors, settlementState, settlementReference;
   final DateTime? at;
   final int? earnedMinor;
@@ -45,6 +47,7 @@ class OrdersOverview {
     return OrdersOverview(
       kpis: OrdersKpis(
         completed: _i(k['completed']),
+        all: _i(k['all']), acknowledge: _i(k['acknowledge']), ready: _i(k['ready']), onWay: _i(k['onWay']), failed: _i(k['failed']),
         cancelled: _i(k['cancelled']),
         ignored: _i(k['ignored']),
         accepted: _i(k['accepted']),
@@ -56,6 +59,7 @@ class OrdersOverview {
                 deliveryId: e['deliveryId'] as String,
                 orderNumber: e['orderNumber'] as String? ?? '',
                 status: e['status'] as String? ?? '',
+                canOpen: e['canOpen'] != false,
                 vendors: e['vendors'] as String?,
                 at: _d(e['at']),
                 earnedMinor: (e['earnedMinor'] as num?)?.toInt(),

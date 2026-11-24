@@ -48,6 +48,11 @@ String orderStatusLabel(BuildContext context, String status) {
     case 'FAILED_DELIVERY':
     case 'RETURNED':
       return context.t('Failed', 'فشل التسليم');
+    case 'REASSIGNED':
+      return context.t('Reassigned', 'أعيد إسنادها');
+    case 'READY_FOR_PICKUP':
+    case 'ASSIGNED_TO_DRIVER':
+      return context.t('Ready', 'جاهزة للاستلام');
     case 'PICKED_UP':
     case 'ON_THE_WAY':
       return context.t('On the way', 'في الطريق');

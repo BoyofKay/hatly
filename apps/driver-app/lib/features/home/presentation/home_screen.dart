@@ -9,6 +9,7 @@ import '../../../core/utils/money.dart';
 import '../../../shared_widgets/driver_ui.dart';
 import '../../shift/shift_api.dart';
 import '../../shift/shift_card.dart';
+import '../../overview/orders_screen.dart';
 
 /// Real Driver Home — online/offline toggle (wired to the real
 /// `PATCH driver/online-status` + the GPS timer, see
@@ -31,6 +32,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  bool _legacyOverview = false;
+
   @override
   void initState() {
     super.initState();
@@ -134,6 +137,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(context.t('Could not update status. Please try again.', 'تعذّر تحديث حالتك. حاول مرة أخرى.'), style: TextStyle(color: Colors.red.shade700)),
             ),
+          if (shiftState != null && !_legacyOverview && shiftState.onDuty)
+            Expanded(child: ShiftOrdersList(tab: 'today', onUnavailable: () { if (mounted) setState(() => _legacyOverview = true); }, activeCard: (row) {
+              if (!row.canOpen || ['DELIVERED','FAILED_DELIVERY','CANCELLED','REASSIGNED'].contains(row.status)) return null;
+              for (final delivery in deliveriesAsync.valueOrNull ?? <Delivery>[]) {
+                if (delivery.id == row.deliveryId) return _DeliveryCard(delivery: delivery);
+              }
+              return null;
+            }))
+          else if (shiftState != null && !_legacyOverview && !shiftState.onDuty && (deliveriesAsync.valueOrNull?.isEmpty ?? false))
+            Expanded(child: Center(child: Text(context.t('Start a shift to receive orders.', 'ابدأ وردية لاستقبال الطلبات.'))))
+          else ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Row(
@@ -189,6 +203,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               },
             ),
           ),
+          ],
         ],
       ),
     );

@@ -27,39 +27,27 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     if (_legacy) return const HistoryScreen();
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFFAFAFA),
-        appBar: AppBar(
-          toolbarHeight: 0,
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          bottom: TabBar(tabs: [
-            Tab(key: const Key('orders-tab-today'), text: context.t('Current shift', 'الوردية الحالية')),
-            Tab(key: const Key('orders-tab-previous'), text: context.t('Previous', 'السابق')),
-          ]),
-        ),
-        body: TabBarView(children: [
-          _OrdersTab(tab: 'today', onUnavailable: () => setState(() => _legacy = true)),
-          _OrdersTab(tab: 'previous', onUnavailable: () => setState(() => _legacy = true)),
-        ]),
-      ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAFAFA),
+      body: ShiftOrdersList(tab: 'previous', onUnavailable: () => setState(() => _legacy = true)),
     );
   }
 }
 
-class _OrdersTab extends ConsumerStatefulWidget {
-  const _OrdersTab({required this.tab, required this.onUnavailable});
+class ShiftOrdersList extends ConsumerStatefulWidget {
+  const ShiftOrdersList({super.key, required this.tab, required this.onUnavailable, this.activeCard});
+  final Widget? Function(OrderRow)? activeCard;
   final String tab;
   final VoidCallback onUnavailable;
   @override
-  ConsumerState<_OrdersTab> createState() => _OrdersTabState();
+  ConsumerState<ShiftOrdersList> createState() => _OrdersTabState();
 }
 
-class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveClientMixin {
+class _OrdersTabState extends ConsumerState<ShiftOrdersList> with AutomaticKeepAliveClientMixin {
   final _search = TextEditingController();
   Timer? _debounce;
+  Timer? _poll;
+  int _request = 0;
   String? _status;
   DateTimeRange? _range; // null = this week (server default)
   OrdersOverview? _data;
@@ -73,18 +61,21 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load(reset: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(reset: true); });
+    if (widget.tab == 'today') _poll = Timer.periodic(const Duration(seconds: 30), (_) { if (mounted && !_loading && (_data?.page ?? 1) == 1) _load(reset: true); });
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _poll?.cancel();
     _search.dispose();
     super.dispose();
   }
 
   Future<void> _load({bool reset = false}) async {
-    if (_loading) return;
+    if (!mounted || (_loading && !reset)) return;
+    final request = ++_request;
     setState(() {
       _loading = true;
       _failed = false;
@@ -99,7 +90,7 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
             search: _search.text.trim(),
             page: page,
           );
-      if (!mounted) return;
+      if (!mounted || request != _request) return;
       setState(() {
         if (reset) _items.clear();
         _items.addAll(r.items);
@@ -107,9 +98,9 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
         _loading = false;
       });
     } on OverviewUnavailable {
-      if (mounted) widget.onUnavailable();
+      if (mounted && request == _request) widget.onUnavailable();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || request != _request) return;
       setState(() {
         _failed = true;
         _loading = false;
@@ -143,7 +134,12 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
       'completed': context.t('Completed', 'مكتمل'),
       'cancelled': context.t('Cancelled', 'ملغي'),
       'failed': context.t('Failed', 'فشل'),
-      if (widget.tab == 'today') 'active': context.t('In progress', 'قيد التنفيذ'),
+      if (widget.tab == 'today') ...{
+        'acknowledge': context.t('Needs acknowledgment', 'بانتظار التأكيد'),
+        'ready': context.t('Ready', 'جاهزة للاستلام'),
+        'on_way': context.t('On the way', 'في الطريق'),
+        'active': context.t('In progress', 'قيد التنفيذ'),
+      },
     };
     String? status = _status;
     DateTimeRange? range = _range;
@@ -254,16 +250,39 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
           ]),
           const SizedBox(height: 12),
           if (k != null)
-            LayoutBuilder(builder: (context, constraints) => Wrap(key: Key('orders-kpis-${widget.tab}'), spacing: 4, runSpacing: 4, children: [
-              MiniKpi(label: context.t('Completed', 'مكتمل'), value: '${k.completed}', width: (constraints.maxWidth - 12) / 4, color: const Color(0xFF1B7F3B)),
-              MiniKpi(label: context.t('Cancelled', 'ملغي'), value: '${k.cancelled}', width: (constraints.maxWidth - 12) / 4),
-              MiniKpi(label: context.t('Ignored', 'متجاهَل'), value: '${k.ignored}', width: (constraints.maxWidth - 12) / 4, color: k.ignored > 0 ? const Color(0xFFB3261E) : null),
-              MiniKpi(
-                label: context.t('Accepted / ignored', 'مقبول / متجاهَل'),
-                value: '${k.accepted} / ${k.ignored}${k.acceptanceRatePercent == null ? '' : ' · ${k.acceptanceRatePercent}%'}',
-                width: (constraints.maxWidth - 12) / 4,
-              ),
-            ])),
+            LayoutBuilder(builder: (context, constraints) {
+              Widget chip(String? filter, String label, int count, int columns) => Semantics(
+                button: true, selected: _status == filter,
+                child: InkWell(
+                  key: Key('orders-quick-${filter ?? 'all'}'),
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () { setState(() => _status = filter); _load(reset: true); },
+                  child: Container(
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _status == filter ? Theme.of(context).colorScheme.primary : Colors.transparent, width: 1.5)),
+                    child: MiniKpi(label: label, value: '$count', width: (constraints.maxWidth - (columns - 1) * 4) / columns - 3),
+                  ),
+                ),
+              );
+              return Column(key: Key('orders-kpis-${widget.tab}'), children: [
+                if (widget.tab == 'today') ...[
+                  Wrap(spacing: 4, runSpacing: 4, children: [
+                    chip(null, context.t('All', 'الكل'), k.all, 4),
+                    chip('acknowledge', context.t('Needs acknowledgment', 'بانتظار التأكيد'), k.acknowledge, 4),
+                    chip('ready', context.t('Ready', 'جاهزة للاستلام'), k.ready, 4),
+                    chip('on_way', context.t('On the way', 'في الطريق'), k.onWay, 4),
+                  ]),
+                  const SizedBox(height: 4),
+                ],
+                Wrap(spacing: 4, runSpacing: 4, children: [
+                  chip('completed', context.t('Delivered orders', 'طلبات تم توصيلها'), k.completed, 3),
+                  chip('cancelled', context.t('Cancelled', 'ملغاة'), k.cancelled, 3),
+                  chip('failed', context.t('Failed', 'فشل التوصيل'), k.failed, 3),
+                ]),
+                if (widget.tab == 'previous' && _status != null)
+                  TextButton(onPressed: () { setState(() => _status = null); _load(reset: true); }, child: Text(context.t('Clear status filter', 'إلغاء تصفية الحالة'))),
+              ]);
+            }),
           const SizedBox(height: 12),
           if (_failed && _items.isEmpty)
             MessageView(icon: Icons.cloud_off_outlined, message: context.t('Could not load your orders.', 'تعذّر تحميل طلباتك.'), onRetry: () => _load(reset: true))
@@ -279,7 +298,7 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
               ),
             ),
           for (final o in _items)
-            Card(
+            widget.activeCard?.call(o) ?? Card(
               margin: const EdgeInsets.only(bottom: 8),
               elevation: 0,
               color: Colors.white,
@@ -287,7 +306,7 @@ class _OrdersTabState extends ConsumerState<_OrdersTab> with AutomaticKeepAliveC
               child: ListTile(
                 key: Key('order-row-${o.orderNumber}'),
                 dense: true,
-                onTap: () => context.push('/deliveries/${o.deliveryId}'),
+                onTap: o.canOpen ? () => context.push('/deliveries/${o.deliveryId}') : null,
                 title: Row(children: [
                   Text(o.orderNumber, style: const TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(width: 8),
