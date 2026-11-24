@@ -158,7 +158,7 @@ function LoginForm() {
               <div>
                 <label htmlFor="login-phone" className="block text-sm font-medium text-gray-700">{t('Phone number', 'رقم الهاتف')}</label>
                 <div dir="ltr" className="mt-1 flex items-stretch overflow-hidden rounded-lg border border-gray-300 focus-within:border-hatly-orange focus-within:ring-2 focus-within:ring-hatly-orange/30">
-                  <span className="flex shrink-0 items-center gap-2 border-e border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-700" aria-label={t('Egypt country code', 'رمز دولة مصر')}>🇪🇬 +20</span>
+                  <span className="flex shrink-0 items-center gap-2 border-e border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-700" aria-label={t('Egypt country code', 'رمز دولة مصر')}>{phone.startsWith('+') || (phone.startsWith('00') && !phone.startsWith('0020')) ? t('Intl', 'دولي') : '🇪🇬 +20'}</span>
                   <input id="login-phone" type="tel" dir="ltr" required autoComplete="username" value={phone} onChange={(e) => setPhone(egyptNationalNumber(e.target.value))} placeholder="10XXXXXXXX" className="min-w-0 flex-1 px-3 py-2.5 text-sm focus:outline-none" />
                 </div>
               </div>

@@ -40,7 +40,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       final saved = await _storage.read(key: _savedPhoneKey);
       if (mounted && saved != null && _phoneController.text.isEmpty) {
-        _phoneController.text = saved.startsWith('+20') ? saved.substring(3) : saved;
+        setState(() => _phoneController.text = saved.startsWith('+20') ? saved.substring(3) : saved);
       }
     } catch (_) { /* Local storage is optional; login must still work. */ }
   }
@@ -55,7 +55,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _handleLogin() async {
     if (_isSubmitting) return;
-    final phone = EgyptPhoneNumber.normalize(_phoneController.text);
+    final phone = EgyptPhoneNumber.normalizeForAuth(_phoneController.text);
     if (phone == null) {
       setState(() => _error = context.t('Enter a valid Egyptian mobile number.', 'أدخل رقم هاتف مصري صحيح.'));
       return;
@@ -76,6 +76,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       TextInput.finishAutofillContext(shouldSave: true);
       ref.read(authStateProvider.notifier).setAuthenticated(true, mustChangePassword: mustChange);
     } on DioException catch (error) {
+      if (!mounted) return;
       // The server explains in English; the driver always sees their own language.
       final status = error.response?.statusCode;
       setState(() {
@@ -89,6 +90,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     'رقم الهاتف أو كلمة المرور غير صحيحة. حاول مرة أخرى.');
       });
     } catch (_) {
+      if (!mounted) return;
       setState(() => _error = context.t(
           'Something went wrong. Please check your connection.',
           'حدث خطأ. تحقق من اتصالك بالإنترنت.'));
@@ -101,7 +103,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Reset password) and send it to the driver, who signs in with it.
   /// Request-based "Forgot password?" (owner decision 2026-11-23): its own screen — request, then the temporary password + a new one.
   void _showForgotPassword(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ForgotPasswordScreen(initialPhone: EgyptPhoneNumber.normalize(_phoneController.text) ?? _phoneController.text.trim())));
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => ForgotPasswordScreen(initialPhone: EgyptPhoneNumber.normalizeForAuth(_phoneController.text) ?? _phoneController.text.trim())));
   }
 
   @override
@@ -110,18 +112,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
-          child: AutofillGroup(child: ConstrainedBox(
+          child: AutofillGroup(onDisposeAction: AutofillContextAction.cancel, child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // The supplied Hatly logo, bundled unchanged (assets/images/hatly-driver-icon.png — the same file the Customer app uses).
+                // The supplied Hatly logo, bundled unchanged (assets/images/hatly-driver-icon.png).
                 Center(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: Image.asset(
-                      'assets/images/hatly-logo.jpg',
+                      'assets/images/hatly-driver-icon.png',
                       key: const Key('hatly-logo'),
                       width: 96,
                       height: 96,
@@ -143,9 +145,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   key: const Key('login-phone'),
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: const [DriverNationalPhoneFormatter()],
+                  onChanged: (_) => setState(() {}),
                   autofillHints: const [AutofillHints.username, AutofillHints.telephoneNumberNational],
                   decoration: InputDecoration(
-                    prefixIcon: const SizedBox(width: 86, child: Center(child: Text('🇪🇬 +20', style: TextStyle(fontWeight: FontWeight.w700)))),
+                    prefixIcon: SizedBox(width: 86, child: Center(child: Text(EgyptPhoneNumber.looksInternational(_phoneController.text) ? 'Intl' : '🇪🇬 +20', style: const TextStyle(fontWeight: FontWeight.w700)))),
                     labelText: context.t('Phone number', 'رقم الهاتف'),
                     hintText: '10XXXXXXXX',
                     border: const OutlineInputBorder()),

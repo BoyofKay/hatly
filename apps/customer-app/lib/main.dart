@@ -77,6 +77,8 @@ Future<void> _start() async {
   ));
 }
 
+final _customerBackDispatcherProvider = Provider<RootBackButtonDispatcher>((ref) => CustomerBackButtonDispatcher(ref.watch(appRouterProvider)));
+
 class HatlyCustomerApp extends ConsumerWidget {
   const HatlyCustomerApp({super.key});
 
@@ -111,7 +113,10 @@ class HatlyCustomerApp extends ConsumerWidget {
       theme: HatlyTheme.light(),
       darkTheme: HatlyTheme.dark(),
       themeMode: ref.watch(themeModeProvider),
-      routerConfig: router,
+      routeInformationProvider: router.routeInformationProvider,
+      routeInformationParser: router.routeInformationParser,
+      routerDelegate: router.routerDelegate,
+      backButtonDispatcher: ref.watch(_customerBackDispatcherProvider),
       builder: (context, child) => AnimatedBuilder(
         animation: router.routerDelegate,
         builder: (context, _) {
@@ -140,16 +145,16 @@ class HatlyCustomerApp extends ConsumerWidget {
             value: (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark).copyWith(statusBarColor: surface),
             child: Column(children: [
               ColoredBox(color: surface, child: SizedBox(width: double.infinity, height: topInset)),
-              if (!onHome) ColoredBox(color: surface, child: header),
-              Expanded(child: onHome
-                ? Stack(children: [
-                    Positioned.fill(child: routeContent),
-                    Positioned(top: 0, left: 0, right: 0, child: ColoredBox(
-                      color: banners.isNotEmpty && !homeScrolled ? Colors.transparent : surface,
-                      child: header,
-                    )),
-                  ])
-                : routeContent),
+              Expanded(child: Stack(children: [
+                Positioned.fill(top: onHome ? 0 : 52, child: routeContent),
+                Positioned(top: 0, left: 0, right: 0, child: Material(
+                  type: MaterialType.transparency,
+                  child: ColoredBox(
+                    color: onHome && banners.isNotEmpty && !homeScrolled ? Colors.transparent : surface,
+                    child: header,
+                  ),
+                )),
+              ])),
             ]),
           );
         },

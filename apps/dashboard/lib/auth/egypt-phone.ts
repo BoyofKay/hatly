@@ -10,6 +10,11 @@ export function egyptNationalNumber(value: string): string {
   return digits;
 }
 export function egyptPhoneForAuth(value: string): string | null {
+  const raw = ascii(value).trim().replace(/[^0-9+]/g, '');
+  const explicit = raw.startsWith('00') ? '+' + raw.slice(2) : raw;
+  if (explicit.startsWith('+') && !explicit.startsWith('+20')) {
+    return /^\+[1-9][0-9]{6,14}$/.test(explicit) ? explicit : null;
+  }
   const digits = egyptNationalNumber(value).replace(/^0/, '');
   return /^1[0125][0-9]{8}$/.test(digits) ? '+20' + digits : null;
 }

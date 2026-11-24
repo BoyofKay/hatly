@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'package:flutter/widgets.dart';
 
 /// Navigation helpers that keep the route STACK sound when a screen is opened from somewhere that is not a normal in-app tap
 /// (a push-notification deep link, the end of checkout).
@@ -28,5 +29,21 @@ extension HatlyRouterStack on GoRouter {
   void replaceFlowWith(String path) {
     go('/');
     push<void>(path);
+  }
+}
+
+/// Handles an externally opened sole route without letting system Back exit.
+/// Normal Navigator pops (including dialogs and sheets) take precedence.
+class CustomerBackButtonDispatcher extends RootBackButtonDispatcher {
+  CustomerBackButtonDispatcher(this.router);
+  final GoRouter router;
+  @override
+  Future<bool> didPopRoute() async {
+    if (await super.didPopRoute()) return true;
+    if (router.routerDelegate.currentConfiguration.matches.isNotEmpty && router.topLocation != '/') {
+      router.go('/');
+    }
+    // Home itself owns the deliberate two-gesture exit via PopScope.
+    return true;
   }
 }
