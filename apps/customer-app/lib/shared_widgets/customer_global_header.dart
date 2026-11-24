@@ -19,6 +19,7 @@ class CustomerGlobalHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final p = context.palette;
+    final iconColor = Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black;
     final l10n = AppLocalizations.of(context);
     final count = ref.watch(isSignedInProvider) ? (ref.watch(cartControllerProvider).valueOrNull?.itemCount ?? 0) : 0;
 
@@ -34,7 +35,7 @@ class CustomerGlobalHeader extends ConsumerWidget {
         const Spacer(),
         NotificationBell(router: router),
         Stack(clipBehavior: Clip.none, children: [
-          IconButton(key: const Key('customer-header-cart'), tooltip: l10n.cart, onPressed: () => router.push('/cart'), icon: const Icon(Icons.shopping_bag_outlined)),
+          IconButton(key: const Key('customer-header-cart'), tooltip: l10n.cart, onPressed: () => router.push('/cart'), icon: Icon(Icons.shopping_bag_outlined, color: iconColor, size: 24)),
           if (count > 0) PositionedDirectional(top: 0, end: 0,
             child: CircleAvatar(radius: 9, backgroundColor: p.accent,
               child: Text(count > 99 ? '99+' : '$count', style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)))),
@@ -43,10 +44,11 @@ class CustomerGlobalHeader extends ConsumerWidget {
           key: const Key('customer-header-favorites'),
           tooltip: l10n.homeFavoritesShortcut,
           onPressed: () {
-            ref.read(shellTabIndexProvider.notifier).state = ShellTab.favorites;
-            router.go('/');
+            if (router.routerDelegate.currentConfiguration.last.matchedLocation != '/favorites') {
+              router.push('/favorites');
+            }
           },
-          icon: const Icon(Icons.favorite_border_rounded),
+          icon: Icon(Icons.favorite_border_rounded, color: iconColor, size: 24),
         ),
       ]),
     );

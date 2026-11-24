@@ -87,7 +87,8 @@ class CartVendorSection extends StatelessWidget {
                       // The API's own vendor subtotal — never recomputed here. Null (custom request not
                       // priced yet) shows nothing rather than a fake 0.
                       if (subtotal != null)
-                        Flexible(
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .32),
                           child: FittedBox(
                             fit: BoxFit.scaleDown,
                             child: LtrText(formatMinorUnits(subtotal, context),

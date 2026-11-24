@@ -76,10 +76,8 @@ class _NotificationBellState extends ConsumerState<NotificationBell>
             constraints: const BoxConstraints(
                 minWidth: HatlyTouch.minTarget,
                 minHeight: HatlyTouch.minTarget),
-            style: IconButton.styleFrom(
-                backgroundColor: p.surface, side: BorderSide(color: p.border)),
             icon: Icon(Icons.notifications_none_rounded,
-                color: p.textPrimary, size: 24),
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, size: 24),
           ),
           if (count > 0)
             PositionedDirectional(

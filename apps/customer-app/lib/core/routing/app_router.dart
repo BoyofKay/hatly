@@ -1,5 +1,8 @@
 import '../../features/auth/presentation/screens/forced_password_change_screen.dart';
 import 'package:flutter/material.dart';
+import '../../features/favorites/presentation/favorites_screen.dart';
+import '../../features/auth/presentation/auth_gate.dart' as gate;
+import '../localization/l10n/app_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../shared_widgets/hatly_state_view.dart';
@@ -112,6 +115,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           path: kChangePasswordPath,
           builder: (context, state) => const ForcedPasswordChangeScreen()),
       GoRoute(path: '/', builder: (context, state) => const CustomerShell()),
+      GoRoute(path: '/favorites', builder: (context, state) => const FavoritesRouteView()),
       GoRoute(
           path: '/search', builder: (context, state) => const SearchScreen()),
       // "See all" behind a Home section (most-ordered | new | offers) — public, like the catalog it lists.
@@ -264,4 +268,13 @@ class _SessionListenable extends ChangeNotifier {
       }
     });
   }
+}
+
+class FavoritesRouteView extends ConsumerWidget {
+  const FavoritesRouteView({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
+    appBar: AppBar(title: Text(AppLocalizations.of(context).homeFavoritesShortcut)),
+    body: ref.watch(gate.isSignedInProvider) ? const FavoritesScreen() : const gate.SignInRequiredView(),
+  );
 }
