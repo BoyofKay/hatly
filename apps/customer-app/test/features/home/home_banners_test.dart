@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hatly_customer/shared_widgets/looping_pager.dart';
+import 'package:hatly_customer/shared_widgets/home_hero_artwork.dart';
 import 'package:hatly_customer/shared_widgets/hatly_soft_image.dart';
 import 'package:hatly_customer/core/theme/hatly_theme.dart';
 import 'package:go_router/go_router.dart';
@@ -134,7 +135,7 @@ void main() {
 
   group('HomeBannerSection states', () {
     Future<void> pump(WidgetTester tester, Future<List<HomeBanner>> Function() banners,
-        {List<HomePromo> promos = const [], Locale locale = const Locale('ar'), double width = 390, double scale = 1.0, List<String>? visited}) async {
+        {List<HomePromo> promos = const [], Locale locale = const Locale('ar'), double width = 390, double scale = 1.0, List<String>? visited, bool extended = false}) async {
       tester.view.physicalSize = Size(width, 1600);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -144,7 +145,7 @@ void main() {
         textScale: scale,
         overrides: [homeBannersProvider.overrideWith((ref) => banners())],
         routes: [
-          GoRoute(path: '/', builder: (c, s) => Scaffold(body: SingleChildScrollView(child: HomeBannerSection(fallbackPromos: promos, onPromoAction: (_) {})))),
+          GoRoute(path: '/', builder: (c, s) => Scaffold(body: SingleChildScrollView(child: HomePinnedSearchScope(pinned: extended, hasArtwork: extended, child: HomeBannerSection(fallbackPromos: promos, onPromoAction: (_) {}))))),
           GoRoute(path: '/products/:id', builder: (c, s) { visited?.add(s.uri.toString()); return const Scaffold(body: Text('product page')); }),
           GoRoute(path: '/vendors/:id', builder: (c, s) { visited?.add(s.uri.toString()); return const Scaffold(body: Text('vendor page')); }),
           GoRoute(path: '/vendors', builder: (c, s) { visited?.add(s.uri.toString()); return const Scaffold(body: Text('vendor list')); }),
@@ -209,6 +210,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.widget<PageView>(find.byType(PageView)).controller!.page!, isNot(afterSwipe));
       expect(find.byType(PromoPageIndicator), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('extended promotion is one square artwork inside a single pager', (tester) async {
+      await pump(tester, () async => [_banner('b1'), _banner('b2')], extended: true);
+      await tester.pumpAndSettle();
+      final card = find.byKey(const Key('home-banner-b1'));
+      expect(tester.getSize(card).width, closeTo(390, .5));
+      expect(tester.getSize(card).height, closeTo(390, .5));
+      expect(find.byType(PageView), findsOneWidget);
+      expect(find.descendant(of: card, matching: find.byType(HatlySoftImage)), findsOneWidget);
+      await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('home-banner-b2')), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
     });
 

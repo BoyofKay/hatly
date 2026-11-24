@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/localization/l10n/app_localizations.dart';
@@ -53,13 +54,34 @@ Future<void> showCartMiniSheet(
   if (wantsCart == true) onViewCart();
 }
 
-class _CartMiniSheet extends ConsumerWidget {
+class _CartMiniSheet extends ConsumerStatefulWidget {
   const _CartMiniSheet({required this.item});
 
   final AddedCartItem item;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CartMiniSheet> createState() => _CartMiniSheetState();
+}
+
+class _CartMiniSheetState extends ConsumerState<_CartMiniSheet> {
+  Timer? _dismiss;
+  @override
+  void initState() {
+    super.initState();
+    _dismiss = Timer(const Duration(seconds: 5), () {
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+        Navigator.of(context).pop(false);
+      }
+    });
+  }
+  @override
+  void dispose() {
+    _dismiss?.cancel();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
     final l10n = AppLocalizations.of(context);
     final p = context.palette;
     final cart = ref.watch(cartControllerProvider).valueOrNull;

@@ -6,6 +6,18 @@ import 'package:hatly_customer/features/auth/presentation/widgets/egypt_phone_fi
 import '../../support/test_app.dart';
 
 void main() {
+  testWidgets('sign-in password visibility is off initially and toggles independently', (tester) async {
+    await tester.pumpWidget(hatlyTestApp(const PhoneEntryScreen()));
+    final password = find.byType(TextField).at(1);
+    expect(tester.widget<TextField>(password).obscureText, isTrue);
+    await tester.tap(find.byKey(const Key('entry-password-visibility')));
+    await tester.pump();
+    expect(tester.widget<TextField>(password).obscureText, isFalse);
+    await tester.tap(find.byKey(const Key('entry-password-visibility')));
+    await tester.pump();
+    expect(tester.widget<TextField>(password).obscureText, isTrue);
+  });
+
   testWidgets('renders the redesigned form with the existing Arabic content',
       (tester) async {
     await tester.pumpWidget(hatlyTestApp(const PhoneEntryScreen()));
