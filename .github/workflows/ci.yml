@@ -6,6 +6,8 @@ name: CI
 
 on:
   push:
+    # Dedicated Android release jobs already run full Flutter analysis and tests.
+    branches-ignore: [app-build, driver-app-build]
   pull_request:
   workflow_dispatch:
 
@@ -151,6 +153,8 @@ jobs:
         run: npm run test:e2e --workspace=apps/backend -- --ci
 
   customer-app:
+    # A production deployment request builds the server/dashboard, not mobile apps.
+    if: github.event_name != 'push' || github.ref != 'refs/heads/ops-request'
     name: Customer app (analyze, tests)
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -171,6 +175,7 @@ jobs:
       - run: flutter test
 
   driver-app:
+    if: github.event_name != 'push' || github.ref != 'refs/heads/ops-request'
     name: Driver app (analyze, tests)
     runs-on: ubuntu-latest
     timeout-minutes: 30
