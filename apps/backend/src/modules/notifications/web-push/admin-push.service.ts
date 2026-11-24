@@ -302,6 +302,8 @@ export class AdminPushService implements OnApplicationBootstrap, OnModuleDestroy
 
 const CATEGORY_TEXT: Record<string, [string, string]> = {
   NEW_ORDER: ['New order', 'طلب جديد'],
+  DRIVER_LONG_SHIFT: ['Long driver shift', 'وردية طويلة'],
+  DRIVER_CASH_EXPOSURE: ['Driver cash exposure', 'تجاوز حد النقدية'],
   DRIVER_OFFLINE: ['Driver offline — order may not have reached them', 'المندوب غير متصل — قد لا يكون الطلب وصله'],
   ACCEPTANCE_OVERDUE: ['Store has not accepted', 'المتجر لم يقبل الطلب'],
   PREPARATION_LATE: ['Preparation is late', 'التحضير متأخر'],
@@ -329,6 +331,7 @@ export function alertMessage(alert: { id: string; category: string; priority: 'C
 
 /** Where an alert leads: the exact order (the Orders workspace opens it), or the failed-delivery queue. Relative to the Admin origin. */
 export function opsAlertHref(alert: { category: string; order_id: string | null }): string {
+  if (alert.category === 'DRIVER_LONG_SHIFT' || alert.category === 'DRIVER_CASH_EXPOSURE') return '/drivers';
   if (alert.category === 'FAILED_DELIVERY') return alert.order_id ? `/order-management?order=${alert.order_id}` : '/failed-deliveries';
   return alert.order_id ? `/order-management?order=${alert.order_id}` : '/inbox';
 }

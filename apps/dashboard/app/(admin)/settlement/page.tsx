@@ -172,11 +172,11 @@ function CourierClosing() {
             {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="courier-close-error">{error}</p>}
             <div className="flex flex-wrap items-center justify-end gap-3">
               {needsAck && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} data-testid="courier-ack" />{t('I reviewed the held orders', 'راجعت الطلبات المؤجلة')}</label>}
-              <Button variant="primary" className="min-h-[44px]" disabled={p.lines.length === 0 || (needsAck && !ack)} onClick={() => setConfirm(true)} data-testid="courier-confirm">{t('Confirm closing', 'تأكيد التقفيل')}</Button>
+              <Button variant="primary" className="min-h-[44px]" disabled={(p.lines.length === 0 && !p.shifts?.some((s: any) => s.endedAt != null)) || (needsAck && !ack)} onClick={() => setConfirm(true)} data-testid="courier-confirm">{t('Confirm closing', 'تأكيد التقفيل')}</Button>
             </div>
             <ConfirmDialog open={confirm} title={t('Confirm this shift closing?', 'تأكيد تقفيل هذه الوردية؟')}
               message={`${t(`${p.totals.orders} orders`, `${p.totals.orders} طلب`)} · ${p.totals.netToCourierMinor >= 0 ? t('owed to the courier', 'مستحق للمندوب') : t('owed by the courier', 'مستحق على المندوب')} ${money(Math.abs(p.totals.netToCourierMinor))}. ${t('A closing cannot be edited; corrections are new entries.', 'لا يُعدَّل التقفيل؛ التصحيح يكون بقيد جديد.')}`}
-              confirmLabel={t('Close the shift', 'تقفيل الوردية')} busy={busy} onConfirm={() => void close()} onClose={() => setConfirm(false)} />
+              confirmLabel={t('Confirm financial closing', 'تأكيد التقفيل المالي')} busy={busy} onConfirm={() => void close()} onClose={() => setConfirm(false)} />
           </>
         )}
       </div>

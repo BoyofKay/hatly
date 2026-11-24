@@ -10,6 +10,8 @@ export const OPS_CATEGORY: Record<OpsAlertCategory, [string, string]> = {
   DRIVER_NOT_RESPONDING: ['Driver not responding', 'السائق لا يستجيب'],
   ASSIGNMENT_ERROR: ['Driver assignment failed', 'فشل إسناد السائق'],
   FAILED_DELIVERY: ['Delivery failed', 'فشل التوصيل'],
+  DRIVER_LONG_SHIFT: ['Long driver shift', 'وردية طويلة'],
+  DRIVER_CASH_EXPOSURE: ['Driver cash exposure', 'تجاوز حد النقدية'],
   DRIVER_OFFLINE: ['Driver offline — order may not have reached them', 'المندوب غير متصل — قد لا يكون الطلب وصله'],
 };
 
@@ -22,6 +24,8 @@ export const OPS_ACTION: Record<OpsAlertCategory, [string, string]> = {
   DRIVER_NOT_RESPONDING: ['Contact or replace the driver', 'تواصل مع السائق أو استبدله'],
   ASSIGNMENT_ERROR: ['Assign a driver', 'أسند سائقًا'],
   FAILED_DELIVERY: ['Decide what happens next', 'قرّر الخطوة التالية'],
+  DRIVER_LONG_SHIFT: ['Review driver duty hours', 'راجع ساعات عمل المندوب'],
+  DRIVER_CASH_EXPOSURE: ['Review outstanding cash', 'راجع النقدية المستحقة'],
   DRIVER_OFFLINE: ['Call the driver, or reassign the order', 'اتصل بالمندوب أو أعد إسناد الطلب'],
 };
 
@@ -35,6 +39,8 @@ export function driverOfflineDetail(detail: string | null | undefined, now: numb
 }
 
 export const OPS_RESOLUTION: Record<string, [string, string]> = {
+  SHIFT_ENDED: ['Shift ended', 'انتهت الوردية'],
+  CASH_EXPOSURE_CLEARED: ['Cash exposure cleared', 'انخفضت النقدية المستحقة'],
   STORE_RESPONDED: ['Store responded', 'استجاب المتجر'],
   ORDER_ENDED: ['Order ended', 'انتهى الطلب'],
   PREPARATION_DONE: ['Preparation done', 'اكتمل التحضير'],

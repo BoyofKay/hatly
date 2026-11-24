@@ -1,12 +1,13 @@
 import { Injectable, Logger, NotFoundException, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+import { driverCashExposure, driverRiskLimits } from '../delivery/driver-financial-risk';
 import { Permission } from '../permissions/permission.enum';
 import { StaffAlertsService, StaffAlertCategory } from './staff-alerts.service';
 import { AdminPushService, opsAlertHref } from './web-push/admin-push.service';
 
 export type OpsAlertCategory =
   | 'NEW_ORDER' | 'ACCEPTANCE_OVERDUE' | 'PREPARATION_LATE' | 'DRIVER_ACK_OVERDUE' | 'NO_DRIVER' | 'DRIVER_NOT_RESPONDING' | 'ASSIGNMENT_ERROR' | 'FAILED_DELIVERY'
-  | 'DRIVER_OFFLINE';
+  | 'DRIVER_OFFLINE' | 'DRIVER_LONG_SHIFT' | 'DRIVER_CASH_EXPOSURE';
 export type OpsAlertPriority = 'CRITICAL' | 'HIGH';
 
 /**
@@ -184,6 +185,7 @@ export class OpsAlertsService implements OnApplicationBootstrap, OnModuleDestroy
     )) candidates.push({ key: `failed:${r.id}`, category: 'FAILED_DELIVERY', priority: 'CRITICAL', orderId: r.id, orderNumber: r.order_number, openedAt: r.began });
 
     candidates.push(...(await this.driverOfflineCandidates()));
+    candidates.push(...(await this.driverRiskCandidates()));
 
     for (const c of candidates) if (await this.raise(this.ds.manager, c)) raised++;
     const resolved = await this.resolveEnded();
@@ -229,6 +231,41 @@ export class OpsAlertsService implements OnApplicationBootstrap, OnModuleDestroy
     return out;
   }
 
+  /** Driver-level conditions are deliberately separate from individual orders. */
+  async driverRiskCandidates(): Promise<RaiseInput[]> {
+    const out: RaiseInput[] = [];
+    const shifts = await this.ds.query(
+      `SELECT sh.id, sh.driver_id, sh.started_at, floor(extract(epoch FROM (now()-sh.started_at))/60)::int AS minutes
+         FROM driver_shifts sh WHERE sh.ended_at IS NULL AND sh.started_at <= now()-interval '14 hours'`);
+    for (const sh of shifts) {
+      const key = `driver-long-shift:${sh.id}`;
+      out.push({key, category:'DRIVER_LONG_SHIFT', priority:'HIGH', orderId:null, orderNumber:null,
+        detail:`Driver ${sh.driver_id} · ${sh.minutes} min on duty`, openedAt:sh.started_at});
+    }
+    const limits = await driverRiskLimits(this.ds);
+    const threshold = limits.warningMinor ?? limits.capMinor;
+    const drivers = await this.ds.query('SELECT id FROM drivers WHERE deleted_at IS NULL');
+    for (const d of drivers) {
+      const prefix = `driver-cash:${d.id}:`;
+      const [last] = await this.ds.query(
+        'SELECT id,resolved_at FROM ops_alerts WHERE alert_key LIKE $1 ORDER BY opened_at DESC,id DESC LIMIT 1',[prefix+'%']);
+      if (threshold === null) {
+        if(last && !last.resolved_at) await this.ds.query("UPDATE ops_alerts SET resolved_at=now(),updated_at=now(),resolution='CASH_EXPOSURE_CLEARED' WHERE id=$1 AND resolved_at IS NULL",[last.id]);
+        continue;
+      }
+      const exposure=await driverCashExposure(this.ds,d.id);
+      if(exposure.outstandingMinor < threshold) {
+        if(last && !last.resolved_at) await this.ds.query("UPDATE ops_alerts SET resolved_at=now(),updated_at=now(),resolution='CASH_EXPOSURE_CLEARED' WHERE id=$1 AND resolved_at IS NULL",[last.id]);
+        continue;
+      }
+      if(last && !last.resolved_at) continue;
+      out.push({key:prefix+(last?.id??'first'),category:'DRIVER_CASH_EXPOSURE',
+        priority:limits.capMinor!==null&&exposure.outstandingMinor>=limits.capMinor?'CRITICAL':'HIGH',
+        orderId:null,orderNumber:null,detail:`Driver ${d.id} · ${(exposure.outstandingMinor/100).toFixed(2)} EGP outstanding`});
+    }
+    return out;
+  }
+
   /** Closes every open alert whose condition no longer holds. Set-based; records why. */
   async resolveEnded(): Promise<number> {
     const stale = await this.presenceStaleMinutes();
@@ -236,6 +273,7 @@ export class OpsAlertsService implements OnApplicationBootstrap, OnModuleDestroy
       `UPDATE ops_alerts x SET resolved_at = now(), updated_at = now(), resolution = r.resolution
          FROM (
            SELECT a.id, CASE
+               WHEN a.category = 'DRIVER_LONG_SHIFT' THEN CASE WHEN NOT EXISTS (SELECT 1 FROM driver_shifts sh WHERE sh.id::text=split_part(a.alert_key,':',2) AND sh.ended_at IS NULL) THEN 'SHIFT_ENDED' END
                WHEN a.category = 'FAILED_DELIVERY' THEN CASE WHEN o.status <> 'FAILED_DELIVERY' OR EXISTS (SELECT 1 FROM failed_delivery_resolutions f WHERE f.order_id = o.id) THEN 'FAILED_DELIVERY_HANDLED' END
                WHEN o.status NOT IN ${ACTIVE} THEN 'ORDER_ENDED'
                WHEN a.category = 'NEW_ORDER' THEN CASE WHEN NOT EXISTS (SELECT 1 FROM order_vendor_segments s WHERE s.order_id = o.id AND s.status = 'PENDING' AND s.deleted_at IS NULL) THEN 'STORE_RESPONDED' END

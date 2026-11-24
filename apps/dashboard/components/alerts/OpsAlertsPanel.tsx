@@ -55,10 +55,11 @@ export function OpsAlertsPanel() {
                   <strong>{t(...OPS_CATEGORY[a.category])}</strong>
                   {a.orderNumber && <> · <bdi className="font-mono">{a.orderNumber}</bdi></>}
                   <span className="text-gray-500"> · {age(a.openedAt, now, locale)} · {t(...OPS_ACTION[a.category])}</span>
+                  {(a.category === 'DRIVER_LONG_SHIFT' || a.category === 'DRIVER_CASH_EXPOSURE') && <span className="block text-xs text-red-700">{a.detail}</span>}
                   {a.category === 'DRIVER_OFFLINE' && <span className="block text-xs text-red-700" data-testid="ops-alert-driver-offline">{driverOfflineDetail(a.detail, now, locale)}</span>}
                 </span>
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${state.tone}`} data-testid="ops-alert-state">{state.text}</span>
-                <Link href={a.href} className="text-xs font-semibold text-hatly-orangeDark underline">{t('Open order', 'افتح الطلب')}</Link>
+                <Link href={a.href} className="text-xs font-semibold text-hatly-orangeDark underline">{a.orderId ? t('Open order', 'افتح الطلب') : t('Review driver', 'راجع المندوب')}</Link>
                 {!a.resolvedAt && ctx.canAck && view === 'open' && (a.pendingParts ?? []).map((part) => <AcceptForStore key={part.segmentId} alert={a} part={part} />)}
                 {!a.acknowledgedAt && !a.resolvedAt && ctx.canAck && (
                   <button type="button" disabled={busy === a.id} className="rounded-lg border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-800 disabled:opacity-50"
