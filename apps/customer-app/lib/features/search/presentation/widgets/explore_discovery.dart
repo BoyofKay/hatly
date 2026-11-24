@@ -8,6 +8,7 @@ import '../../../../shared_widgets/skeleton_box.dart';
 import '../../../home/data/home_providers.dart';
 import '../../../home/domain/home_content.dart';
 import '../../../home/presentation/widgets/home_category_section.dart';
+import '../../../home/presentation/widgets/category_card.dart';
 import '../../../home/presentation/widgets/home_horizontal_row.dart';
 import '../../../home/presentation/widgets/home_offers_section.dart';
 import '../../../home/presentation/widgets/home_promo_actions.dart';
@@ -15,7 +16,6 @@ import '../../../home/presentation/widgets/hatly_service_entry_card.dart';
 import '../../../products/presentation/widgets/product_card.dart';
 import '../../../vendors/domain/vendor.dart';
 import '../../../vendors/presentation/widgets/vendor_cover_card.dart';
-import '../../data/explore_content_config.dart';
 import '../../data/explore_logic.dart';
 import '../../data/explore_providers.dart';
 import 'explore_message.dart';
@@ -46,25 +46,12 @@ class ExploreDiscovery extends StatelessWidget {
   }
 }
 
-/// Shop by Category on Explore: the Home grid language, collapsed to the first
-/// [kExploreInitialCategoryCount] categories. When more exist, "عرض الكل ←"
-/// expands the grid in place to every available category and "عرض أقل"
-/// collapses it again — Explore IS the destination, so it never navigates away
-/// from itself.
-class ExploreCategoriesSection extends ConsumerStatefulWidget {
+/// All active sectors, in a horizontally scrollable grid of at most three rows.
+class ExploreCategoriesSection extends ConsumerWidget {
   const ExploreCategoriesSection({super.key});
 
   @override
-  ConsumerState<ExploreCategoriesSection> createState() =>
-      _ExploreCategoriesSectionState();
-}
-
-class _ExploreCategoriesSectionState
-    extends ConsumerState<ExploreCategoriesSection> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final categoriesAsync = ref.watch(homeCategoriesProvider);
 
@@ -84,26 +71,40 @@ class _ExploreCategoriesSectionState
       ),
       data: (categories) {
         if (categories.isEmpty) return const SizedBox.shrink();
-        final hasMore = categories.length > kExploreInitialCategoryCount;
-        final shown = _expanded
-            ? categories
-            : categories.take(kExploreInitialCategoryCount).toList();
         final featured = featuredCategories(categories);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            HatlySectionHeader(
-              title: l10n.homeSectionCategories,
-              seeAllLabel: hasMore
-                  ? (_expanded ? l10n.exploreSeeLess : l10n.seeAll)
-                  : null,
-              onSeeAll:
-                  hasMore ? () => setState(() => _expanded = !_expanded) : null,
-            ),
+            HatlySectionHeader(title: l10n.homeSectionCategories),
             const SizedBox(height: HatlySpacing.sm),
-            // Reference board ("الأقسام"): two large photo cards per row.
-            CategoryGrid(categories: shown, columns: 2, large: true),
+            LayoutBuilder(builder: (context, constraints) {
+              final ar = Localizations.localeOf(context).languageCode == 'ar';
+              const gap = 10.0;
+              final width = (constraints.maxWidth - 2 * HatlySpacing.screenPadding - 2 * gap) / 2.35;
+              return SingleChildScrollView(
+                key: const Key('explore-all-sectors'),
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: HatlySpacing.screenPadding, vertical: 4),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  for (var col = 0; col * 3 < categories.length; col++) ...[
+                    if (col > 0) const SizedBox(width: gap),
+                    Column(mainAxisSize: MainAxisSize.min, children: [
+                      for (var row = 0; row < 3 && col * 3 + row < categories.length; row++) ...[
+                        if (row > 0) const SizedBox(height: gap),
+                        CategoryCard(
+                          width: width, large: true,
+                          label: categoryDisplayName(categories[col * 3 + row], isArabic: ar),
+                          slug: categories[col * 3 + row].slug,
+                          imageUrl: categories[col * 3 + row].imageUrl,
+                          onTap: () => context.push(categoryListingRoute(categories[col * 3 + row], isArabic: ar)),
+                        ),
+                      ],
+                    ]),
+                  ],
+                ]),
+              );
+            }),
             if (featured.isNotEmpty) ...[
               const SizedBox(height: ExploreDiscovery.sectionGap),
               HatlySectionHeader(title: l10n.exploreSectionFeaturedCategories),

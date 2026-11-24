@@ -296,89 +296,28 @@ void main() {
           reason: 'the pushed /search route keeps autofocus by default');
     });
 
-    testWidgets(
-        'Shop by Category: two-column large cards; tap → existing listing route',
-        (tester) async {
-      _phone(tester);
-      final visited = <String>[];
-      await _open(tester, _app(overrides: _overrides(), visited: visited));
-
-      final grid =
-          tester.widgetList<CategoryCard>(find.byType(CategoryCard)).toList();
-      expect(grid, hasLength(6), reason: 'collapsed: three rows of two');
-      expect(grid.every((c) => c.large), isTrue);
-      final rects = [
-        for (var i = 0; i < 6; i++)
-          tester.getRect(find.byType(CategoryCard).at(i))
-      ];
-      expect({for (final r in rects) r.left.round()}.length, 2);
-      expect({for (final r in rects) r.top.round()}.length, 3);
-      // Arabic: the first category is on the right
-      expect(rects[0].left, greaterThan(rects[1].left));
-
-      await tester.tap(find.byType(CategoryCard).at(1));
-      await tester.pumpAndSettle();
-      expect(visited.single,
-          startsWith('/vendors?sectorId=sec1&sectorName='));
-      expect(Uri.parse(visited.single).queryParameters['sectorName'], 'فئة 1');
-    });
-
-    testWidgets(
-        'collapsed by default at 6; "عرض الكل ←" appears only above 6, expands in place to ALL, and "عرض أقل" collapses',
-        (tester) async {
+    testWidgets('Explore renders all sectors in three rows and scrolls in RTL', (tester) async {
       _phone(tester, height: 6000);
       final visited = <String>[];
-
-      // exactly 6 → nothing more to show, no action
-      await _open(tester,
-          _app(overrides: _overrides(categories: _cats(6)), visited: visited));
-      expect(find.byType(CategoryCard), findsNWidgets(6));
+      await _open(tester, _app(overrides: _overrides(categories: _cats(15)), visited: visited));
+      final cards = find.byType(CategoryCard);
+      expect(cards, findsNWidgets(15));
       expect(find.text('عرض الكل'), findsNothing);
       expect(find.text('عرض أقل'), findsNothing);
-
-      await tester.pumpWidget(const SizedBox());
-      await _open(tester,
-          _app(overrides: _overrides(categories: _cats(15)), visited: visited));
-      // collapsed: first 6 in the existing order
-      final collapsed = tester
-          .widgetList<CategoryCard>(find.byType(CategoryCard))
-          .map((c) => c.label)
-          .toList();
-      expect(collapsed, [for (var i = 0; i < 6; i++) 'فئة $i']);
-      expect(find.text('عرض الكل'), findsOneWidget);
-      expect(find.text('عرض أقل'), findsNothing);
-
-      // expand → every available category (15), in the same order
-      await tester.tap(find.text('عرض الكل'));
+      final first = tester.getRect(cards.at(0));
+      final second = tester.getRect(cards.at(3));
+      expect(first.left, greaterThan(second.left));
+      expect(tester.getRect(cards.at(1)).top, greaterThan(first.top));
+      expect(tester.getRect(cards.at(2)).top, greaterThan(tester.getRect(cards.at(1)).top));
+      final scroll = find.byKey(const Key('explore-all-sectors'));
+      await tester.drag(scroll, const Offset(600, 0));
       await tester.pumpAndSettle();
-      final expanded = tester
-          .widgetList<CategoryCard>(find.byType(CategoryCard))
-          .map((c) => c.label)
-          .toList();
-      expect(expanded, [for (var i = 0; i < 15; i++) 'فئة $i']);
-      expect(find.text('عرض الكل'), findsNothing);
-      expect(find.text('عرض أقل'), findsOneWidget);
-      expect(visited, isEmpty, reason: 'it expands in place, no navigation');
-
-      // collapse again
-      await tester.tap(find.text('عرض أقل'));
+      await tester.ensureVisible(find.text('فئة 14'));
       await tester.pumpAndSettle();
-      expect(find.byType(CategoryCard), findsNWidgets(6));
-      expect(find.text('عرض الكل'), findsOneWidget);
-    });
-
-    testWidgets('a category tapped after expanding still opens its listing',
-        (tester) async {
-      _phone(tester, height: 6000);
-      final visited = <String>[];
-      await _open(tester,
-          _app(overrides: _overrides(categories: _cats(10)), visited: visited));
-      await tester.tap(find.text('عرض الكل'));
+      await tester.tap(find.text('فئة 14'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('فئة 9'));
-      await tester.pumpAndSettle();
-      expect(visited.single,
-          startsWith('/vendors?sectorId=sec9&sectorName='));
+      expect(visited.single, startsWith('/vendors?sectorId=sec14&sectorName='));
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets(
@@ -787,7 +726,7 @@ void main() {
       });
 
       testWidgets(
-          'discovery EXPANDED: no overflow / exceptions: ${scenario.$1}',
+          'discovery horizontal scroll: no overflow / exceptions: ${scenario.$1}',
           (tester) async {
         _phone(tester, width: scenario.$4, height: 8000);
         await _open(
@@ -798,8 +737,8 @@ void main() {
                 dark: scenario.$3,
                 textScale: scenario.$5,
                 visited: []));
-        await tester.tap(find
-            .text(scenario.$2.languageCode == 'ar' ? 'عرض الكل' : 'See all'));
+        await tester.drag(find.byKey(const Key('explore-all-sectors')),
+            Offset(scenario.$2.languageCode == 'ar' ? 200 : -200, 0));
         await tester.pumpAndSettle();
         expect(find.byType(CategoryCard), findsNWidgets(15));
         expect(tester.takeException(), isNull);

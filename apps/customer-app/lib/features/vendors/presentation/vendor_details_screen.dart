@@ -345,8 +345,8 @@ class _VendorHeader extends StatelessWidget {
             child: _FavoriteHeartButton(vendorId: details.vendor.id)),
         ),
         PositionedDirectional(
-          start: 20, end: 20, bottom: 48,
-          child: Align(alignment: AlignmentDirectional.centerStart,
+          start: 112, end: 12, bottom: 8,
+          child: Align(alignment: AlignmentDirectional.centerEnd,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(color: Colors.white.withValues(alpha: .84), borderRadius: BorderRadius.circular(8)),
