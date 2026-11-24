@@ -136,6 +136,16 @@ export class DriverOverviewService {
     const balanceMinor = t.netToCourierMinor - allowanceMinor;
     const [shift] = await this.ds.query(`SELECT started_at FROM driver_shifts WHERE driver_id = $1 AND ended_at IS NULL`, [driver.id]);
     const held = p.unresolved.filter((u) => u.reason !== 'IN_PROGRESS');
+    const previousBalances: Array<{net_payable_minor: string; settled: string}> = await this.ds.query(
+      `SELECT p.net_payable_minor, coalesce((SELECT sum(s.amount_minor) FROM settlement_payments s WHERE s.driver_period_id=p.id AND s.status='RECORDED'),0) AS settled
+         FROM driver_settlement_periods p WHERE p.driver_id=$1 AND p.status='CLOSED' AND p.deleted_at IS NULL`,[driver.id]);
+    let unpaidPayoutMinor=0, unpaidCollectionMinor=0;
+    for(const row of previousBalances){
+      const due=driverPeriodDue(num(row.net_payable_minor));
+      const remaining=remainingMinor(due.dueMinor,num(row.settled));
+      if(due.direction==='PAYOUT') unpaidPayoutMinor+=remaining; else unpaidCollectionMinor+=remaining;
+    }
+    const previousUnpaidMinor=unpaidPayoutMinor-unpaidCollectionMinor;
     return {
       tab: 'current' as const,
       shiftStartedAt: iso(shift?.started_at),
@@ -148,6 +158,10 @@ export class DriverOverviewService {
         balanceMinor,
         balanceDirection: balanceMinor >= 0 ? 'PAYOUT' : 'COLLECTION',
         unsettledOrders: p.lines.length + held.length,
+        readyToClose: p.lines.length, unresolvedOrders: held.length,
+        unclosedMinutes: Math.floor(p.shifts.reduce((sum,sh)=>sum+(new Date(sh.reconciledTo).getTime()-new Date(sh.reconciledFrom).getTime())/60_000,0)),
+        unpaidPayoutMinor, unpaidCollectionMinor, previousUnpaidMinor,
+        totalPositionMinor: balanceMinor+previousUnpaidMinor,
       },
       items: p.lines.map((l) => ({
         orderId: l.orderId,
@@ -169,13 +183,25 @@ export class DriverOverviewService {
   private async previousEarnings(driverId: string, q: { from?: string; to?: string; status?: string }) {
     const range = this.range(q);
     const periods: any[] = await this.ds.query(
-      `SELECT p.*, coalesce((SELECT sum(s.amount_minor) FROM settlement_payments s WHERE s.driver_period_id = p.id AND s.status = 'RECORDED'), 0) AS settled,
-              coalesce((SELECT sum(greatest(0, extract(epoch FROM (coalesce(sh.ended_at, now()) - sh.started_at)) / 60))::int FROM driver_shifts sh WHERE sh.closing_period_id = p.id), 0) AS minutes,
-              coalesce((SELECT sum(a.amount_minor) FROM driver_allowances a WHERE a.closing_period_id = p.id), 0) AS allowance_returned
-         FROM driver_settlement_periods p
-        WHERE p.driver_id = $1 AND p.status = 'CLOSED' AND p.deleted_at IS NULL
-          AND (p.closed_at AT TIME ZONE '${CAIRO}')::date BETWEEN $2::date AND $3::date
-        ORDER BY p.closed_at DESC LIMIT 100`,
+      `WITH bounds AS (
+         SELECT ($2::date::timestamp AT TIME ZONE '${CAIRO}') AS lo, (($3::date+1)::timestamp AT TIME ZONE '${CAIRO}') AS hi
+       )
+       SELECT p.*, coalesce((SELECT sum(s.amount_minor) FROM settlement_payments s WHERE s.driver_period_id=p.id AND s.status='RECORDED'),0) AS settled,
+              coalesce(l.orders,0) AS selected_orders, coalesce(l.revenue,0) AS selected_revenue,
+              coalesce(t.seconds,0) AS selected_seconds,
+              coalesce((SELECT sum(a.amount_minor) FROM driver_allowances a WHERE a.closing_period_id=p.id),0) AS allowance_returned
+       FROM driver_settlement_periods p CROSS JOIN bounds b
+       LEFT JOIN LATERAL (
+         SELECT count(*)::int AS orders, sum(o.courier_compensation_minor) AS revenue FROM driver_settlement_period_orders o
+         WHERE o.period_id=p.id AND o.delivered_at>=b.lo AND o.delivered_at<b.hi
+       ) l ON true
+       LEFT JOIN LATERAL (
+         SELECT sum(extract(epoch FROM (least(i.to_at,b.hi)-greatest(i.from_at,b.lo)))) AS seconds
+         FROM driver_shift_reconciliations i WHERE i.period_id=p.id AND i.from_at<b.hi AND i.to_at>b.lo
+       ) t ON true
+       WHERE p.driver_id=$1 AND p.status='CLOSED' AND p.deleted_at IS NULL
+         AND (l.orders>0 OR t.seconds>0 OR (p.closed_at>=b.lo AND p.closed_at<b.hi))
+       ORDER BY p.closed_at DESC,p.id`,
       [driverId, range.from, range.to],
     );
     let items = periods.map((p) => {
@@ -186,9 +212,13 @@ export class DriverOverviewService {
         id: p.id,
         reference: p.reference ?? null,
         closedAt: iso(p.closed_at),
-        orders: num(p.orders_count),
-        minutesWorked: num(p.minutes),
-        revenueMinor: v2 ? num(p.courier_compensation_minor) : num(p.total_earnings_minor) - num(p.total_commission_owed_minor),
+        orders: num(p.selected_orders),
+        minutesWorked: Math.floor(num(p.selected_seconds)/60),
+        workedSeconds: num(p.selected_seconds),
+        revenueMinor: num(p.selected_revenue),
+        legacyUnallocated: !v2 && num(p.orders_count)>0,
+        closingOrders: num(p.orders_count),
+        closingRevenueMinor: v2 ? num(p.courier_compensation_minor) : num(p.total_earnings_minor)-num(p.total_commission_owed_minor),
         netMinor: num(p.net_payable_minor),
         allowanceReturnedMinor: num(p.allowance_returned),
         direction: due.direction,
@@ -211,7 +241,7 @@ export class DriverOverviewService {
       kpis: {
         revenueMinor: items.reduce((s, i) => s + i.revenueMinor, 0),
         orders: items.reduce((s, i) => s + i.orders, 0),
-        minutesWorked: items.reduce((s, i) => s + i.minutesWorked, 0),
+        minutesWorked: Math.floor(items.reduce((s, i) => s + i.workedSeconds, 0)/60),
       },
       items,
     };

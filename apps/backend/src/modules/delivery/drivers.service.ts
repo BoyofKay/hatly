@@ -160,7 +160,11 @@ export class DriversService {
    * separate re-review workflow is invented).
    */
   async setVerificationStatus(driverId: string, status: 'APPROVED' | 'REJECTED'): Promise<Driver> {
-    await this.requireDriver(driverId);
+    const driver = await this.requireDriver(driverId);
+    const rate = driver.commissionRateBasisPoints;
+    if (status === 'APPROVED' && (rate == null || !Number.isInteger(rate) || rate < 0 || rate > 10000)) {
+      throw new BadRequestException({message:'Configure the driver commission before approval (explicit 0% is valid).',details:{code:'DRIVER_COMMISSION_REQUIRED'}});
+    }
     // Column-targeted (Operational Completion milestone): never writes back a stale is_available / is_online.
     await this.driversRepository.update({ id: driverId }, { verificationStatus: status });
     return this.driversRepository.findOneOrFail({ where: { id: driverId } });

@@ -112,6 +112,9 @@ class _CurrentTabState extends ConsumerState<_CurrentTab> with AutomaticKeepAliv
               width: 150,
             ),
             MiniKpi(label: context.t('Unsettled orders', 'طلبات غير مسوّاة'), value: '${d.unsettledOrders}', width: 150),
+            MiniKpi(label: context.t('Ready for closing', 'جاهزة للتقفيل'), value: '${d.readyToClose}', width: 150),
+            MiniKpi(label: context.t('Require office resolution', 'تحتاج معالجة المكتب'), value: '${d.unresolvedOrders}', width: 150),
+            MiniKpi(label: context.t('Unclosed working hours', 'ساعات العمل غير المقفلة'), value: hoursMinutes(context, d.unclosedMinutes), width: 150),
           ]),
           const SizedBox(height: 6),
           Text(
@@ -121,11 +124,24 @@ class _CurrentTabState extends ConsumerState<_CurrentTab> with AutomaticKeepAliv
           ),
             ],
           ),
+          if (d.totalPositionMinor != null)
+            Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text(context.t('Financial position', 'الموقف المالي'), style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Text(context.t('Current unclosed: ${money(d.balanceMinor)}', 'الرصيد غير المقفل: ${money(d.balanceMinor)}')),
+              Text(context.t('Previous unpaid payouts: ${money(d.unpaidPayoutMinor)}', 'مستحقات سابقة لك: ${money(d.unpaidPayoutMinor)}')),
+              Text(context.t('Previous uncollected amounts: ${money(d.unpaidCollectionMinor)}', 'مستحقات سابقة عليك: ${money(d.unpaidCollectionMinor)}')),
+              const Divider(),
+              Text(context.t('Total net position: ${money(d.totalPositionMinor!)}', 'صافي الموقف المالي: ${money(d.totalPositionMinor!)}'),
+                style: TextStyle(fontWeight: FontWeight.w800, color: d.totalPositionMinor! < 0 ? Colors.red.shade700 : Colors.green.shade800)),
+              Text(context.t('Positive: Hatly owes you. Negative: you owe Hatly. Loans are separate.', 'الموجب: هاتلي تدين لك. السالب: أنت مدين لهاتلي. السلف منفصلة.'), style: const TextStyle(fontSize: 11)),
+            ]))),
           const SizedBox(height: 12),
           if (d.items.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 24),
-              child: Center(child: Text(context.t('No delivered orders in this shift yet.', 'لا توجد طلبات مُسلّمة في هذه الوردية بعد.'), key: const Key('earnings-current-empty'), style: const TextStyle(color: Color(0xFF6B6B6B)))),
+              child: Center(child: Text(context.t('No delivered orders awaiting financial closing.', 'لا توجد طلبات مُسلّمة بانتظار التقفيل.'), key: const Key('earnings-current-empty'), style: const TextStyle(color: Color(0xFF6B6B6B)))),
             ),
           for (final e in d.items)
             Card(

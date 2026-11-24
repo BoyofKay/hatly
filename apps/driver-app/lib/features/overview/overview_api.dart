@@ -94,9 +94,13 @@ class CurrentEarnings {
     required this.unsettledOrders,
     required this.items,
     required this.held,
+    this.unclosedMinutes = 0, this.readyToClose = 0, this.unresolvedOrders = 0,
+    this.unpaidPayoutMinor = 0, this.unpaidCollectionMinor = 0, this.previousUnpaidMinor = 0, this.totalPositionMinor,
   });
   final DateTime? shiftStartedAt;
   final int cashInPocketMinor, revenueMinor, loanMinor, allowanceMinor, balanceMinor, unsettledOrders;
+  final int unclosedMinutes, readyToClose, unresolvedOrders, unpaidPayoutMinor, unpaidCollectionMinor, previousUnpaidMinor;
+  final int? totalPositionMinor;
   final List<EarningRow> items;
   final List<String> held; // order numbers held back (cannot be settled yet)
 
@@ -110,6 +114,9 @@ class CurrentEarnings {
       allowanceMinor: _i(k['allowanceMinor']),
       balanceMinor: _i(k['balanceMinor']),
       unsettledOrders: _i(k['unsettledOrders']),
+      unclosedMinutes: _i(k['unclosedMinutes']), readyToClose: _i(k['readyToClose']), unresolvedOrders: _i(k['unresolvedOrders']),
+      unpaidPayoutMinor: _i(k['unpaidPayoutMinor']), unpaidCollectionMinor: _i(k['unpaidCollectionMinor']), previousUnpaidMinor: _i(k['previousUnpaidMinor']),
+      totalPositionMinor: (k['totalPositionMinor'] as num?)?.toInt(),
       items: (j['items'] as List)
           .map((e) => e as Map<String, dynamic>)
           .map((e) => EarningRow(
