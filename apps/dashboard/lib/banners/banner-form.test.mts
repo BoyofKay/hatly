@@ -86,15 +86,14 @@ test('image files: only JPEG/PNG/WebP, not empty, not over 5 MB', () => {
   assert.equal(checkImageFile({ type: 'image/jpeg', size: max }, allowed, max), null);
 });
 
-test('banner shape: the recommended 1200×600 and nearby wide sizes pass', () => {
-  for (const [w, h] of [[1200, 600], [1000, 450], [800, 400], [1600, 700]]) assert.equal(checkBannerShape(w, h), null, `${w}x${h}`);
+test('banner shape: square including the reported 1254×1254 and legacy landscape artwork pass', () => {
+  for (const [w, h] of [[1080, 1080], [1254, 1254], [1000, 1000], [1200, 600], [800, 400], [512, 512]]) assert.equal(checkBannerShape(w, h), null, `${w}x${h}`);
 });
 
-test('banner shape: too small, square, tall and extreme panoramas are refused with the actual size in the message', () => {
-  assert.match(checkBannerShape(400, 200)!, /400×200.*at least 800×320/);
-  assert.match(checkBannerShape(1000, 1000)!, /1000×1000.*2:1/);
-  assert.match(checkBannerShape(800, 1200)!, /2:1/);
-  assert.match(checkBannerShape(3000, 800)!, /2:1/);
+test('banner shape: tiny images fail the quality floor; aspect recommendations are advisory', () => {
+  assert.match(checkBannerShape(400, 200)!, /400×200.*at least 320×320/);
+  assert.equal(checkBannerShape(800, 1200), null);
+  assert.equal(checkBannerShape(3000, 800), null);
 });
 
 test('banner shape: an unreadable size is refused', () => {

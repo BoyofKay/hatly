@@ -36,14 +36,14 @@ function png(width: number, height: number): Buffer {
 
 /**
  * Home banners, end to end in a real browser against the real backend: create → image shape validation → upload + preview → publish →
- * unpublish → delete. The shape rule (wide ~2:1, at least 800×320) is enforced in the browser AND by the server.
+ * unpublish → delete. A 320×320 quality floor is enforced in the browser and server; square artwork is recommended.
  */
 test.describe('Admin — Home banners', () => {
   test.use({ storageState: SUPER_ADMIN_STORAGE_STATE });
 
   test('a banner goes draft → image (shape-checked) → published → unpublished → deleted', async ({ page }) => {
     await page.goto('/banners');
-    await expect(page.getByTestId('banners-rule')).toContainText('at least 800×320');
+    await expect(page.getByTestId('banners-rule')).toContainText('1080×1080');
 
     const title = `E2E banner ${Date.now()}`;
     await page.getByTestId('banner-new').click();
@@ -62,16 +62,16 @@ test.describe('Admin — Home banners', () => {
     await expect(row.getByTestId('banner-row-error')).toContainText('400×200');
     await expect(row.getByTestId('banner-no-image')).toBeVisible();
 
-    // Square → refused (not a wide banner).
+    // Tiny image → refused.
     await row.getByTestId('banner-image').click();
-    await page.getByTestId('banner-file').setInputFiles({ name: 'square.png', mimeType: 'image/png', buffer: png(1000, 1000) });
-    await expect(row.getByTestId('banner-row-error')).toContainText('about 2:1');
+    await page.getByTestId('banner-file').setInputFiles({ name: 'tiny.png', mimeType: 'image/png', buffer: png(100, 100) });
+    await expect(row.getByTestId('banner-row-error')).toContainText('at least 320×320');
 
-    // 1200×600 → stored, previewed.
+    // 1254×1254 → stored, previewed.
     await row.getByTestId('banner-image').click();
     const [upload] = await Promise.all([
       page.waitForResponse((r) => /\/admin\/home-banners\/.+\/image/.test(r.url()) && r.request().method() === 'POST'),
-      page.getByTestId('banner-file').setInputFiles({ name: 'wide.png', mimeType: 'image/png', buffer: png(1200, 600) }),
+      page.getByTestId('banner-file').setInputFiles({ name: 'square.png', mimeType: 'image/png', buffer: png(1254, 1254) }),
     ]);
     expect(upload.ok()).toBe(true);
     await expect(row.getByTestId('banner-thumb')).toBeVisible();

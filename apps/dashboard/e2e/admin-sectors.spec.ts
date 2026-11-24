@@ -52,3 +52,5 @@ test.describe('Admin — Sectors', () => {
     await expect(first).toBeDisabled();
   });
 });
+
+// Sector artwork is now managed together in the Assets panel.

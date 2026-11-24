@@ -63,9 +63,9 @@ describe('readImageDimensions', () => {
   });
 });
 
-describe('checkBannerDimensions — a banner is a wide image', () => {
-  it('accepts the recommended 1200×600 and nearby shapes in every format', () => {
-    for (const buffer of [pngOf(1200, 600), jpegOf(1200, 600), webpVp8x(1000, 450), webpLossy(900, 400)]) {
+describe('checkBannerDimensions — square artwork recommended', () => {
+  it('accepts recommended square, reported 1254×1254 and legacy artwork in every format', () => {
+    for (const buffer of [pngOf(1080, 1080), pngOf(1254, 1254), jpegOf(1200, 600), webpVp8x(1000, 1000), webpLossy(900, 400)]) {
       expect(checkBannerDimensions(buffer)).toMatchObject({ ok: true });
     }
   });
@@ -75,9 +75,9 @@ describe('checkBannerDimensions — a banner is a wide image', () => {
     expect(checkBannerDimensions(jpegOf(1200, 200))).toMatchObject({ ok: false, code: 'BANNER_IMAGE_TOO_SMALL' });
   });
 
-  it('refuses the wrong shape (square, tall, extreme panorama)', () => {
+  it('does not reject non-square artwork solely by ratio', () => {
     for (const buffer of [pngOf(1000, 1000), pngOf(800, 1200), jpegOf(3000, 800)]) {
-      expect(checkBannerDimensions(buffer)).toMatchObject({ ok: false, code: 'BANNER_IMAGE_WRONG_SHAPE' });
+      expect(checkBannerDimensions(buffer)).toMatchObject({ ok: true });
     }
   });
 

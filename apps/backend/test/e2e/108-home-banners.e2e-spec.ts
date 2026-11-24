@@ -20,8 +20,8 @@ describe('E2E — Home banners', () => {
   let product: { id: string };
   let sector: { id: string };
 
-  // A banner is a wide image (1200×600 recommended); the 1×1 pixel is kept for the shape-refusal test.
-  const png = pngOf(1200, 600);
+  // Square promotion artwork (1080×1080 recommended); the 1×1 pixel is kept for the shape-refusal test.
+  const png = pngOf(1080, 1080);
   const tinyPng = Buffer.from(PNG_1X1_BASE64, 'base64');
   const admin = (token = superAdmin.accessToken) => ({ token });
   const create = async (body: Record<string, unknown>, token = superAdmin.accessToken) => expectData<any>(await world.api('post', '/admin/home-banners', { token, body }), 201);
@@ -104,15 +104,17 @@ describe('E2E — Home banners', () => {
       await expect(world.ds.query('UPDATE home_banners SET is_active = true WHERE id = $1', [b.id])).rejects.toThrow(/chk_home_banners_active_has_image/);
     });
 
-    it('image SHAPE is validated: too small and not-wide images are refused with their own codes and the banner stays imageless', async () => {
+    it('image quality floor is enforced, square and legacy wide uploads are accepted', async () => {
       const b = await create({ title: 'Shape' });
       const small = await upload(b.id).attach('image', tinyPng, { filename: 'x.png', contentType: 'image/png' });
       expect(small.status).toBe(400);
       expect(small.body.error.details.code).toBe('BANNER_IMAGE_TOO_SMALL');
-      const square = await upload(b.id).attach('image', pngOf(1000, 1000), { filename: 'x.png', contentType: 'image/png' });
-      expect(square.status).toBe(400);
-      expect(square.body.error.details.code).toBe('BANNER_IMAGE_WRONG_SHAPE');
       expect(expectData<any>(await world.api('get', `/admin/home-banners/${b.id}`, { token: superAdmin.accessToken })).imageUrl).toBeNull();
+      for (const [w, h] of [[1080, 1080], [1254, 1254], [1200, 600]]) {
+        const accepted = await upload(b.id).attach('image', pngOf(w, h), { filename: 'x.png', contentType: 'image/png' });
+        expect(accepted.status).toBe(201);
+        expect(accepted.body.data.imageUrl).toBeTruthy();
+      }
     });
 
     it('image upload: JPEG/PNG/WebP only, 5 MB max, real image bytes, a file is required; the stored reference is the stable upload path', async () => {

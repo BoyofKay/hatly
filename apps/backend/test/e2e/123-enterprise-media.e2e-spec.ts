@@ -125,13 +125,13 @@ describe('E2E — Media platform', () => {
     expect(['MEDIA_TOO_MANY_PIXELS', 'MEDIA_TOO_LARGE_DIMENSIONS']).toContain(res.body.error.details.code);
   });
 
-  it('purpose rules: the banner needs ~2:1 (crop makes it fit), the logo is centre-cropped square, crop bounds are validated', async () => {
-    const banner = await img(1600, 1200); // 4:3 = 1.33 — outside the 1.6–2.6 banner rule
-    const bad = await upload(superAdmin, banner, { purpose: 'HOME_BANNER' });
-    expect(bad.body.error.details.code).toBe('MEDIA_BAD_ASPECT');
-    const cropped = await upload(superAdmin, banner, { purpose: 'HOME_BANNER', crop: JSON.stringify({ x: 0, y: 200, width: 1600, height: 800 }) });
+  it('purpose rules: square and legacy banner artwork accepted, optional crop, logo centre-cropped square', async () => {
+    const banner = await img(1600, 1200);
+    expect((await upload(superAdmin, await img(1254, 1254), { purpose: 'HOME_BANNER' })).status).toBe(201);
+    expect((await upload(superAdmin, banner, { purpose: 'HOME_BANNER' })).status).toBe(201);
+    const cropped = await upload(superAdmin, banner, { purpose: 'HOME_BANNER', crop: JSON.stringify({ x: 100, y: 0, width: 1200, height: 1200 }) });
     expect(cropped.status).toBe(201);
-    expect(cropped.body.data.width / cropped.body.data.height).toBeCloseTo(2, 1);
+    expect(cropped.body.data.width / cropped.body.data.height).toBeCloseTo(1, 1);
     expect((await upload(superAdmin, banner, { purpose: 'HOME_BANNER', crop: JSON.stringify({ x: 0, y: 900, width: 1600, height: 800 }) })).body.error.details.code).toBe('MEDIA_BAD_CROP');
 
     const logo = await upload(superAdmin, await img(900, 500), { purpose: 'VENDOR_LOGO' });
