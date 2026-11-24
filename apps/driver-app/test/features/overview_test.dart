@@ -95,7 +95,7 @@ void main() {
     await tester.tap(find.byKey(const Key('orders-tab-previous')));
     await tester.pumpAndSettle();
     expect(find.text('HT-090'), findsOneWidget);
-    expect(find.text('21/11 – 27/11'), findsOneWidget);
+    expect(find.textContaining('21/11 – 27/11'), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
   });
 
@@ -113,8 +113,12 @@ void main() {
   testWidgets('Earnings: current shift KPIs (allowance, balance, unsettled) and an expandable order; previous closings', (tester) async {
     final api = _Api();
     await _pump(tester, api, const EarningsTabsScreen());
+    expect(find.text('500.00 EGP'), findsNothing); // collapsed by default
+    expect(find.text('Current wallet balance'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('earnings-kpi-toggle')));
+    await tester.pumpAndSettle();
     expect(find.text('500.00 EGP'), findsOneWidget); // daily allowance
-    expect(find.text('470.00 EGP'), findsOneWidget); // balance — he hands it over
+    expect(find.text('470.00 EGP'), findsWidgets); // balance — he hands it over
     expect(find.text('Balance — you hand over'), findsOneWidget);
     expect(find.text('3'), findsOneWidget); // unsettled orders
     expect(find.byKey(const Key('mb-fee')), findsNothing);
