@@ -245,7 +245,7 @@ export class SettlementClosingService {
     return createHash('sha256').update(ids.map((x) => `${x.id}:${x.net}`).sort().join('|')).digest('hex').slice(0, 32);
   }
 
-  async courierPreview(driverId: string, m: EntityManager = this.ds.manager) {
+  async courierPreview(driverId: string, m: EntityManager = this.ds.manager, cutoff = new Date()) {
     assertUuid(driverId, 'Courier');
     const [driver] = await m.query(`SELECT d.id, d.user_id, u.full_name, u.phone, d.commission_rate_basis_points FROM drivers d JOIN users u ON u.id = d.user_id WHERE d.id = $1 AND d.deleted_at IS NULL`, [driverId]);
     if (!driver) throw notFound('Courier');
@@ -262,15 +262,16 @@ export class SettlementClosingService {
     const [prev] = await m.query(`SELECT period_end, reference FROM driver_settlement_periods WHERE driver_id = $1 AND status = 'CLOSED' AND deleted_at IS NULL ORDER BY period_end DESC LIMIT 1`, [driverId]);
     const { lines, unresolved } = await this.courierFacts(m, driverId);
     const totals = courierTotals(lines);
-    // Driver shifts (2026-11-22): the shifts this closing covers (not linked to a closing yet), with their length — the open one is ended by it.
-    const shiftRows: Array<{ id: string; started_at: Date; ended_at: Date | null }> = await m
-      .query(`SELECT id, started_at, ended_at FROM driver_shifts WHERE driver_id = $1 AND closing_period_id IS NULL ORDER BY started_at`, [driverId])
-      .catch(() => []);
-    const shifts = shiftRows.map((r) => ({
-      id: r.id,
-      startedAt: iso(r.started_at),
-      endedAt: r.ended_at ? iso(r.ended_at) : null,
-      minutes: Math.max(0, Math.round(((r.ended_at ? new Date(r.ended_at) : new Date()).getTime() - new Date(r.started_at).getTime()) / 60_000)),
+    // Reconcile only the unallocated part of each shift up to this cutoff.
+    const shiftRows: Array<{ id: string; started_at: Date; ended_at: Date | null; slice_start: Date; slice_end: Date }> = await m.query(
+      `SELECT sh.id, sh.started_at, sh.ended_at,
+          coalesce((SELECT max(i.to_at) FROM driver_shift_reconciliations i WHERE i.shift_id = sh.id), sh.started_at) AS slice_start,
+          least(coalesce(sh.ended_at, $2::timestamptz), $2::timestamptz) AS slice_end
+        FROM driver_shifts sh WHERE sh.driver_id = $1 ORDER BY sh.started_at`, [driverId, cutoff.toISOString()]);
+    const shifts = shiftRows.filter(r => new Date(r.slice_end) > new Date(r.slice_start)).map(r => ({
+      id: r.id, startedAt: iso(r.started_at), endedAt: iso(r.ended_at),
+      reconciledFrom: iso(r.slice_start)!, reconciledTo: iso(r.slice_end)!,
+      minutes: Math.max(0, Math.floor((new Date(r.slice_end).getTime() - new Date(r.slice_start).getTime()) / 60_000)),
     }));
     // Daily driver allowance (2026-11-23): cash he holds for paying stores, returned with this closing (its own ledger).
     const allowanceOutMinor = await DriverAllowanceService.outstandingMinor(m, driverId);
@@ -297,14 +298,15 @@ export class SettlementClosingService {
     try {
       return await this.ds.transaction(async (m) => {
         await m.query(`SELECT pg_advisory_xact_lock(hashtext('driver-settlement:' || $1))`, [driverId]);
-        const preview = await this.courierPreview(driverId, m);
+        await m.query('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', [driverId]);
+        const now = new Date();
+        const preview = await this.courierPreview(driverId, m, now);
         if (opts.previewToken && opts.previewToken !== preview.previewToken) {
           throw new ConflictException({ message: 'The orders to settle changed since your preview (they may have just been settled by another closing). Review the new preview and confirm again.', details: { code: 'PREVIEW_CHANGED' } });
         }
-        if (preview.lines.length === 0) throw new BadRequestException({ message: 'No delivered orders to settle since the last closing.', details: { code: 'NOTHING_TO_CLOSE' } });
-        const now = new Date();
+        if (preview.lines.length === 0 && preview.shifts.length === 0) throw new BadRequestException({ message: 'No delivered orders or working time to reconcile.', details: { code: 'NOTHING_TO_CLOSE' } });
         const firstDelivered = preview.lines.map((l) => l.deliveredAt).filter(Boolean).sort()[0];
-        const periodStart = preview.previousClosing?.periodEnd ?? firstDelivered ?? now.toISOString();
+        const periodStart = preview.previousClosing?.periodEnd ?? firstDelivered ?? preview.shifts[0]?.reconciledFrom ?? now.toISOString();
         const start = new Date(periodStart) < now ? periodStart : new Date(now.getTime() - 1).toISOString();
         const t = preview.totals;
         // total_earnings_minor = fee entitlement (as before); total_reimbursements_owed_minor = goods Hatly owes back (R26) — never COD pass-through.
@@ -330,15 +332,15 @@ export class SettlementClosingService {
             [...head, ...COURIER_MONEY_COLUMNS.map(([k]) => l[k])],
           );
         }
-        // Driver shifts (2026-11-22): the closing ends an open shift (the driver is off duty after it) and links every shift it covers.
-        await m.query(
-          `UPDATE driver_shifts SET ended_at = now(), ended_by = 'CLOSING', ended_by_user_id = $2, updated_at = now() WHERE driver_id = $1 AND ended_at IS NULL`,
-          [driverId, actorUserId],
-        );
-        await m.query(`UPDATE driver_shifts SET closing_period_id = $2, updated_at = now() WHERE driver_id = $1 AND closing_period_id IS NULL`, [driverId, p.id]);
-        await m.query(`UPDATE drivers SET is_online = false, accepting_new_orders = true, online_changed_at = now() WHERE id = $1 AND is_online`, [driverId]);
-        // Daily driver allowance: handed back with this closing.
-        const allowanceReturnedMinor = await DriverAllowanceService.returnWithClosing(m, driverId, p.id, actorUserId);
+        // Financial reconciliation never changes the operational shift or online state.
+        for (const sh of preview.shifts) {
+          await m.query(`INSERT INTO driver_shift_reconciliations (shift_id, period_id, from_at, to_at, reconciled_by_user_id) VALUES ($1,$2,$3,$4,$5)`,
+            [sh.id, p.id, sh.reconciledFrom, sh.reconciledTo, actorUserId]);
+        }
+        // Preserve the existing office allowance-return procedure for money closings.
+        // A time-only reconciliation does not represent physical cash movement.
+        const allowanceReturnedMinor = preview.lines.length > 0
+          ? await DriverAllowanceService.returnWithClosing(m, driverId, p.id, actorUserId) : 0;
         const { previewToken: _t, ...rest } = preview;
         return {
           ...rest,

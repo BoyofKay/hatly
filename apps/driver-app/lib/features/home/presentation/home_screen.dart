@@ -45,6 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   void _startPolling() {
     ref.read(driverPollingServiceProvider).start(() async {
       ref.invalidate(deliveriesProvider);
+      ref.invalidate(shiftStateProvider);
       await ref.read(deliveriesProvider.future);
     });
   }
@@ -54,6 +55,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     switch (state) {
       case AppLifecycleState.resumed:
         _startPolling();
+        ref.invalidate(shiftStateProvider);
         ref.read(driverOnlineStateProvider.notifier).syncFromServer();
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:

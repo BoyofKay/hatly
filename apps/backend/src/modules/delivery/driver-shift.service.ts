@@ -23,7 +23,7 @@ export interface ShiftState {
   shift: ShiftView | null;
   /** Can the driver end the shift themselves right now, and if not, why (shown in the app). */
   canEnd: { ok: boolean; reason: 'HAS_ACTIVE_ORDERS' | 'NOT_SETTLED' | 'ALLOWANCE_OUT' | 'NO_OPEN_SHIFT' | null; activeOrders: number; unsettledOrders: number };
-  /** Daily driver allowance he holds (cash for paying stores) — must be returned before the shift ends. */
+  /** Daily driver allowance he holds (cash for paying stores) — independent of shift closure. */
   allowanceOutMinor: number;
   longShift: boolean;
 }
@@ -40,11 +40,9 @@ const view = (r: any): ShiftView => ({
 /**
  * Driver shifts (owner decision 2026-11-22) — "Start shift / End shift" (on duty / off duty, في الخدمة / خارج الخدمة):
  *  - Start: opens a shift (one at a time), puts the driver on duty and taking new orders.
- *  - End (by the driver): only with NO order with them (active or pre-assigned) AND nothing to settle (no delivered order waiting for a
- *    closing: no cash in hand, nothing owed either way). Otherwise the shift is ended at the office by the courier closing.
- *    Loans are not part of this rule — they are repaid at closings.
+ *  - End (by the driver): only with no active responsibility. Financial liabilities carry forward independently.
  *  - "Stop new orders": the driver keeps their shift and current orders but receives nothing new (so they can finish and end).
- *  - The courier closing ends an open shift and links every shift it covers (SettlementClosingService).
+ *  - Financial closing does not end shifts.
  *  - A supervisor can force-end a shift (lost phone, left without closing).
  * The old online switch (older driver apps) still works: switching online opens a shift if none is open.
  */
@@ -73,14 +71,10 @@ export class DriverShiftService {
       ? 'NO_OPEN_SHIFT'
       : activeOrders > 0
         ? 'HAS_ACTIVE_ORDERS'
-        : unsettledOrders > 0
-          ? 'NOT_SETTLED'
-          : allowanceOutMinor > 0
-            ? 'ALLOWANCE_OUT'
-            : null;
+        : null;
     return {
-      onDuty: Boolean(shift) && d.is_online === true,
-      acceptingNewOrders: d.accepting_new_orders !== false,
+      onDuty: Boolean(shift),
+      acceptingNewOrders: Boolean(shift) && d.is_online === true && d.accepting_new_orders !== false,
       shift,
       canEnd: { ok: reason === null, reason, activeOrders, unsettledOrders },
       allowanceOutMinor,
@@ -101,6 +95,7 @@ export class DriverShiftService {
   /** Opens a shift if none is open, and puts the driver on duty (also used by the older apps' online switch). */
   async openShift(driverId: string): Promise<void> {
     await this.ds.transaction(async (m) => {
+      await m.query('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', [driverId]);
       await m.query(`INSERT INTO driver_shifts (driver_id) VALUES ($1) ON CONFLICT DO NOTHING`, [driverId]);
       await m.query(
         `UPDATE drivers SET is_online = true, accepting_new_orders = true, online_changed_at = CASE WHEN is_online THEN online_changed_at ELSE now() END WHERE id = $1`,
@@ -110,29 +105,9 @@ export class DriverShiftService {
     });
   }
 
-  /** End shift by the driver: refused while an order is with them or something is still to settle. */
+  /** End shift by the driver: refused only while an active order is with them. */
   async end(userId: string): Promise<ShiftState> {
     const driver = await this.driverAuthorizationService.getDriverForUser(userId);
-    const s = await this.state(driver.id);
-    if (!s.shift) throw new ConflictException({ message: 'You have no open shift.', details: { code: 'NO_OPEN_SHIFT' } });
-    if (s.canEnd.reason === 'HAS_ACTIVE_ORDERS') {
-      throw new ConflictException({
-        message: `You still have ${s.canEnd.activeOrders} order(s). Finish them first — switch off "new orders" so no more come.`,
-        details: { code: 'SHIFT_HAS_ACTIVE_ORDERS', activeOrders: s.canEnd.activeOrders },
-      });
-    }
-    if (s.canEnd.reason === 'NOT_SETTLED') {
-      throw new ConflictException({
-        message: `You have ${s.canEnd.unsettledOrders} delivered order(s) not settled yet. End your shift at the office with the shift closing.`,
-        details: { code: 'SHIFT_NOT_SETTLED', unsettledOrders: s.canEnd.unsettledOrders },
-      });
-    }
-    if (s.canEnd.reason === 'ALLOWANCE_OUT') {
-      throw new ConflictException({
-        message: `You still hold the daily allowance (${(s.allowanceOutMinor / 100).toFixed(2)} EGP). Return it at the office to end your shift.`,
-        details: { code: 'SHIFT_ALLOWANCE_OUT', allowanceOutMinor: s.allowanceOutMinor },
-      });
-    }
     await this.closeShift(driver.id, 'DRIVER', userId);
     return this.state(driver.id);
   }
@@ -160,6 +135,18 @@ export class DriverShiftService {
 
   private async closeShift(driverId: string, by: 'DRIVER' | 'SUPERVISOR', actorUserId: string): Promise<void> {
     await this.ds.transaction(async (m) => {
+      // Assignment paths lock the driver row too. Recheck under that lock,
+      // rather than trusting an earlier UI preview.
+      await m.query('SELECT id FROM drivers WHERE id = $1 FOR UPDATE', [driverId]);
+      const [open] = await m.query('SELECT id FROM driver_shifts WHERE driver_id = $1 AND ended_at IS NULL', [driverId]);
+      if (!open) throw new ConflictException({ message: 'No open shift.', details: { code: 'NO_OPEN_SHIFT' } });
+      if (by === 'DRIVER') {
+        const [r] = await m.query(`SELECT count(*)::int AS n FROM deliveries x JOIN orders o ON o.id = x.order_id WHERE x.driver_id = $1 AND x.deleted_at IS NULL AND ${ACTIVE_DELIVERY_CONDITION('x', 'o')}`, [driverId]);
+        if (Number(r?.n ?? 0) > 0) throw new ConflictException({
+          message: 'Finish or hand over active orders before ending your shift.',
+          details: { code: 'SHIFT_HAS_ACTIVE_ORDERS', activeOrders: Number(r.n) },
+        });
+      }
       await m.query(`UPDATE driver_shifts SET ended_at = now(), ended_by = $2, ended_by_user_id = $3, updated_at = now() WHERE driver_id = $1 AND ended_at IS NULL`, [driverId, by, actorUserId]);
       await m.query(`UPDATE drivers SET is_online = false, online_changed_at = now(), accepting_new_orders = true WHERE id = $1`, [driverId]);
     });
@@ -175,7 +162,7 @@ export class DriverShiftService {
 
   /**
    * Delivered orders not settled yet — those the next closing would settle AND those it cannot settle yet (e.g. no commission rate set):
-   * either way the driver may hold cash or be owed money, so only the office closing may end the shift. Same facts as the admin closing.
+   * informational only; not a shift-ending restriction.
    */
   private async unsettledOrders(driverId: string): Promise<number> {
     const preview = await this.settlementClosingService.courierPreview(driverId);

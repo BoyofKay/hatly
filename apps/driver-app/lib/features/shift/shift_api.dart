@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/api_client.dart';
@@ -107,5 +108,9 @@ class ShiftApi {
 final shiftApiProvider =
     Provider<ShiftApi>((ref) => ShiftApi(ref.watch(apiClientProvider)));
 
-final shiftStateProvider = FutureProvider.autoDispose<ShiftState?>(
-    (ref) => ref.watch(shiftApiProvider).getShift());
+final shiftStateProvider = FutureProvider.autoDispose<ShiftState?>((ref) async {
+  final api = ref.watch(shiftApiProvider);
+  final timer = Timer(const Duration(seconds: 30), ref.invalidateSelf);
+  ref.onDispose(timer.cancel);
+  return api.getShift();
+});

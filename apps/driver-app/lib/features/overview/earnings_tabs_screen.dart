@@ -34,7 +34,7 @@ class _EarningsTabsScreenState extends ConsumerState<EarningsTabsScreen> {
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
           bottom: TabBar(tabs: [
-            Tab(key: const Key('earnings-tab-current'), text: context.t('Current shift', 'الوردية الحالية')),
+            Tab(key: const Key('earnings-tab-current'), text: context.t('Current balance', 'الرصيد الحالي')),
             Tab(key: const Key('earnings-tab-previous'), text: context.t('Previous', 'السابق')),
           ]),
         ),

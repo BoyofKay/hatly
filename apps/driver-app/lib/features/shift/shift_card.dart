@@ -58,7 +58,7 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
       await op();
       // The location timer follows the duty state (the existing online notifier starts / stops it).
       if (goOnline != null)
-        await ref.read(driverOnlineStateProvider.notifier).setOnline(goOnline);
+        await ref.read(driverOnlineStateProvider.notifier).syncFromServer();
       ref.invalidate(shiftStateProvider);
     } on ShiftRefused catch (e) {
       if (mounted)
@@ -73,18 +73,20 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
   Widget build(BuildContext context) {
     final s = widget.state;
     final api = ref.read(shiftApiProvider);
-    final green = const Color(0xFF2E7D32);
+    final minutes = elapsedShiftMinutes(s);
+    final green = shiftWarningColor(minutes);
+    final dutyBackground = minutes >= 1080 ? const Color(0xFFFDE8E8) : minutes >= 840 ? const Color(0xFFFFF3D9) : const Color(0xFFE8F5E9);
     // A Material (not a decorated box) so the switch row's tap ink shows on the coloured card.
     return Padding(
       key: const Key('shift-card'),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Material(
-        color: s.onDuty ? const Color(0xFFE8F5E9) : Colors.white,
+        color: s.onDuty ? dutyBackground : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
               color:
-                  s.onDuty ? const Color(0xFF81C784) : const Color(0xFFE0E0E0)),
+                  s.onDuty ? green : const Color(0xFFE0E0E0)),
         ),
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -104,6 +106,10 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
                     key: const Key('shift-card-chevron'), color: green),
                 ])),
               ),
+              if (s.onDuty && minutes >= 840)
+                Text(context.t(minutes >= 1080 ? 'Unusually long shift' : 'Extended shift — please review',
+                  minutes >= 1080 ? 'وردية طويلة بشكل غير معتاد' : 'وردية ممتدة — يرجى المراجعة'),
+                  style: TextStyle(color: green, fontWeight: FontWeight.w600)),
               if (s.allowanceOutMinor > 0 && (!s.onDuty || _expanded))
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -112,8 +118,8 @@ class _ShiftCardState extends ConsumerState<ShiftCard> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        context.t('Daily allowance with you: ${formatMinor(s.allowanceOutMinor)} — return it at the end of the shift',
-                            'العهدة اليومية معك: ${formatMinor(s.allowanceOutMinor, arabic: true)} — تُرد في نهاية الوردية'),
+                        context.t('Daily allowance with you: ${formatMinor(s.allowanceOutMinor)} — remains outstanding until reconciled',
+                            'العهدة اليومية معك: ${formatMinor(s.allowanceOutMinor, arabic: true)} — تظل مستحقة حتى التسوية'),
                         key: const Key('shift-allowance'),
                         style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF8D6E00)),
                       ),

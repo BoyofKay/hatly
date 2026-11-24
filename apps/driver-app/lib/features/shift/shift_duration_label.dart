@@ -40,23 +40,29 @@ class _ShiftDurationLabelState extends ConsumerState<ShiftDurationLabel> {
     // Prefer server-computed elapsed shift minutes. Local device clock skew must
     // not inflate the current-shift duration; the device only advances the
     // server duration from its own read timestamp.
-    final minuteAtRead = shift.serverElapsedMinutes;
-    final passed = shift.readAt == null ? 0 : DateTime.now().difference(shift.readAt!).inMinutes.clamp(0, 10000000);
-    final minutes = (minuteAtRead == null
-      ? DateTime.now().difference(shift.startedAt!).inMinutes
-      : minuteAtRead + passed).clamp(0, 10000000);
+    final minutes = elapsedShiftMinutes(shift);
+    final color = shiftWarningColor(minutes);
     final hours = minutes ~/ 60;
     final mins = minutes % 60;
     final since = shift.startedAt!.toLocal();
     final sinceText = '${since.day.toString().padLeft(2, '0')}/${since.month.toString().padLeft(2, '0')}/${(since.year % 100).toString().padLeft(2, '0')} ${since.hour.toString().padLeft(2, '0')}:${since.minute.toString().padLeft(2, '0')}';
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      const Icon(Icons.schedule_outlined, size: 16, color: Color(0xFF1B5E20)),
+      Icon(minutes >= 840 ? Icons.warning_amber_rounded : Icons.schedule_outlined, size: 16, color: color),
       const SizedBox(width: 5),
       Flexible(child: FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart,
         child: Text(widget.compact ? context.t('${hours}h ${mins}m', '${hours}س ${mins}د') : context.t('Since $sinceText · ${hours}h ${mins}m',
           'منذ $sinceText · ${hours}س ${mins}د'),
           key: const Key('shift-duration'), maxLines: 1,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1B5E20), decoration: TextDecoration.none)))),
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color, decoration: TextDecoration.none)))),
     ]);
   }
 }
+
+int elapsedShiftMinutes(ShiftState shift, {DateTime? now}) {
+  final at = now ?? DateTime.now();
+  final base = shift.serverElapsedMinutes;
+  final passed = shift.readAt == null ? 0 : at.difference(shift.readAt!).inMinutes.clamp(0, 10000000);
+  return (base == null ? (shift.startedAt == null ? 0 : at.difference(shift.startedAt!).inMinutes) : base + passed).clamp(0, 10000000).toInt();
+}
+Color shiftWarningColor(int minutes) => minutes >= 1080 ? const Color(0xFFB52A2A)
+    : minutes >= 840 ? const Color(0xFF9B650A) : const Color(0xFF1B5E20);
