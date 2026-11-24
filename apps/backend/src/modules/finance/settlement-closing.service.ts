@@ -304,9 +304,10 @@ export class SettlementClosingService {
         if (opts.previewToken && opts.previewToken !== preview.previewToken) {
           throw new ConflictException({ message: 'The orders to settle changed since your preview (they may have just been settled by another closing). Review the new preview and confirm again.', details: { code: 'PREVIEW_CHANGED' } });
         }
-        if (preview.lines.length === 0 && preview.shifts.length === 0) throw new BadRequestException({ message: 'No delivered orders or working time to reconcile.', details: { code: 'NOTHING_TO_CLOSE' } });
+        const slices = preview.lines.length > 0 ? preview.shifts : preview.shifts.filter(sh => sh.endedAt !== null);
+        if (preview.lines.length === 0 && slices.length === 0) throw new BadRequestException({ message: 'No delivered orders or working time to reconcile.', details: { code: 'NOTHING_TO_CLOSE' } });
         const firstDelivered = preview.lines.map((l) => l.deliveredAt).filter(Boolean).sort()[0];
-        const periodStart = preview.previousClosing?.periodEnd ?? firstDelivered ?? preview.shifts[0]?.reconciledFrom ?? now.toISOString();
+        const periodStart = preview.previousClosing?.periodEnd ?? firstDelivered ?? slices[0]?.reconciledFrom ?? now.toISOString();
         const start = new Date(periodStart) < now ? periodStart : new Date(now.getTime() - 1).toISOString();
         const t = preview.totals;
         // total_earnings_minor = fee entitlement (as before); total_reimbursements_owed_minor = goods Hatly owes back (R26) — never COD pass-through.
@@ -333,7 +334,7 @@ export class SettlementClosingService {
           );
         }
         // Financial reconciliation never changes the operational shift or online state.
-        for (const sh of preview.shifts) {
+        for (const sh of slices) {
           await m.query(`INSERT INTO driver_shift_reconciliations (shift_id, period_id, from_at, to_at, reconciled_by_user_id) VALUES ($1,$2,$3,$4,$5)`,
             [sh.id, p.id, sh.reconciledFrom, sh.reconciledTo, actorUserId]);
         }
@@ -344,6 +345,7 @@ export class SettlementClosingService {
         const { previewToken: _t, ...rest } = preview;
         return {
           ...rest,
+          shifts: slices,
           id: p.id, reference: p.reference, status: p.status, frequency: p.frequency, methodVersion: 2,
           periodStart: iso(p.period_start), periodEnd: iso(p.period_end), closedAt: iso(p.closed_at), closedByUserId: p.closed_by_user_id,
           totalEarningsMinor: num(p.total_earnings_minor), totalCommissionOwedMinor: num(p.total_commission_owed_minor),

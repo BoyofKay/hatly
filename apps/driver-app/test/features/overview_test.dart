@@ -80,34 +80,36 @@ Future<void> _pump(WidgetTester tester, _Api api, Widget screen) async {
 }
 
 void main() {
-  testWidgets('Orders: Today with KPIs and rows; Previous shows the week and its own figures; search reaches the server', (tester) async {
+  testWidgets('Current shift quick filters and search; History has concluded shifts only', (tester) async {
     final api = _Api();
-    await _pump(tester, api, const OrdersScreen());
+    await _pump(tester, api, ShiftOrdersList(tab: 'today', onUnavailable: () {}));
     expect(find.text('HT-100'), findsOneWidget);
-    expect(find.text('3 / 1 · 75%'), findsOneWidget);
+    expect(find.text('3 / 1 · 75%'), findsNothing);
     expect(find.text('25.00 EGP'), findsOneWidget);
-
     await tester.enterText(find.byKey(const Key('orders-search-today')), 'tarw');
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
     expect(api.calls, contains('orders:today:-:tarw'));
-
-    await tester.tap(find.byKey(const Key('orders-tab-previous')));
+    await tester.pumpWidget(const SizedBox());
     await tester.pumpAndSettle();
+    await _pump(tester, api, const OrdersScreen());
     expect(find.text('HT-090'), findsOneWidget);
     expect(find.textContaining('21/11 – 27/11'), findsOneWidget);
     expect(find.text('12'), findsOneWidget);
+    expect(find.byKey(const Key('orders-tab-today')), findsNothing);
   });
 
-  testWidgets('Orders: the status filter is sent to the server', (tester) async {
+  testWidgets('Current shift: status filter reaches the server', (tester) async {
     final api = _Api();
-    await _pump(tester, api, const OrdersScreen());
+    await _pump(tester, api, ShiftOrdersList(tab: 'today', onUnavailable: () {}));
     await tester.tap(find.byKey(const Key('orders-filter-today')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('orders-status-cancelled')));
     await tester.tap(find.byKey(const Key('orders-filter-apply')));
     await tester.pumpAndSettle();
     expect(api.calls.last, 'orders:today:cancelled:');
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
   });
 
   testWidgets('Earnings: current shift KPIs (allowance, balance, unsettled) and an expandable order; previous closings', (tester) async {

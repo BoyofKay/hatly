@@ -14,19 +14,28 @@ class ShiftDurationLabel extends ConsumerStatefulWidget {
   ConsumerState<ShiftDurationLabel> createState() => _ShiftDurationLabelState();
 }
 
-class _ShiftDurationLabelState extends ConsumerState<ShiftDurationLabel> {
+class _ShiftDurationLabelState extends ConsumerState<ShiftDurationLabel> with WidgetsBindingObserver {
   Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
-    _ticker = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) setState(() {});
+    WidgetsBinding.instance.addObserver(this);
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      if (widget.compact) ref.invalidate(shiftStateProvider);
+      setState(() {});
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (mounted && widget.compact && state == AppLifecycleState.resumed) ref.invalidate(shiftStateProvider);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
     super.dispose();
   }

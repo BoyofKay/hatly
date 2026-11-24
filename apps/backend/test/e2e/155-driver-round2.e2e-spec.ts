@@ -85,7 +85,7 @@ describe('E2E — driver app round 2', () => {
     const [{ order_number }] = await world.ds.query(`SELECT order_number FROM orders WHERE id = $1`, [order.id]);
     let today = expectData<any>(await call('get', d.accessToken, '/driver/orders/overview?tab=today'));
     expect(today.items.map((i: any) => i.orderNumber)).toContain(order_number);
-    expect(today.kpis).toMatchObject({ completed: 1, cancelled: 0, ignored: 1, accepted: 1, acceptanceRatePercent: 50 });
+    expect(today.kpis).toMatchObject({ all: 1, completed: 1, cancelled: 0, failed: 0, ignored: 0, accepted: 0, acceptanceRatePercent: null });
     const hit = today.items.find((i: any) => i.orderNumber === order_number);
     expect(hit).toMatchObject({ status: 'DELIVERED', settlementState: 'PENDING', vendors: 'Round Two Grill' });
     expect(hit.earnedMinor).toEqual(expect.any(Number));
@@ -106,6 +106,9 @@ describe('E2E — driver app round 2', () => {
     // the closing moves everything to Previous
     const preview = expectData<any>(await call('get', sa.accessToken, `/admin/settlement/drivers/${d.driverId}/close-preview`));
     const closed = expectData<any>(await call('post', sa.accessToken, `/admin/settlement/drivers/${d.driverId}/close`, { previewToken: preview.previewToken }), 201);
+    today = expectData<any>(await call('get', d.accessToken, '/driver/orders/overview?tab=today'));
+    expect(today.total).toBe(1);
+    expectData(await call('post', d.accessToken, '/driver/shift/end'), 201);
     today = expectData<any>(await call('get', d.accessToken, '/driver/orders/overview?tab=today'));
     expect(today.total).toBe(0);
     const prev = expectData<any>(await call('get', d.accessToken, '/driver/orders/overview?tab=previous'));

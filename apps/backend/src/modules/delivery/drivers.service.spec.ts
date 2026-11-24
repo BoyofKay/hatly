@@ -154,7 +154,7 @@ describe('DriversService.setVerificationStatus (Driver Core + Dispatch Foundatio
   }
 
   it('moves a PENDING driver to APPROVED — the previously-missing writer DriverRankingService requires', async () => {
-    const { service, driverRows } = buildVerificationHarness({ id: 'driver-1', verificationStatus: 'PENDING' });
+    const { service, driverRows } = buildVerificationHarness({ id: 'driver-1', verificationStatus: 'PENDING', commissionRateBasisPoints: 0 });
 
     const result = await service.setVerificationStatus('driver-1', 'APPROVED');
 
@@ -163,12 +163,18 @@ describe('DriversService.setVerificationStatus (Driver Core + Dispatch Foundatio
   });
 
   it('writes ONLY verification_status (never a whole-row save that could resurrect a stale is_available)', async () => {
-    const { service, driversRepository } = buildVerificationHarness({ id: 'driver-1', verificationStatus: 'PENDING', isAvailable: true });
+    const { service, driversRepository } = buildVerificationHarness({ id: 'driver-1', verificationStatus: 'PENDING', isAvailable: true, commissionRateBasisPoints: 1000 });
 
     await service.setVerificationStatus('driver-1', 'APPROVED');
 
     expect(driversRepository.update).toHaveBeenCalledWith({ id: 'driver-1' }, { verificationStatus: 'APPROVED' });
     expect(driversRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('refuses approval without an explicit commission rate', async () => {
+    const { service, driversRepository } = buildVerificationHarness({ id: 'driver-1', verificationStatus: 'PENDING', commissionRateBasisPoints: null });
+    await expect(service.setVerificationStatus('driver-1', 'APPROVED')).rejects.toMatchObject({ response: { details: { code: 'DRIVER_COMMISSION_REQUIRED' } } });
+    expect(driversRepository.update).not.toHaveBeenCalled();
   });
 
   it('can also REJECT a driver', async () => {
@@ -180,7 +186,7 @@ describe('DriversService.setVerificationStatus (Driver Core + Dispatch Foundatio
   });
 
   it('is idempotent: setting the same status twice leaves the driver in that one state, no error', async () => {
-    const { service } = buildVerificationHarness({ id: 'driver-1', verificationStatus: 'APPROVED' });
+    const { service } = buildVerificationHarness({ id: 'driver-1', verificationStatus: 'APPROVED', commissionRateBasisPoints: 0 });
 
     await expect(service.setVerificationStatus('driver-1', 'APPROVED')).resolves.toMatchObject({
       verificationStatus: 'APPROVED',

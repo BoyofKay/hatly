@@ -57,7 +57,7 @@ describe('E2E — driver shifts', () => {
     expect(row.ended_by).toBe('DRIVER');
   });
 
-  it('end is refused while carrying an order and while a delivery is unsettled; the closing ends and links the shift; "stop new orders" receives nothing', async () => {
+  it('end is refused while carrying an order; financial closing does not end the shift; "stop new orders" receives nothing', async () => {
     const d = await s.driver({ ...near });
     await world.ds.query(`UPDATE drivers SET commission_rate_basis_points = 1000 WHERE id = $1`, [d.driverId]); // a real driver has a commission rate
     expectData(await call('post', d.accessToken, '/driver/shift/start'), 201);
@@ -81,22 +81,24 @@ describe('E2E — driver shifts', () => {
     for (const status of ['PICKED_UP', 'ON_THE_WAY']) expectData(await call('patch', d.accessToken, `/driver/deliveries/${delivery.id}/status`, { status }));
     expectData(await call('patch', d.accessToken, `/driver/deliveries/${delivery.id}/status`, { status: 'DELIVERED', proofPhotoUrl: await s.uploadFakePhoto(d.accessToken), recipientName: 'Customer' }));
 
-    const unsettled = await call('post', d.accessToken, '/driver/shift/end');
-    expect(unsettled.status).toBe(409);
-    expect(code(unsettled)).toBe('SHIFT_NOT_SETTLED');
+    const eligible = expectData<any>(await call('get', d.accessToken, '/driver/shift'));
+    expect(eligible.canEnd.ok).toBe(true);
+    expect(eligible.canEnd.unsettledOrders).toBeGreaterThan(0);
 
     const preview = expectData<any>(await call('get', sa.accessToken, `/admin/settlement/drivers/${d.driverId}/close-preview`));
     expect(preview.shifts).toHaveLength(1);
     expect(preview.shifts[0].endedAt).toBeNull();
     const closed = expectData<any>(await call('post', sa.accessToken, `/admin/settlement/drivers/${d.driverId}/close`, { previewToken: preview.previewToken }), 201);
     const [shift] = await world.ds.query(`SELECT ended_by, closing_period_id FROM driver_shifts WHERE driver_id = $1`, [d.driverId]);
-    expect(shift.ended_by).toBe('CLOSING');
-    expect(shift.closing_period_id).toBe(closed.id);
+    expect(shift.ended_by).toBeNull();
+    const intervals = await world.ds.query('SELECT * FROM driver_shift_reconciliations WHERE period_id = $1', [closed.id]);
+    expect(intervals).toHaveLength(1);
     const state = expectData<any>(await call('get', d.accessToken, '/driver/shift'));
-    expect(state.onDuty).toBe(false);
+    expect(state.onDuty).toBe(true);
+    expectData(await call('post', d.accessToken, '/driver/shift/end'), 201);
   });
 
-  it('daily allowance (2026-11-23): handed out, blocks End shift, returned at the office or with the closing, cancel needs a reason', async () => {
+  it('daily allowance: carries between shifts, returned at the office or with the closing, cancel needs a reason', async () => {
     const d = await s.driver({ ...near });
     await world.ds.query(`UPDATE drivers SET commission_rate_basis_points = 1000 WHERE id = $1`, [d.driverId]);
     expectData(await call('post', d.accessToken, '/driver/shift/start'), 201);
@@ -110,10 +112,10 @@ describe('E2E — driver shifts', () => {
     // the driver sees it and cannot end his shift while he holds it
     let state = expectData<any>(await call('get', d.accessToken, '/driver/shift'));
     expect(state.allowanceOutMinor).toBe(50000);
-    expect(state.canEnd.reason).toBe('ALLOWANCE_OUT');
-    const blocked = await call('post', d.accessToken, '/driver/shift/end');
-    expect(blocked.status).toBe(409);
-    expect(code(blocked)).toBe('SHIFT_ALLOWANCE_OUT');
+    expect(state.canEnd.ok).toBe(true);
+    expectData(await call('post', d.accessToken, '/driver/shift/end'), 201);
+    expectData(await call('post', d.accessToken, '/driver/shift/start'), 201);
+    expect(expectData<any>(await call('get', d.accessToken, '/driver/shift')).allowanceOutMinor).toBe(50000);
 
     // returned at the office → he may end the shift; returning twice is refused
     expectData(await call('post', sa.accessToken, `/admin/driver-allowances/${first.id}/return`), 201);

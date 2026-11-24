@@ -382,6 +382,9 @@ export class Scenario {
     );
     const actor = await this.login('/auth/driver/login', { phone, fullName, role: Role.DRIVER });
     const vehicleTypeId = await this.ensureVehicleType();
+    // Explicit zero is a valid configured rate. Keep legacy fixture economics unchanged
+    // after approval, so missing-rate tests can still exercise historical orders.
+    await this.world.ds.query('UPDATE drivers SET commission_rate_basis_points = 0 WHERE id = $1', [created.id]);
     expectData(
       await this.world.api('patch', `/admin/drivers/${created.id}/verification`, {
         token: superAdmin.accessToken,
@@ -397,6 +400,7 @@ export class Scenario {
     expectData(await this.world.api('patch', '/driver/online-status', { token: actor.accessToken, body: { isOnline: true } }));
     expectData(await this.world.api('patch', '/driver/location', { token: actor.accessToken, body: { latitude: p.lat, longitude: p.lng } }));
     const [row] = await this.world.ds.query(`SELECT id FROM drivers WHERE user_id = $1`, [actor.id]);
+    await this.world.ds.query('UPDATE drivers SET commission_rate_basis_points = NULL WHERE id = $1', [created.id]);
     const fixture: DriverFixture = { ...actor, driverId: row.id ?? created.id };
     this.drivers.push(fixture);
     return fixture;

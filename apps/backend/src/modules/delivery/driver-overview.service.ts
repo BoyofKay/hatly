@@ -67,13 +67,12 @@ export class DriverOverviewService {
     // that shift; the immutable attempt records remain available for future dispatch analytics.
     const cte = `WITH scoped AS (
       SELECT DISTINCT ON (a.shift_id,a.order_id) a.*, coalesce(a.concluded_at,a.assigned_at) AS at
-      FROM driver_shift_assignments a JOIN driver_shifts sh ON sh.id=a.shift_id
+      FROM driver_shift_assignments a JOIN driver_shifts sh ON sh.id=a.shift_id JOIN orders o ON o.id=a.order_id AND o.deleted_at IS NULL
       WHERE a.driver_id=$1 AND ${scope}
       ORDER BY a.shift_id,a.order_id,a.assigned_at DESC,a.id DESC
     ), selected AS (
-      SELECT DISTINCT ON (a.order_id) a.* FROM scoped a
+      SELECT a.* FROM scoped a
       ${range ? "WHERE (a.at AT TIME ZONE 'Africa/Cairo')::date BETWEEN $2::date AND $3::date" : ''}
-      ORDER BY a.order_id,a.assigned_at DESC,a.id DESC
     )`;
     if (range) params.push(range.from, range.to);
     const active = "a.concluded_at IS NULL AND a.status NOT IN ('DELIVERED','CANCELLED','FAILED_DELIVERY','REASSIGNED','COLLECTED')";
