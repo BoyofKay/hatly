@@ -16,7 +16,7 @@ export const STAFF_LEVELS: StaffLevel[] = ['ADMIN', 'OPS_SUPERVISOR', 'OPS_TEAM'
  * Permissions only an ADMIN-level account (or the super admin) may hold — never an operations supervisor or team member, whoever grants it.
  * Owner decision 2026-11-22: marketplace sectors (the Home categories, their photos and the custom-request switch) are admin-only.
  */
-export const ADMIN_LEVEL_ONLY_PERMISSIONS: ReadonlySet<string> = new Set([Permission.MANAGE_MARKETPLACE_SECTORS]);
+export const ADMIN_LEVEL_ONLY_PERMISSIONS: ReadonlySet<string> = new Set([Permission.MANAGE_MARKETPLACE_SECTORS, Permission.ADJUST_DRIVER_FINANCES]);
 
 /** Higher number = more authority. SUPER_ADMIN is a role, above every level. */
 const RANK: Record<StaffLevel | 'SUPER_ADMIN', number> = { SUPER_ADMIN: 4, ADMIN: 3, OPS_SUPERVISOR: 2, OPS_TEAM: 1 };

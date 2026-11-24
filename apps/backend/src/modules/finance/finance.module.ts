@@ -1,3 +1,4 @@
+import { DriverCommissionRepairService } from './driver-commission-repair.service';
 import { DriverAllowanceService } from './driver-allowance.service';
 import { AdminDriverAllowancesController } from './admin-driver-allowances.controller';
 import { Module } from '@nestjs/common';
@@ -65,6 +66,7 @@ import { DeliveryFeeCalculationModule } from '../delivery-fee/delivery-fee-calcu
     SettlementService,
     SettlementClosingService,
     DriverAllowanceService,
+    DriverCommissionRepairService,
   ],
   exports: [DriverAllowanceService, SettlementClosingService, FinancialEventService, OrderFinancialEventsService, HatlyServicePricingService, EmployeeLoanService],
 })

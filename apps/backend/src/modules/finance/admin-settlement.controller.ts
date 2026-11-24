@@ -1,3 +1,5 @@
+import { DriverCommissionRepairService } from './driver-commission-repair.service';
+import { DriverCommissionRepairDto, DriverCommissionRepairPreviewDto } from './dto/driver-commission-repair.dto';
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { RequiresPermission } from '../permissions/decorators/requires-permission.decorator';
@@ -18,6 +20,7 @@ export class AdminSettlementController {
   constructor(
     private readonly settlementService: SettlementService,
     private readonly closing: SettlementClosingService,
+    private readonly repairs: DriverCommissionRepairService,
   ) {}
 
   @Get('couriers/open')
@@ -63,6 +66,18 @@ export class AdminSettlementController {
   async closeDriverPeriod(@CurrentUser() user: AuthenticatedUser, @Param('driverId') driverId: string, @Body() body: CloseCourierDto = {}) {
     const period = await this.settlementService.closeDriverPeriod(driverId, user.id, body ?? {});
     return { data: period };
+  }
+
+  @Post('drivers/:driverId/commission-repair-preview')
+  @RequiresPermission(Permission.ADJUST_DRIVER_FINANCES,Permission.CLOSE_DRIVER_SETTLEMENTS)
+  async commissionRepairPreview(@CurrentUser() user:AuthenticatedUser,@Param('driverId') driverId:string,@Body() body:DriverCommissionRepairPreviewDto) {
+    return {data:await this.repairs.preview(user,driverId,body.orderNumbers,body.rateBasisPoints)};
+  }
+
+  @Post('drivers/:driverId/commission-repair')
+  @RequiresPermission(Permission.ADJUST_DRIVER_FINANCES,Permission.CLOSE_DRIVER_SETTLEMENTS)
+  async commissionRepair(@CurrentUser() user:AuthenticatedUser,@Param('driverId') driverId:string,@Body() body:DriverCommissionRepairDto) {
+    return {data:await this.repairs.apply(user,driverId,body.orderNumbers,body.rateBasisPoints,body.previewToken,body.reason)};
   }
 
   @Get('drivers/:driverId/statement')

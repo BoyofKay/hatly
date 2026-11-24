@@ -24,7 +24,7 @@ export default function ClosingPage() {
   const [picked, setTab] = useState<'courier' | 'vendor' | null>(null);
   const tab = picked ?? (canCourier ? 'courier' : 'vendor');
   const tabs = [
-    ...(canCourier ? [{ id: 'courier', label: t('Courier shift closing', 'تقفيل وردية المندوب') }] : []),
+    ...(canCourier ? [{ id: 'courier', label: t('Courier financial closing', 'التقفيل المالي للمندوب') }] : []),
     ...(canVendor ? [{ id: 'vendor', label: t('Store period closing', 'تقفيل فترة المتجر') }] : []),
   ];
   return (
@@ -64,6 +64,7 @@ function PartyPicker<T extends { id: string }>({ rows, loading, label, render, v
 
 function CourierClosing() {
   const { t, money, dateTime } = useLang();
+  const { can } = usePermissions();
   const couriers = useApi<any[]>('/admin/settlement/couriers/open');
   const [driverId, setDriverId] = useState('');
   const preview = useApi<any>(driverId ? `/admin/settlement/drivers/${driverId}/close-preview` : null);
@@ -106,7 +107,7 @@ function CourierClosing() {
         {!driverId && <p className="rounded-lg bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">{t('Choose a courier to preview their shift.', 'اختر مندوبًا لمعاينة ورديته.')}</p>}
         {closed && (
           <div role="status" className="rounded-xl border border-green-200 bg-green-50 p-4" data-testid="courier-closed">
-            <p className="font-semibold text-green-900">{t('Shift closed', 'تم تقفيل الوردية')} · <bdi className="font-mono">{closed.reference}</bdi></p>
+            <p className="font-semibold text-green-900">{t('Financial closing saved', 'تم التقفيل المالي')} · <bdi className="font-mono">{closed.reference}</bdi></p>
             <p className="mt-1 text-sm text-green-900">{dateTime(closed.periodStart)} → {dateTime(closed.periodEnd)} · {t(`${closed.totals.orders} orders`, `${closed.totals.orders} طلب`)} · <CourierNet minor={closed.netPayableMinor} /></p>
             <Link href={`/settlements/driver/${closed.id}`} className="mt-2 inline-block text-sm font-medium text-hatly-orangeDark hover:underline">{t('Open the saved statement (record payments) →', 'افتح الكشف المحفوظ (تسجيل المدفوعات) ←')}</Link>
           </div>
@@ -133,14 +134,14 @@ function CourierClosing() {
                 <ul className="divide-y divide-gray-100 text-sm">
                   {p.shifts.map((s: any) => (
                     <li key={s.id} className="flex flex-wrap justify-between gap-2 py-1.5">
-                      <span className="text-gray-600">{new Date(s.startedAt).toLocaleString()} → {s.endedAt ? new Date(s.endedAt).toLocaleString() : t('open — ends with this closing', 'مفتوحة — تنتهي بهذا التقفيل')}</span>
+                      <span className="text-gray-600">{dateTime(s.reconciledFrom ?? s.startedAt)} → {dateTime(s.reconciledTo ?? s.endedAt) + (s.endedAt ? '' : ' · ' + t('open — duty continues', 'مفتوحة — تستمر الوردية'))}</span>
                       <span className="tabular-nums font-medium">{Math.floor(s.minutes / 60)}{t('h', 'س')} {s.minutes % 60}{t('m', 'د')}</span>
                     </li>
                   ))}
                 </ul>
               </Card>
             )}
-            {p.allowance?.outstandingMinor > 0 && (
+            {p.lines.length > 0 && p.allowance?.outstandingMinor > 0 && (
               <Card title={t('Daily allowance to return', 'العهدة اليومية المطلوب ردّها')} testId="courier-allowance">
                 <p className="text-sm text-gray-700">{t(`The courier holds ${money(p.allowance.outstandingMinor)} of daily allowance; this closing marks it as returned.`, `مع المندوب ${money(p.allowance.outstandingMinor)} عهدة يومية؛ هذا التقفيل يسجّلها كمردودة.`)}</p>
                 <p className="mt-1 text-sm font-semibold">{p.allowance.cashToSettleMinor < 0 ? t('Total to receive from the courier', 'الإجمالي المطلوب استلامه من المندوب') : t('Total to pay the courier', 'الإجمالي المطلوب دفعه للمندوب')}: <span className="tabular-nums">{money(Math.abs(p.allowance.cashToSettleMinor))}</span></p>
@@ -166,7 +167,8 @@ function CourierClosing() {
             {p.unresolved.length > 0 && (
               <Card title={t(`Held for the next closing (${p.unresolved.length})`, `طلبات مؤجلة للتقفيلة التالية (${p.unresolved.length})`)}>
                 <UnresolvedList items={p.unresolved} />
-                {held.length > 0 && <p className="mt-2 text-xs text-gray-500">{t('They are not settled now and will appear again in the next closing once resolved. Late settlement never blocks new orders (R29).', 'لا تُسوّى الآن وتظهر في التقفيل التالي بعد حلّها. تأخر التسوية لا يوقف الطلبات الجديدة (R29).')}</p>}
+                {can('ADJUST_DRIVER_FINANCES') && held.some((u: any) => u.reason === 'RATE_UNDEFINED') && <CommissionRepair key={driverId} driverId={driverId} orders={held.filter((u: any) => u.reason === 'RATE_UNDEFINED')} onSaved={preview.reload} />}
+                {held.length > 0 && <p className="mt-2 text-xs text-gray-500">{t('They are not settled now and will appear again in the next closing once resolved. Cash exposure limits still apply to new assignments.', 'لا تُسوّى الآن وتظهر في التقفيل التالي بعد حلّها. تظل حدود النقدية سارية على الإسناد الجديد.')}</p>}
               </Card>
             )}
             {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" data-testid="courier-close-error">{error}</p>}
@@ -174,7 +176,7 @@ function CourierClosing() {
               {needsAck && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} data-testid="courier-ack" />{t('I reviewed the held orders', 'راجعت الطلبات المؤجلة')}</label>}
               <Button variant="primary" className="min-h-[44px]" disabled={(p.lines.length === 0 && !p.shifts?.some((s: any) => s.endedAt != null)) || (needsAck && !ack)} onClick={() => setConfirm(true)} data-testid="courier-confirm">{t('Confirm closing', 'تأكيد التقفيل')}</Button>
             </div>
-            <ConfirmDialog open={confirm} title={t('Confirm this shift closing?', 'تأكيد تقفيل هذه الوردية؟')}
+            <ConfirmDialog open={confirm} title={t('Confirm this financial closing?', 'تأكيد هذا التقفيل المالي؟')}
               message={`${t(`${p.totals.orders} orders`, `${p.totals.orders} طلب`)} · ${p.totals.netToCourierMinor >= 0 ? t('owed to the courier', 'مستحق للمندوب') : t('owed by the courier', 'مستحق على المندوب')} ${money(Math.abs(p.totals.netToCourierMinor))}. ${t('A closing cannot be edited; corrections are new entries.', 'لا يُعدَّل التقفيل؛ التصحيح يكون بقيد جديد.')}`}
               confirmLabel={t('Confirm financial closing', 'تأكيد التقفيل المالي')} busy={busy} onConfirm={() => void close()} onClose={() => setConfirm(false)} />
           </>
@@ -182,6 +184,41 @@ function CourierClosing() {
       </div>
     </div>
   );
+}
+
+function CommissionRepair({driverId,orders,onSaved}:{driverId:string;orders:any[];onSaved:()=>void}) {
+  const { t,money }=useLang();
+  const [selected,setSelected]=useState<string[]>([]);
+  const [rate,setRate]=useState('');
+  const [reason,setReason]=useState('');
+  const [review,setReview]=useState<any>(null);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState<string|null>(null);
+  const rateBasisPoints=Math.round(Number(rate)*100);
+  const valid=selected.length>0 && rate.trim()!=='' && Number.isFinite(Number(rate)) && rateBasisPoints>=0 && rateBasisPoints<=10000;
+  const body={orderNumbers:selected,rateBasisPoints};
+  const request=async(apply:boolean)=>{
+    setBusy(true);setError(null);
+    try {
+      const result=await send<any>('post',`/admin/settlement/drivers/${driverId}/commission-repair${apply?'':'-preview'}`,
+        apply?{...body,previewToken:review.previewToken,reason}:body);
+      if(apply){setReview(null);setSelected([]);setReason('');onSaved();}else setReview(result);
+    } catch(e){setReview(null);setError(apiErrorMessage(e,t('Correction could not be saved.','تعذّر حفظ التصحيح.')));}
+    finally{setBusy(false);}
+  };
+  return <div className="mt-4 space-y-3 rounded-lg border border-gray-200 p-3">
+    <p className="font-semibold">{t('Repair missing commission (audited)','تصحيح العمولة المفقودة (مدقق)')}</p>
+    <p className="text-xs text-gray-500">{t('Select exact delivered orders. This appends only missing commission entries; it does not close orders, change future rates or record payment.','اختر الطلبات المسلّمة المحددة. يضيف التصحيح القيود المفقودة فقط دون تقفيل أو تغيير النسب المستقبلية أو تسجيل دفعة.')}</p>
+    {orders.map(o=><label key={o.orderNumber} className="flex gap-2 text-sm"><input type="checkbox" disabled={busy} checked={selected.includes(o.orderNumber)} onChange={e=>{setSelected(v=>e.target.checked?[...v,o.orderNumber]:v.filter(n=>n!==o.orderNumber));setReview(null);}}/>{o.orderNumber}</label>)}
+    <LabeledInput label={t('Explicit commission %','نسبة العمولة المحددة %')} type="number" min="0" max="100" step="0.01" value={rate} onChange={e=>{setRate(e.target.value);setReview(null);}}/>
+    <Button disabled={!valid||busy} onClick={()=>void request(false)}>{t('Preview correction','معاينة التصحيح')}</Button>
+    {review&&<div className="space-y-2">
+      {review.rows.map((r:any)=><p key={r.orderId} className="text-sm">{r.orderNumber} · {t('Driver fee','أجر المندوب')} {money(r.driverCompensationMinor)} · {t('Commission','العمولة')} {money(r.commissionMinor)} · {t('Hatly premium','عائد هاتلي')} {money(r.hatlyServiceRevenueMinor)}</p>)}
+      <LabeledInput label={t('Audit reason / evidence reference','سبب التصحيح / مرجع الإثبات')} value={reason} onChange={e=>setReason(e.target.value)}/>
+      <Button variant="primary" disabled={busy||reason.trim().length<10} onClick={()=>void request(true)}>{t('Confirm append-only correction','تأكيد التصحيح بقيد جديد')}</Button>
+    </div>}
+    {error&&<p role="alert" className="text-sm text-red-700">{error}</p>}
+  </div>;
 }
 
 function VendorClosing() {
