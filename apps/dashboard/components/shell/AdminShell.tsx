@@ -133,6 +133,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   useEffect(() => setOpen(false), [pathname]);
   // On a narrow screen the section's tabs scroll sideways; bring the current page's tab into view.
   useEffect(() => {
+    if (pathname.startsWith('/settings')) return;
     document.querySelector('[data-testid="section-tabs"] [aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
   }, [pathname]);
   useEffect(() => {
@@ -147,6 +148,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const visible = (i: NavItem) => (i.superOnly ? isSuper : perms.can(...(i.perms ?? [])));
   const groups: NavGroup[] = NAV.map((g) => ({ ...g, items: g.items.filter(visible) })).filter((g) => g.items.length > 0);
   const here = locate(pathname, groups);
+  const settingsTabs = here.group?.id === 'settings';
 
   // The reference sidebar: the Hatly logo on an orange block, then one icon row per section; the section holding this page is filled orange.
   const sidebar = (
@@ -227,7 +229,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const subItems = here.group && here.item?.sub ? here.group.items.filter((i) => i.sub?.id === here.item!.sub!.id) : [];
   const subTabs = subItems.length > 1 ? (
     <nav aria-label={t('Section sub-pages', 'صفحات فرعية')} data-testid="section-subtabs" className="-mt-4 mb-5">
-      <ul className="flex gap-1 overflow-x-auto rounded-lg bg-gray-100 p-1">
+      <ul className={`flex gap-1 rounded-lg bg-gray-100 p-1 ${settingsTabs ? 'flex-wrap' : 'overflow-x-auto'}`}>
         {subItems.map((i) => {
           const current = here.item?.href === i.href;
           return (
@@ -245,7 +247,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const tabs = here.group && here.group.items.length > 1 ? (<>
     <nav aria-label={t('Section pages', 'صفحات القسم')} data-testid="section-tabs" className="-mx-4 mb-5 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <div className="flex items-end border-b border-gray-200">
-        <ul className="flex min-w-0 flex-1 gap-1 overflow-x-auto">{mainTabs.map((i) => (i.sub ? subTab(i) : tabLink(i)))}</ul>
+        <ul className={`flex min-w-0 flex-1 gap-1 ${settingsTabs ? 'flex-wrap' : 'overflow-x-auto'}`}>{mainTabs.map((i) => (i.sub ? subTab(i) : tabLink(i)))}</ul>
         {moreTabs.length > 0 && (
           <div className="relative shrink-0">
             <button type="button" aria-expanded={moreOpen} aria-haspopup="true" onClick={() => setMoreOpen((v) => !v)} data-testid="section-tabs-more"

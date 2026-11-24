@@ -5,6 +5,7 @@ import 'package:hatly_driver/features/earnings/domain/earnings.dart';
 import 'package:hatly_driver/features/overview/earnings_tabs_screen.dart';
 import 'package:hatly_driver/features/overview/orders_screen.dart';
 import 'package:hatly_driver/features/overview/overview_api.dart';
+import 'package:hatly_driver/features/profile/presentation/profile_screen.dart';
 import 'package:hatly_driver/features/shift/shift_api.dart';
 
 /// Driver app round 2 (owner decision 2026-11-22): Orders (Today | Previous) and Earnings (Current shift | Previous) with KPIs.
@@ -41,6 +42,9 @@ class _Api implements OverviewApi {
       loanMinor: 10000,
       allowanceMinor: 50000,
       balanceMinor: -47000,
+      unpaidPayoutMinor: 5000,
+      unpaidCollectionMinor: 1000,
+      totalPositionMinor: -43000,
       unsettledOrders: 3,
       items: const [
         EarningRow(
@@ -81,6 +85,13 @@ Future<void> _pump(WidgetTester tester, _Api api, Widget screen) async {
 }
 
 void main() {
+  testWidgets('Profile displays server financial position, not an earnings duplicate', (tester) async {
+    await _pump(tester, _Api(), const ProfileScreen());
+    expect(find.byKey(const Key('driver-financial-position')), findsOneWidget);
+    expect(find.textContaining('Total net position: -430.00'), findsOneWidget);
+    expect(find.textContaining('Previous unpaid payouts: 50.00'), findsOneWidget);
+  });
+
   testWidgets('Current shift quick filters and search; History has concluded shifts only', (tester) async {
     final api = _Api();
     await _pump(tester, api, Scaffold(body: ShiftOrdersList(tab: 'today', onUnavailable: () {})));
@@ -118,6 +129,7 @@ void main() {
     await _pump(tester, api, const EarningsTabsScreen());
     expect(find.text('500.00 EGP'), findsNothing); // collapsed by default
     expect(find.text('Current wallet balance'), findsOneWidget);
+    expect(find.text('Financial position'), findsNothing);
     await tester.tap(find.byKey(const Key('earnings-kpi-toggle')));
     await tester.pumpAndSettle();
     expect(find.text('500.00 EGP'), findsOneWidget); // daily allowance

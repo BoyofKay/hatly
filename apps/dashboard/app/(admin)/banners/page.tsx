@@ -492,7 +492,7 @@ export default function HomeBannersPage() {
                         {tl('Assets', 'الأصول')}
                         
                       </button>
-                      <AssetHint text={tl('Recommended: 1080 × 1080 px (1:1). Keep the top 35% (378 px) free of text and important objects for the pinned header and search.', 'المقاس المقترح: 1080 × 1080 بكسل (1:1). اترك أعلى 35% (378 بكسل) دون نص أو تفاصيل مهمة للهيدر والبحث.')} />
+
                        <button data-testid="banner-edit" disabled={!canManage || busyId === b.id} onClick={() => { setCreating(false); setEditingId(b.id); }} className="text-xs text-gray-600 underline disabled:opacity-40">
                         Edit
                       </button>
@@ -553,7 +553,7 @@ export default function HomeBannersPage() {
                       <p className="text-xs text-gray-600">{label(b)} · #{b.sortOrder}</p>
                       <p className="text-xs text-gray-500">{formatWhen(b.startsAt)} → {formatWhen(b.endsAt)}</p>
                       <div className="flex flex-wrap gap-2 pt-1">
-                        <button disabled={!canManage || busyId === b.id} onClick={() => { setRowError(null); setAssetsId(b.id); }} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{tl('Assets', 'الأصول')}</button><AssetHint text={tl('1080 × 1080 px (1:1) recommended. Top 35% clear for pinned header/search.', 'يفضل 1080 × 1080 بكسل (1:1). اترك أعلى 35% خاليًا للهيدر والبحث.')} />
+                        <button disabled={!canManage || busyId === b.id} onClick={() => { setRowError(null); setAssetsId(b.id); }} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{tl('Assets', 'الأصول')}</button>
                         <button disabled={!canManage || busyId === b.id} onClick={() => { setCreating(false); setEditingId(b.id); }} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{tl('Edit', 'تعديل')}</button>
                         <button disabled={!canManage || busyId === b.id || (!b.isActive && (!b.imageUrl && !b.imageUrlAr))} onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), 'Failed to update the banner.')} className="min-h-[44px] rounded-lg bg-hatly-orange px-3 text-sm font-medium text-white disabled:opacity-40">{b.isActive ? tl('Unpublish', 'إلغاء النشر') : tl('Publish', 'نشر')}</button>
                         <button disabled={!canManage || busyId === b.id} onClick={() => { if (window.confirm(`Delete the banner "${b.title}"? Customers stop seeing it immediately.`)) run(b, () => deleteHomeBanner(b.id), 'Failed to delete the banner.'); }} className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-red-600 disabled:opacity-40">{tl('Delete', 'حذف')}</button>

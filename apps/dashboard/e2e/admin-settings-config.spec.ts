@@ -19,17 +19,30 @@ test.describe('Admin Settings — operational configuration', () => {
   test('the Customer OTP setting is described as first-time phone verification during registration — never as the way customers sign in', async ({ page }) => {
     await page.goto('/settings');
     const card = page.locator('div.rounded-xl.border.bg-white', { hasText: 'Customer Authentication — OTP' }).first();
-    await expect(card).toContainText('verify a customer\'s phone number the first time, during registration');
-    await expect(card).toContainText('customers always sign in with phone + password');
+    await expect(card).toContainText('first-time phone verification during registration');
+    await expect(card).toContainText('Sign-in always uses phone + password');
     await expect(card).not.toContainText('authenticate with OTP');
     await expect(card).not.toContainText('instead of OTP');
+  });
+
+  test('every operational field has localized instructions and the settings tabs wrap', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto('/settings?lang=en');
+    const rows = page.locator('[data-testid^="config-row-"]');
+    await expect(rows).toHaveCount(25);
+    for (const row of await rows.all()) await expect(row.locator('p').nth(1)).not.toBeEmpty();
+    await expect(page.getByTestId('config-row-VENDOR_SETTLEMENT_FREQUENCY')).toContainText('Vendor-specific terms override');
+    await expect(page.getByTestId('settings-nav')).toHaveCSS('flex-wrap', 'wrap');
+    await page.goto('/settings?lang=ar');
+    await expect(page.getByTestId('config-row-VENDOR_SETTLEMENT_FREQUENCY')).toContainText('شروط المتجر الخاصة لها الأولوية');
+    for (const row of await rows.all()) await expect(row.locator('p').nth(1)).toHaveText(/[\u0600-\u06ff]/);
   });
 
   test('toggling Multi-Vendor Orders and saving PUTs the new value, and the server\'s own response confirms it was persisted', async ({ page }) => {
     await page.goto('/settings');
     // The specific ConfigRow wrapper (its own className) — not the deepest text match, which would
     // be the label-only div that doesn't contain the select/button at all.
-    const row = page.locator('div.flex.flex-col.gap-1', { hasText: 'Multi-Vendor Orders' });
+    const row = page.getByTestId('config-row-MULTI_VENDOR_ORDERS_ENABLED');
     const select = row.getByRole('combobox');
     await expect(select).toBeVisible();
 
