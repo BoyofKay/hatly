@@ -100,6 +100,18 @@ const VALUE_VALIDATORS: Partial<Record<string, { valid: (v: unknown) => boolean;
     valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 300 && v <= 50_000,
     message: 'DISPATCH_PREFERRED_RADIUS_METERS must be a whole number of metres from 300 to 50000; clear it for the 3000 m default.',
   },
+  [BusinessConfigKey.DRIVER_CASH_WARNING_MINOR]: {
+    valid: (v) => typeof v==='number' && Number.isSafeInteger(v) && v>0 && v<=100_000_000,
+    message: 'Cash warning must be a positive whole amount in minor units.',
+  },
+  [BusinessConfigKey.DRIVER_CASH_CAP_MINOR]: {
+    valid: (v) => typeof v==='number' && Number.isSafeInteger(v) && v>0 && v<=100_000_000,
+    message: 'Cash cap must be a positive whole amount in minor units.',
+  },
+  [BusinessConfigKey.DRIVER_ALLOWANCE_CAP_MINOR]: {
+    valid: (v) => typeof v==='number' && Number.isSafeInteger(v) && v>=0 && v<=100_000_000,
+    message: 'Allowance cap must be a nonnegative whole amount in minor units.',
+  },
   [BusinessConfigKey.EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR]: {
     valid: (v) => typeof v === 'number' && Number.isInteger(v) && v > 0 && v <= 100_000_000,
     message: 'EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR must be a positive whole amount in piastres; clear it for no cap.',
@@ -184,6 +196,19 @@ export class BusinessConfigService {
     const validator = VALUE_VALIDATORS[key];
     if (validator && !validator.valid(value)) {
       throw new BadRequestException({ message: validator.message, details: { code: 'INVALID_BUSINESS_CONFIG_VALUE', key } });
+    }
+    if (key===BusinessConfigKey.DRIVER_CASH_WARNING_MINOR || key===BusinessConfigKey.DRIVER_CASH_CAP_MINOR) {
+      return this.repo.manager.transaction(async m=>{
+        await m.query("SELECT pg_advisory_xact_lock(hashtext('driver-cash-limits'))");
+        const repository=m.getRepository(BusinessConfig);
+        const warning=key===BusinessConfigKey.DRIVER_CASH_WARNING_MINOR ? value : (await repository.findOne({where:{key:BusinessConfigKey.DRIVER_CASH_WARNING_MINOR}}))?.value;
+        const cap=key===BusinessConfigKey.DRIVER_CASH_CAP_MINOR ? value : (await repository.findOne({where:{key:BusinessConfigKey.DRIVER_CASH_CAP_MINOR}}))?.value;
+        if(typeof warning==='number'&&typeof cap==='number'&&warning>cap) throw new BadRequestException({message:'Cash warning cannot exceed cash cap.',details:{code:'INVALID_CASH_LIMITS'}});
+        const row=(await repository.findOne({where:{key}}))??repository.create({key});
+        row.value=value;row.updatedByUserId=updatedByUserId;
+        if(description!==undefined)row.description=description;
+        return repository.save(row);
+      });
     }
     let row = await this.repo.findOne({ where: { key } });
     if (!row) {

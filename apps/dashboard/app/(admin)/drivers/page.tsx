@@ -301,7 +301,8 @@ function AdminDriversScreen() {
 
                   {(
                     <div className="flex flex-wrap gap-2">
-                      {d.verificationStatus !== 'APPROVED' && <Button variant="primary" size="sm" className="min-h-[40px]" onClick={() => { setVerifyError(null); setVerifying({ driver: d, status: 'APPROVED' }); }}>{t('drvApprove')}</Button>}
+                      {d.verificationStatus !== 'APPROVED' && d.commissionRateBasisPoints == null && <span className="text-xs font-medium text-amber-700">{tl('Set commission before approval.', 'حدّد العمولة قبل الاعتماد.')}</span>}
+                      {d.verificationStatus !== 'APPROVED' && <Button variant="primary" size="sm" disabled={d.commissionRateBasisPoints == null} className="min-h-[40px]" onClick={() => { setVerifyError(null); setVerifying({ driver: d, status: 'APPROVED' }); }}>{t('drvApprove')}</Button>}
                       {d.verificationStatus !== 'REJECTED' && <Button size="sm" className="min-h-[40px]" onClick={() => { setVerifyError(null); setVerifying({ driver: d, status: 'REJECTED' }); }}>{t('drvReject')}</Button>}
                       <Button size="sm" className="min-h-[40px]" onClick={() => setEditingDriver({ id: d.id, fullName: d.fullName, phone: d.phone })}>{tl('Edit details', 'تعديل البيانات')}</Button>
                       <ResetPasswordButton path={`/admin/drivers/${d.id}/reset-password`} name={d.fullName} />

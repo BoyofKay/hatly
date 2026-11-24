@@ -1,3 +1,4 @@
+import { canTakeFinancialRisk, driverRiskLimits, driverCashExposure, cashCapBlocks } from './driver-financial-risk';
 import { driverLoad, recomputeDriverAvailability } from './driver-capacity';
 import { BusinessConfigKey } from '../business-config/business-config-key.enum';
 import { BusinessConfig } from '../business-config/entities/business-config.entity';
@@ -134,6 +135,7 @@ export class DeliveryAssignmentService {
             return null; // driver went unavailable between candidate list and lock
           }
 
+          if (!(await canTakeFinancialRisk(manager,driver.id,params.orderId))) return null;
           const assigned = await this.assignInTransaction(manager, params.orderId, driver);
           return { ...assigned, driverUserId: driver.userId };
         });
@@ -182,6 +184,11 @@ export class DeliveryAssignmentService {
     if (!d) return;
     if (!d.is_online) {
       throw new ConflictException({ message: 'This driver is offline. Ask them to go online, or choose another driver.', details: { code, reason: 'OFFLINE' } });
+    }
+    const limits=await driverRiskLimits(db);
+    if(limits.capMinor!==null){
+      const e=await driverCashExposure(db,driverId);
+      if(cashCapBlocks(limits.capMinor,e.outstandingMinor,e.projectedMinor)) throw new ConflictException({message:'Driver cash exposure cap reached.',details:{code,reason:'CASH_CAP',outstandingMinor:e.outstandingMinor,capMinor:limits.capMinor}});
     }
     if (load && load.active >= load.capacity) {
       throw new ConflictException({
@@ -245,6 +252,7 @@ export class DeliveryAssignmentService {
           });
         }
 
+        if (!(await canTakeFinancialRisk(manager,newDriver.id,params.orderId))) throw new ConflictException({message:'Driver cash exposure cap reached.',details:{code:'DRIVER_UNAVAILABLE',reason:'CASH_CAP'}});
         // Release (frees the previous driver — the state machine's own rule) and re-assign, in this same transaction.
         const release = await this.orderStateMachine.transitionInTransaction(manager, {
           orderId: params.orderId,
@@ -283,6 +291,7 @@ export class DeliveryAssignmentService {
           if (existing?.driverId && existing.earlyAssignedAt) return 'ORDER_GONE' as const; // someone was attached meanwhile
           const driver = await manager.findOne(Driver, { where: { id: driverId }, lock: { mode: 'pessimistic_write' } });
           if (!driver || !driver.isAvailable || !driver.isOnline || driver.acceptingNewOrders === false) return null;
+          if (!(await canTakeFinancialRisk(manager,driver.id,params.orderId))) return null;
           const windowRow = await manager.findOne(BusinessConfig, { where: { key: BusinessConfigKey.DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES } });
           const acknowledgeBy = new Date(Date.now() + resolveAcknowledgementWindowMinutes(windowRow?.value) * 60_000);
           const fields = { driverId: driver.id, assignedAt: new Date(), acceptDeadlineAt: acknowledgeBy, acknowledgedAt: null, pickedUpAt: null, deliveredAt: null, earlyAssignedAt: new Date() };

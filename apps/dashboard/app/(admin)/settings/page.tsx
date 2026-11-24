@@ -61,6 +61,9 @@ const CONFIG_FIELDS: ConfigFieldDef[] = [
     unit: '× base fee',
     help: "Applies to BOTH Hatly and Wasally, once, after the ordinary base delivery fee: Hatly / Wasally fee = base fee × this multiplier. The base fee is the selected delivery area's fixed fee (manual address) or the road-distance fee from the price per 100 m and minimum above (GPS address). It is never applied to the per-100 m price itself. Approved default 1.5. Positive, up to 10. New quotes/orders only — placed orders keep the fee they were frozen with.",
   },
+  { key: 'DRIVER_CASH_WARNING_MINOR', label: 'Driver cash exposure warning / تنبيه النقدية المستحقة', type: 'money', unit: 'EGP', help: 'Notify Operations when unclosed plus closed-uncollected cash reaches this limit. Must not exceed the hard cap.' },
+  { key: 'DRIVER_CASH_CAP_MINOR', label: 'Driver maximum cash exposure / الحد الأقصى للنقدية', type: 'money', unit: 'EGP', help: 'Blocks new assignments at the cap or if projected COD collections exceed it. Existing orders can be completed.' },
+  { key: 'DRIVER_ALLOWANCE_CAP_MINOR', label: 'Maximum outstanding daily allowance / الحد الأقصى للعهدة', type: 'money', unit: 'EGP', help: 'Block additional allowances when outstanding plus new amount exceeds the limit. Zero prevents issuance.' },
   { key: 'EMPLOYEE_LOAN_MAX_OUTSTANDING_MINOR', label: 'Maximum a driver may owe in loans', type: 'money', unit: 'EGP', clearable: true, help: 'The most one employee (driver) may owe in loans at a time. Empty = no cap: the operations supervisor decides each loan.' },
   { key: 'MAX_BICYCLE_PICKUP_DISTANCE_METERS', label: 'Max Bicycle Pickup Distance', type: 'integer', unit: 'meters' },
   {

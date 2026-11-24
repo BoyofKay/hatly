@@ -1,3 +1,4 @@
+import { driverRiskLimits } from '../delivery/driver-financial-risk';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
@@ -22,7 +23,7 @@ const MAX_ALLOWANCE_MINOR = 10_000_000; // 100,000 EGP — a typo guard, not a b
 
 /**
  * Daily driver allowance (owner decision 2026-11-23, "العهدة اليومية"): cash handed to a driver so he can pay stores for orders. It is his
- * liability: while any is OUT he cannot end his shift himself (DriverShiftService); it is returned at the office ("Allowance returned") or
+ * liability: it carries across operational shifts; it is returned at the office ("Allowance returned") or
  * by the courier closing, which returns it together with the orders' money. Kept as its own ledger — the closing's order figures
  * (net payable, lines) are never changed by it.
  */
@@ -56,12 +57,23 @@ export class DriverAllowanceService {
     if (!Number.isInteger(amountMinor) || amountMinor <= 0 || amountMinor > MAX_ALLOWANCE_MINOR) {
       throw new BadRequestException({ message: 'Enter the amount handed to the driver (more than 0).', details: { code: 'INVALID_AMOUNT' } });
     }
-    const [row] = await this.ds.query(
+    const row = await this.ds.transaction(async m=>{
+      await m.query('SELECT id FROM drivers WHERE id=$1 FOR UPDATE',[driverId]);
+      const {allowanceCapMinor}=await driverRiskLimits(m);
+      const [balance]=await m.query("SELECT coalesce(sum(amount_minor),0) AS total FROM driver_allowances WHERE driver_id=$1 AND status='OUT'",[driverId]);
+      const outstanding=Number(balance?.total??0);
+      if(allowanceCapMinor!==null&&outstanding+amountMinor>allowanceCapMinor) throw new ConflictException({
+        message:'This allowance would exceed the configured maximum outstanding allowance.',
+        details:{code:'DRIVER_ALLOWANCE_CAP',outstandingMinor:outstanding,capMinor:allowanceCapMinor}
+      });
+      const [saved]=await m.query(
       `INSERT INTO driver_allowances (driver_id, amount_minor, note, handed_by_user_id, shift_id)
        VALUES ($1, $2, $3, $4, (SELECT id FROM driver_shifts WHERE driver_id = $1 AND ended_at IS NULL))
        RETURNING id`,
       [driverId, amountMinor, note?.trim().slice(0, 200) || null, actorUserId],
-    );
+      );
+      return saved;
+    });
     return this.one(row.id);
   }
 
