@@ -206,7 +206,7 @@ export default function SectorsPage() {
                     <td className="px-3 py-2 text-gray-500" dir="ltr">{s.slug}</td>
                     <td className="px-3 py-2"><div className="flex items-center gap-2">
                       {s.bannerUrl ? <img src={resolveMediaUrl(s.bannerUrl)} alt="" className="h-10 w-20 rounded-lg object-cover" /> : <span className="text-xs text-gray-400">{t('No banner', 'لا يوجد بانر')}</span>}
-                      <button type="button" disabled={!canManage || !!busyId} className="rounded border px-2 py-2 text-xs text-hatly-orangeDark disabled:opacity-40" onClick={() => setBannerSector(s)}>{t('Choose', 'اختيار')}</button>
+                      <button type="button" disabled={!canManage || !!busyId} className="rounded border px-2 py-2 text-xs text-hatly-orangeDark disabled:opacity-40" onClick={() => setBannerSector(s)}>{t('Choose', 'اختيار')}</button><span className="text-[10px] text-gray-500">1280 × 720 px</span>
                       {s.bannerUrl && <button type="button" disabled={!canManage || !!busyId} className="text-xs text-red-600 disabled:opacity-40" onClick={() => void updateBanner(s, null)}>{t('Remove', 'إزالة')}</button>}
                     </div></td>
                     <td className="px-3 py-2">
@@ -236,7 +236,7 @@ export default function SectorsPage() {
                     disabled={!canManage || !!busyId} onChange={(e) => void updateAccent(s, e.target.value)} />
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
-                  <button type="button" disabled={!canManage || !!busyId} className="text-xs text-hatly-orangeDark" onClick={() => setBannerSector(s)}>{s.bannerUrl ? t('Change banner', 'تغيير البانر') : t('Add banner', 'إضافة بانر')}</button>
+                  <button type="button" disabled={!canManage || !!busyId} className="text-xs text-hatly-orangeDark" onClick={() => setBannerSector(s)}>{s.bannerUrl ? t('Change banner', 'تغيير البانر') : t('Add banner', 'إضافة بانر')}</button><span className="text-[10px] text-gray-500">1280 × 720 px</span>
                   {s.bannerUrl && <button type="button" disabled={!canManage || !!busyId} className="text-xs text-red-600" onClick={() => void updateBanner(s, null)}>{t('Remove', 'إزالة')}</button>}
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
@@ -263,7 +263,7 @@ export default function SectorsPage() {
           onSaved={async () => { setEditing(null); await refresh(); }}
         />
       )}
-      <MediaPicker open={bannerSector !== null} onClose={() => setBannerSector(null)} title={t('Choose sector banner', 'اختر بانر القطاع')} onPick={(assets) => {
+      <MediaPicker open={bannerSector !== null} onClose={() => setBannerSector(null)} title={t('Choose sector banner — 1280 × 720 px (16:9)', 'اختر بانر القطاع — 1280 × 720 بكسل (16:9)')} onPick={(assets) => {
         const sector = bannerSector;
         const url = assets[0]?.display?.url;
         setBannerSector(null);

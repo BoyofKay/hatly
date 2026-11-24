@@ -842,6 +842,7 @@ export default function VendorProductsPage() {
                         </p>
                         <label className="mt-1 inline-block text-xs text-hatly-orange">
                           {uploadingImageId === p.id ? t('Uploading...', 'جارٍ الرفع...') : p.imageUrl ? t('Change Image', 'تغيير الصورة') : t('Upload Image', 'رفع صورة')}
+                          <span className="block text-gray-500">1000 × 1000 px (1:1)</span>
                           <input
                             type="file"
                             accept="image/jpeg,image/png,image/webp"

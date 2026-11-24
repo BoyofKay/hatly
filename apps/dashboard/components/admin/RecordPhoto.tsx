@@ -52,7 +52,8 @@ export function RecordPhoto({ entity, entityId, imageUrl, purpose, canEdit, onCh
           {t('Remove', 'إزالة')}
         </button>
       )}
-      <MediaPicker open={open} onClose={() => setOpen(false)} purpose={purpose} onPick={(picked) => picked[0] && void assign(picked[0].id)} title={t('Choose a photo', 'اختر صورة')} />
+      {purpose === 'SECTOR_IMAGE' && <span className="text-[10px] text-gray-500">512 × 512 px (1:1)</span>}
+      <MediaPicker open={open} onClose={() => setOpen(false)} purpose={purpose} onPick={(picked) => picked[0] && void assign(picked[0].id)} title={purpose === 'SECTOR_IMAGE' ? t('Choose a photo — 512 × 512 px (1:1)', 'اختر صورة — 512 × 512 بكسل (1:1)') : t('Choose a photo', 'اختر صورة')} />
     </span>
   );
 }

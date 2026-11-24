@@ -484,6 +484,7 @@ export default function HomeBannersPage() {
                     <td className="space-x-2 px-3 py-2 text-right whitespace-nowrap">
                       <button data-testid="banner-image" disabled={!canManage || busyId === b.id} onClick={() => chooseImage(b)} className="text-xs text-gray-600 underline disabled:opacity-40">
                         {b.imageUrl ? 'Change image' : 'Upload image'}
+                        <span className="block text-[10px] text-gray-500">1080 × 1080 px (1:1) · top 35% clear</span>
                       </button>
                       <button data-testid="banner-edit" disabled={!canManage || busyId === b.id} onClick={() => { setCreating(false); setEditingId(b.id); }} className="text-xs text-gray-600 underline disabled:opacity-40">
                         Edit
@@ -545,7 +546,7 @@ export default function HomeBannersPage() {
                       <p className="text-xs text-gray-600">{label(b)} · #{b.sortOrder}</p>
                       <p className="text-xs text-gray-500">{formatWhen(b.startsAt)} → {formatWhen(b.endsAt)}</p>
                       <div className="flex flex-wrap gap-2 pt-1">
-                        <button disabled={!canManage || busyId === b.id} onClick={() => chooseImage(b)} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{b.imageUrl ? tl('Change image', 'تغيير الصورة') : tl('Upload image', 'رفع صورة')}</button>
+                        <button disabled={!canManage || busyId === b.id} onClick={() => chooseImage(b)} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{b.imageUrl ? tl('Change image', 'تغيير الصورة') : tl('Upload image', 'رفع صورة')}</button><p className="w-full text-xs text-gray-500">{tl('1080 × 1080 px (1:1). Keep top 35% free of important details.', '1080 × 1080 بكسل (1:1). اترك أعلى 35% دون تفاصيل مهمة.')}</p>
                         <button disabled={!canManage || busyId === b.id} onClick={() => { setCreating(false); setEditingId(b.id); }} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{tl('Edit', 'تعديل')}</button>
                         <button disabled={!canManage || busyId === b.id || (!b.isActive && !b.imageUrl)} onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), 'Failed to update the banner.')} className="min-h-[44px] rounded-lg bg-hatly-orange px-3 text-sm font-medium text-white disabled:opacity-40">{b.isActive ? tl('Unpublish', 'إلغاء النشر') : tl('Publish', 'نشر')}</button>
                         <button disabled={!canManage || busyId === b.id} onClick={() => { if (window.confirm(`Delete the banner "${b.title}"? Customers stop seeing it immediately.`)) run(b, () => deleteHomeBanner(b.id), 'Failed to delete the banner.'); }} className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-red-600 disabled:opacity-40">{tl('Delete', 'حذف')}</button>
