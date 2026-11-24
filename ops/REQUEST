@@ -1,3 +1,3 @@
 ACTION=deploy
 ARG=
-# 2026-11-24: correct artwork validators, localized sector assets, compact admin UI. Additive banner_url_ar migration; preserve existing data.
+# 2026-11-24: localized artwork, customer Explore, driver operational shifts, finance controls, and audited commission correction. Additive migrations; preserve existing production data.
