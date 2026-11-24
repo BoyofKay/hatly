@@ -24,6 +24,7 @@ export interface AdminHomeBannerView {
   title: string;
   titleAr: string | null;
   imageUrl: string | null;
+  imageUrlAr?: string | null;
   actionType: HomeBannerActionType;
   actionTargetId: string | null;
   sectorId: string | null;
@@ -42,6 +43,7 @@ export interface PublicHomeBannerView {
   title: string;
   titleAr: string | null;
   imageUrl: string;
+  imageUrlAr?: string | null;
   actionType: HomeBannerActionType;
   actionTargetId: string | null;
   sectorId: string | null;
@@ -121,6 +123,7 @@ export class HomeBannersService {
     id: string,
     file: { buffer: Buffer; mimetype: string; size: number },
     uploadedByUserId: string,
+    language: 'en' | 'ar' = 'en',
   ): Promise<AdminHomeBannerView> {
     const banner = await this.getOne(id);
     const extension = IMAGE_EXTENSIONS[file.mimetype];
@@ -135,13 +138,14 @@ export class HomeBannersService {
       throw new BadRequestException({ message: shape.message, details: { code: shape.code } });
     }
     const upload = await this.uploads.upload(file.buffer.toString('base64'), `banner${extension}`, uploadedByUserId);
-    banner.imageUrl = upload.url;
+    if (language === 'ar') banner.imageUrlAr = upload.url;
+    else banner.imageUrl = upload.url;
     return this.toAdminView(await this.repo.save(banner));
   }
 
   async activate(id: string): Promise<AdminHomeBannerView> {
     const banner = await this.getOne(id);
-    if (!banner.imageUrl) {
+    if (!banner.imageUrl && !banner.imageUrlAr) {
       throw new BadRequestException({ message: 'Upload an image before publishing this banner.', details: { code: 'BANNER_IMAGE_REQUIRED' } });
     }
     banner.isActive = true;
@@ -174,7 +178,7 @@ export class HomeBannersService {
     const rows = await this.repo
       .createQueryBuilder('b')
       .where('b.is_active = true')
-      .andWhere('b.image_url IS NOT NULL')
+      .andWhere('(b.image_url IS NOT NULL OR b.image_url_ar IS NOT NULL)')
       .andWhere('(b.starts_at IS NULL OR b.starts_at <= :now)', { now })
       .andWhere('(b.ends_at IS NULL OR b.ends_at > :now)', { now })
       .orderBy('b.sort_order', 'ASC')
@@ -195,7 +199,8 @@ export class HomeBannersService {
         id: b.id,
         title: b.title,
         titleAr: b.titleAr ?? null,
-        imageUrl: b.imageUrl as string,
+        imageUrl: (b.imageUrl ?? b.imageUrlAr) as string,
+        ...(b.imageUrlAr ? { imageUrlAr: b.imageUrlAr } : {}),
         actionType: b.actionType,
         actionTargetId: b.actionTargetId ?? null,
         sectorId: b.sectorId ?? (b.actionType === HomeBannerActionType.SECTOR ? b.actionTargetId ?? null : null),
@@ -257,6 +262,7 @@ export class HomeBannersService {
       title: b.title,
       titleAr: b.titleAr ?? null,
       imageUrl: b.imageUrl ?? null,
+      ...(b.imageUrlAr ? { imageUrlAr: b.imageUrlAr } : {}),
       actionType: b.actionType,
       actionTargetId: b.actionTargetId ?? null,
       sectorId: b.sectorId ?? null,
@@ -270,8 +276,8 @@ export class HomeBannersService {
     };
   }
 
-  statusAt(b: Pick<HomeBanner, 'isActive' | 'imageUrl' | 'startsAt' | 'endsAt'>, now: Date): HomeBannerDisplayStatus {
-    if (!b.isActive || !b.imageUrl) return 'DRAFT';
+  statusAt(b: Pick<HomeBanner, 'isActive' | 'imageUrl' | 'imageUrlAr' | 'startsAt' | 'endsAt'>, now: Date): HomeBannerDisplayStatus {
+    if (!b.isActive || (!b.imageUrl && !b.imageUrlAr)) return 'DRAFT';
     if (b.startsAt && b.startsAt.getTime() > now.getTime()) return 'SCHEDULED';
     if (b.endsAt && b.endsAt.getTime() <= now.getTime()) return 'EXPIRED';
     return 'LIVE';

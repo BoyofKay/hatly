@@ -11,6 +11,7 @@ export interface HomeBanner {
   titleAr: string | null;
   /** The server's stable upload reference (`/uploads/files/<name>`); resolve it with `resolveMediaUrl` to display it. */
   imageUrl: string | null;
+  imageUrlAr?: string | null;
   actionType: BannerActionType;
   actionTargetId: string | null;
   sectorId?: string | null;
@@ -65,10 +66,10 @@ export async function updateHomeBanner(id: string, input: UpdateHomeBannerInput)
 }
 
 /** Multipart, field name "image" — the same contract as a product image. Content-Type is left to the browser (it must add the boundary). */
-export async function uploadHomeBannerImage(id: string, file: File): Promise<HomeBanner> {
+export async function uploadHomeBannerImage(id: string, file: File, language: 'en' | 'ar' = 'en'): Promise<HomeBanner> {
   const formData = new FormData();
   formData.append('image', file);
-  const res = await apiClient.post(`/admin/home-banners/${id}/image`, formData);
+  const res = await apiClient.post(`/admin/home-banners/${id}/image${language === 'ar' ? '/ar' : ''}`, formData);
   return res.data.data;
 }
 

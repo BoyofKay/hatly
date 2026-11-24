@@ -220,7 +220,7 @@ export class MediaService {
     if (q.purpose) { params.push(q.purpose); where.push(`a.purpose = $${params.length}`); }
     if (q.q) { params.push(likeTerm(q.q)); where.push(`(a.original_name ILIKE $${params.length} ESCAPE '\\' OR a.alt_en ILIKE $${params.length} ESCAPE '\\' OR a.alt_ar ILIKE $${params.length} ESCAPE '\\')`); }
     const usedSql = `(EXISTS (SELECT 1 FROM vendors x WHERE x.logo_media_asset_id = a.id) OR EXISTS (SELECT 1 FROM vendor_branches x WHERE x.cover_media_asset_id = a.id) OR EXISTS (SELECT 1 FROM marketplace_sectors x WHERE x.media_asset_id = a.id OR EXISTS (SELECT 1 FROM media_variants v WHERE v.asset_id = a.id AND v.url IN (x.banner_url, x.banner_url_ar)) OR a.legacy_source_url IN (x.banner_url, x.banner_url_ar))
-      OR EXISTS (SELECT 1 FROM marketplace_subcategories x WHERE x.media_asset_id = a.id) OR EXISTS (SELECT 1 FROM home_banners x WHERE x.media_asset_id = a.id) OR EXISTS (SELECT 1 FROM products x WHERE x.media_asset_id = a.id)
+      OR EXISTS (SELECT 1 FROM marketplace_subcategories x WHERE x.media_asset_id = a.id) OR EXISTS (SELECT 1 FROM home_banners x WHERE x.media_asset_id = a.id OR EXISTS (SELECT 1 FROM media_variants v WHERE v.asset_id = a.id AND v.url = x.image_url_ar) OR a.legacy_source_url = x.image_url_ar) OR EXISTS (SELECT 1 FROM products x WHERE x.media_asset_id = a.id)
       OR EXISTS (SELECT 1 FROM catalog_products x WHERE x.media_asset_id = a.id) OR EXISTS (SELECT 1 FROM product_media x WHERE x.media_asset_id = a.id))`;
     if (q.used === 'true') where.push(usedSql);
     if (q.used === 'false') where.push(`NOT ${usedSql}`);
@@ -257,12 +257,12 @@ export class MediaService {
     const refs = await this.ds.query(
       `SELECT 'vendor' AS type, id, name AS label, 'logo' AS field FROM vendors WHERE (logo_media_asset_id = $1 OR logo_url = ANY($2)) AND deleted_at IS NULL
        UNION ALL SELECT 'branch_cover', id, name, 'cover' FROM vendor_branches WHERE cover_media_asset_id = $1 AND deleted_at IS NULL
-       UNION ALL SELECT 'sector', id, name, 'image' FROM marketplace_sectors WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL
+       UNION ALL SELECT 'sector', id, name, 'image' FROM marketplace_sectors WHERE (media_asset_id = $1 OR image_url = ANY($2) OR image_url_ar = ANY($2)) AND deleted_at IS NULL
        UNION ALL SELECT 'sector', id, name, 'banner (EN)' FROM marketplace_sectors WHERE banner_url = ANY($2) AND deleted_at IS NULL
        UNION ALL SELECT 'sector', id, name, 'banner (AR)' FROM marketplace_sectors WHERE banner_url_ar = ANY($2) AND deleted_at IS NULL
-       UNION ALL SELECT 'subcategory', id, name, 'image' FROM marketplace_subcategories WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL
-       UNION ALL SELECT 'banner', id, title, 'image' FROM home_banners WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL
-       UNION ALL SELECT 'product', id, name, 'primary image' FROM products WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL
+       UNION ALL SELECT 'subcategory', id, name, 'image' FROM marketplace_subcategories WHERE (media_asset_id = $1 OR image_url = ANY($2) OR image_url_ar = ANY($2)) AND deleted_at IS NULL
+       UNION ALL SELECT 'banner', id, title, 'image' FROM home_banners WHERE (media_asset_id = $1 OR image_url = ANY($2) OR image_url_ar = ANY($2)) AND deleted_at IS NULL
+       UNION ALL SELECT 'product', id, name, 'primary image' FROM products WHERE (media_asset_id = $1 OR image_url = ANY($2) OR image_url_ar = ANY($2)) AND deleted_at IS NULL
        UNION ALL SELECT 'product', p.id, p.name, 'additional image' FROM product_media pm JOIN products p ON p.id = pm.product_id WHERE pm.media_asset_id = $1 AND pm.is_primary = false AND p.deleted_at IS NULL
        UNION ALL SELECT 'catalog_product', id, name, 'image' FROM catalog_products WHERE (media_asset_id = $1 OR image_url = ANY($2)) AND deleted_at IS NULL`,
       [id, urls],
@@ -404,7 +404,7 @@ export class MediaService {
     const candidates: Array<{ url: string }> = await this.ds.query(
       `SELECT url FROM (
          SELECT logo_url AS url FROM vendors WHERE logo_url IS NOT NULL AND deleted_at IS NULL UNION SELECT image_url FROM marketplace_sectors WHERE image_url IS NOT NULL AND deleted_at IS NULL
-         UNION SELECT image_url FROM marketplace_subcategories WHERE image_url IS NOT NULL AND deleted_at IS NULL UNION SELECT image_url FROM home_banners WHERE image_url IS NOT NULL AND deleted_at IS NULL
+         UNION SELECT image_url FROM marketplace_subcategories WHERE image_url IS NOT NULL AND deleted_at IS NULL UNION SELECT image_url FROM home_banners WHERE image_url IS NOT NULL AND deleted_at IS NULL UNION SELECT image_url_ar FROM home_banners WHERE image_url_ar IS NOT NULL AND deleted_at IS NULL
          UNION SELECT image_url FROM products WHERE image_url IS NOT NULL AND deleted_at IS NULL UNION SELECT image_url FROM catalog_products WHERE image_url IS NOT NULL AND deleted_at IS NULL) u
        WHERE url LIKE $1 || '%' AND NOT EXISTS (SELECT 1 FROM media_assets a WHERE a.legacy_source_url = u.url) ORDER BY url LIMIT ${Math.min(200, Math.max(1, limit))}`,
       [prefix],
@@ -443,7 +443,7 @@ export class MediaService {
     const [{ remaining }] = await this.ds.query(
       `SELECT count(*)::int AS remaining FROM (
          SELECT logo_url AS url FROM vendors WHERE logo_url IS NOT NULL AND deleted_at IS NULL UNION SELECT image_url FROM marketplace_sectors WHERE image_url IS NOT NULL AND deleted_at IS NULL
-         UNION SELECT image_url FROM marketplace_subcategories WHERE image_url IS NOT NULL AND deleted_at IS NULL UNION SELECT image_url FROM home_banners WHERE image_url IS NOT NULL AND deleted_at IS NULL
+         UNION SELECT image_url FROM marketplace_subcategories WHERE image_url IS NOT NULL AND deleted_at IS NULL UNION SELECT image_url FROM home_banners WHERE image_url IS NOT NULL AND deleted_at IS NULL UNION SELECT image_url_ar FROM home_banners WHERE image_url_ar IS NOT NULL AND deleted_at IS NULL
          UNION SELECT image_url FROM products WHERE image_url IS NOT NULL AND deleted_at IS NULL UNION SELECT image_url FROM catalog_products WHERE image_url IS NOT NULL AND deleted_at IS NULL) u
        WHERE url LIKE $1 || '%' AND NOT EXISTS (SELECT 1 FROM media_assets a WHERE a.legacy_source_url = u.url)`,
       [prefix],

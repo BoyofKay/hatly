@@ -160,8 +160,8 @@ class _HomeBannerCarouselState extends State<HomeBannerCarousel> {
                               children: [
                                 // A failed or missing image shows the quiet placeholder (never a broken-image icon or an exception).
                                 if (widget.fullArtwork)
-                                  HatlySoftImage(url: banner.imageUrl, width: double.infinity, height: double.infinity, radius: 0, placeholderIcon: Icons.local_offer_outlined)
-                                else HomeHeroArtwork(url: banner.imageUrl, alignment: Alignment.bottomCenter),
+                                  HatlySoftImage(url: banner.localizedImage(arabic), width: double.infinity, height: double.infinity, radius: 0, placeholderIcon: Icons.local_offer_outlined)
+                                else HomeHeroArtwork(url: banner.localizedImage(arabic), alignment: Alignment.bottomCenter),
                                 if (title.isNotEmpty) ...[
                                   // A soft scrim so the title stays readable on any picture.
                                   const Positioned.fill(

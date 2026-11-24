@@ -25,6 +25,9 @@ export class HomeBanner extends BaseEntity {
   @Column({ name: 'image_url', type: 'varchar', length: 500, nullable: true })
   imageUrl?: string | null;
 
+  @Column({ name: 'image_url_ar', type: 'varchar', length: 500, nullable: true })
+  imageUrlAr?: string | null;
+
   @Column({ name: 'action_type', type: 'varchar', length: 10, default: HomeBannerActionType.NONE })
   actionType: HomeBannerActionType;
 

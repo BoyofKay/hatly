@@ -9,6 +9,7 @@ class HomeBanner {
     required this.title,
     this.titleAr,
     required this.imageUrl,
+    this.imageUrlAr,
     this.action = HomeBannerAction.none,
     this.targetId,
     this.sectorId,
@@ -20,6 +21,9 @@ class HomeBanner {
 
   /// The server's stable upload reference (`/uploads/files/<name>`) or an absolute URL; resolved by the shared media resolver.
   final String imageUrl;
+  final String? imageUrlAr;
+
+  String localizedImage(bool arabic) => arabic && imageUrlAr != null && imageUrlAr!.trim().isNotEmpty ? imageUrlAr! : imageUrl;
   final HomeBannerAction action;
   final String? targetId;
   final String? sectorId;
@@ -62,6 +66,7 @@ class HomeBanner {
       titleAr:
           raw['titleAr'] is String ? (raw['titleAr'] as String).trim() : null,
       imageUrl: imageUrl.trim(),
+      imageUrlAr: raw['imageUrlAr'] is String ? (raw['imageUrlAr'] as String).trim() : null,
       action: action,
       // A destination type this app version does not know, or one without a target, simply makes the banner non-tappable.
       targetId: target is String && target.isNotEmpty ? target : null,

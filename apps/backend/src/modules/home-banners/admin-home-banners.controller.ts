@@ -43,7 +43,7 @@ export class AdminHomeBannersController {
     return { data: await this.banners.update(id, dto) };
   }
 
-  /** `multipart/form-data`, one file in the field `image` (JPEG/PNG/WebP, up to 5 MB) — the same contract as a product image. */
+  /** English/legacy artwork: `multipart/form-data`, one file in the field `image` (JPEG/PNG/WebP, up to 5 MB) — the same contract as a product image. */
   @Post(':id/image')
   @RequiresPermission(Permission.MANAGE_HOME_BANNERS)
   @Throttled(RateLimitPolicies.productImageUpload)
@@ -54,6 +54,18 @@ export class AdminHomeBannersController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return { data: await this.banners.uploadImage(id, requireUploadedFile(file, 'image'), user.id) };
+  }
+
+  @Post(':id/image/ar')
+  @RequiresPermission(Permission.MANAGE_HOME_BANNERS)
+  @Throttled(RateLimitPolicies.productImageUpload)
+  @UseInterceptors(FileInterceptor('image', { limits: singleFileMultipartLimits(5 * 1024 * 1024) }))
+  async uploadArabicImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return { data: await this.banners.uploadImage(id, requireUploadedFile(file, 'image'), user.id, 'ar') };
   }
 
   @Patch(':id/activate')
