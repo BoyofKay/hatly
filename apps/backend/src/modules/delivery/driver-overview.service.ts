@@ -12,7 +12,7 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export type OrdersTab = 'today' | 'previous';
 export type EarningsTab = 'current' | 'previous';
-type OrderStatusFilter = 'completed' | 'cancelled' | 'failed' | 'active';
+type OrderStatusFilter = 'completed' | 'cancelled' | 'failed' | 'active' | 'acknowledge' | 'ready' | 'on_way';
 
 /** Cairo dates of the current week (Saturday → Friday, the Egyptian work week) — the default range of the "Previous" tabs. */
 export function currentCairoWeek(now = new Date()): { from: string; to: string } {
@@ -55,121 +55,74 @@ export class DriverOverviewService {
     return { from, to };
   }
 
-  private async lastClosingEnd(driverId: string): Promise<string | null> {
-    const [r] = await this.ds.query(
-      `SELECT max(period_end) AS e FROM driver_settlement_periods WHERE driver_id = $1 AND status = 'CLOSED' AND deleted_at IS NULL`,
-      [driverId],
-    );
-    return r?.e ? new Date(r.e).toISOString() : null;
-  }
-
   async orders(userId: string, q: { tab?: string; from?: string; to?: string; status?: string; q?: string; page?: string; limit?: string }) {
     const driver = await this.auth.getDriverForUser(userId);
     const tab: OrdersTab = q.tab === 'previous' ? 'previous' : 'today';
-    const status = (['completed', 'cancelled', 'failed', 'active'] as const).includes(q.status as OrderStatusFilter) ? (q.status as OrderStatusFilter) : null;
-    const page = Math.max(1, Number(q.page) || 1);
-    const limit = Math.min(50, Math.max(1, Number(q.limit) || 20));
-    // Membership is by an actual open shift. A finished order immediately
-    // moves to Previous when the shift ends (even if office closing is later).
-    const [openShift] = await this.ds.query(
-      'SELECT started_at FROM driver_shifts WHERE driver_id = $1 AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1',
-      [driver.id],
-    );
-    const openShiftStart = openShift?.started_at ? new Date(openShift.started_at).toISOString() : null;
+    const page = Math.max(1, Math.floor(Number(q.page) || 1));
+    const limit = Math.min(50, Math.max(1, Math.floor(Number(q.limit) || 20)));
     const range = tab === 'previous' ? this.range(q) : null;
-
-    const params: unknown[] = [driver.id, openShiftStart];
-    const at = `coalesce(d.delivered_at, o.updated_at)`;
-    const settled = `EXISTS (SELECT 1 FROM driver_settlement_period_orders so WHERE so.order_id = o.id)`;
-    const active = `o.status::text NOT IN ('DELIVERED','CANCELLED','FAILED_DELIVERY','RETURNED')`;
-    // Keep active orders visible even after a supervisor force-end (safety).
-    // Finished orders belong to Current only while their shift is still open.
-    const todaySet = `(${active} OR (NOT ${settled} AND $2::timestamptz IS NOT NULL AND ${at} >= $2::timestamptz))`;
-    const where = [`d.driver_id = $1`, `d.deleted_at IS NULL`, `o.deleted_at IS NULL`, tab === 'today' ? todaySet : `NOT ${todaySet}`];
-    if (range) {
-      params.push(range.from, range.to);
-      where.push(`(${at} AT TIME ZONE '${CAIRO}')::date BETWEEN $3::date AND $4::date`);
-    }
-    if (status) {
-      const map: Record<OrderStatusFilter, string> = {
-        completed: `o.status::text = 'DELIVERED'`,
-        cancelled: `o.status::text = 'CANCELLED'`,
-        failed: `o.status::text IN ('FAILED_DELIVERY','RETURNED')`,
-        active,
-      };
-      where.push(map[status]);
-    }
-    const search = (q.q ?? '').trim().slice(0, 60);
+    const params: unknown[] = [driver.id];
+    const scope = tab === 'today' ? 'sh.ended_at IS NULL AND sh.id IS NOT NULL' : 'sh.ended_at IS NOT NULL';
+    // An order may be offered repeatedly in one shift. Choose the latest recorded assignment in
+    // that shift; the immutable attempt records remain available for future dispatch analytics.
+    const cte = `WITH scoped AS (
+      SELECT DISTINCT ON (a.shift_id,a.order_id) a.*, coalesce(a.concluded_at,a.assigned_at) AS at
+      FROM driver_shift_assignments a JOIN driver_shifts sh ON sh.id=a.shift_id
+      WHERE a.driver_id=$1 AND ${scope}
+      ORDER BY a.shift_id,a.order_id,a.assigned_at DESC,a.id DESC
+    ), selected AS (
+      SELECT DISTINCT ON (a.order_id) a.* FROM scoped a
+      ${range ? "WHERE (a.at AT TIME ZONE 'Africa/Cairo')::date BETWEEN $2::date AND $3::date" : ''}
+      ORDER BY a.order_id,a.assigned_at DESC,a.id DESC
+    )`;
+    if (range) params.push(range.from, range.to);
+    const active = "a.concluded_at IS NULL AND a.status NOT IN ('DELIVERED','CANCELLED','FAILED_DELIVERY','REASSIGNED','COLLECTED')";
+    const ack = `(${active} AND a.acknowledged_at IS NULL)`;
+    const ready = `(${active} AND a.status IN ('READY_FOR_PICKUP','ASSIGNED_TO_DRIVER'))`;
+    const onWay = `(${active} AND a.status IN ('PICKED_UP','ON_THE_WAY'))`;
+    const map: Record<OrderStatusFilter,string> = {
+      completed: "a.status='DELIVERED'", cancelled: "a.status='CANCELLED'", failed: "a.status='FAILED_DELIVERY'",
+      active, acknowledge: ack, ready, on_way: onWay,
+    };
+    const [k] = await this.ds.query(`${cte}
+      SELECT count(*)::int AS total,
+        count(*) FILTER (WHERE ${map.completed})::int AS completed,
+        count(*) FILTER (WHERE ${map.cancelled})::int AS cancelled,
+        count(*) FILTER (WHERE ${map.failed})::int AS failed,
+        count(*) FILTER (WHERE ${ack})::int AS acknowledge,
+        count(*) FILTER (WHERE ${ready})::int AS ready,
+        count(*) FILTER (WHERE ${onWay})::int AS on_way
+      FROM selected a`,params);
+    const where = ['o.deleted_at IS NULL'];
+    if (q.status && Object.prototype.hasOwnProperty.call(map,q.status)) where.push(map[q.status as OrderStatusFilter]);
+    const search = (q.q ?? '').trim().slice(0,60);
     if (search) {
-      params.push(`%${search.replace(/[%_\\]/g, (c) => `\\${c}`)}%`);
-      const i = params.length;
-      where.push(`(o.order_number ILIKE $${i} OR EXISTS (SELECT 1 FROM order_vendor_segments s JOIN vendor_branches b ON b.id = s.vendor_branch_id JOIN vendors v ON v.id = b.vendor_id
-                     WHERE s.order_id = o.id AND (v.name ILIKE $${i} OR v.name_ar ILIKE $${i})))`);
+      params.push('%' + search.replace(/[%_\\]/g,c=>'\\'+c) + '%');
+      const i=params.length;
+      where.push(`(o.order_number ILIKE $${i} OR EXISTS (SELECT 1 FROM order_vendor_segments s JOIN vendor_branches b ON b.id=s.vendor_branch_id JOIN vendors v ON v.id=b.vendor_id WHERE s.order_id=o.id AND (v.name ILIKE $${i} OR v.name_ar ILIKE $${i})))`);
     }
-    const base = `FROM deliveries d JOIN orders o ON o.id = d.order_id WHERE ${where.join(' AND ')}`;
-    const [tot] = await this.ds.query(`SELECT count(*)::int AS n ${base}`, params);
-    const rows: any[] = await this.ds.query(
-      `SELECT d.id AS delivery_id, o.id AS order_id, o.order_number, o.status::text AS status, o.payment_method::text AS payment_method, ${at} AS at, d.assigned_at,
-              (SELECT string_agg(DISTINCT v.name, ' · ') FROM order_vendor_segments s JOIN vendor_branches b ON b.id = s.vendor_branch_id JOIN vendors v ON v.id = b.vendor_id
-                WHERE s.order_id = o.id AND s.deleted_at IS NULL) AS vendors
-         ${base} ORDER BY ${at} DESC NULLS LAST, o.id LIMIT ${limit} OFFSET ${(page - 1) * limit}`,
-      params,
-    );
-    const states = await this.closing.courierOrderStates(driver.id, rows.filter((r) => r.status === 'DELIVERED').map((r) => r.order_id));
-
-    // KPIs over the whole window (not the page), ignoring search/status so the numbers describe the shift / the range.
-    const kWhere = [`d.driver_id = $1`, `d.deleted_at IS NULL`, `o.deleted_at IS NULL`, tab === 'today' ? todaySet : `NOT ${todaySet}`];
-    const kParams: unknown[] = [driver.id, openShiftStart];
-    if (range) {
-      kParams.push(range.from, range.to);
-      kWhere.push(`(${at} AT TIME ZONE '${CAIRO}')::date BETWEEN $3::date AND $4::date`);
-    }
-    const [k] = await this.ds.query(
-      `SELECT count(*) FILTER (WHERE o.status::text = 'DELIVERED')::int AS completed,
-              count(*) FILTER (WHERE o.status::text = 'CANCELLED')::int AS cancelled,
-              count(*) FILTER (WHERE d.acknowledged_at IS NOT NULL)::int AS accepted
-         FROM deliveries d JOIN orders o ON o.id = d.order_id WHERE ${kWhere.join(' AND ')}`,
-      kParams,
-    );
-    const ignoredWindow = range
-      ? { sql: `(a.created_at AT TIME ZONE '${CAIRO}')::date BETWEEN $2::date AND $3::date`, params: [driver.id, range.from, range.to] }
-      : { sql: `($2::timestamptz IS NOT NULL AND a.created_at >= $2::timestamptz)`, params: [driver.id, openShiftStart] };
-    const [ig] = await this.ds.query(
-      `SELECT count(DISTINCT a.order_id)::int AS n FROM dispatch_attempts a WHERE a.driver_id = $1 AND a.outcome = 'ACKNOWLEDGEMENT_OVERDUE' AND ${ignoredWindow.sql}`,
-      ignoredWindow.params,
-    );
-    const ignored = num(ig?.n);
-    const accepted = num(k?.accepted);
+    const base = `FROM selected a JOIN orders o ON o.id=a.order_id JOIN deliveries d ON d.id=a.delivery_id WHERE ${where.join(' AND ')}`;
+    const [tot] = await this.ds.query(`${cte} SELECT count(*)::int AS n ${base}`,params);
+    const rows: any[] = await this.ds.query(`${cte}
+      SELECT a.*,o.order_number,o.payment_method::text AS payment_method,
+        (d.driver_id=a.driver_id AND d.assigned_at=a.assigned_at AND a.status<>'REASSIGNED' AND d.deleted_at IS NULL) AS can_open,
+        (SELECT string_agg(DISTINCT v.name,' · ') FROM order_vendor_segments s JOIN vendor_branches b ON b.id=s.vendor_branch_id JOIN vendors v ON v.id=b.vendor_id WHERE s.order_id=o.id AND s.deleted_at IS NULL) AS vendors
+      ${base}
+      ORDER BY CASE WHEN ${ack} THEN 0 WHEN ${ready} THEN 1 WHEN ${onWay} THEN 2 WHEN ${active} THEN 3 ELSE 4 END,
+        CASE WHEN ${ack} THEN a.acknowledge_by END ASC NULLS LAST, a.at DESC, a.id
+      LIMIT ${limit} OFFSET ${(page-1)*limit}`,params);
+    const states = await this.closing.courierOrderStates(driver.id, rows.filter(r=>r.status==='DELIVERED' && r.can_open).map(r=>r.order_id));
     return {
-      tab,
-      range,
-      kpis: {
-        completed: num(k?.completed),
-        cancelled: num(k?.cancelled),
-        ignored,
-        accepted,
-        // share of the offers he answered: accepted ÷ (accepted + ignored); null when there was nothing to answer
-        acceptanceRatePercent: accepted + ignored > 0 ? Math.round((accepted * 100) / (accepted + ignored)) : null,
-      },
-      items: rows.map((r) => {
-        const st = states.get(r.order_id);
-        const line = (st?.line ?? null) as Record<string, number> | null;
-        return {
-          deliveryId: r.delivery_id,
-          orderId: r.order_id,
-          orderNumber: r.order_number,
-          status: r.status,
-          paymentMethod: r.payment_method,
-          vendors: r.vendors ?? null,
-          at: iso(r.at),
-          earnedMinor: line ? num(line.courierCompensationMinor) : null,
-          settlementState: st?.state ?? null,
-          settlementReference: st?.reference ?? null,
-        };
+      tab, range, page, limit, total:num(tot?.n),
+      kpis: { all:num(k?.total), completed:num(k?.completed), cancelled:num(k?.cancelled), failed:num(k?.failed),
+        acknowledge:num(k?.acknowledge), ready:num(k?.ready), onWay:num(k?.on_way), ignored:0, accepted:0, acceptanceRatePercent:null },
+      items: rows.map(r=>{
+        const st=states.get(r.order_id);
+        const line=(st?.line ?? null) as Record<string,number>|null;
+        return {deliveryId:r.delivery_id,orderId:r.order_id,orderNumber:r.order_number,status:r.status,
+          paymentMethod:r.payment_method,vendors:r.vendors??null,at:iso(r.at),canOpen:r.can_open===true,
+          earnedMinor:line?num(line.courierCompensationMinor):null,settlementState:st?.state??null,settlementReference:st?.reference??null};
       }),
-      page,
-      limit,
-      total: num(tot?.n),
     };
   }
 

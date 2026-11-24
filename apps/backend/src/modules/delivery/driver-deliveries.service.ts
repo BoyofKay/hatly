@@ -155,10 +155,10 @@ export class DriverDeliveriesService {
     if (options.implicitAcknowledgement !== false) await this.markAcknowledged(deliveryId, driver.id);
 
     const delivery = await this.deliveriesRepository.findOne({
-      where: { id: deliveryId },
+      where: { id: deliveryId, driverId: driver.id },
       relations: { order: { customer: true, segments: { items: true } } },
     });
-    if (!delivery || delivery.order.status === OrderStatus.READY_FOR_PICKUP) {
+    if (!delivery || (delivery.order.status === OrderStatus.READY_FOR_PICKUP && !delivery.earlyAssignedAt)) {
       // Same reason as the list: a released driver is no longer on the order.
       throw new NotFoundException('Delivery not found.');
     }

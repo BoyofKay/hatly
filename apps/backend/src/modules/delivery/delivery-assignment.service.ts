@@ -130,7 +130,7 @@ export class DeliveryAssignmentService {
             lock: { mode: 'pessimistic_write' },
           });
 
-          if (!driver || !driver.isAvailable || !driver.isOnline) {
+          if (!driver || !driver.isAvailable || !driver.isOnline || driver.acceptingNewOrders === false) {
             return null; // driver went unavailable between candidate list and lock
           }
 
@@ -237,7 +237,7 @@ export class DeliveryAssignmentService {
           const row = await manager.findOne(Driver, { where: { id }, lock: { mode: 'pessimistic_write' } });
           if (id === params.newDriverId) newDriver = row;
         }
-        if (!newDriver || !newDriver.isOnline || !newDriver.isAvailable) {
+        if (!newDriver || !newDriver.isOnline || !newDriver.isAvailable || newDriver.acceptingNewOrders === false) {
           if (newDriver) await this.throwNamedDriverRefusal(newDriver.id, 'DRIVER_UNAVAILABLE', manager);
           throw new ConflictException({
             message: 'The selected driver is not online and available right now.',
@@ -282,7 +282,7 @@ export class DeliveryAssignmentService {
           const existing = await manager.findOne(Delivery, { where: { orderId: params.orderId }, lock: { mode: 'pessimistic_write' } });
           if (existing?.driverId && existing.earlyAssignedAt) return 'ORDER_GONE' as const; // someone was attached meanwhile
           const driver = await manager.findOne(Driver, { where: { id: driverId }, lock: { mode: 'pessimistic_write' } });
-          if (!driver || !driver.isAvailable || !driver.isOnline) return null;
+          if (!driver || !driver.isAvailable || !driver.isOnline || driver.acceptingNewOrders === false) return null;
           const windowRow = await manager.findOne(BusinessConfig, { where: { key: BusinessConfigKey.DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES } });
           const acknowledgeBy = new Date(Date.now() + resolveAcknowledgementWindowMinutes(windowRow?.value) * 60_000);
           const fields = { driverId: driver.id, assignedAt: new Date(), acceptDeadlineAt: acknowledgeBy, acknowledgedAt: null, pickedUpAt: null, deliveredAt: null, earlyAssignedAt: new Date() };
