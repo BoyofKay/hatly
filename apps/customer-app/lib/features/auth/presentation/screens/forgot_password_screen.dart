@@ -180,18 +180,21 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 HatlyTextField(
                     key: const Key('forgot-temp'),
                     controller: _temp,
+                     passwordVisibility: true,
                     hintText: l10n.forgotTempLabel),
                 const SizedBox(height: HatlySpacing.sm),
                 HatlyTextField(
                     key: const Key('forgot-new'),
                     controller: _next,
                     obscureText: true,
+                     passwordVisibility: true,
                     hintText: l10n.forgotNewLabel),
                 const SizedBox(height: HatlySpacing.sm),
                 HatlyTextField(
                     key: const Key('forgot-confirm'),
                     controller: _confirm,
                     obscureText: true,
+                     passwordVisibility: true,
                     hintText: l10n.forgotConfirmLabel),
                 const SizedBox(height: HatlySpacing.sm),
                 HatlyButton(

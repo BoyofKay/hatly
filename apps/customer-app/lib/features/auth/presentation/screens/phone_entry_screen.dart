@@ -31,6 +31,8 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
   final _nameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  bool _showPassword = false;
+  bool _showConfirm = false;
 
   // Local (client-side) validation error, kept separate from the
   // flow controller's server-side errorCode — they're shown the same
@@ -129,7 +131,7 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                     _FieldLabel(l10n.passwordLabel),
                     TextField(
                       controller: _passwordController,
-                      obscureText: true,
+                      obscureText: !_showPassword,
                       enableSuggestions: false,
                       autocorrect: false,
                       autofillHints: [
@@ -142,51 +144,45 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
                           : TextInputAction.done,
                       onSubmitted: _registering ? null : (_) => _submit(l10n),
                       style: context.type.body.copyWith(color: p.textPrimary),
-                      decoration: InputDecoration(hintText: l10n.passwordHint),
+                      decoration: InputDecoration(hintText: l10n.passwordHint, suffixIcon: _visibilityButton(_showPassword, () => setState(() => _showPassword = !_showPassword), 'entry-password-visibility')),
                     ),
                     if (_registering) ...[
                       const SizedBox(height: HatlySpacing.md),
                       _FieldLabel(l10n.passwordConfirmLabel),
                       TextField(
                         controller: _confirmController,
-                        obscureText: true,
+                        obscureText: !_showConfirm,
                         enableSuggestions: false,
                         autocorrect: false,
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => _submit(l10n),
                         style: context.type.body.copyWith(color: p.textPrimary),
                         decoration:
-                            InputDecoration(hintText: l10n.passwordHint),
+                            InputDecoration(hintText: l10n.passwordHint, suffixIcon: _visibilityButton(_showConfirm, () => setState(() => _showConfirm = !_showConfirm), 'entry-confirm-visibility')),
                       ),
                     ],
                     const SizedBox(height: HatlySpacing.sm),
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        TextButton(
-                          onPressed: flowState.isSubmitting
-                              ? null
-                              : () => _switchTo(_form == _EntryForm.login
-                                  ? _EntryForm.register
-                                  : _EntryForm.login),
-                          child: Text(
-                            _form == _EntryForm.login
-                                ? l10n.passwordCreateAccountInstead
-                                : l10n.passwordHaveAccountInstead,
-                          ),
+                    if (_form == _EntryForm.login)
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: TextButton(
+                          key: const Key('forgot-password-link'),
+                          onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                  builder: (_) => ForgotPasswordScreen(
+                                      initialPhone: _phoneController.text))),
+                          child: Text(l10n.forgotPasswordLink),
                         ),
-                        if (_form == _EntryForm.login)
-                          TextButton(
-                            key: const Key('forgot-password-link'),
-                            onPressed: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                    builder: (_) => ForgotPasswordScreen(
-                                        initialPhone: _phoneController.text))),
-                            child: Text(l10n.forgotPasswordLink),
-                          ),
-                      ],
-                    ),
+                      ),
+                    Center(child: TextButton(
+                      onPressed: flowState.isSubmitting
+                          ? null
+                          : () => _switchTo(_form == _EntryForm.login
+                              ? _EntryForm.register : _EntryForm.login),
+                      child: Text(_form == _EntryForm.login
+                          ? l10n.passwordCreateAccountInstead
+                          : l10n.passwordHaveAccountInstead),
+                    )),
                     if (displayedError != null) ...[
                       const SizedBox(height: HatlySpacing.md),
                       AuthErrorNotice(message: displayedError),
@@ -208,6 +204,13 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
     );
   }
 
+  Widget _visibilityButton(bool visible, VoidCallback toggle, String key) {
+    final ar = Localizations.localeOf(context).languageCode == 'ar';
+    return IconButton(key: Key(key), onPressed: toggle,
+      tooltip: visible ? (ar ? 'إخفاء كلمة المرور' : 'Hide password') : (ar ? 'إظهار كلمة المرور' : 'Show password'),
+      icon: Icon(visible ? Icons.visibility_off_outlined : Icons.visibility_outlined));
+  }
+
   /// Switches form. Typed passwords are dropped (never carried between forms) and stale errors cleared; the phone is kept.
   void _switchTo(_EntryForm form) {
     ref.read(otpFlowControllerProvider.notifier).clearError();
@@ -216,6 +219,8 @@ class _PhoneEntryScreenState extends ConsumerState<PhoneEntryScreen> {
       _localValidationError = null;
       _passwordController.clear();
       _confirmController.clear();
+      _showPassword = false;
+      _showConfirm = false;
     });
   }
 

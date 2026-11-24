@@ -50,7 +50,7 @@ class CustomRequestAction extends ConsumerWidget {
           pickImageOverride: pickImageOverride),
       );
       if (added == true) {
-        messenger.showSnackBar(SnackBar(content: Text(l10n.customRequestAdded)));
+        messenger..hideCurrentSnackBar()..showSnackBar(SnackBar(content: Text(l10n.customRequestAdded), duration: const Duration(seconds: 3), behavior: SnackBarBehavior.floating));
       }
     }
     if (floating) {

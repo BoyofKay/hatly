@@ -362,8 +362,9 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
         ..showSnackBar(SnackBar(
           key: const Key('added-to-cart-snackbar'),
           content: Text('${l10n.addedToCartConfirmation} · $addedName'),
-          duration: const Duration(seconds: 3),
+          duration: const Duration(seconds: 5),
           behavior: SnackBarBehavior.floating,
+          persist: false,
           action: SnackBarAction(
               label: l10n.cartSummaryViewCart,
               onPressed: () => router.push('/cart')),

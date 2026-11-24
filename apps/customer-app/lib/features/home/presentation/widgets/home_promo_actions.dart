@@ -122,7 +122,8 @@ Future<void> handleQuickAdd(
       .addItem(productId: productId, quantity: 1);
   if (error == null) {
     messenger
-        .showSnackBar(SnackBar(content: Text(l10n.addedToCartConfirmation)));
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(l10n.addedToCartConfirmation), duration: const Duration(seconds: 3), behavior: SnackBarBehavior.floating));
     return;
   }
   if (_needsProductPage.contains(error.businessCode)) {
