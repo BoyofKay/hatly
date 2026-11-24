@@ -17,7 +17,6 @@ import '../../cart/data/cart_providers.dart';
 import '../../cart/presentation/cart_error_messages.dart';
 import '../../cart/presentation/cart_compatibility_flow.dart';
 import 'widgets/weight_inline_input.dart';
-import '../../cart/presentation/widgets/cart_icon_button.dart';
 import '../../cart/presentation/widgets/cart_mini_sheet.dart';
 import '../../search/presentation/widgets/explore_message.dart';
 import '../data/product_providers.dart';
@@ -100,7 +99,6 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
     final total = config.estimatedTotalMinor(product);
 
     return Scaffold(
-      appBar: AppBar(actions: const [CartIconButton()]),
       body: SafeArea(
         top: false,
         child: ListView(
@@ -108,25 +106,40 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
           children: [
             // Reference board ("تفاصيل المنتج"): the photo fills the width on a soft panel with rounded lower corners, then the
             // name and price are centred under it.
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(HatlyRadius.promoBanner + 8)),
-              child: ColoredBox(
-                color: p.surfaceSoft,
+            Stack(clipBehavior: Clip.none, children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(HatlyRadius.promoBanner + 8)),
                 child: AspectRatio(
-                  aspectRatio: 1.5,
-                  child: HatlySoftImage(
-                    url: product.imageUrl,
-                    width: double.infinity,
-                    height: double.infinity,
-                    radius: 0,
-                    placeholderIcon: Icons.shopping_basket_outlined,
-                    placeholderIconSize: 64,
-                    semanticLabel: name,
+                  aspectRatio: 1.9,
+                  child: HatlySoftImage(url: product.imageUrl, width: double.infinity,
+                    height: double.infinity, radius: 0, placeholderIcon: Icons.shopping_basket_outlined,
+                    placeholderIconSize: 64, semanticLabel: name),
+                ),
+              ),
+              PositionedDirectional(start: 12, top: 8,
+                child: Material(color: const Color(0xAA000000), shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    onPressed: () => Navigator.of(context).maybePop(),
                   ),
                 ),
               ),
-            ),
+              if (product.vendor != null)
+                PositionedDirectional(start: 18, bottom: -28,
+                  child: Material(color: p.surface, shape: const CircleBorder(), elevation: 3,
+                    child: InkWell(key: const Key('product-vendor-link'), customBorder: const CircleBorder(),
+                      onTap: product.vendor!.vendorBranchId.isEmpty ? null
+                        : () => context.push('/vendors/${product.vendor!.vendorBranchId}'),
+                      child: Padding(padding: const EdgeInsets.all(4),
+                        child: HatlySoftImage(url: product.vendor!.logoUrl, width: 56, height: 56,
+                          circular: true, placeholderIcon: Icons.storefront_outlined),
+                      ),
+                    ),
+                  ),
+                ),
+            ]),
+            if (product.vendor != null) const SizedBox(height: 24),
             Padding(
               padding: const EdgeInsets.fromLTRB(HatlySpacing.screenPadding,
                   HatlySpacing.lg, HatlySpacing.screenPadding, 0),
@@ -172,15 +185,11 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
                             label: l10n.productUnavailable),
                     ],
                   ),
-                  if (product.vendor != null) ...[
-                    const SizedBox(height: HatlySpacing.md),
-                    _VendorSummary(
-                      vendor: product.vendor!,
-                      onChangeStore: product.catalogProductId == null
-                          ? null
-                          : () => _changeStore(product.catalogProductId!),
-                    ),
-                  ],
+                  if (product.vendor != null && product.catalogProductId != null)
+                    Center(child: TextButton(
+                      onPressed: () => _changeStore(product.catalogProductId!),
+                      child: Text(l10n.catalogChangeStore),
+                    )),
                   if (description != null && description.trim().isNotEmpty) ...[
                     const SizedBox(height: HatlySpacing.md),
                     ExpandableText(description,
@@ -370,135 +379,6 @@ class _ProductDetailsScreenState extends ConsumerState<ProductDetailsScreen> {
       onViewCart: () {
         if (mounted) context.push('/cart');
       },
-    );
-  }
-}
-
-class _VendorSummary extends StatelessWidget {
-  const _VendorSummary({required this.vendor, required this.onChangeStore});
-
-  final ProductVendorSummary vendor;
-  final VoidCallback? onChangeStore;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final p = context.palette;
-    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final name =
-        isArabic && vendor.nameAr != null ? vendor.nameAr! : vendor.name;
-    final hasRating = vendor.ratingCount > 0;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: p.surface,
-        borderRadius: BorderRadius.circular(HatlyRadius.card),
-        boxShadow: HatlyShadows.soft(p),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(
-            HatlySpacing.ms, HatlySpacing.sm, HatlySpacing.sm, HatlySpacing.ms),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Name row: small logo, the name, and "تغيير المتجر" on the same line. The name gets the larger
-            // share; at very large text sizes both shrink/ellipsize instead of overflowing.
-            Row(
-              children: [
-                HatlySoftImage(
-                  url: vendor.logoUrl,
-                  width: 32,
-                  height: 32,
-                  circular: true,
-                  placeholderIcon: Icons.storefront_outlined,
-                  placeholderIconSize: 18,
-                ),
-                const SizedBox(width: HatlySpacing.sm),
-                Expanded(
-                  flex: 2,
-                  // The vendor's name (and logo) open the vendor page — by the listing's own vendorBranchId, never by guessing from
-                  // the displayed name. The route (`/vendors/:id`) is keyed by the branch id, exactly as the vendor list uses it.
-                  child: Semantics(
-                    button: true,
-                    label: name,
-                    excludeSemantics: true,
-                    child: InkWell(
-                      key: const Key('product-vendor-link'),
-                      borderRadius: BorderRadius.circular(HatlyRadius.chip),
-                      onTap: vendor.vendorBranchId.isEmpty
-                          ? null
-                          : () =>
-                              context.push('/vendors/${vendor.vendorBranchId}'),
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                            minHeight: HatlyTouch.minTarget),
-                        child: Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Text(name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: context.type.body.copyWith(
-                                  color: p.textPrimary,
-                                  fontWeight: FontWeight.w700)),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (onChangeStore != null)
-                  Flexible(
-                    child: Align(
-                      alignment: AlignmentDirectional.centerEnd,
-                      child: TextButton(
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(
-                              HatlyTouch.minTarget, HatlyTouch.minTarget),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: HatlySpacing.sm),
-                          foregroundColor: p.link,
-                        ),
-                        onPressed: onChangeStore,
-                        child: Text(l10n.catalogChangeStore,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: context.type.small.copyWith(
-                                color: p.link, fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: HatlySpacing.sm,
-              runSpacing: HatlySpacing.xs,
-              children: [
-                if (hasRating)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.star_rounded, size: 16, color: p.warning),
-                      const SizedBox(width: 2),
-                      LtrText(vendor.ratingAverage.toStringAsFixed(1),
-                          style: context.type.small.copyWith(
-                              color: p.textPrimary,
-                              fontWeight: FontWeight.w700)),
-                      const SizedBox(width: 4),
-                      LtrText('(${vendor.ratingCount})',
-                          style: context.type.caption),
-                    ],
-                  ),
-                HatlyBadge(
-                  kind: vendor.isOpen
-                      ? HatlyBadgeKind.open
-                      : HatlyBadgeKind.closed,
-                  label: vendor.isOpen ? l10n.vendorOpenNow : l10n.vendorClosed,
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

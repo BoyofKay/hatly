@@ -202,7 +202,8 @@ class _ProfileHeader extends StatelessWidget {
           ],
         ),
       ),
-      child: Column(
+      child: Stack(children: [
+        SizedBox(width: double.infinity, child: Column(
         children: [
           const SizedBox(height: HatlySpacing.md),
           Container(
@@ -228,16 +229,17 @@ class _ProfileHeader extends StatelessWidget {
                 key: const Key('profile-displayed-name'),
                 maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: context.type.h2.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800))),
-              const SizedBox(width: 4),
-              if (saving) const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-              else IconButton(
-                key: const Key('profile-edit-name'), onPressed: onEdit,
-                tooltip: Localizations.localeOf(context).languageCode == 'ar' ? 'تعديل الاسم' : 'Edit name',
-                icon: Icon(Icons.edit_outlined, size: 20, color: p.textPrimary)),
+
             ]),
           ],
         ],
-      ),
+      )),
+        PositionedDirectional(top: 0, end: 0, child: saving
+          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+          : IconButton(key: const Key('profile-edit-name'), onPressed: onEdit,
+              tooltip: Localizations.localeOf(context).languageCode == 'ar' ? 'تعديل الاسم' : 'Edit name',
+              icon: Icon(Icons.edit_outlined, size: 20, color: p.textPrimary))),
+      ]),
     );
   }
 }

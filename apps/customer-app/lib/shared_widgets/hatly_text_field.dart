@@ -38,15 +38,21 @@ class HatlyTextField extends StatelessWidget {
       keyboardType: keyboardType,
       maxLines: maxLines,
       onChanged: onChanged,
+      style: isSearch ? const TextStyle(fontSize: 13) : null,
       decoration: InputDecoration(
         hintText: hintText,
         errorText: errorText,
-        prefixIcon: isSearch ? const Icon(Icons.search) : null,
+        prefixIcon: isSearch ? const Icon(Icons.search, size: 18) : null,
+        prefixIconConstraints: isSearch ? const BoxConstraints(minWidth: 36, minHeight: 36) : null,
+        isDense: isSearch,
+        hintStyle: isSearch ? const TextStyle(fontSize: 12) : null,
+        contentPadding: isSearch ? const EdgeInsets.symmetric(vertical: 8, horizontal: 10) : null,
         border: isSearch
             ? OutlineInputBorder(
                 borderRadius: BorderRadius.circular(999),
                 borderSide: BorderSide.none)
             : null,
+        focusedBorder: isSearch ? OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none) : null,
         enabledBorder: isSearch
             ? OutlineInputBorder(
                 borderRadius: BorderRadius.circular(999),

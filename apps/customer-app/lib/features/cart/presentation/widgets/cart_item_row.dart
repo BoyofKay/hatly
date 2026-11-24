@@ -154,7 +154,7 @@ class CartItemRow extends StatelessWidget {
             // on narrow phones / large Arabic text instead of shrinking the
             // quantity control's 44px touch targets. No mutation rules change.
             LayoutBuilder(
-              builder: (context, constraints) => Wrap(
+              builder: (context, constraints) => SizedBox(width: constraints.maxWidth, child: Wrap(
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: HatlySpacing.xs,
@@ -217,7 +217,7 @@ class CartItemRow extends StatelessWidget {
                     ],
                   ),
                 ],
-              ),
+              )),
             ),
           ],
         ),

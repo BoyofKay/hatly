@@ -104,19 +104,19 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
           ClipRRect(
             borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
             child: SizedBox(
-              height: 230,
+              height: MediaQuery.sizeOf(context).width * 9 / 16,
               width: double.infinity,
               child: Stack(fit: StackFit.expand, children: [
                 ColoredBox(color: translucentHero(sectorTint, Theme.of(context).scaffoldBackgroundColor)),
                 if (bannerUrl != null)
-                  HatlySoftImage(url: bannerUrl, width: double.infinity, height: 230,
+                  HatlySoftImage(url: bannerUrl, width: double.infinity, height: MediaQuery.sizeOf(context).width * 9 / 16,
                     radius: 0, placeholderIcon: Icons.storefront_outlined),
                 const DecoratedBox(decoration: BoxDecoration(
                   gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
                     stops: [0, 0.45, 1],
                     colors: [Color(0x66000000), Color(0x00000000), Color(0x88000000)]))),
                 PositionedDirectional(
-                  start: 12, top: MediaQuery.viewPaddingOf(context).top + 6,
+                  start: 12, top: 6,
                   child: Material(color: const Color(0xAA000000), shape: const CircleBorder(),
                     child: IconButton(
                       key: const Key('sector-hero-back'), tooltip: MaterialLocalizations.of(context).backButtonTooltip,
@@ -132,7 +132,7 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: HatlySpacing.sm),
+            padding: const EdgeInsets.symmetric(vertical: HatlySpacing.xs),
             child: SubcategoryChipRow(
               sectorId: sectorId,
               selectedSubcategoryId: _selectedSubcategoryId,
@@ -148,7 +148,7 @@ class _VendorListScreenState extends ConsumerState<VendorListScreen> {
                 Expanded(
                   child: HatlyTextField(
                     isSearch: true,
-                    hintText: l10n.searchHint,
+                    hintText: Localizations.localeOf(context).languageCode == 'ar' ? 'ابحث عن متجر' : 'Search stores',
                     onChanged: (value) => setState(() => _searchQuery = value),
                   ),
                 ),

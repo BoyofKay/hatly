@@ -52,7 +52,6 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen> {
   // Filters V1. The committed/active filter state — the filter sheet
   // only ever replaces this wholesale, on Apply.
   ProductFilters _filters = ProductFilters.empty;
-  double? _customBubbleY;
 
   @override
   Widget build(BuildContext context) {
@@ -77,14 +76,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen> {
       ),
       data: (details) => Scaffold(
         bottomNavigationBar: const CartSummaryBar(),
-        body: LayoutBuilder(builder: (context, constraints) {
-          // Overlay never becomes a menu sliver: lazy paging and cached pages survive.
-          final maxTop = (constraints.maxHeight - 80).clamp(0.0, double.infinity).toDouble();
-          final minTop = maxTop < 80 ? 0.0 : 80.0;
-          final top = (_customBubbleY ?? constraints.maxHeight * 0.50)
-              .clamp(minTop, maxTop).toDouble();
-          return Stack(children: [
-            Positioned.fill(child: _VendorDetailsContent(
+        body: _VendorDetailsContent(
               details: details,
               selectedCategoryId: _selectedCategoryId,
               onCategorySelected: (id) => setState(() => _selectedCategoryId = id),
@@ -94,22 +86,7 @@ class _VendorDetailsScreenState extends ConsumerState<VendorDetailsScreen> {
               onSearchChanged: (query) => setState(() => _searchQuery = query),
               filters: _filters,
               onFiltersChanged: (filters) => setState(() => _filters = filters),
-            )),
-            if (details.branch.allowsCustomRequests && details.branch.isOpen)
-              PositionedDirectional(
-                end: HatlySpacing.sm,
-                top: top,
-                child: GestureDetector(
-                  onVerticalDragUpdate: (d) => setState(() =>
-                    _customBubbleY = (top + d.delta.dy).clamp(minTop, maxTop).toDouble()),
-                  child: CustomRequestAction(
-                    vendorBranchId: details.branch.id,
-                    floating: true,
-                  ),
-                ),
-              ),
-          ]);
-        }),
+            ),
       ),
     );
   }
@@ -192,6 +169,12 @@ class _VendorDetailsContent extends ConsumerWidget {
               child: _VendorHeader(details: details, vendorName: vendorName)),
           if (!details.branch.isOpen)
             const SliverToBoxAdapter(child: _ClosedBanner()),
+          if (details.branch.allowsCustomRequests && details.branch.isOpen)
+            SliverToBoxAdapter(child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: HatlySpacing.md),
+              child: Align(alignment: AlignmentDirectional.centerEnd,
+                child: CustomRequestAction(vendorBranchId: details.branch.id, floating: true)),
+            )),
           // Visual UX (reference comparison): the menu search comes straight after the vendor/branch
           // info, then the menu sections, directly above the products they filter.
           const SliverToBoxAdapter(child: SizedBox(height: HatlySpacing.sm)),
@@ -324,11 +307,11 @@ class _VendorHeader extends StatelessWidget {
           child: StoreCoverImage(
             coverUrl: details.vendor.coverImageUrl,
             logoUrl: details.vendor.logoUrl,
-            width: double.infinity, height: 226, radius: 0,
+            width: double.infinity, height: MediaQuery.sizeOf(context).width * 9 / 16, radius: 0,
           ),
         ),
         PositionedDirectional(
-          start: 12, top: MediaQuery.viewPaddingOf(context).top + 6,
+          start: 12, top: 6,
           child: Material(color: const Color(0xAA000000), shape: const CircleBorder(),
             child: IconButton(
               key: const Key('store-hero-back'),
@@ -339,7 +322,7 @@ class _VendorHeader extends StatelessWidget {
           ),
         ),
         PositionedDirectional(
-          end: 12, top: MediaQuery.viewPaddingOf(context).top + 6,
+          end: 12, top: 6,
           child: Material(color: const Color(0xAA000000), shape: const CircleBorder(),
             child: _FavoriteHeartButton(vendorId: details.vendor.id)),
         ),
@@ -355,14 +338,15 @@ class _VendorHeader extends StatelessWidget {
           ),
         ),
       ]),
-      const SizedBox(height: 49),
       Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 20, 12),
+        padding: const EdgeInsetsDirectional.fromSTEB(112, 4, 12, 0),
+        child: _BranchInfoSection(branch: details.branch),
+      ),
+      Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 6, 20, 6),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(vendorName, maxLines: 2, overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 5),
-          _BranchInfoSection(branch: details.branch),
           if (details.ratingCount > 0)
             Padding(padding: const EdgeInsets.only(top: 5), child: HatlyRatingInline(
               key: const Key('vendor-details-rating'),
@@ -418,12 +402,14 @@ class _BranchInfoSection extends StatelessWidget {
                 openLabel: l10n.vendorOpenNow,
                 closedLabel: l10n.vendorClosed,
               ),
-              if (hoursLabel != null)
+              if (hoursLabel != null) ...[
+                Icon(Icons.schedule_outlined, size: 14, color: p.textMuted),
                 Text(
-                  '· ${l10n.vendorHoursToday(hoursLabel)}',
+                  hoursLabel,
                   key: const Key('vendor-details-hours'),
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
+              ],
             ],
           ),
         ],
@@ -495,15 +481,18 @@ class _ProductSearchAndSortBar extends StatelessWidget {
 
     final searchField = TextField(
       onChanged: onSearchChanged,
+      style: const TextStyle(fontSize: 13),
       decoration: InputDecoration(
-        hintText: l10n.searchHint,
-        prefixIcon: const Icon(Icons.search, size: 20),
+        hintText: Localizations.localeOf(context).languageCode == 'ar' ? 'ابحث عن منتج' : 'Search items',
+        hintStyle: const TextStyle(fontSize: 12),
+        prefixIcon: const Icon(Icons.search, size: 18),
+        prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
         filled: true,
         fillColor: p.surfaceSoft,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(999),
           borderSide: BorderSide.none,
         ),
       ),
