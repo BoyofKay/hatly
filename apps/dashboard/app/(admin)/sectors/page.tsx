@@ -1,17 +1,18 @@
 'use client';
 import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 import { SimpleEditModal } from '../../../components/admin/SimpleEditModal';
-import { RecordPhoto } from '../../../components/admin/RecordPhoto';
+import { AssetHint } from '../../../components/admin/AssetHint';
+import { send } from '../../../lib/ui/api';
 import { MediaPicker } from '../../../components/media/MediaPicker';
 import { resolveMediaUrl } from '../../../lib/media-url';
 
 import { useEffect, useState } from 'react';
-import { AdminSector, MANAGE_MARKETPLACE_SECTORS, createSector, listAdminSectors, setSectorActive, setSectorCustomRequests, setSectorBanner, setSectorAccentColor } from '../../../lib/api/admin-sectors';
+import { AdminSector, MANAGE_MARKETPLACE_SECTORS, createSector, listAdminSectors, setSectorActive, setSectorCustomRequests, setSectorBanner } from '../../../lib/api/admin-sectors';
 import { EMPTY_SECTOR_FORM, SectorFormState, buildCreateSectorBody, suggestSlug } from '../../../lib/sectors/sector-form';
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { useAdminPermission } from '../../../lib/auth/use-admin-permission';
 import { useLang } from '../../../lib/ui/lang';
-import { Badge, Button, Card, EmptyState, ErrorState, KpiCard, LabeledInput, PageHeader, Skeleton } from '../../../components/ui';
+import { Badge, Button, Card, EmptyState, ErrorState, KpiCard, LabeledInput, PageHeader, Skeleton, Modal } from '../../../components/ui';
 
 /**
  * Marketplace sectors and the one setting an admin controls per sector here: whether customers may send a custom request
@@ -36,7 +37,9 @@ export default function SectorsPage() {
   const [saving, setSaving] = useState(false);
 
   const [editing, setEditing] = useState<AdminSector | null>(null);
-  const [bannerSector, setBannerSector] = useState<AdminSector | null>(null);
+  const [assetsId, setAssetsId] = useState<string | null>(null);
+  const [assetSlot, setAssetSlot] = useState<'photo' | 'en' | 'ar' | null>(null);
+  const assetsSector = sectors?.find(s => s.id === assetsId) ?? null;
 
   async function refresh() {
     setError(null);
@@ -88,24 +91,22 @@ export default function SectorsPage() {
     }
   }
 
-  async function updateBanner(sector: AdminSector, bannerUrl: string | null) {
+  async function saveAsset(sector: AdminSector, slot: 'photo' | 'en' | 'ar', asset: { id: string; display?: { url?: string } } | null) {
     if (!canManage || busyId) return;
     setBusyId(sector.id); setError(null);
     try {
-      const updated = await setSectorBanner(sector.id, bannerUrl);
-      setSectors((all) => (all ?? []).map((s) => s.id === updated.id ? updated : s));
-    } catch (err) { setError(apiErrorMessage(err, t('Could not update banner.', 'تعذر تعديل البانر.'))); }
-    finally { setBusyId(null); }
-  }
-
-  async function updateAccent(sector: AdminSector, color: string) {
-    if (!canManage || busyId) return;
-    setBusyId(sector.id); setError(null);
-    try {
-      const updated = await setSectorAccentColor(sector.id, color);
-      setSectors((all) => (all ?? []).map((s) => s.id === updated.id ? updated : s));
-    } catch (err) { setError(apiErrorMessage(err, t('Could not update sector color.', 'تعذر تحديث لون القطاع.'))); }
-    finally { setBusyId(null); }
+      if (slot === 'photo') {
+        await send('post', '/admin/media/assign', { entity: 'sector', entityId: sector.id, assetId: asset?.id ?? null });
+        await refresh();
+      } else {
+        const url = asset ? asset.display?.url : null;
+        if (asset && !url) throw new Error('Selected asset has no display URL');
+        const updated = await setSectorBanner(sector.id, url ?? null, slot);
+        setSectors((all) => (all ?? []).map((s) => (s.id === updated.id ? updated : s)));
+      }
+    } catch (err) {
+      setError(apiErrorMessage(err, t('Could not update sector assets.', 'تعذر تحديث أصول القطاع.')));
+    } finally { setBusyId(null); }
   }
 
   async function toggleActive(sector: AdminSector) {
@@ -184,69 +185,45 @@ export default function SectorsPage() {
       )}
       {sectors && sectors.length > 0 && (
         <>
-          <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm md:block">
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             <table data-testid="sectors-table" className="min-w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                  <th className="px-3 py-2 text-start font-medium">{t('Photo', 'الصورة')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('Sector', 'القطاع')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('Slug', 'المعرّف')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('Banner', 'البانر')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('Theme color', 'لون القطاع')}</th>
-                  <th className="px-3 py-2 text-start font-medium">{t('Status', 'الحالة')}</th>
-                  <th className="px-3 py-2 text-start font-medium" />
-                  <th className="px-3 py-2 text-start font-medium">{t('Custom requests', 'الطلبات المخصصة')}</th>
+                  <th className="px-3 py-3 text-start font-medium">{t('Sector', 'القطاع')}</th>
+                  <th className="hidden px-3 py-3 text-start font-medium lg:table-cell">{t('Slug', 'المعرّف')}</th>
+                  <th className="px-3 py-3 text-start font-medium">{t('Status', 'الحالة')}</th>
+                  <th className="px-3 py-3 text-start font-medium">{t('Custom requests', 'الطلبات المخصصة')}</th>
+                  <th className="px-3 py-3 text-start font-medium">{t('Actions', 'الإجراءات')}</th>
                 </tr>
               </thead>
               <tbody>
                 {sectors.map((s) => (
                   <tr key={s.id} data-testid={`sector-row-${s.id}`} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-3 py-2"><RecordPhoto entity="sector" entityId={s.id} imageUrl={s.imageUrl} purpose="SECTOR_IMAGE" canEdit={canManage} onChanged={refresh} /></td>
-                    <td className="px-3 py-2"><span className="font-medium text-gray-900">{s.name}</span>{s.nameAr ? <span dir="rtl" className="text-gray-500"> / {s.nameAr}</span> : null}</td>
-                    <td className="px-3 py-2 text-gray-500" dir="ltr">{s.slug}</td>
-                    <td className="px-3 py-2"><div className="flex items-center gap-2">
-                      {s.bannerUrl ? <img src={resolveMediaUrl(s.bannerUrl)} alt="" className="h-10 w-20 rounded-lg object-cover" /> : <span className="text-xs text-gray-400">{t('No banner', 'لا يوجد بانر')}</span>}
-                      <button type="button" disabled={!canManage || !!busyId} className="rounded border px-2 py-2 text-xs text-hatly-orangeDark disabled:opacity-40" onClick={() => setBannerSector(s)}>{t('Choose', 'اختيار')}</button><span className="text-[10px] text-gray-500">1280 × 720 px</span>
-                      {s.bannerUrl && <button type="button" disabled={!canManage || !!busyId} className="text-xs text-red-600 disabled:opacity-40" onClick={() => void updateBanner(s, null)}>{t('Remove', 'إزالة')}</button>}
+                    <td className="px-3 py-3"><div className="flex items-center gap-3">
+                      {s.imageUrl ? <img src={resolveMediaUrl(s.imageUrl)} alt="" className="h-10 w-10 shrink-0 rounded-lg object-cover" /> : <div className="h-10 w-10 shrink-0 rounded-lg bg-gray-100" />}
+                      <div className="min-w-0"><p className="font-medium text-gray-900">{s.name}</p>{s.nameAr && <p className="text-xs text-gray-500" dir="rtl">{s.nameAr}</p>}</div>
                     </div></td>
-                    <td className="px-3 py-2">
-                      <input aria-label={t('Sector theme color', 'لون القطاع')} type="color"
-                        value={s.accentColor ?? '#FF7A1A'} disabled={!canManage || !!busyId}
-                        onChange={(e) => void updateAccent(s, e.target.value)} />
+                    <td className="hidden px-3 py-3 text-gray-500 lg:table-cell" dir="ltr">{s.slug}</td>
+                    <td className="px-3 py-3"><Badge tone={s.isActive ? 'green' : 'gray'}>{s.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge></td>
+                    <td className="px-3 py-3"><Switch s={s} testId={`sector-custom-requests-${s.id}`} /></td>
+                    <td className="px-3 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button size="sm" onClick={() => { setAssetsId(s.id); setAssetSlot(null); }}>{t('Assets', 'الأصول')}</Button>
+                        {canManage && <Button size="sm" onClick={() => setEditing(s)}>{t('Edit', 'تعديل')}</Button>}
+                        {canManage && <details className="relative">
+                          <summary className="cursor-pointer list-none rounded-lg border border-gray-200 px-3 py-2 text-sm" aria-label={t('More actions', 'إجراءات إضافية')}>⋯</summary>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border bg-white p-2">
+                            <button type="button" data-testid={`sector-active-toggle-${s.id}`} disabled={busyId === s.id} onClick={() => void toggleActive(s)} className="px-2 py-1 text-xs font-medium text-hatly-orangeDark disabled:opacity-40">{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</button>
+                            <DeleteRecordButton path={`/admin/sectors/${s.id}`} name={s.name} what={['Section', 'القسم']} consequence={['Only a section with no stores can be deleted: move its stores to another section first.', 'يمكن حذف القسم الذي لا يحتوي متاجر فقط: انقل متاجره أولًا.']} onDeleted={refresh} />
+                          </div>
+                        </details>}
+                      </div>
                     </td>
-                    <td className="px-3 py-2"><Badge tone={s.isActive ? 'green' : 'gray'}>{s.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge></td>
-                    <td className="px-3 py-2"><button data-testid={`sector-active-toggle-${s.id}`} disabled={!canManage || busyId === s.id} onClick={() => toggleActive(s)} className="min-h-[36px] text-xs font-medium text-hatly-orangeDark hover:underline disabled:opacity-40">{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</button>{canManage && <span className="ms-3 inline-flex gap-2"><Button size="sm" onClick={() => setEditing(s)}>{t('Edit', 'تعديل')}</Button><DeleteRecordButton path={`/admin/sectors/${s.id}`} name={s.name} what={['Section', 'القسم']} consequence={['Only a section with no stores can be deleted: move its stores to another section first.', 'يمكن حذف القسم الذي لا يحتوي متاجر فقط: انقل متاجره أولًا.']} onDeleted={refresh} /></span>}</td>
-                    <td className="px-3 py-2"><Switch s={s} testId={`sector-custom-requests-${s.id}`} /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <ul className="space-y-2 md:hidden">
-            {sectors.map((s) => (
-              <li key={s.id} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
-                <div className="flex items-start justify-between gap-2">
-                  <RecordPhoto entity="sector" entityId={s.id} imageUrl={s.imageUrl} purpose="SECTOR_IMAGE" canEdit={canManage} onChanged={refresh} />
-                  <div className="min-w-0 flex-1"><p className="font-semibold text-gray-900">{s.name}</p>{s.nameAr && <p className="text-sm text-gray-500" dir="rtl">{s.nameAr}</p>}<p className="text-xs text-gray-400" dir="ltr">{s.slug}</p></div>
-                  <Badge tone={s.isActive ? 'green' : 'gray'}>{s.isActive ? t('Active', 'نشط') : t('Inactive', 'غير نشط')}</Badge>
-                </div>
-                <div className="mt-3 flex items-center gap-3 border-t border-gray-100 pt-2">
-                  <label className="text-xs text-gray-600">{t('Theme color', 'لون القطاع')}</label>
-                  <input type="color" aria-label={t('Sector theme color', 'لون القطاع')} value={s.accentColor ?? '#FF7A1A'}
-                    disabled={!canManage || !!busyId} onChange={(e) => void updateAccent(s, e.target.value)} />
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
-                  <button type="button" disabled={!canManage || !!busyId} className="text-xs text-hatly-orangeDark" onClick={() => setBannerSector(s)}>{s.bannerUrl ? t('Change banner', 'تغيير البانر') : t('Add banner', 'إضافة بانر')}</button><span className="text-[10px] text-gray-500">1280 × 720 px</span>
-                  {s.bannerUrl && <button type="button" disabled={!canManage || !!busyId} className="text-xs text-red-600" onClick={() => void updateBanner(s, null)}>{t('Remove', 'إزالة')}</button>}
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2 border-t border-gray-100 pt-2">
-                  <span className="text-xs text-gray-600">{t('Custom requests', 'الطلبات المخصصة')}</span>
-                  <span className="flex items-center gap-2"><Switch s={s} /><button disabled={!canManage || busyId === s.id} onClick={() => toggleActive(s)} className="min-h-[36px] text-xs font-medium text-hatly-orangeDark disabled:opacity-40">{s.isActive ? t('Deactivate', 'إيقاف') : t('Activate', 'تفعيل')}</button></span>
-                </div>
-                {canManage && <div className="mt-2 flex gap-2"><Button size="sm" onClick={() => setEditing(s)}>{t('Edit', 'تعديل')}</Button><DeleteRecordButton path={`/admin/sectors/${s.id}`} name={s.name} what={['Section', 'القسم']} onDeleted={refresh} /></div>}
-              </li>
-            ))}
-          </ul>
         </>
       )}
       {editing && (
@@ -263,13 +240,38 @@ export default function SectorsPage() {
           onSaved={async () => { setEditing(null); await refresh(); }}
         />
       )}
-      <MediaPicker open={bannerSector !== null} onClose={() => setBannerSector(null)} title={t('Choose sector banner — 1280 × 720 px (16:9)', 'اختر بانر القطاع — 1280 × 720 بكسل (16:9)')} onPick={(assets) => {
-        const sector = bannerSector;
-        const url = assets[0]?.display?.url;
-        setBannerSector(null);
-        if (sector && typeof url === 'string') void updateBanner(sector, url);
-        else setError(t('Selected image has no display URL.', 'الصورة المحددة لا تحتوي على رابط.'));
-      }} />
+      {assetsSector && !assetSlot && (
+        <Modal open title={`${t('Assets', 'الأصول')} — ${assetsSector.name}`} onClose={() => setAssetsId(null)} wide
+          footer={<Button onClick={() => setAssetsId(null)}>{t('Done', 'تم')}</Button>}>
+          {error && <p role="alert" className="rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
+          <p className="text-xs text-gray-500">{t('Upload distinct English and Arabic artwork. If one banner is missing, the other is used. Changes save immediately.', 'ارفع تصميمًا مستقلًا لكل لغة. عند غياب أحد البانرين يُستخدم الآخر. تُحفظ التغييرات فورًا.')}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {([
+              { slot: 'photo', title: t('Photo', 'الصورة'), url: assetsSector.imageUrl, hint: t('512 × 512 px (1:1). Center the subject.', '512 × 512 بكسل (1:1). ضع العنصر في المنتصف.') },
+              { slot: 'en', title: t('Banner (EN)', 'البانر (إنجليزي)'), url: assetsSector.bannerUrl, hint: t('1280 × 720 px (16:9). English text, LTR layout.', '1280 × 720 بكسل (16:9). تصميم إنجليزي من اليسار إلى اليمين.') },
+              { slot: 'ar', title: t('Banner (AR)', 'البانر (عربي)'), url: assetsSector.bannerUrlAr, hint: t('1280 × 720 px (16:9). Arabic text, RTL layout.', '1280 × 720 بكسل (16:9). تصميم عربي من اليمين إلى اليسار.') },
+            ] as const).map(({slot, title, url, hint}) => (
+              <section key={slot} className="space-y-2 rounded-xl border border-gray-200 p-3">
+                <h3 className="font-medium">{title}</h3>
+                <div className={`overflow-hidden rounded-lg bg-gray-50 ${slot === 'photo' ? 'aspect-square w-24' : 'aspect-video w-full'}`}>
+                  {url ? <img src={resolveMediaUrl(url)} alt={title} className="h-full w-full object-contain" /> : <div className="flex h-full items-center justify-center text-xs text-gray-400">{t('No image', 'لا توجد صورة')}</div>}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" disabled={!canManage || !!busyId} onClick={() => { setError(null); setAssetSlot(slot); }}>{url ? t('Change image', 'تغيير الصورة') : t('Upload image', 'رفع صورة')}</Button>
+                  <AssetHint text={hint} />
+                  {url && <Button size="sm" variant="ghost" disabled={!canManage || !!busyId} onClick={() => void saveAsset(assetsSector, slot, null)}>{t('Remove', 'إزالة')}</Button>}
+                </div>
+              </section>
+            ))}
+          </div>
+        </Modal>
+      )}
+      {assetsSector && assetSlot && <MediaPicker key={`${assetsSector.id}-${assetSlot}`} open
+        onClose={() => setAssetSlot(null)}
+        purpose={assetSlot === 'photo' ? 'SECTOR_IMAGE' : 'SECTOR_BANNER'}
+        title={assetSlot === 'photo' ? t('Sector photo — 512 × 512 px', 'صورة القطاع — 512 × 512 بكسل') : assetSlot === 'en' ? t('English banner — 1280 × 720 px', 'البانر الإنجليزي — 1280 × 720 بكسل') : t('Arabic banner — 1280 × 720 px', 'البانر العربي — 1280 × 720 بكسل')}
+        onPick={(picked) => { if (picked[0]) void saveAsset(assetsSector, assetSlot, picked[0]); setAssetSlot(null); }}
+      />}
     </div>
   );
 }
