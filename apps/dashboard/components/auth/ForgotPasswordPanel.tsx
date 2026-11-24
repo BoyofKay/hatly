@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { PasswordVisibilityInput } from './PasswordVisibilityInput';
+import { egyptPhoneForAuth } from '../../lib/auth/egypt-phone';
 import { apiClient } from '../../lib/api/client';
 import { apiErrorCode, apiErrorMessage } from '../../lib/api/errors';
 import { useLang } from '../../lib/ui/lang';
@@ -23,10 +25,10 @@ export function ForgotPasswordPanel({ phone: initialPhone, onClose }: { phone: s
   const input = 'mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-hatly-orange focus:outline-none';
 
   const ask = async () => {
-    if (phone.trim().length < 6) { setError(t('Enter your phone number.', 'أدخل رقم هاتفك.')); return; }
+    if (!egyptPhoneForAuth(phone)) { setError(t('Enter your phone number.', 'أدخل رقم هاتفك.')); return; }
     setBusy(true); setError(null);
     try {
-      await apiClient.post('/auth/password-reset/request', { phone: phone.trim() });
+      await apiClient.post('/auth/password-reset/request', { phone: egyptPhoneForAuth(phone) ?? phone.trim() });
       setInfo(t('Request sent. Your manager will call you with a temporary password (valid 60 minutes).', 'تم إرسال الطلب. سيتصل بك مديرك ويعطيك كلمة مرور مؤقتة (صالحة 60 دقيقة).'));
       setStep('enter');
     } catch (e) {
@@ -38,7 +40,7 @@ export function ForgotPasswordPanel({ phone: initialPhone, onClose }: { phone: s
     if (next !== confirm) { setError(t('The two new passwords do not match.', 'كلمتا المرور الجديدتان غير متطابقتين.')); return; }
     setBusy(true); setError(null);
     try {
-      await apiClient.post('/auth/password-reset/complete', { phone: phone.trim(), tempPassword: temp.trim(), newPassword: next });
+      await apiClient.post('/auth/password-reset/complete', { phone: egyptPhoneForAuth(phone) ?? phone.trim(), tempPassword: temp.trim(), newPassword: next });
       setStep('done');
     } catch (e: any) {
       const code = apiErrorCode(e);
@@ -84,15 +86,15 @@ export function ForgotPasswordPanel({ phone: initialPhone, onClose }: { phone: s
               {info && <p className="text-xs text-gray-700" role="status">{info}</p>}
               <div>
                 <label htmlFor="fp-temp" className="block text-xs font-medium text-gray-700">{t('Temporary password', 'كلمة المرور المؤقتة')}</label>
-                <input id="fp-temp" dir="ltr" value={temp} onChange={(e) => setTemp(e.target.value)} autoComplete="one-time-code" className={input} />
+                <PasswordVisibilityInput id="fp-temp" dir="ltr" value={temp} onChange={(e) => setTemp(e.target.value)} autoComplete="current-password" className={input} />
               </div>
               <div>
                 <label htmlFor="fp-new" className="block text-xs font-medium text-gray-700">{t('New password (10+ characters, a letter and a digit)', 'كلمة المرور الجديدة (10 أحرف أو أكثر بها حرف ورقم)')}</label>
-                <input id="fp-new" dir="ltr" type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" className={input} />
+                <PasswordVisibilityInput id="fp-new" dir="ltr" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" className={input} />
               </div>
               <div>
                 <label htmlFor="fp-confirm" className="block text-xs font-medium text-gray-700">{t('Repeat the new password', 'أعد كتابة كلمة المرور الجديدة')}</label>
-                <input id="fp-confirm" dir="ltr" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" className={input} />
+                <PasswordVisibilityInput id="fp-confirm" dir="ltr" value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" className={input} />
               </div>
               <button type="button" disabled={busy || !temp || !next} onClick={() => void complete()} data-testid="fp-complete" className="rounded-lg bg-hatly-orange px-3 py-2 text-sm font-medium text-white disabled:opacity-50">{t('Change password', 'تغيير كلمة المرور')}</button>
             </>

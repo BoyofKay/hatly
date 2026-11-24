@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginWithPassword } from '../../../lib/auth/session';
+import { egyptPhoneForAuth, egyptNationalNumber } from '../../../lib/auth/egypt-phone';
 import { ForgotPasswordPanel } from '../../../components/auth/ForgotPasswordPanel';
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { LangProvider, useLang } from '../../../lib/ui/lang';
@@ -50,7 +51,7 @@ function LoginForm() {
 
   function pick(a: RecentAccount | null) {
     setPicked(a);
-    setPhone(a?.phone ?? '');
+    setPhone(egyptNationalNumber(a?.phone ?? ''));
     setPassword('');
     setNeedsCode(false);
     setMfaCode('');
@@ -60,14 +61,16 @@ function LoginForm() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (isSubmitting) return;
+    const normalizedPhone = egyptPhoneForAuth(phone);
+    if (!normalizedPhone) { setError(t('Enter a valid Egyptian mobile number.', 'أدخل رقم هاتف مصري صحيح.')); return; }
     setIsSubmitting(true);
     setError(null);
     try {
-      const user = await loginWithPassword(phone.trim(), password, needsCode ? mfaCode.trim() : undefined);
+      const user = await loginWithPassword(normalizedPhone, password, needsCode ? mfaCode.trim() : undefined);
       const allowed = ['ADMIN', 'SUPER_ADMIN', 'VENDOR', 'VENDOR_MANAGER'].includes(user.role);
       if (allowed) {
-        if (remember) rememberAccount({ phone: phone.trim(), fullName: user.fullName ?? null, role: user.role });
-        else forgetAccount(phone.trim());
+        if (remember) rememberAccount({ phone: normalizedPhone, fullName: user.fullName ?? null, role: user.role });
+        else forgetAccount(normalizedPhone);
       }
       if (allowed && user.mustChangePassword) {
         router.push('/change-password'); // a temporary password set by a manager: choose your own first
@@ -154,7 +157,10 @@ function LoginForm() {
             {!picked && (
               <div>
                 <label htmlFor="login-phone" className="block text-sm font-medium text-gray-700">{t('Phone number', 'رقم الهاتف')}</label>
-                <input id="login-phone" type="tel" dir="ltr" required autoComplete="username" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+20..." className={input} />
+                <div dir="ltr" className="mt-1 flex items-stretch overflow-hidden rounded-lg border border-gray-300 focus-within:border-hatly-orange focus-within:ring-2 focus-within:ring-hatly-orange/30">
+                  <span className="flex shrink-0 items-center gap-2 border-e border-gray-200 bg-gray-50 px-3 text-sm font-semibold text-gray-700" aria-label={t('Egypt country code', 'رمز دولة مصر')}>🇪🇬 +20</span>
+                  <input id="login-phone" type="tel" dir="ltr" required autoComplete="username" value={phone} onChange={(e) => setPhone(egyptNationalNumber(e.target.value))} placeholder="10XXXXXXXX" className="min-w-0 flex-1 px-3 py-2.5 text-sm focus:outline-none" />
+                </div>
               </div>
             )}
             <div>
@@ -174,7 +180,7 @@ function LoginForm() {
               </div>
             </div>
 
-            {forgotOpen && <ForgotPasswordPanel phone={phone} onClose={() => setForgotOpen(false)} />}
+            {forgotOpen && <ForgotPasswordPanel phone={egyptPhoneForAuth(phone) ?? phone} onClose={() => setForgotOpen(false)} />}
 
             {needsCode && (
               <div>

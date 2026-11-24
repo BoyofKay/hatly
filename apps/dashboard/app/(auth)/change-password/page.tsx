@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { PasswordVisibilityInput } from '../../../components/auth/PasswordVisibilityInput';
 import { useRouter } from 'next/navigation';
 import { changeMyPassword, staffPasswordProblem } from '../../../lib/api/admin-staff';
 import { apiErrorMessage } from '../../../lib/api/errors';
@@ -65,16 +66,16 @@ function ChangePasswordForm() {
           <form onSubmit={(e) => void submit(e)} className="mt-6 space-y-4">
             <div>
               <label htmlFor="cp-current" className="block text-sm font-medium text-gray-700">{t('Temporary password', 'كلمة المرور المؤقتة')}</label>
-              <input id="cp-current" type="password" dir="ltr" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} className={input} />
+              <PasswordVisibilityInput id="cp-current" dir="ltr" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} className={input} />
             </div>
             <div>
               <label htmlFor="cp-new" className="block text-sm font-medium text-gray-700">{t('New password', 'كلمة المرور الجديدة')}</label>
-              <input id="cp-new" type="password" dir="ltr" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} className={input} />
+              <PasswordVisibilityInput id="cp-new" dir="ltr" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} className={input} />
               <p className={`mt-1 text-xs ${problem ? 'text-red-600' : 'text-gray-500'}`}>{problem ?? t('10+ characters with a letter and a digit.', '10 أحرف أو أكثر بها حرف ورقم.')}</p>
             </div>
             <div>
               <label htmlFor="cp-confirm" className="block text-sm font-medium text-gray-700">{t('Repeat the new password', 'أعد كتابة كلمة المرور الجديدة')}</label>
-              <input id="cp-confirm" type="password" dir="ltr" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={input} />
+              <PasswordVisibilityInput id="cp-confirm" dir="ltr" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={input} />
               {mismatch && <p className="mt-1 text-xs text-red-600">{mismatch}</p>}
             </div>
             {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
