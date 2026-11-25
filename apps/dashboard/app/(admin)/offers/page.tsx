@@ -29,7 +29,7 @@ import { useLang } from '../../../lib/ui/lang';
  * existing offer's fields — that limitation is real, not an oversight.
  */
 export default function AdminOffersPage() {
-  const { t: tl } = useLang();
+  const { t: tl, money } = useLang();
   const [offerFilter, setOfferFilter] = useState<'ALL' | 'LIVE' | 'SCHEDULED' | 'ENDED' | 'INACTIVE'>('ALL');
   const [branches, setBranches] = useState<VendorBranch[] | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState('');
@@ -179,17 +179,17 @@ export default function AdminOffersPage() {
 
   function formatMinor(minor: number | null): string {
     if (minor == null) return '—';
-    return `${(minor / 100).toFixed(2)} EGP`;
+    return money(minor);
   }
 
   function targetingSummary(offer: Offer): string {
     if (offer.productIds.length > 0) {
       const p = products?.find((pr) => pr.id === offer.productIds[0]);
-      return `Product: ${p?.name ?? offer.productIds[0]}`;
+      return tl(`Product: ${p?.name ?? offer.productIds[0]}`, `المنتج: ${p?.nameAr || p?.name || offer.productIds[0]}`);
     }
     if (offer.categoryIds.length > 0) {
       const c = categories?.find((cat) => cat.id === offer.categoryIds[0]);
-      return `Category: ${c?.name ?? offer.categoryIds[0]}`;
+      return tl(`Category: ${c?.name ?? offer.categoryIds[0]}`, `القسم: ${c?.nameAr || c?.name || offer.categoryIds[0]}`);
     }
     return tl("Branch-wide", "الفرع بالكامل");
   }

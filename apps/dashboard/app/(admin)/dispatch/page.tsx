@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useLang } from '../../../lib/ui/lang';
 
 /**
  * Dispatch now lives in the Control Tower (assign / reassign on each delivery row, dispatch alerts, the dispatcher's driver
@@ -12,12 +13,13 @@ import { useRouter } from 'next/navigation';
  */
 export default function DispatchRedirectPage() {
   const router = useRouter();
+  const { t } = useLang();
   useEffect(() => {
     router.replace('/control-tower');
   }, [router]);
   return (
     <p className="text-sm text-gray-500">
-      Dispatch has moved to the <Link href="/control-tower" className="underline">Control Tower</Link>.
+      {t('Dispatch has moved to the', 'تم نقل إدارة التوزيع إلى')} <Link href="/control-tower" className="underline">{t('Control Tower', 'مركز التحكم')}</Link>.
     </p>
   );
 }

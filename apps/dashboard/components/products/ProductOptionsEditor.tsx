@@ -15,6 +15,8 @@ import {
   updateOptionValue,
 } from '../../lib/api/product-options';
 import { apiErrorMessage } from '../../lib/api/errors';
+import { useLang } from '../../lib/ui/lang';
+import { localizeAdminFormMessage } from '../../lib/admin/form-messages';
 
 /**
  * Option groups ("modifiers") of one product: a group is single-choice or multiple-choice, optionally required, with optional
@@ -23,6 +25,7 @@ import { apiErrorMessage } from '../../lib/api/errors';
  * placed (orders keep their own snapshot); a carts holding a removed value simply loses it and asks again at checkout.
  */
 export function ProductOptionsEditor({ scope, productId }: { scope: OptionsScope; productId: string }) {
+  const { t } = useLang();
   const [groups, setGroups] = useState<ProductOptionGroup[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -32,9 +35,9 @@ export function ProductOptionsEditor({ scope, productId }: { scope: OptionsScope
     try {
       setGroups(await listOptionGroups(scope, productId));
     } catch (err) {
-      setError(apiErrorMessage(err, 'Failed to load the options.'));
+      setError(apiErrorMessage(err, t("Failed to load the options.", "تعذّر تحميل الخيارات.")));
     }
-  }, [scope, productId]);
+  }, [scope, productId, t]);
 
   useEffect(() => {
     refresh();
@@ -45,15 +48,14 @@ export function ProductOptionsEditor({ scope, productId }: { scope: OptionsScope
   return (
     <div data-testid={`options-editor-${productId}`} className="mt-3 rounded border border-dashed bg-gray-50 p-3">
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold">Options (modifiers)</h4>
+        <h4 className="text-sm font-semibold">{t("Options (modifiers)", "الخيارات والإضافات")}</h4>
         <button data-testid="option-group-new" onClick={() => setAdding((v) => !v)} className="text-xs text-hatly-orange underline">
-          {adding ? 'Cancel' : 'Add option group'}
+          {adding ? t("Cancel", "إلغاء") : t("Add option group", "إضافة مجموعة خيارات")}
         </button>
       </div>
       {scope === 'vendor' && (
         <p className="mt-2 rounded bg-blue-50 p-2 text-xs text-blue-800" data-testid="options-review-note">
-          On a live product, new options, renamed choices and higher prices are sent to Hatly for approval; lowering a price or removing a choice applies at once.
-          {' '}<span dir="rtl">في المنتج المعروض، الخيارات الجديدة وتغيير الأسماء ورفع الأسعار تُرسل إلى هاتلي للموافقة؛ خفض السعر أو حذف خيار يُطبَّق فورًا.</span>
+          {t('On a live product, new options, renamed choices and higher prices are sent to Hatly for approval; lowering a price or removing a choice applies at once.', 'في المنتج المعروض، تُرسل الخيارات الجديدة وتغيير الأسماء ورفع الأسعار إلى هاتلي للموافقة؛ أما خفض السعر أو حذف خيار فيُطبَّق فورًا.')}
         </p>
       )}
       {error && (
@@ -61,8 +63,8 @@ export function ProductOptionsEditor({ scope, productId }: { scope: OptionsScope
           {error}
         </p>
       )}
-      {groups === null && !error && <p className="mt-2 text-xs text-gray-500">Loading…</p>}
-      {groups?.length === 0 && !adding && <p className="mt-2 text-xs text-gray-500">No options — customers just add the product.</p>}
+      {groups === null && !error && <p className="mt-2 text-xs text-gray-500">{t("Loading…", "جارٍ التحميل…")}</p>}
+      {groups?.length === 0 && !adding && <p className="mt-2 text-xs text-gray-500">{t("No options — customers just add the product.", "لا توجد خيارات — يضيف العملاء المنتج مباشرةً.")}</p>}
       {adding && (
         <NewGroupForm
           onCreate={async (input) => {
@@ -87,12 +89,12 @@ export function ProductOptionsEditor({ scope, productId }: { scope: OptionsScope
   );
 }
 
-function describe(g: ProductOptionGroup): string {
-  const kind = g.allowsMultiple ? 'Multiple choice' : 'Single choice';
+function describe(g: ProductOptionGroup, t: (en: string, ar: string) => string): string {
+  const kind = g.allowsMultiple ? t('Multiple choice', 'اختيار متعدد') : t('Single choice', 'اختيار واحد');
   const parts = [kind];
-  if (g.isRequired) parts.push('required');
-  if (g.allowsMultiple && g.minSelections > 1) parts.push(`min ${g.minSelections}`);
-  if (g.allowsMultiple && g.maxSelections != null) parts.push(`max ${g.maxSelections}`);
+  if (g.isRequired) parts.push(t('required', 'إلزامي'));
+  if (g.allowsMultiple && g.minSelections > 1) parts.push(t(`min ${g.minSelections}`, `الحد الأدنى ${g.minSelections}`));
+  if (g.allowsMultiple && g.maxSelections != null) parts.push(t(`max ${g.maxSelections}`, `الحد الأقصى ${g.maxSelections}`));
   return parts.join(' · ');
 }
 
@@ -107,6 +109,7 @@ function GroupCard({
   onChanged: (g: ProductOptionGroup) => void;
   onDeleted: () => void;
 }) {
+  const { t } = useLang();
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -121,7 +124,7 @@ function GroupCard({
     try {
       await action();
     } catch (err) {
-      setError(apiErrorMessage(err, 'The change was refused.'));
+      setError(apiErrorMessage(err, t("The change was refused.", "لم يتم قبول التغيير.")));
     } finally {
       setBusy(false);
     }
@@ -136,24 +139,24 @@ function GroupCard({
             {group.nameAr ? <span className="text-gray-500"> / <bdi dir="rtl">{group.nameAr}</bdi></span> : null}
           </p>
           <p data-testid="option-group-summary" className="text-xs text-gray-500">
-            {describe(group)}
+            {describe(group, t)}
           </p>
         </div>
         <div className="flex gap-2 text-xs">
           <button data-testid="option-group-edit" onClick={() => setEditing((v) => !v)} className="underline">
-            {editing ? 'Close' : 'Edit'}
+            {editing ? t("Close", "إغلاق") : t("Edit", "تعديل")}
           </button>
           <button
             data-testid="option-group-delete"
             disabled={busy}
             onClick={() => run(async () => {
-              if (!window.confirm(`Delete the option group “${group.name}” and all its values?`)) return;
+              if (!window.confirm(t(`Delete the option group “${group.name}” and all its values?`, `حذف مجموعة الخيارات «${group.nameAr || group.name}» وكل قيمها؟`))) return;
               await deleteOptionGroup(scope, group.id);
               onDeleted();
             })}
             className="text-red-600 underline disabled:opacity-50"
           >
-            Delete
+            {t("Delete", "حذف")}
           </button>
         </div>
       </div>
@@ -171,9 +174,9 @@ function GroupCard({
         onSubmit={(e) => {
           e.preventDefault();
           const price = valuePrice.trim() === '' ? 0 : parseSignedEgpToMinor(valuePrice);
-          if (!valueName.trim()) return setError('Enter a value name.');
-          if (!valueNameAr.trim()) return setError('Enter the Arabic name too (الاسم بالعربي).');
-          if (price === null) return setError('Enter the price in EGP, e.g. 5, 5.50 or -2.');
+          if (!valueName.trim()) return setError(t("Enter a value name.", "أدخل اسم الخيار."));
+          if (!valueNameAr.trim()) return setError(t("Enter the Arabic name too (الاسم بالعربي).", "أدخل الاسم بالعربية أيضًا."));
+          if (price === null) return setError(t("Enter the price in EGP, e.g. 5, 5.50 or -2.", "أدخل السعر بالجنيه المصري، مثل 5 أو 5.50 أو -2."));
           run(async () => {
             onChanged(await addOptionValue(scope, group.id, { name: valueName.trim(), nameAr: valueNameAr.trim(), priceDeltaMinor: price }));
             setValueName('');
@@ -182,11 +185,11 @@ function GroupCard({
           });
         }}
       >
-        <input data-testid="option-value-name" value={valueName} onChange={(e) => setValueName(e.target.value)} placeholder="New value (English)" className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+        <input data-testid="option-value-name" value={valueName} onChange={(e) => setValueName(e.target.value)} placeholder={t("New value (English)", "خيار جديد بالإنجليزية")} className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
         <input data-testid="option-value-name-ar" dir="rtl" value={valueNameAr} onChange={(e) => setValueNameAr(e.target.value)} placeholder="الاسم بالعربي" className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
-        <input data-testid="option-value-price" value={valuePrice} onChange={(e) => setValuePrice(e.target.value)} placeholder="Price EGP (0)" className="w-28 rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+        <input data-testid="option-value-price" value={valuePrice} onChange={(e) => setValuePrice(e.target.value)} placeholder={t("Price EGP (0)", "السعر بالجنيه (0)")} className="w-28 rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
         <button data-testid="option-value-add" type="submit" disabled={busy} className="rounded-lg bg-hatly-orange px-2 py-1 text-xs text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-          Add value
+          {t("Add value", "إضافة خيار")}
         </button>
       </form>
       {error && (
@@ -209,18 +212,19 @@ function ValueRow({
   onChanged: (g: ProductOptionGroup) => void;
   onError: (message: string | null) => void;
 }) {
+  const { t } = useLang();
   const [editing, setEditing] = useState(false);
   const [price, setPrice] = useState((value.priceDeltaMinor / 100).toFixed(2));
 
   async function save() {
     const minor = parseSignedEgpToMinor(price);
-    if (minor === null) return onError('Enter the price in EGP, e.g. 5, 5.50 or -2.');
+    if (minor === null) return onError(t("Enter the price in EGP, e.g. 5, 5.50 or -2.", "أدخل السعر بالجنيه المصري، مثل 5 أو 5.50 أو -2."));
     try {
       onError(null);
       onChanged(await updateOptionValue(scope, value.id, { priceDeltaMinor: minor }));
       setEditing(false);
     } catch (err) {
-      onError(apiErrorMessage(err, 'The change was refused.'));
+      onError(apiErrorMessage(err, t("The change was refused.", "لم يتم قبول التغيير.")));
     }
   }
 
@@ -229,7 +233,7 @@ function ValueRow({
       onError(null);
       onChanged(await deleteOptionValue(scope, value.id));
     } catch (err) {
-      onError(apiErrorMessage(err, 'The change was refused.'));
+      onError(apiErrorMessage(err, t("The change was refused.", "لم يتم قبول التغيير.")));
     }
   }
 
@@ -243,20 +247,20 @@ function ValueRow({
         <span className="flex items-center gap-1">
           <input data-testid="option-value-price-input" value={price} onChange={(e) => setPrice(e.target.value)} className="w-20 rounded-lg border px-1 py-0.5 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           <button data-testid="option-value-price-save" onClick={save} className="rounded-lg bg-hatly-orange px-2 py-0.5 text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-            Save
+            {t("Save", "حفظ")}
           </button>
           <button onClick={() => setEditing(false)} className="underline">
-            Cancel
+            {t("Cancel", "إلغاء")}
           </button>
         </span>
       ) : (
         <span className="flex items-center gap-2">
-          <span data-testid="option-value-price-text">{formatSignedMinor(value.priceDeltaMinor)} EGP</span>
+          <span data-testid="option-value-price-text">{formatSignedMinor(value.priceDeltaMinor)} {t('EGP', 'ج.م')}</span>
           <button data-testid="option-value-price-edit" onClick={() => setEditing(true)} className="underline">
-            Price
+            {t("Price", "السعر")}
           </button>
           <button data-testid="option-value-delete" onClick={remove} className="text-red-600 underline">
-            Remove
+            {t("Remove", "إزالة")}
           </button>
         </span>
       )}
@@ -282,25 +286,26 @@ function toLimits(f: GroupFormState): { ok: true; minSelections: number; maxSele
 }
 
 function LimitsFields({ f, set }: { f: GroupFormState; set: (patch: Partial<GroupFormState>) => void }) {
+  const { t } = useLang();
   return (
     <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
       <label className="flex items-center gap-1">
         <input data-testid="option-group-multiple" type="checkbox" checked={f.allowsMultiple} onChange={(e) => set({ allowsMultiple: e.target.checked })} />
-        Multiple choice
+        {t("Multiple choice", "اختيار متعدد")}
       </label>
       <label className="flex items-center gap-1">
         <input data-testid="option-group-required" type="checkbox" checked={f.isRequired} onChange={(e) => set({ isRequired: e.target.checked })} />
-        Required
+        {t("Required", "إلزامي")}
       </label>
       {f.allowsMultiple && (
         <>
           <label>
-            Min selections
+            {t("Min selections", "الحد الأدنى للاختيارات")}
             <input data-testid="option-group-min" value={f.min} onChange={(e) => set({ min: e.target.value })} className="ml-1 w-14 rounded-lg border px-1 py-0.5 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           </label>
           <label>
-            Max selections
-            <input data-testid="option-group-max" value={f.max} onChange={(e) => set({ max: e.target.value })} placeholder="no limit" className="ml-1 w-16 rounded-lg border px-1 py-0.5 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
+            {t("Max selections", "الحد الأقصى للاختيارات")}
+            <input data-testid="option-group-max" value={f.max} onChange={(e) => set({ max: e.target.value })} placeholder={t("no limit", "بلا حد")} className="ml-1 w-16 rounded-lg border px-1 py-0.5 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           </label>
         </>
       )}
@@ -309,6 +314,7 @@ function LimitsFields({ f, set }: { f: GroupFormState; set: (patch: Partial<Grou
 }
 
 function GroupEditForm({ group, onSave }: { group: ProductOptionGroup; onSave: (input: { name: string; nameAr?: string; isRequired: boolean; allowsMultiple: boolean; minSelections: number; maxSelections: number | null }) => void }) {
+  const { t } = useLang();
   const [f, setF] = useState<GroupFormState>({
     name: group.name,
     nameAr: group.nameAr ?? '',
@@ -325,8 +331,8 @@ function GroupEditForm({ group, onSave }: { group: ProductOptionGroup; onSave: (
       onSubmit={(e) => {
         e.preventDefault();
         const limits = toLimits(f);
-        if (!f.name.trim()) return setError('Enter a group name.');
-        if (!limits.ok) return setError(limits.error);
+        if (!f.name.trim()) return setError(t("Enter a group name.", "أدخل اسم المجموعة."));
+        if (!limits.ok) return setError(localizeAdminFormMessage(limits.error, t));
         setError(null);
         onSave({
           name: f.name.trim(),
@@ -339,19 +345,20 @@ function GroupEditForm({ group, onSave }: { group: ProductOptionGroup; onSave: (
       }}
     >
       <div className="grid grid-cols-2 gap-2">
-        <input data-testid="option-group-name" value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder="Name" className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+        <input data-testid="option-group-name" value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder={t("Name", "الاسم")} className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
         <input value={f.nameAr} dir="rtl" onChange={(e) => set({ nameAr: e.target.value })} placeholder="الاسم بالعربية" className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
       </div>
       <LimitsFields f={f} set={set} />
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
       <button data-testid="option-group-save" type="submit" className="mt-2 rounded-lg bg-hatly-orange px-3 py-1 text-xs text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-        Save group
+        {t("Save group", "حفظ المجموعة")}
       </button>
     </form>
   );
 }
 
 function NewGroupForm({ onCreate }: { onCreate: (input: { name: string; nameAr?: string; isRequired: boolean; allowsMultiple: boolean; minSelections: number; maxSelections?: number | null; values: Array<{ name: string; priceDeltaMinor: number }> }) => Promise<void> }) {
+  const { t } = useLang();
   const [f, setF] = useState<GroupFormState>({ name: '', nameAr: '', allowsMultiple: false, isRequired: false, min: '', max: '' });
   const [valuesText, setValuesText] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -361,15 +368,15 @@ function NewGroupForm({ onCreate }: { onCreate: (input: { name: string; nameAr?:
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
-    if (!f.name.trim()) return setError('Enter a group name.');
+    if (!f.name.trim()) return setError(t("Enter a group name.", "أدخل اسم المجموعة."));
     const limits = toLimits(f);
-    if (!limits.ok) return setError(limits.error);
+    if (!limits.ok) return setError(localizeAdminFormMessage(limits.error, t));
     // One value per line: "Name | price EGP" — the price is optional (0) and may be negative.
     const values: Array<{ name: string; priceDeltaMinor: number }> = [];
     for (const line of valuesText.split('\n').map((l) => l.trim()).filter(Boolean)) {
       const [name, price = ''] = line.split('|').map((s) => s.trim());
       const minor = price === '' ? 0 : parseSignedEgpToMinor(price);
-      if (!name || minor === null) return setError(`Could not read “${line}”. Use: Name | price in EGP (e.g. Large | 6.50).`);
+      if (!name || minor === null) return setError(t(`Could not read “${line}”. Use: Name | price in EGP (e.g. Large | 6.50).`, `تعذّرت قراءة «${line}». استخدم: الاسم | السعر بالجنيه (مثل كبير | 6.50).`));
       values.push({ name, priceDeltaMinor: minor });
     }
     setBusy(true);
@@ -385,7 +392,7 @@ function NewGroupForm({ onCreate }: { onCreate: (input: { name: string; nameAr?:
         values,
       });
     } catch (err) {
-      setError(apiErrorMessage(err, 'The group was refused.'));
+      setError(apiErrorMessage(err, t("The group was refused.", "لم يتم قبول المجموعة.")));
     } finally {
       setBusy(false);
     }
@@ -394,7 +401,7 @@ function NewGroupForm({ onCreate }: { onCreate: (input: { name: string; nameAr?:
   return (
     <form data-testid="option-group-form" onSubmit={submit} className="mt-2 space-y-2 rounded-xl border bg-white p-3 border-gray-200 shadow-sm">
       <div className="grid grid-cols-2 gap-2">
-        <input data-testid="option-group-name" value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder="Group name (e.g. Size)" className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+        <input data-testid="option-group-name" value={f.name} onChange={(e) => set({ name: e.target.value })} placeholder={t("Group name (e.g. Size)", "اسم المجموعة (مثل الحجم)")} className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
         <input value={f.nameAr} dir="rtl" onChange={(e) => set({ nameAr: e.target.value })} placeholder="الاسم بالعربية" className="rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
       </div>
       <LimitsFields f={f} set={set} />
@@ -403,7 +410,7 @@ function NewGroupForm({ onCreate }: { onCreate: (input: { name: string; nameAr?:
         value={valuesText}
         onChange={(e) => setValuesText(e.target.value)}
         rows={4}
-        placeholder={'One value per line — Name | price in EGP\nSmall\nLarge | 6.50'}
+        placeholder={t('One value per line — Name | price in EGP\nSmall\nLarge | 6.50', 'قيمة واحدة في كل سطر — الاسم | السعر بالجنيه\nصغير\nكبير | 6.50')}
         className="w-full rounded-lg border px-2 py-1 text-xs border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
       />
       {error && (
@@ -412,7 +419,7 @@ function NewGroupForm({ onCreate }: { onCreate: (input: { name: string; nameAr?:
         </p>
       )}
       <button data-testid="option-group-create" type="submit" disabled={busy} className="rounded-lg bg-hatly-orange px-3 py-1 text-xs text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-        {busy ? 'Creating…' : 'Create group'}
+        {busy ? t("Creating…", "جارٍ الإنشاء…") : t("Create group", "إنشاء المجموعة")}
       </button>
     </form>
   );

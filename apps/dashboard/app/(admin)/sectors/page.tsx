@@ -13,6 +13,7 @@ import { EMPTY_SECTOR_FORM, SectorFormState, buildCreateSectorBody, suggestSlug 
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { useAdminPermission } from '../../../lib/auth/use-admin-permission';
 import { useLang } from '../../../lib/ui/lang';
+import { localizeAdminFormMessage } from '../../../lib/admin/form-messages';
 import { Badge, Button, Card, EmptyState, ErrorState, KpiCard, LabeledInput, PageHeader, Skeleton, Modal } from '../../../components/ui';
 
 /**
@@ -103,7 +104,7 @@ export default function SectorsPage() {
     if (saving) return;
     const v = buildCreateSectorBody(form);
     if (!v.ok) {
-      setFormError(v.error);
+      setFormError(localizeAdminFormMessage(v.error, t));
       return;
     }
     setSaving(true);
@@ -160,7 +161,7 @@ export default function SectorsPage() {
     <button
       role="switch"
       aria-checked={s.customRequestsEnabled}
-      aria-label={`Custom requests for ${s.name}`}
+      aria-label={t(`Custom requests for ${s.name}`, `الطلبات المخصصة لقطاع ${s.nameAr || s.name}`)}
       data-testid={testId}
       disabled={!canManage || busyId === s.id}
       title={canManage ? undefined : noPermission}

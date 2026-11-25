@@ -32,6 +32,7 @@ import {
   isoToLocalInput,
 } from '../../../lib/banners/banner-form';
 import { useLang } from '../../../lib/ui/lang';
+import { localizeAdminFormMessage } from '../../../lib/admin/form-messages';
 import { useIsMobile } from '../../../lib/ui/use-media-query';
 
 /**
@@ -127,7 +128,7 @@ function BannerForm({
     if (busy) return;
     const v = isEdit ? buildUpdateBody(form) : buildCreateBody(form);
     if (!v.ok) {
-      setError(v.error);
+      setError(localizeAdminFormMessage(v.error, tl));
       return;
     }
     setBusy(true);
@@ -296,9 +297,9 @@ export default function HomeBannersPage() {
     const branchName = new Map(branches.map((b) => [b.id, b.name]));
     return (b: HomeBanner) => {
       if (b.actionType === 'NONE') return tl("Not tappable", "غير قابل للضغط");
-      if (b.actionType === 'SECTOR') return `Sector: ${sectorName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`;
-      if (b.actionType === 'VENDOR') return `Branch: ${branchName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`;
-      return `Product: ${b.actionTargetId}`;
+      if (b.actionType === 'SECTOR') return tl(`Sector: ${sectorName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`, `القطاع: ${sectorName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`);
+      if (b.actionType === 'VENDOR') return tl(`Branch: ${branchName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`, `الفرع: ${branchName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`);
+      return tl(`Product: ${b.actionTargetId}`, `المنتج: ${b.actionTargetId}`);
     };
   }, [sectors, branches, tl]);
 
@@ -330,7 +331,7 @@ export default function HomeBannersPage() {
     if (!file || !banner) return;
     const problem = checkImageFile(file, BANNER_IMAGE_TYPES, BANNER_IMAGE_MAX_BYTES);
     if (problem) {
-      setRowError({ id: banner.id, message: problem });
+      setRowError({ id: banner.id, message: localizeAdminFormMessage(problem, tl) });
       return;
     }
     // The shape is checked here too (the server checks again): a wide image only, so the carousel never crops it badly.
@@ -339,14 +340,14 @@ export default function HomeBannersPage() {
       const shapeProblem = checkBannerShape(bitmap.width, bitmap.height);
       bitmap.close();
       if (shapeProblem) {
-        setRowError({ id: banner.id, message: shapeProblem });
+        setRowError({ id: banner.id, message: localizeAdminFormMessage(shapeProblem, tl) });
         return;
       }
     } catch {
-      setRowError({ id: banner.id, message: 'This file could not be read as an image.' });
+      setRowError({ id: banner.id, message: tl('This file could not be read as an image.', 'تعذّرت قراءة الملف كصورة.') });
       return;
     }
-    await run(banner, () => uploadHomeBannerImage(banner.id, file, uploadLanguage.current), 'Failed to upload the image.');
+    await run(banner, () => uploadHomeBannerImage(banner.id, file, uploadLanguage.current), tl('Failed to upload the image.', 'تعذّر رفع الصورة.'));
   }
 
   const shown = (banners ?? []).filter((b) => statusFilter === 'ALL' || b.displayStatus === statusFilter);
@@ -477,8 +478,8 @@ export default function HomeBannersPage() {
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-600">{label(b)}</td>
                     <td className="px-3 py-2 text-xs text-gray-600">
-                      <div>From: {formatWhen(b.startsAt)}</div>
-                      <div>Until: {formatWhen(b.endsAt)}</div>
+                      <div>{tl('From:', 'من:')} {formatWhen(b.startsAt)}</div>
+                      <div>{tl('Until:', 'حتى:')} {formatWhen(b.endsAt)}</div>
                     </td>
                     <td className="px-3 py-2">{b.sortOrder}</td>
                     <td className="px-3 py-2">
@@ -499,7 +500,7 @@ export default function HomeBannersPage() {
                         data-testid="banner-toggle"
                         disabled={!canManage || busyId === b.id || (!b.isActive && (!b.imageUrl && !b.imageUrlAr))}
                         title={!b.isActive && (!b.imageUrl && !b.imageUrlAr) ? tl("Upload an image first", "ارفع صورة أولًا") : undefined}
-                        onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), 'Failed to update the banner.')}
+                        onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), tl('Failed to update the banner.', 'تعذّر تحديث البانر.'))}
                         className="text-xs text-gray-600 underline disabled:opacity-40"
                       >
                         {b.isActive ? tl("Unpublish", "إلغاء النشر") : tl("Publish", "نشر")}
@@ -509,7 +510,7 @@ export default function HomeBannersPage() {
                         disabled={!canManage || busyId === b.id}
                         onClick={() => {
                           if (window.confirm(tl(`Delete the banner "${b.title}"? Customers stop seeing it immediately.`, `حذف البانر «${b.title}»؟ سيتوقف ظهوره للعملاء فورًا.`))) {
-                            run(b, () => deleteHomeBanner(b.id), 'Failed to delete the banner.');
+                            run(b, () => deleteHomeBanner(b.id), tl('Failed to delete the banner.', 'تعذّر حذف البانر.'));
                           }
                         }}
                         className="text-xs text-red-600 underline disabled:opacity-40"
@@ -554,8 +555,8 @@ export default function HomeBannersPage() {
                       <div className="flex flex-wrap gap-2 pt-1">
                         <button disabled={!canManage || busyId === b.id} onClick={() => { setRowError(null); setAssetsId(b.id); }} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{tl('Assets', 'الأصول')}</button>
                         <button disabled={!canManage || busyId === b.id} onClick={() => { setCreating(false); setEditingId(b.id); }} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{tl('Edit', 'تعديل')}</button>
-                        <button disabled={!canManage || busyId === b.id || (!b.isActive && (!b.imageUrl && !b.imageUrlAr))} onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), 'Failed to update the banner.')} className="min-h-[44px] rounded-lg bg-hatly-orange px-3 text-sm font-medium text-white disabled:opacity-40">{b.isActive ? tl('Unpublish', 'إلغاء النشر') : tl('Publish', 'نشر')}</button>
-                        <button disabled={!canManage || busyId === b.id} onClick={() => { if (window.confirm(tl(`Delete the banner "${b.title}"? Customers stop seeing it immediately.`, `حذف البانر «${b.title}»؟ سيتوقف ظهوره للعملاء فورًا.`))) run(b, () => deleteHomeBanner(b.id), 'Failed to delete the banner.'); }} className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-red-600 disabled:opacity-40">{tl('Delete', 'حذف')}</button>
+                        <button disabled={!canManage || busyId === b.id || (!b.isActive && (!b.imageUrl && !b.imageUrlAr))} onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), tl('Failed to update the banner.', 'تعذّر تحديث البانر.'))} className="min-h-[44px] rounded-lg bg-hatly-orange px-3 text-sm font-medium text-white disabled:opacity-40">{b.isActive ? tl('Unpublish', 'إلغاء النشر') : tl('Publish', 'نشر')}</button>
+                        <button disabled={!canManage || busyId === b.id} onClick={() => { if (window.confirm(tl(`Delete the banner "${b.title}"? Customers stop seeing it immediately.`, `حذف البانر «${b.title}»؟ سيتوقف ظهوره للعملاء فورًا.`))) run(b, () => deleteHomeBanner(b.id), tl('Failed to delete the banner.', 'تعذّر حذف البانر.')); }} className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-red-600 disabled:opacity-40">{tl('Delete', 'حذف')}</button>
                       </div>
                       {rowError?.id === b.id && <p className="text-xs text-red-600">{rowError.message}</p>}
                     </div>
