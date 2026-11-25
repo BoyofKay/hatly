@@ -6,6 +6,7 @@ import { Button, Card, DataTable, FilterBar, LabeledSelect, PageHeader, Paginati
 import { send, useApi } from '../../../../lib/ui/api';
 import { apiErrorMessage } from '../../../../lib/api/errors';
 import { useLang } from '../../../../lib/ui/lang';
+import { commonStatusLabel } from '../../../../lib/admin/labels';
 import { usePermissions } from '../../../../lib/ui/permissions';
 
 export default function JobsPage() {
@@ -19,7 +20,7 @@ export default function JobsPage() {
   return (
     <div>
       <PageHeader title={t('Background jobs', 'المهام الخلفية')} subtitle={t('Report exports are the only background jobs run from this panel. Failed ones can be queued again; the retry is audited.', 'تصدير التقارير هو المهام الخلفية الوحيدة المشغَّلة من هذه اللوحة. يمكن إعادة جدولة الفاشلة، وتُسجَّل في التدقيق.')} actions={<Link className="text-sm text-hatly-orangeDark hover:underline" href="/exports">{t('My exports', 'تصديراتي')}</Link>} />
-      <FilterBar><div className="w-44"><LabeledSelect label={t('Status', 'الحالة')} value={status} onChange={(e) => setStatus(e.target.value)}><option value="">{t('All', 'الكل')}</option>{['QUEUED', 'RUNNING', 'READY', 'FAILED', 'EXPIRED', 'CANCELLED'].map((s) => <option key={s} value={s}>{s}</option>)}</LabeledSelect></div></FilterBar>
+      <FilterBar><div className="w-44"><LabeledSelect label={t('Status', 'الحالة')} value={status} onChange={(e) => setStatus(e.target.value)}><option value="">{t('All', 'الكل')}</option>{['QUEUED', 'RUNNING', 'READY', 'FAILED', 'EXPIRED', 'CANCELLED'].map((s) => <option key={s} value={s}>{commonStatusLabel(s, t)}</option>)}</LabeledSelect></div></FilterBar>
       <Card pad={false}>
         <DataTable rows={list.data} rowKey={(r: any) => r.id} loading={list.loading} error={list.error} status={list.status} onRetry={list.reload} emptyTitle={t('No jobs', 'لا مهام')} columns={[
           { key: 'l', header: t('Job', 'المهمة'), cell: (r: any) => r.label },

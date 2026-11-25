@@ -62,7 +62,7 @@ export default function AdminOffersPage() {
   useEffect(() => {
     listVendorBranches()
       .then(setBranches)
-      .catch((err) => setListError(apiErrorMessage(err, 'Failed to load branches.')));
+      .catch((err) => setListError(apiErrorMessage(err, tl("Failed to load branches.", "تعذّر تحميل الفروع."))));
   }, []);
 
   useEffect(() => {
@@ -82,7 +82,7 @@ export default function AdminOffersPage() {
       setProducts(productsData);
       setCategories(categoriesData);
     } catch (err: any) {
-      setListError(apiErrorMessage(err, 'Failed to load offers.'));
+      setListError(apiErrorMessage(err, tl("Failed to load offers.", "تعذّر تحميل العروض.")));
     }
   }
 
@@ -122,11 +122,11 @@ export default function AdminOffersPage() {
     e.preventDefault();
     if (isCreating || !selectedBranchId) return;
     if (mechanism === 'FLASH_SALE' && limitUnit === 'MIXED' && (perCustomerLifetimeLimit.trim() || totalAllocationLimit.trim())) {
-      setCreateError('These products mix items sold by piece and by weight, so one limit cannot fit both. Create separate offers, or leave the limits empty.');
+      setCreateError(tl("These products mix items sold by piece and by weight, so one limit cannot fit both. Create separate offers, or leave the limits empty.", "تجمع هذه المنتجات بين البيع بالقطعة والوزن، لذلك لا يصلح حد واحد لكليهما. أنشئ عروضًا منفصلة أو اترك الحدود فارغة."));
       return;
     }
     if (toLimit(perCustomerLifetimeLimit) === null || toLimit(totalAllocationLimit) === null) {
-      setCreateError(limitUnit === 'WEIGHT' ? 'Enter the limits in kg, e.g. 0.5, 1 or 3.5 (up to 3 decimals).' : 'Enter the limits as whole numbers of pieces.');
+      setCreateError(limitUnit === 'WEIGHT' ? tl("Enter the limits in kg, e.g. 0.5, 1 or 3.5 (up to 3 decimals).", "أدخل الحدود بالكيلوجرام، مثل 0.5 أو 1 أو 3.5 (حتى 3 منازل عشرية).") : tl("Enter the limits as whole numbers of pieces.", "أدخل الحدود كعدد صحيح من القطع."));
       return;
     }
     setIsCreating(true);
@@ -161,7 +161,7 @@ export default function AdminOffersPage() {
     } catch (err: any) {
       // Mutual-exclusion and other structured backend errors surface
       // their real message directly — never a generic/raw stack trace.
-      setCreateError(apiErrorMessage(err, 'Failed to create offer.'));
+      setCreateError(apiErrorMessage(err, tl("Failed to create offer.", "تعذّر إنشاء العرض.")));
     } finally {
       setIsCreating(false);
     }
@@ -173,7 +173,7 @@ export default function AdminOffersPage() {
       offer.isActive ? await deactivateOffer(offer.id) : await activateOffer(offer.id);
       await refresh(selectedBranchId);
     } catch (err: any) {
-      setActionErrorById((prev) => ({ ...prev, [offer.id]: apiErrorMessage(err, 'Failed to update offer.' )}));
+      setActionErrorById((prev) => ({ ...prev, [offer.id]: apiErrorMessage(err, tl("Failed to update offer.", "تعذّر تحديث العرض.") )}));
     }
   }
 
@@ -191,16 +191,16 @@ export default function AdminOffersPage() {
       const c = categories?.find((cat) => cat.id === offer.categoryIds[0]);
       return `Category: ${c?.name ?? offer.categoryIds[0]}`;
     }
-    return 'Branch-wide';
+    return tl("Branch-wide", "الفرع بالكامل");
   }
 
   function mechanismSummary(offer: Offer): string {
     if (offer.mechanism === 'SUBTOTAL_DISCOUNT') {
       const value =
         offer.discountType === 'PERCENTAGE' ? `${((offer.discountValue ?? 0) / 100).toFixed(0)}%` : formatMinor(offer.discountValue);
-      return `${value} off eligible products`;
+      return tl(`${value} off eligible products`, `خصم ${value} على المنتجات المؤهلة`);
     }
-    return `Special Price ${formatMinor(offer.specialPriceMinor)}`;
+    return tl(`Special Price ${formatMinor(offer.specialPriceMinor)}`, `السعر الخاص ${formatMinor(offer.specialPriceMinor)}`);
   }
 
   /** Derived only from the offer's own fields: inactive, not started yet, running now, or ended. */
@@ -217,13 +217,13 @@ export default function AdminOffersPage() {
       <div className="mb-2 min-w-0"><h1 className="text-xl font-semibold text-gray-900 sm:text-2xl">{tl('Offers', 'العروض')}</h1><p className="mt-1 max-w-3xl text-sm text-gray-500">{tl('Discounts and flash sales a vendor branch offers, with their dates and targeting.', 'الخصومات والعروض السريعة التي يقدمها فرع المتجر، بتواريخها واستهدافها.')}</p></div>
 
       <div className="mt-4">
-        <label className="text-sm font-medium">Vendor Branch</label>
+        <label className="text-sm font-medium">{tl("Vendor Branch", "فرع المتجر")}</label>
         <select
           value={selectedBranchId}
           onChange={(e) => setSelectedBranchId(e.target.value)}
           className="mt-1 block w-full min-h-[44px] rounded-lg sm:ml-2 sm:mt-0 sm:inline-block sm:w-auto rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
         >
-          <option value="">Select a branch…</option>
+          <option value="">{tl("Select a branch…", "اختر فرعًا…")}</option>
           {branches?.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
@@ -241,43 +241,43 @@ export default function AdminOffersPage() {
               onClick={() => setShowCreateForm((v) => !v)}
               className="min-h-[44px] rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
             >
-              {showCreateForm ? 'Cancel' : 'New Offer'}
+              {showCreateForm ? tl("Cancel", "إلغاء") : tl("New Offer", "عرض جديد")}
             </button>
           </div>
 
           {showCreateForm && (
             <form onSubmit={handleCreate} className="mt-3 space-y-3 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
               <div>
-                <label className="block text-sm font-medium">Mechanism</label>
+                <label className="block text-sm font-medium">{tl("Mechanism", "آلية العرض")}</label>
                 <select
                   value={mechanism}
                   onChange={(e) => setMechanism(e.target.value as OfferMechanism)}
                   className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                 >
-                  <option value="SUBTOTAL_DISCOUNT">Subtotal Discount</option>
-                  <option value="FLASH_SALE">Flash Sale</option>
+                  <option value="SUBTOTAL_DISCOUNT">{tl("Subtotal Discount", "خصم الإجمالي")}</option>
+                  <option value="FLASH_SALE">{tl("Flash Sale", "عرض سريع")}</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium">Name (English)</label>
+                <label className="block text-sm font-medium">{tl("Name (English)", "الاسم بالإنجليزية")}</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} required className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
               </div>
               <div>
-                <label className="block text-sm font-medium">Name (Arabic) — الاسم بالعربي</label>
+                <label className="block text-sm font-medium">{tl("Name (Arabic) — الاسم بالعربي", "الاسم بالعربية")}</label>
                 <input dir="rtl" value={nameAr} onChange={(e) => setNameAr(e.target.value)} required className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
               </div>
 
               <div>
-                <label className="block text-sm font-medium">Targeting</label>
+                <label className="block text-sm font-medium">{tl("Targeting", "نطاق التطبيق")}</label>
                 <select
                   value={targetingMode}
                   onChange={(e) => setTargetingMode(e.target.value as any)}
                   className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                 >
-                  <option value="BRANCH_WIDE">Branch-wide (applies to every product)</option>
-                  <option value="PRODUCT">Specific Product</option>
-                  <option value="CATEGORY">Specific Category</option>
+                  <option value="BRANCH_WIDE">{tl("Branch-wide (applies to every product)", "الفرع بالكامل (يشمل كل المنتجات)")}</option>
+                  <option value="PRODUCT">{tl("Specific Product", "منتج محدد")}</option>
+                  <option value="CATEGORY">{tl("Specific Category", "قسم محدد")}</option>
                 </select>
                 {targetingMode === 'PRODUCT' && (
                   <select
@@ -286,7 +286,7 @@ export default function AdminOffersPage() {
                     required
                     className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                   >
-                    <option value="">Select a product…</option>
+                    <option value="">{tl("Select a product…", "اختر منتجًا…")}</option>
                     {products?.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
@@ -301,7 +301,7 @@ export default function AdminOffersPage() {
                     required
                     className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                   >
-                    <option value="">Select a category…</option>
+                    <option value="">{tl("Select a category…", "اختر قسمًا…")}</option>
                     {categories?.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -315,19 +315,19 @@ export default function AdminOffersPage() {
                 <>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="block text-sm font-medium">Discount Type</label>
+                      <label className="block text-sm font-medium">{tl("Discount Type", "نوع الخصم")}</label>
                       <select
                         value={discountType}
                         onChange={(e) => setDiscountType(e.target.value as DiscountType)}
                         className="mt-1 w-full min-h-[40px] rounded-lg border px-3 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
                       >
-                        <option value="PERCENTAGE">Percentage</option>
-                        <option value="FIXED">Fixed Amount</option>
+                        <option value="PERCENTAGE">{tl("Percentage", "نسبة مئوية")}</option>
+                        <option value="FIXED">{tl("Fixed Amount", "مبلغ ثابت")}</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium">
-                        {discountType === 'PERCENTAGE' ? 'Discount %' : 'Discount Amount (EGP)'}
+                        {discountType === 'PERCENTAGE' ? tl("Discount %", "نسبة الخصم %") : tl("Discount Amount (EGP)", "مبلغ الخصم (ج.م)")}
                       </label>
                       <input
                         type="number"
@@ -341,7 +341,7 @@ export default function AdminOffersPage() {
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="block text-sm font-medium">Minimum Eligible Subtotal (EGP)</label>
+                      <label className="block text-sm font-medium">{tl("Minimum Eligible Subtotal (EGP)", "الحد الأدنى للإجمالي المؤهل (ج.م)")}</label>
                       <input
                         type="number"
                         value={minimumEligibleSubtotal}
@@ -351,7 +351,7 @@ export default function AdminOffersPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium">Maximum Discount (EGP)</label>
+                      <label className="block text-sm font-medium">{tl("Maximum Discount (EGP)", "الحد الأقصى للخصم (ج.م)")}</label>
                       <input
                         type="number"
                         value={maximumDiscount}
@@ -365,7 +365,7 @@ export default function AdminOffersPage() {
               ) : (
                 <>
                   <div>
-                    <label className="block text-sm font-medium">Special Price (EGP)</label>
+                    <label className="block text-sm font-medium">{tl("Special Price (EGP)", "السعر الخاص (ج.م)")}</label>
                     <input
                       type="number"
                       value={specialPrice}
@@ -377,7 +377,7 @@ export default function AdminOffersPage() {
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="block text-sm font-medium">Per-Customer Cumulative Limit {limitLabel}</label>
+                      <label className="block text-sm font-medium">{tl('Per-Customer Cumulative Limit', 'الحد التراكمي لكل عميل')} {limitLabel}</label>
                       <input
                         inputMode="decimal"
                         dir="ltr"
@@ -388,7 +388,7 @@ export default function AdminOffersPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium">Global Total Allocation {limitLabel}</label>
+                      <label className="block text-sm font-medium">{tl('Global Total Allocation', 'الحد الإجمالي للكمية المخصصة')} {limitLabel}</label>
                       <input
                         inputMode="decimal"
                         dir="ltr"
@@ -404,7 +404,7 @@ export default function AdminOffersPage() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium">Start</label>
+                  <label className="block text-sm font-medium">{tl("Start", "البداية")}</label>
                   <input
                     type="datetime-local"
                     value={startAt}
@@ -414,7 +414,7 @@ export default function AdminOffersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium">End</label>
+                  <label className="block text-sm font-medium">{tl("End", "النهاية")}</label>
                   <input
                     type="datetime-local"
                     value={endAt}
@@ -427,7 +427,7 @@ export default function AdminOffersPage() {
 
               {mechanism === 'SUBTOTAL_DISCOUNT' && (
                 <div>
-                  <label className="block text-sm font-medium">Budget Cap (EGP, optional)</label>
+                  <label className="block text-sm font-medium">{tl("Budget Cap (EGP, optional)", "سقف الميزانية (ج.م، اختياري)")}</label>
                   <input
                     type="number"
                     value={budgetCapMinor}
@@ -445,7 +445,7 @@ export default function AdminOffersPage() {
                 disabled={isCreating}
                 className="min-h-[44px] rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
               >
-                {isCreating ? 'Creating…' : 'Create Offer'}
+                {isCreating ? tl("Creating…", "جارٍ الإنشاء…") : tl("Create Offer", "إنشاء عرض")}
               </button>
             </form>
           )}
@@ -468,7 +468,7 @@ export default function AdminOffersPage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <span className={`rounded px-2 py-0.5 text-xs font-semibold ${offer.mechanism === 'FLASH_SALE' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
-                      {offer.mechanism === 'FLASH_SALE' ? 'FLASH SALE' : 'SUBTOTAL DISCOUNT'}
+                      {offer.mechanism === 'FLASH_SALE' ? tl("FLASH SALE", "عرض سريع") : tl("SUBTOTAL DISCOUNT", "خصم الإجمالي")}
                     </span>
                     <span className="font-semibold">{offer.name}</span>
                     <span className={`rounded px-2 py-0.5 text-xs ${stateTone[offerState(offer)]}`}>{stateLabel[offerState(offer)]}</span>
@@ -490,7 +490,7 @@ export default function AdminOffersPage() {
               </div>
             ))}
             {offers && offers.length > 0 && shownOffers.length === 0 && <p className="text-sm text-gray-500">{tl('No offer in this state.', 'لا يوجد عرض بهذه الحالة.')}</p>}
-            {offers?.length === 0 && <p className="text-sm text-gray-500">No offers for this branch yet.</p>}
+            {offers?.length === 0 && <p className="text-sm text-gray-500">{tl("No offers for this branch yet.", "لا توجد عروض لهذا الفرع بعد.")}</p>}
           </div>
         </>
       )}

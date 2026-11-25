@@ -60,3 +60,10 @@ export const FINANCIAL_DIRECTION: Record<string, Pair> = {
 type T = (en: string, ar: string) => string;
 /** Localized label for a known code; unknown codes are shown as-is (never hidden). */
 export const label = (m: Record<string, Pair>, key: string | null | undefined, t: T): string => (key ? (m[key] ? t(m[key][0], m[key][1]) : key) : '—');
+
+/** Generic display wording for status codes. Keep API values unchanged. */
+const COMMON_STATUS_AR: Record<string, string> = {"OK":"سليم","ACTIVE":"نشط","DELIVERED":"تم التسليم","COLLECTED":"تم الاستلام","PAID":"مدفوع","SUCCEEDED":"نجح","COMPLETED":"مكتمل","APPLIED":"تم التطبيق","BALANCED":"متوازن","RUNNING":"قيد التنفيذ","SENT":"تم الإرسال","APPROVED":"معتمد","PENDING":"قيد الانتظار","QUEUED":"في قائمة الانتظار","PARTIAL":"جزئي","UNPAID":"غير مدفوع","DEGRADED":"أداء منخفض","LOW":"منخفض","SCHEDULED":"مجدول","PENDING_APPROVAL":"بانتظار الاعتماد","SENDING":"جارٍ الإرسال","PREPARING":"قيد التحضير","CONFIRMED":"مؤكد","CANCELLED":"ملغى","FAILED":"فشل","DOWN":"متوقف","REJECTED":"مرفوض","OVERPAID":"مدفوع بالزيادة","OUT":"نفد","MISMATCH":"غير مطابق","VOIDED":"ملغى","DISABLED":"معطّل","DRAFT":"مسودة","EXPIRED":"منتهٍ","NOTHING_DUE":"لا توجد مستحقات","UNLIMITED":"غير محدود","READY":"جاهز","READY_FOR_PICKUP":"جاهز للاستلام","ASSIGNED_TO_DRIVER":"مُسند لسائق","PICKED_UP":"تم الاستلام","ON_THE_WAY":"في الطريق","FAILED_DELIVERY":"فشل التوصيل","CUSTOMER_CLAIMED_TRANSFER":"أبلغ العميل بالتحويل","UNDER_REVIEW":"قيد المراجعة","INACTIVE":"غير نشط","OPEN":"مفتوح","CLOSED":"مغلق","LIVE":"نشط","ENDED":"منتهٍ","ONLINE":"متصل","OFFLINE":"غير متصل","AVAILABLE":"متاح","UNAVAILABLE":"غير متاح","RESOLVED":"تم الحل","PENDING_REVIEW":"بانتظار المراجعة","REFUNDED":"تم الاسترداد","PARTIALLY_PAID":"مدفوع جزئيًا"};
+export function commonStatusLabel(status: string, t: T): string {
+  const en = status.replace(/_/g, ' ');
+  return t(en, COMMON_STATUS_AR[status] ?? en);
+}

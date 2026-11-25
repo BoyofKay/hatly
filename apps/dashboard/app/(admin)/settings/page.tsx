@@ -456,6 +456,8 @@ function ConfigRow({ field }: { field: ConfigFieldDef }) {
 }
 
 
+const ROUTE_AR: Record<string, [string, string]> = {"HATLY_SERVICE_DEFAULT_PICKUP_LOCATION":["هاتلي — نقطة البداية الافتراضية","نقطة بداية طلب هاتلي من مكان عندما لا يحدد العميل نقطة بداية أخرى."],"HATLY_SERVICE_DEFAULT_DESTINATION_LOCATION":["هاتلي — الوجهة الافتراضية","وجهة طلب هاتلي عندما لا يحدد العميل وجهة أخرى."],"WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION":["وصّلي — الوجهة الافتراضية","وجهة طلب وصّلي لمكان عندما لا يحدد العميل وجهة أخرى. يختار العميل دائمًا مكان الاستلام."]};
+const routeValidationAr: Record<string, string> = {"Enter the label customers will see (e.g. the place name).":"أدخل الاسم الذي سيظهر للعملاء (مثل اسم المكان).","The label can be at most 120 characters.":"يجب ألا يتجاوز الاسم 120 حرفًا.","Latitude and longitude must be decimal numbers (e.g. 30.4181 and 31.5622).":"يجب إدخال خط العرض وخط الطول كأرقام عشرية (مثل 30.4181 و31.5622).","Latitude must be between 21.9 and 31.7 (Egypt). Latitude and longitude may be swapped.":"يجب أن يكون خط العرض بين 21.9 و31.7 (مصر). تحقق من عدم عكس الإحداثيات.","Longitude must be between 24.6 and 36.9 (Egypt). Latitude and longitude may be swapped.":"يجب أن يكون خط الطول بين 24.6 و36.9 (مصر). تحقق من عدم عكس الإحداثيات."};
 const STATUS_TEXT: Record<RouteDefaultStatus, { text: string; className: string }> = {
   NOT_CONFIGURED: { text: 'Not configured — customers must choose this point themselves', className: 'text-amber-700' },
   CONFIGURED: { text: 'Configured', className: 'text-green-700' },
@@ -464,6 +466,7 @@ const STATUS_TEXT: Record<RouteDefaultStatus, { text: string; className: string 
 
 /** One default route location: status, the three fields, Save (validated here and again by the backend) and Clear. */
 function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: (key: string, raw: unknown) => void }) {
+  const { t } = useLang();
   const [form, setForm] = useState<RouteDefaultForm>({ ...EMPTY_ROUTE_DEFAULT_FORM });
   const [status, setStatus] = useState<RouteDefaultStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -480,7 +483,7 @@ function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: 
         setForm(formFromValue(raw));
         onChanged(def.key, raw);
       } catch (err: any) {
-        if (!cancelled) setError(apiErrorMessage(err, 'Failed to load.'));
+        if (!cancelled) setError(apiErrorMessage(err, t("Failed to load.", "تعذّر التحميل.")));
       }
     })();
     return () => {
@@ -500,7 +503,7 @@ function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: 
     setNote(null);
     const built = buildRouteDefault(form);
     if (!built.ok) {
-      setError(built.error);
+      setError(t(built.error, routeValidationAr[built.error] ?? built.error));
       return;
     }
     setBusy(true);
@@ -509,9 +512,9 @@ function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: 
       setStatus('CONFIGURED');
       setForm(formFromValue(built.value));
       onChanged(def.key, built.value);
-      setNote('Saved. New quotes use it immediately; placed orders keep the route they were frozen with.');
+      setNote(t("Saved. New quotes use it immediately; placed orders keep the route they were frozen with.", "تم الحفظ. تستخدم عروض الأسعار الجديدة هذا الموقع فورًا، وتحتفظ الطلبات القائمة بمسارها الأصلي."));
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to save.'));
+      setError(apiErrorMessage(err, t("Failed to save.", "تعذّر الحفظ.")));
     } finally {
       setBusy(false);
     }
@@ -519,7 +522,7 @@ function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: 
 
   async function clear() {
     if (busy) return;
-    if (!window.confirm(`Clear "${def.title}"? Customers will then have to choose this point themselves.`)) return;
+    if (!window.confirm(t(`Clear "${def.title}"? Customers will then have to choose this point themselves.`, `مسح «${ROUTE_AR[def.key]?.[0] ?? def.title}»؟ سيحتاج العملاء إلى اختيار هذه النقطة بأنفسهم.`))) return;
     setError(null);
     setNote(null);
     setBusy(true);
@@ -528,9 +531,9 @@ function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: 
       setStatus('NOT_CONFIGURED');
       setForm({ ...EMPTY_ROUTE_DEFAULT_FORM });
       onChanged(def.key, null);
-      setNote('Cleared.');
+      setNote(t("Cleared.", "تم المسح."));
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to clear.'));
+      setError(apiErrorMessage(err, t("Failed to clear.", "تعذّر المسح.")));
     } finally {
       setBusy(false);
     }
@@ -539,17 +542,17 @@ function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: 
   const s = status ? STATUS_TEXT[status] : null;
   return (
     <div className="border-b py-3 last:border-0" data-testid={`route-default-${def.key}`}>
-      <p className="text-sm font-medium">{def.title}</p>
-      <p className="text-xs text-gray-500">{def.help}</p>
+      <p className="text-sm font-medium">{t(def.title, ROUTE_AR[def.key]?.[0] ?? def.title)}</p>
+      <p className="text-xs text-gray-500">{t(def.help, ROUTE_AR[def.key]?.[1] ?? def.help)}</p>
       <p className={`mt-1 text-xs ${s?.className ?? 'text-gray-400'}`} data-testid={`route-default-status-${def.key}`}>
-        {s ? s.text : 'Loading...'}
+        {s && status ? t(s.text, { NOT_CONFIGURED: 'غير محدد — يجب أن يختار العملاء هذه النقطة بأنفسهم', CONFIGURED: 'تم التحديد', INVALID: 'القيمة المحفوظة غير صالحة — يتم تجاهلها حتى حفظ قيمة صالحة' }[status]) : t('Loading...', 'جارٍ التحميل...')}
       </p>
       <div className="mt-2 grid gap-2 sm:grid-cols-[8rem_8rem_1fr]">
         <input
           aria-label={`${def.title} latitude`}
           data-testid={`route-default-lat-${def.key}`}
           inputMode="decimal"
-          placeholder="Latitude"
+          placeholder={t("Latitude", "خط العرض")}
           value={form.latitude}
           onChange={(e) => edit({ latitude: e.target.value })}
           className="rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
@@ -558,7 +561,7 @@ function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: 
           aria-label={`${def.title} longitude`}
           data-testid={`route-default-lng-${def.key}`}
           inputMode="decimal"
-          placeholder="Longitude"
+          placeholder={t("Longitude", "خط الطول")}
           value={form.longitude}
           onChange={(e) => edit({ longitude: e.target.value })}
           className="rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
@@ -567,7 +570,7 @@ function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: 
           aria-label={`${def.title} label`}
           data-testid={`route-default-label-${def.key}`}
           maxLength={120}
-          placeholder="Label customers see (e.g. the place name)"
+          placeholder={t("Label customers see (e.g. the place name)", "الاسم الذي يظهر للعملاء (مثل اسم المكان)")}
           value={form.label}
           onChange={(e) => edit({ label: e.target.value })}
           className="rounded-lg border px-2 py-1 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100"
@@ -575,10 +578,10 @@ function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: 
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <button onClick={save} disabled={busy || status === null} className="rounded-lg bg-hatly-orange px-3 py-1 text-xs font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-          {busy ? 'Working...' : 'Save'}
+          {busy ? t("Working...", "جارٍ التنفيذ...") : t("Save", "حفظ")}
         </button>
         <button onClick={clear} disabled={busy || status === null || status === 'NOT_CONFIGURED'} className="rounded-lg border px-3 py-1 text-xs disabled:opacity-50 border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-          Clear
+          {t("Clear", "مسح")}
         </button>
         {note && <span className="text-xs text-green-700">{note}</span>}
         {error && <span className="text-xs text-red-600" role="alert">{error}</span>}
@@ -593,6 +596,7 @@ function RouteDefaultRow({ def, onChanged }: { def: RouteDefaultDef; onChanged: 
  * until a default is saved the customer app asks the customer to choose that point.
  */
 function RouteDefaultsCard() {
+  const { t } = useLang();
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [loadedKeys, setLoadedKeys] = useState<Set<string>>(new Set());
   const onChanged = (key: string, raw: unknown) => {
@@ -602,15 +606,13 @@ function RouteDefaultsCard() {
   const missing = ROUTE_DEFAULT_DEFS.filter((d) => loadedKeys.has(d.key) && statusOf(values[d.key]) !== 'CONFIGURED');
   return (
     <div className="mt-6 rounded-xl border bg-white p-4 border-gray-200 shadow-sm" data-testid="route-defaults-card">
-      <h2 className="font-semibold">Hatly &amp; Wasally default route points</h2>
+      <h2 className="font-semibold">{t("Hatly & Wasally default route points", "نقاط المسار الافتراضية لهاتلي ووصّلي")}</h2>
       <p className="mt-1 text-xs text-gray-500">
-        Every Hatly / Wasally request goes from an origin to a destination. Each end is the customer&apos;s own choice; when they do not
-        choose one, the default below is used. Hatly and Wasally keep separate defaults. A default is never taken from the customer&apos;s
-        address, and nothing is filled in for you: enter the real coordinates and the name customers will see.
+        {t("Every Hatly / Wasally request goes from an origin to a destination. Each end is the customer's own choice; when they do not choose one, the default below is used. Hatly and Wasally keep separate defaults. A default is never taken from the customer's address, and nothing is filled in for you: enter the real coordinates and the name customers will see.", "ينطلق كل طلب هاتلي أو وصّلي من نقطة بداية إلى وجهة. يختار العميل كل نقطة، وعندما لا يختارها تُستخدم القيمة الافتراضية أدناه. لكل خدمة إعداداتها المستقلة. لا يُستخدم عنوان العميل تلقائيًا ولا تُملأ القيم مسبقًا: أدخل الإحداثيات الفعلية واسم الموقع الذي سيظهر للعملاء.")}
       </p>
       {missing.length > 0 && (
         <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800" data-testid="route-defaults-missing">
-          Still to enter: {missing.map((d) => d.title).join(' · ')}.
+          {t('Still to enter:', 'لم يتم تحديد:')} {missing.map((d) => t(d.title, ROUTE_AR[d.key]?.[0] ?? d.title)).join(' · ')}.
         </p>
       )}
       <div className="mt-2">
@@ -624,6 +626,7 @@ function RouteDefaultsCard() {
 
 /** M3a (Launch-Readiness Gap Audit, G-28). `{ label, phoneOrAccountNumber, accountName? }` — see BusinessConfigKey's own doc comment. Until set, Manual Transfer fails closed. */
 function ManualTransferDestinationForm() {
+  const { t } = useLang();
   const KEY = 'MANUAL_TRANSFER_DESTINATION';
   const [label, setLabel] = useState('');
   const [phoneOrAccountNumber, setPhoneOrAccountNumber] = useState('');
@@ -641,7 +644,7 @@ function ManualTransferDestinationForm() {
       setPhoneOrAccountNumber(raw?.phoneOrAccountNumber ?? '');
       setAccountName(raw?.accountName ?? '');
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to load.'));
+      setError(apiErrorMessage(err, t("Failed to load.", "تعذّر التحميل.")));
     } finally {
       setLoaded(true);
     }
@@ -655,7 +658,7 @@ function ManualTransferDestinationForm() {
     e.preventDefault();
     if (isSaving) return;
     if (!label.trim() || !phoneOrAccountNumber.trim()) {
-      setError('Label and phone/account number are required.');
+      setError(t("Label and phone/account number are required.", "اسم الوجهة ورقم الهاتف أو الحساب مطلوبان."));
       return;
     }
     setError(null);
@@ -665,23 +668,23 @@ function ManualTransferDestinationForm() {
       await setBusinessConfigValue(KEY, { label: label.trim(), phoneOrAccountNumber: phoneOrAccountNumber.trim(), accountName: accountName.trim() || undefined });
       setSaved(true);
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to save.'));
+      setError(apiErrorMessage(err, t("Failed to save.", "تعذّر الحفظ.")));
     } finally {
       setIsSaving(false);
     }
   }
 
-  if (!loaded) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (!loaded) return <p className="text-sm text-gray-500">{t("Loading...", "جارٍ التحميل...")}</p>;
 
   return (
     <form onSubmit={handleSave} className="space-y-2">
-      <input value={label} onChange={(e) => { setLabel(e.target.value); setSaved(false); }} placeholder="Label (e.g. InstaPay)" className="w-full rounded-lg border px-2 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
-      <input value={phoneOrAccountNumber} onChange={(e) => { setPhoneOrAccountNumber(e.target.value); setSaved(false); }} placeholder="Phone or account number" className="w-full rounded-lg border px-2 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
-      <input value={accountName} onChange={(e) => { setAccountName(e.target.value); setSaved(false); }} placeholder="Account name (optional)" className="w-full rounded-lg border px-2 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+      <input value={label} onChange={(e) => { setLabel(e.target.value); setSaved(false); }} placeholder={t("Label (e.g. InstaPay)", "اسم الوجهة (مثل إنستاباي)")} className="w-full rounded-lg border px-2 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+      <input value={phoneOrAccountNumber} onChange={(e) => { setPhoneOrAccountNumber(e.target.value); setSaved(false); }} placeholder={t("Phone or account number", "رقم الهاتف أو الحساب")} className="w-full rounded-lg border px-2 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
+      <input value={accountName} onChange={(e) => { setAccountName(e.target.value); setSaved(false); }} placeholder={t("Account name (optional)", "اسم صاحب الحساب (اختياري)")} className="w-full rounded-lg border px-2 py-1.5 text-sm border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100" />
       {error && <p className="text-sm text-red-600">{error}</p>}
-      {saved && <p className="text-sm text-green-700">Saved.</p>}
+      {saved && <p className="text-sm text-green-700">{t("Saved.", "تم الحفظ.")}</p>}
       <button type="submit" disabled={isSaving} className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-        {isSaving ? 'Saving...' : 'Save'}
+        {isSaving ? t("Saving...", "جارٍ الحفظ...") : t("Save", "حفظ")}
       </button>
     </form>
   );
@@ -707,7 +710,7 @@ export default function SettingsPage() {
       // Matches the backend's own default: unset (null) means OTP mode (true).
       setOtpEnabled(value ?? true);
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to load setting.'));
+      setError(apiErrorMessage(err, tl("Failed to load setting.", "تعذّر تحميل الإعداد.")));
     }
   }
 
@@ -723,7 +726,7 @@ export default function SettingsPage() {
       // matching this Dashboard's existing convention (no new
       // confirmation-dialog infrastructure introduced).
       const confirmed = window.confirm(
-        'Turn OFF phone verification by OTP? New customers will still register and sign in with Phone + Password, but they will not be asked to verify their phone number with a code until this is turned back on. Existing accounts and sessions are not affected.',
+        tl('Turn OFF phone verification by OTP? New customers will still register and sign in with Phone + Password, but they will not be asked to verify their phone number with a code until this is turned back on. Existing accounts and sessions are not affected.', 'هل تريد إيقاف التحقق من الهاتف برمز لمرة واحدة؟ سيستمر العملاء الجدد في التسجيل والدخول برقم الهاتف وكلمة المرور، لكن لن يُطلب منهم تأكيد الرقم برمز حتى إعادة التفعيل. لن تتأثر الحسابات أو الجلسات الحالية.'),
       );
       if (!confirmed) return;
     }
@@ -733,7 +736,7 @@ export default function SettingsPage() {
       await setBusinessConfigValue(CUSTOMER_OTP_ENABLED_KEY, next, 'Controls first-time phone verification by OTP during customer registration. It never changes sign-in: customers always sign in with phone + password.');
       setOtpEnabled(next);
     } catch (err: any) {
-      setError(apiErrorMessage(err, 'Failed to update setting.'));
+      setError(apiErrorMessage(err, tl("Failed to update setting.", "تعذّر تحديث الإعداد.")));
     } finally {
       setIsSaving(false);
     }
@@ -781,11 +784,11 @@ export default function SettingsPage() {
           <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {error}{' '}
             <button onClick={load} className="underline">
-              Retry
+              {tl("Retry", "إعادة المحاولة")}
             </button>
           </div>
         )}
-        {otpEnabled === null && !error && <p className="mt-3 text-sm text-gray-500">Loading...</p>}
+        {otpEnabled === null && !error && <p className="mt-3 text-sm text-gray-500">{tl("Loading...", "جارٍ التحميل...")}</p>}
       </div>
 
       <div id="sec-config" className="mt-6 scroll-mt-16 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
