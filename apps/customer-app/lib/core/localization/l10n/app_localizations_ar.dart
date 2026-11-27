@@ -2720,8 +2720,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get voiceNoteAttached => 'رسالة صوتية';
 
   @override
-  String get voiceNoteLimitHint =>
-      'حتى 5 دقائق. يستمع إليها المندوب قبل الشراء.';
+  String voiceNoteLimitHint(String limit) {
+    return 'حتى $limit. يستمع إليها المندوب قبل الشراء.';
+  }
 
   @override
   String get voiceNotePermissionDenied =>

@@ -4883,8 +4883,8 @@ abstract class AppLocalizations {
   /// No description provided for @voiceNoteLimitHint.
   ///
   /// In ar, this message translates to:
-  /// **'حتى 5 دقائق. يستمع إليها المندوب قبل الشراء.'**
-  String get voiceNoteLimitHint;
+  /// **'حتى {limit}. يستمع إليها المندوب قبل الشراء.'**
+  String voiceNoteLimitHint(String limit);
 
   /// No description provided for @voiceNotePermissionDenied.
   ///

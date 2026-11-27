@@ -6,8 +6,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
-/// Voice notes (owner decision 2026-11-27): the longest a note may be.
+import '../../features/auth/presentation/auth_gate.dart';
+import '../../features/hatly_service/data/hatly_service_api.dart';
+
+/// Voice notes (owner decision 2026-11-27): the longest a note may be when the server does not say (Admin → Settings sets it).
 const Duration voiceNoteMaxDuration = Duration(minutes: 5);
+
+/// The limit from Admin → Settings (VOICE_NOTE_MAX_SECONDS, 30–600 s); the 5-minute default until it is known or when it cannot be read.
+final voiceNoteLimitProvider = FutureProvider.autoDispose<Duration>((ref) async {
+  if (!ref.watch(isSignedInProvider)) return voiceNoteMaxDuration;
+  final s = await ref.watch(hatlyServiceApiProvider).getVoiceNoteMaxSeconds();
+  return s != null && s >= 30 && s <= 600 ? Duration(seconds: s) : voiceNoteMaxDuration;
+});
 
 /// The device side of a voice note — recording and playback — behind one small interface so the screens can be tested without a microphone.
 abstract class VoiceNoteEngine {

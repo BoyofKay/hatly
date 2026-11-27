@@ -184,6 +184,8 @@ export enum BusinessConfigKey {
    * freezes the value it used (`multiplierUsed` in its delivery breakdown).
    */
   HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER = 'HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER',
+  /** Longest voice note a customer may record on a Hatly / Wasaly / custom request, in seconds (owner 2026-11-28). Blank = 300. */
+  VOICE_NOTE_MAX_SECONDS = 'VOICE_NOTE_MAX_SECONDS',
 
   /**
    * PHASE F addition. CONFIRMED: settlement frequency (WEEKLY or

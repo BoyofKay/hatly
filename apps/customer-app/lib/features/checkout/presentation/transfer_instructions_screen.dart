@@ -226,10 +226,10 @@ class _TransferApp {
 
 const _transferApps = [
   _TransferApp('INSTAPAY', 'InstaPay Egypt', Color(0xFF4B2C82), androidId: 'com.egyptianbanks.instapay'),
-  _TransferApp('VODAFONE_CASH', 'Vodafone Cash', Color(0xFFE60000)),
-  _TransferApp('ORANGE_CASH', 'Orange Cash', Color(0xFFFF7900)),
-  _TransferApp('WE_PAY', 'WE Pay', Color(0xFF5C2D91)),
-  _TransferApp('ETISALAT_CASH', 'e& money Etisalat Cash', Color(0xFF00A651)),
+  _TransferApp('VODAFONE_CASH', 'Ana Vodafone', Color(0xFFE60000), androidId: 'com.emeint.android.myservices'),
+  _TransferApp('ORANGE_CASH', 'Orange Cash', Color(0xFFFF7900), androidId: 'com.orange.mobinilandme'),
+  _TransferApp('WE_PAY', 'WE Pay', Color(0xFF5C2D91), androidId: 'com.TE.WEWallet'),
+  _TransferApp('ETISALAT_CASH', 'e& money', Color(0xFF00A651), androidId: 'com.etisalat.flous'),
 ];
 
 List<_TransferApp> _orderedApps(String? chosen) => [

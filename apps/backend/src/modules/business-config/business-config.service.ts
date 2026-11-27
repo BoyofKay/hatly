@@ -41,6 +41,7 @@ const CLEARABLE_KEYS: ReadonlySet<string> = new Set([
   BusinessConfigKey.WASALLY_SERVICE_DEFAULT_DESTINATION_LOCATION,
   // Optional settings whose absence has a defined meaning: default 5 min (R16), fallback number (R17), automatic cancellation off (R21).
   BusinessConfigKey.DISPATCH_ACKNOWLEDGEMENT_WINDOW_MINUTES,
+  BusinessConfigKey.VOICE_NOTE_MAX_SECONDS,
   BusinessConfigKey.OPERATIONS_CONTACT_PHONE,
   BusinessConfigKey.MANUAL_TRANSFER_VERIFICATION_WINDOW_MINUTES,
   BusinessConfigKey.DRIVER_PRESENCE_STALE_MINUTES, // unset = the "app silent" driver alert is off
@@ -63,7 +64,19 @@ export function resolveAcknowledgementWindowMinutes(value: unknown): number {
     : ACK_WINDOW_DEFAULT_MINUTES;
 }
 
+export const VOICE_NOTE_DEFAULT_SECONDS = 300;
+export const VOICE_NOTE_MIN_SECONDS = 30;
+/** 10 minutes at the app's 32 kbps is about 2.4 MB — inside the 4 MB audio upload cap. */
+export const VOICE_NOTE_MAX_ALLOWED_SECONDS = 600;
+export function resolveVoiceNoteMaxSeconds(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= VOICE_NOTE_MIN_SECONDS && value <= VOICE_NOTE_MAX_ALLOWED_SECONDS ? value : VOICE_NOTE_DEFAULT_SECONDS;
+}
+
 const VALUE_VALIDATORS: Partial<Record<string, { valid: (v: unknown) => boolean; message: string }>> = {
+  [BusinessConfigKey.VOICE_NOTE_MAX_SECONDS]: {
+    valid: (v) => typeof v === 'number' && Number.isInteger(v) && v >= VOICE_NOTE_MIN_SECONDS && v <= VOICE_NOTE_MAX_ALLOWED_SECONDS,
+    message: `The voice note limit must be a whole number of seconds from ${VOICE_NOTE_MIN_SECONDS} to ${VOICE_NOTE_MAX_ALLOWED_SECONDS}.`,
+  },
   [BusinessConfigKey.HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER]: {
     valid: isValidHatlyServiceMultiplier,
     message: 'The Hatly Service delivery fee multiplier must be a positive number up to 10 (e.g. 1.5).',
@@ -339,6 +352,12 @@ export class BusinessConfigService {
   async getEtaRangeBufferMinutes(): Promise<number | null> {
     const value = await this.get<unknown>(BusinessConfigKey.ETA_RANGE_BUFFER_MINUTES, null);
     return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+  }
+
+  /** The longest voice note customers may record (seconds); blank or invalid = the 5-minute default. */
+  async getVoiceNoteMaxSeconds(): Promise<number> {
+    const row = await this.repo.findOne({ where: { key: BusinessConfigKey.VOICE_NOTE_MAX_SECONDS } });
+    return resolveVoiceNoteMaxSeconds(row?.value);
   }
 
   async getCustomerServiceWhatsappNumber(): Promise<string> {

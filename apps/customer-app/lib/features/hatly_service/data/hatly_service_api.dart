@@ -8,6 +8,18 @@ class HatlyServiceApi {
   HatlyServiceApi(this._client);
   final ApiClient _client;
 
+  /// The voice-note limit set in Admin → Settings (owner 2026-11-28), in seconds. Null = not known (older server): the app uses 5 minutes.
+  Future<int?> getVoiceNoteMaxSeconds() async {
+    try {
+      return await _client.request(
+        (dio) => dio.get('/hatly-service/voice-note-limit'),
+        (data) => ((data['data'] as Map<String, dynamic>)['maxSeconds'] as num?)?.toInt(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// The configured Hatly / Wasally default route endpoints. A backend that predates the endpoint (404) answers "nothing configured".
   Future<RouteDefaults> getRouteDefaults() async {
     try {

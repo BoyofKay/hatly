@@ -120,6 +120,17 @@ const CONFIG_FIELDS: ConfigFieldDef[] = [
     "helpAr": "رسوم إلزامية بالجنيه المصري لكل مجموعة متجر مسجل إضافية بعد الأولى، سواء بالتسعير الثابت للمنطقة أو حسب المسافة. الصفر يعني عدم إضافة رسوم."
   },
   {
+    "key": "VOICE_NOTE_MAX_SECONDS",
+    "label": "Voice note limit",
+    "labelAr": "الحد الأقصى للرسالة الصوتية",
+    "type": "integer",
+    "unit": "seconds",
+    "unitAr": "ثانية",
+    "help": "The longest voice note a customer can record on a Hatly, Wasaly or store custom request. Blank = 300 seconds (5 minutes); allowed 30–600 seconds. Applies to new recordings.",
+    "helpAr": "أطول رسالة صوتية يستطيع العميل تسجيلها في طلب هاتلي أو وصّلي أو الطلب المخصص من متجر. الافتراضي 300 ثانية (5 دقائق)؛ المسموح 30–600 ثانية. يسري على التسجيلات الجديدة.",
+    "clearable": true
+  },
+  {
     "key": "HATLY_SERVICE_DELIVERY_FEE_MULTIPLIER",
     "label": "Hatly & Wasally delivery fee multiplier",
     "labelAr": "معامل رسوم توصيل هاتلي ووصّلي",

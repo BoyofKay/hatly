@@ -1331,7 +1331,7 @@
   "voiceNoteStopPlaying": "Stop",
   "voiceNoteDelete": "Delete the voice note",
   "voiceNoteAttached": "Voice note",
-  "voiceNoteLimitHint": "Up to 5 minutes. The driver listens to it before buying.",
+  "voiceNoteLimitHint": "Up to {limit}. The driver listens to it before buying.",
   "voiceNotePermissionDenied": "Hatly needs the microphone to record. Allow it in your phone's settings.",
   "voiceNoteTooShort": "The recording was too short. Try again.",
   "voiceNoteFailed": "The voice note could not be recorded. Try again.",
@@ -1367,5 +1367,12 @@
   "orderTransferUnderReviewTitle": "Waiting for payment review",
   "orderTransferUnderReviewBody": "We received your transfer proof. The team is checking it.",
   "orderTransferRejectedTitle": "Your transfer was not accepted",
-  "orderTransferRejectedBody": "Please contact Hatly on WhatsApp."
+  "orderTransferRejectedBody": "Please contact Hatly on WhatsApp.",
+  "@voiceNoteLimitHint": {
+    "placeholders": {
+      "limit": {
+        "type": "String"
+      }
+    }
+  }
 }

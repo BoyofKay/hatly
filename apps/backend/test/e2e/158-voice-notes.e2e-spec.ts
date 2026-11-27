@@ -4,6 +4,7 @@
  * write a note for the driver.
  */
 import * as http from 'http';
+import sharp = require('sharp');
 import { bootWorld, World } from './support/world';
 import { Scenario, Actor, expectData, withQuoteToken } from './support/actors';
 import { Permission } from '../../src/modules/permissions/permission.enum';
@@ -44,6 +45,30 @@ describe('E2E — voice notes on Hatly / Wasaly requests', () => {
     ...extra,
   });
   const uploadVoice = async (c: Actor) => expectData<any>(await world.api('post', '/uploads/audio', { token: c.accessToken, body: { base64Content: M4A } }), 201).url as string;
+
+  it('owner 2026-11-28: the voice-note limit is set in Admin settings (30–600 s, blank = 300) and read by the app', async () => {
+    const admin = await s.superAdmin();
+    const c = await s.customer('Limit Reader');
+    const limit = async () => expectData<any>(await world.api('get', '/hatly-service/voice-note-limit', { token: c.accessToken })).maxSeconds;
+    expect(await limit()).toBe(300);
+    expectData(await world.api('put', '/admin/business-config/VOICE_NOTE_MAX_SECONDS', { token: admin.accessToken, body: { value: 120 } }));
+    expect(await limit()).toBe(120);
+    expect((await world.api('put', '/admin/business-config/VOICE_NOTE_MAX_SECONDS', { token: admin.accessToken, body: { value: 5 } })).status).toBe(400);
+    expect((await world.api('put', '/admin/business-config/VOICE_NOTE_MAX_SECONDS', { token: admin.accessToken, body: { value: 900 } })).status).toBe(400);
+    expect((await world.api('delete', '/admin/business-config/VOICE_NOTE_MAX_SECONDS', { token: admin.accessToken })).status).toBeLessThan(300);
+    expect(await limit()).toBe(300);
+  });
+
+  it('UAT 2026-11-28: Operations see the photos of a Hatly request', async () => {
+    const c = await s.customer('Photo Request');
+    const png = sharp({ create: { width: 400, height: 400, channels: 3, background: { r: 9, g: 99, b: 199 } } }).png().toBuffer();
+    const up = expectData<any>(await world.api('post', '/uploads', { token: c.accessToken, body: { base64Content: (await png).toString('base64'), filename: 'photo.png' } }), 201);
+    expectData(await world.api('post', '/cart/adhoc-items', { token: c.accessToken, body: request({ freeTextDescription: 'This one', imageUrls: [up.url] }) }), 201);
+    const placed = await world.api('post', '/orders', { token: c.accessToken, body: await withQuoteToken(world, c.accessToken, { deliveryAddress: address, paymentMethod: 'COD' }) });
+    expect(placed.status).toBe(201);
+    const admin = expectData<any>(await world.api('get', `/admin/orders/${placed.body.data.id}`, { token: ops.accessToken }));
+    expect(admin.segments[0].items[0].imageUrls).toEqual([up.url]);
+  });
 
   it('rejects a file that is not audio, and an empty request (no text, photo or voice)', async () => {
     const c = await s.customer('Voice Reject');

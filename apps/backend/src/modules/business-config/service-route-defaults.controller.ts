@@ -21,4 +21,10 @@ export class ServiceRouteDefaultsController {
   async routeDefaults() {
     return { data: await this.businessConfigService.getServiceRouteDefaults() };
   }
+
+  /** The voice-note limit set in Admin → Settings (owner 2026-11-28). */
+  @Get('voice-note-limit')
+  async voiceNoteLimit() {
+    return { data: { maxSeconds: await this.businessConfigService.getVoiceNoteMaxSeconds() } };
+  }
 }

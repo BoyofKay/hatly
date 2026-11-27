@@ -350,6 +350,7 @@ Widget _app({
   RouteDefaults defaults = RouteDefaults.none,
   bool buyOnly = false,
   _FakeVoiceEngine? voice,
+  Duration? voiceLimit,
 }) {
   var pickIndex = 0;
   return hatlyRouterApp(
@@ -359,6 +360,7 @@ Widget _app({
       savedAddressesProvider.overrideWith((ref) async => saved),
       routeDefaultsProvider.overrideWith((ref) async => defaults),
       voiceNoteEngineProvider.overrideWith((ref) => voice ?? _FakeVoiceEngine()),
+      voiceNoteLimitProvider.overrideWith((ref) async => voiceLimit ?? voiceNoteMaxDuration),
     ],
     initialLocation: '/hatly-service',
     routes: [
@@ -791,7 +793,7 @@ void main() {
       }
       await _settle(tester);
       expect(engine.recording, isFalse);
-      expect(find.textContaining('5:00'), findsOneWidget);
+      expect((tester.widget(find.byKey(const Key('voice-note-attached'))) as Text).data, contains('5:00'));
 
       await tester.tap(find.byKey(const Key('voice-note-play')));
       await _settle(tester);
@@ -801,6 +803,23 @@ void main() {
       await _settle(tester);
       expect(find.byKey(const Key('voice-note-record')), findsOneWidget);
       expect(_canContinue(tester), isFalse);
+    });
+
+    testWidgets('the limit set in Admin → Settings is used (here 1 minute)', (tester) async {
+      _tallViewport(tester);
+      final engine = _FakeVoiceEngine();
+      await tester.pumpWidget(_app(cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi(), defaults: _allDefaults, voice: engine, voiceLimit: const Duration(minutes: 1)));
+      await _settle(tester);
+      expect(find.textContaining('1:00'), findsWidgets); // the hint names the limit
+      await tester.ensureVisible(find.byKey(const Key('voice-note-record')));
+      await tester.tap(find.byKey(const Key('voice-note-record')));
+      await tester.pump();
+      for (var i = 0; i < 61; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+      await _settle(tester);
+      expect(engine.recording, isFalse);
+      expect(find.byKey(const Key('voice-note-attached')), findsOneWidget);
     });
 
     testWidgets('a refused microphone says so and records nothing', (tester) async {

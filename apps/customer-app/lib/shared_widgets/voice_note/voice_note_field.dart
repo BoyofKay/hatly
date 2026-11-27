@@ -16,11 +16,12 @@ class VoiceNoteDraft {
 
 /// Record (up to 5 minutes, stops by itself at the limit), listen, delete. Optional — text, photos and voice are each optional.
 class VoiceNoteField extends ConsumerStatefulWidget {
-  const VoiceNoteField({super.key, required this.value, required this.onChanged, this.maxDuration = voiceNoteMaxDuration});
+  const VoiceNoteField({super.key, required this.value, required this.onChanged, this.maxDuration});
 
   final VoiceNoteDraft? value;
   final ValueChanged<VoiceNoteDraft?> onChanged;
-  final Duration maxDuration;
+  /// Fixed limit (tests); null = the limit set in Admin → Settings.
+  final Duration? maxDuration;
 
   @override
   ConsumerState<VoiceNoteField> createState() => _VoiceNoteFieldState();
@@ -35,6 +36,8 @@ class _VoiceNoteFieldState extends ConsumerState<VoiceNoteField> {
   Timer? _timer;
 
   VoiceNoteEngine get _engine => ref.read(voiceNoteEngineProvider);
+
+  Duration get _max => widget.maxDuration ?? ref.read(voiceNoteLimitProvider).valueOrNull ?? voiceNoteMaxDuration;
 
   @override
   void initState() {
@@ -70,7 +73,7 @@ class _VoiceNoteFieldState extends ConsumerState<VoiceNoteField> {
       _timer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (!mounted) return;
         setState(() => _elapsed += const Duration(seconds: 1));
-        if (_elapsed >= widget.maxDuration) unawaited(_stop());
+        if (_elapsed >= _max) unawaited(_stop());
       });
     } catch (_) {
       if (mounted) setState(() => _error = l10n.voiceNoteFailed);
@@ -91,7 +94,7 @@ class _VoiceNoteFieldState extends ConsumerState<VoiceNoteField> {
         setState(() => _error = l10n.voiceNoteTooShort);
         return;
       }
-      widget.onChanged(VoiceNoteDraft(path: path, duration: _elapsed > widget.maxDuration ? widget.maxDuration : _elapsed));
+      widget.onChanged(VoiceNoteDraft(path: path, duration: _elapsed > _max ? _max : _elapsed));
     } catch (_) {
       if (mounted) setState(() => _error = l10n.voiceNoteFailed);
     }
@@ -121,6 +124,7 @@ class _VoiceNoteFieldState extends ConsumerState<VoiceNoteField> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final p = context.palette;
+    ref.watch(voiceNoteLimitProvider);
     final note = widget.value;
     Widget body;
     if (_recording) {
@@ -128,7 +132,7 @@ class _VoiceNoteFieldState extends ConsumerState<VoiceNoteField> {
         Icon(Icons.fiber_manual_record, color: p.urgent, size: 18),
         const SizedBox(width: HatlySpacing.sm),
         Expanded(
-          child: Text('${l10n.voiceNoteRecording} ${formatVoiceDuration(_elapsed)} / ${formatVoiceDuration(widget.maxDuration)}',
+          child: Text('${l10n.voiceNoteRecording} ${formatVoiceDuration(_elapsed)} / ${formatVoiceDuration(_max)}',
               key: const Key('voice-note-elapsed'), style: context.type.small),
         ),
         FilledButton.icon(
@@ -168,7 +172,7 @@ class _VoiceNoteFieldState extends ConsumerState<VoiceNoteField> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       body,
       const SizedBox(height: HatlySpacing.xs),
-      Text(l10n.voiceNoteLimitHint, style: context.type.caption),
+      Text(l10n.voiceNoteLimitHint(formatVoiceDuration(_max)), style: context.type.caption),
       if (_error != null) ...[
         const SizedBox(height: HatlySpacing.xs),
         Text(_error!, key: const Key('voice-note-error'), style: context.type.small.copyWith(color: p.urgent)),

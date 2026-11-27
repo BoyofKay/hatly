@@ -2750,8 +2750,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceNoteAttached => 'Voice note';
 
   @override
-  String get voiceNoteLimitHint =>
-      'Up to 5 minutes. The driver listens to it before buying.';
+  String voiceNoteLimitHint(String limit) {
+    return 'Up to $limit. The driver listens to it before buying.';
+  }
 
   @override
   String get voiceNotePermissionDenied =>

@@ -1345,7 +1345,7 @@
   "voiceNoteStopPlaying": "إيقاف",
   "voiceNoteDelete": "حذف الرسالة الصوتية",
   "voiceNoteAttached": "رسالة صوتية",
-  "voiceNoteLimitHint": "حتى 5 دقائق. يستمع إليها المندوب قبل الشراء.",
+  "voiceNoteLimitHint": "حتى {limit}. يستمع إليها المندوب قبل الشراء.",
   "voiceNotePermissionDenied": "يحتاج هاتلي إلى الميكروفون للتسجيل. اسمح به من إعدادات هاتفك.",
   "voiceNoteTooShort": "التسجيل قصير جدًا. حاول مرة أخرى.",
   "voiceNoteFailed": "تعذّر تسجيل الرسالة الصوتية. حاول مرة أخرى.",
@@ -1378,6 +1378,13 @@
   "@transferStep2Title": {
     "placeholders": {
       "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "@voiceNoteLimitHint": {
+    "placeholders": {
+      "limit": {
         "type": "String"
       }
     }
