@@ -2800,4 +2800,59 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get cartErrorRouteSamePoint =>
       'The pickup and the destination are the same place. Choose a different place.';
+
+  @override
+  String get transferStep1Title => 'Tell Hatly on WhatsApp';
+
+  @override
+  String get transferStep1Body =>
+      'Send the ready message with your order number. Hatly then appears at the top of WhatsApp when you share the receipt.';
+
+  @override
+  String get transferStep1Button => 'Open WhatsApp';
+
+  @override
+  String transferStep2Title(String amount) {
+    return 'Transfer $amount';
+  }
+
+  @override
+  String get transferStep2Body =>
+      'Open your transfer app and send the amount to this number.';
+
+  @override
+  String get transferCopyNumber => 'Copy the number';
+
+  @override
+  String get transferNumberCopied => 'Number copied';
+
+  @override
+  String get transferStep3Title => 'Share the receipt with Hatly';
+
+  @override
+  String get transferStep3Body =>
+      'In your transfer app, open the receipt and tap Share, then choose WhatsApp → Hatly. Many apps block screenshots, so use Share. Then tap the button below.';
+
+  @override
+  String get orderTransferProofNeededTitle => 'Send the transfer proof';
+
+  @override
+  String get orderTransferProofNeededBody =>
+      'Your order waits for your transfer. Open the payment steps to finish.';
+
+  @override
+  String get orderTransferProofButton => 'Complete the payment';
+
+  @override
+  String get orderTransferUnderReviewTitle => 'Waiting for payment review';
+
+  @override
+  String get orderTransferUnderReviewBody =>
+      'We received your transfer proof. The team is checking it.';
+
+  @override
+  String get orderTransferRejectedTitle => 'Your transfer was not accepted';
+
+  @override
+  String get orderTransferRejectedBody => 'Please contact Hatly on WhatsApp.';
 }

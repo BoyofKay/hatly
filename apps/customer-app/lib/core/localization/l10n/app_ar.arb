@@ -1358,5 +1358,28 @@
   "routeSavedOutsideArea": "هذا العنوان المحفوظ خارج المنطقة التي يخدمها هاتلي.",
   "routeOtherLocation": "مكان آخر",
   "cartErrorRouteOutsideArea": "هذا المكان خارج المنطقة التي يخدمها هاتلي. اختر مكانًا داخلها.",
-  "cartErrorRouteSamePoint": "مكان الاستلام والتوصيل واحد. اختر مكانًا مختلفًا."
+  "cartErrorRouteSamePoint": "مكان الاستلام والتوصيل واحد. اختر مكانًا مختلفًا.",
+  "transferStep1Title": "أبلغ هاتلي على واتساب",
+  "transferStep1Body": "أرسل الرسالة الجاهزة برقم طلبك. بعدها يظهر هاتلي في أول قائمة واتساب عند مشاركة الإيصال.",
+  "transferStep1Button": "افتح واتساب",
+  "transferStep2Title": "حوّل {amount}",
+  "transferStep2Body": "افتح تطبيق التحويل وأرسل المبلغ إلى هذا الرقم.",
+  "transferCopyNumber": "انسخ الرقم",
+  "transferNumberCopied": "تم نسخ الرقم",
+  "transferStep3Title": "شارك الإيصال مع هاتلي",
+  "transferStep3Body": "في تطبيق التحويل افتح الإيصال واضغط مشاركة، ثم اختر واتساب ← هاتلي. كثير من التطبيقات تمنع لقطة الشاشة، فاستخدم المشاركة. ثم اضغط الزر بالأسفل.",
+  "orderTransferProofNeededTitle": "أرسل إثبات التحويل",
+  "orderTransferProofNeededBody": "طلبك ينتظر تحويلك. افتح خطوات الدفع لإكماله.",
+  "orderTransferProofButton": "أكمل الدفع",
+  "orderTransferUnderReviewTitle": "بانتظار مراجعة الدفع",
+  "orderTransferUnderReviewBody": "وصلنا إثبات التحويل. الفريق يراجعه الآن.",
+  "orderTransferRejectedTitle": "لم يُقبل التحويل",
+  "orderTransferRejectedBody": "من فضلك تواصل مع هاتلي على واتساب.",
+  "@transferStep2Title": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  }
 }

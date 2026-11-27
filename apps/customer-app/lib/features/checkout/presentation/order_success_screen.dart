@@ -141,7 +141,7 @@ class _Content extends StatelessWidget {
               key: const Key('success-complete-payment'),
               style: hatlyAccentButtonStyle(context),
               onPressed: () => context.push(
-                '/checkout/transfer/${order.id}',
+                '/checkout/transfer/${order.id}${order.electronicPaymentMethod != null ? '?m=${order.electronicPaymentMethod}' : ''}',
                 extra: (
                   // What must be TRANSFERRED is the amount due after the wallet — never the full total.
                   totalMinor: order.amountDueMinor ?? order.totalMinor,

@@ -2769,4 +2769,59 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get cartErrorRouteSamePoint =>
       'مكان الاستلام والتوصيل واحد. اختر مكانًا مختلفًا.';
+
+  @override
+  String get transferStep1Title => 'أبلغ هاتلي على واتساب';
+
+  @override
+  String get transferStep1Body =>
+      'أرسل الرسالة الجاهزة برقم طلبك. بعدها يظهر هاتلي في أول قائمة واتساب عند مشاركة الإيصال.';
+
+  @override
+  String get transferStep1Button => 'افتح واتساب';
+
+  @override
+  String transferStep2Title(String amount) {
+    return 'حوّل $amount';
+  }
+
+  @override
+  String get transferStep2Body =>
+      'افتح تطبيق التحويل وأرسل المبلغ إلى هذا الرقم.';
+
+  @override
+  String get transferCopyNumber => 'انسخ الرقم';
+
+  @override
+  String get transferNumberCopied => 'تم نسخ الرقم';
+
+  @override
+  String get transferStep3Title => 'شارك الإيصال مع هاتلي';
+
+  @override
+  String get transferStep3Body =>
+      'في تطبيق التحويل افتح الإيصال واضغط مشاركة، ثم اختر واتساب ← هاتلي. كثير من التطبيقات تمنع لقطة الشاشة، فاستخدم المشاركة. ثم اضغط الزر بالأسفل.';
+
+  @override
+  String get orderTransferProofNeededTitle => 'أرسل إثبات التحويل';
+
+  @override
+  String get orderTransferProofNeededBody =>
+      'طلبك ينتظر تحويلك. افتح خطوات الدفع لإكماله.';
+
+  @override
+  String get orderTransferProofButton => 'أكمل الدفع';
+
+  @override
+  String get orderTransferUnderReviewTitle => 'بانتظار مراجعة الدفع';
+
+  @override
+  String get orderTransferUnderReviewBody =>
+      'وصلنا إثبات التحويل. الفريق يراجعه الآن.';
+
+  @override
+  String get orderTransferRejectedTitle => 'لم يُقبل التحويل';
+
+  @override
+  String get orderTransferRejectedBody => 'من فضلك تواصل مع هاتلي على واتساب.';
 }

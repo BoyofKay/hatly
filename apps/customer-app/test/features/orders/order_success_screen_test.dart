@@ -96,7 +96,7 @@ void main() {
     expect(find.text('تم استلام طلبك'), findsNothing);
     await tester.tap(find.byKey(const Key('success-complete-payment')));
     await tester.pumpAndSettle();
-    expect(visited.last, '/checkout/transfer/$orderId');
+    expect(visited.last, '/checkout/transfer/$orderId?m=VODAFONE_CASH');
   });
 
   testWidgets('wallet + Manual Transfer: the amount to TRANSFER is the remainder after the wallet, never the full total', (tester) async {

@@ -4963,6 +4963,102 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'مكان الاستلام والتوصيل واحد. اختر مكانًا مختلفًا.'**
   String get cartErrorRouteSamePoint;
+
+  /// No description provided for @transferStep1Title.
+  ///
+  /// In ar, this message translates to:
+  /// **'أبلغ هاتلي على واتساب'**
+  String get transferStep1Title;
+
+  /// No description provided for @transferStep1Body.
+  ///
+  /// In ar, this message translates to:
+  /// **'أرسل الرسالة الجاهزة برقم طلبك. بعدها يظهر هاتلي في أول قائمة واتساب عند مشاركة الإيصال.'**
+  String get transferStep1Body;
+
+  /// No description provided for @transferStep1Button.
+  ///
+  /// In ar, this message translates to:
+  /// **'افتح واتساب'**
+  String get transferStep1Button;
+
+  /// No description provided for @transferStep2Title.
+  ///
+  /// In ar, this message translates to:
+  /// **'حوّل {amount}'**
+  String transferStep2Title(String amount);
+
+  /// No description provided for @transferStep2Body.
+  ///
+  /// In ar, this message translates to:
+  /// **'افتح تطبيق التحويل وأرسل المبلغ إلى هذا الرقم.'**
+  String get transferStep2Body;
+
+  /// No description provided for @transferCopyNumber.
+  ///
+  /// In ar, this message translates to:
+  /// **'انسخ الرقم'**
+  String get transferCopyNumber;
+
+  /// No description provided for @transferNumberCopied.
+  ///
+  /// In ar, this message translates to:
+  /// **'تم نسخ الرقم'**
+  String get transferNumberCopied;
+
+  /// No description provided for @transferStep3Title.
+  ///
+  /// In ar, this message translates to:
+  /// **'شارك الإيصال مع هاتلي'**
+  String get transferStep3Title;
+
+  /// No description provided for @transferStep3Body.
+  ///
+  /// In ar, this message translates to:
+  /// **'في تطبيق التحويل افتح الإيصال واضغط مشاركة، ثم اختر واتساب ← هاتلي. كثير من التطبيقات تمنع لقطة الشاشة، فاستخدم المشاركة. ثم اضغط الزر بالأسفل.'**
+  String get transferStep3Body;
+
+  /// No description provided for @orderTransferProofNeededTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'أرسل إثبات التحويل'**
+  String get orderTransferProofNeededTitle;
+
+  /// No description provided for @orderTransferProofNeededBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'طلبك ينتظر تحويلك. افتح خطوات الدفع لإكماله.'**
+  String get orderTransferProofNeededBody;
+
+  /// No description provided for @orderTransferProofButton.
+  ///
+  /// In ar, this message translates to:
+  /// **'أكمل الدفع'**
+  String get orderTransferProofButton;
+
+  /// No description provided for @orderTransferUnderReviewTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'بانتظار مراجعة الدفع'**
+  String get orderTransferUnderReviewTitle;
+
+  /// No description provided for @orderTransferUnderReviewBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'وصلنا إثبات التحويل. الفريق يراجعه الآن.'**
+  String get orderTransferUnderReviewBody;
+
+  /// No description provided for @orderTransferRejectedTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'لم يُقبل التحويل'**
+  String get orderTransferRejectedTitle;
+
+  /// No description provided for @orderTransferRejectedBody.
+  ///
+  /// In ar, this message translates to:
+  /// **'من فضلك تواصل مع هاتلي على واتساب.'**
+  String get orderTransferRejectedBody;
 }
 
 class _AppLocalizationsDelegate

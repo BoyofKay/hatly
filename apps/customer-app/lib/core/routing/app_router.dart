@@ -247,6 +247,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             totalMinor: extra?.totalMinor,
             paymentMethodLabel: extra?.paymentMethodLabel ?? '',
             orderNumber: extra?.orderNumber,
+            paymentMethodCode: state.uri.queryParameters['m'],
           );
         },
       ),

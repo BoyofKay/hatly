@@ -113,7 +113,7 @@ void main() {
 
     expect(api.getConfigCalls, 2);
     // The real destination content is now showing — the error state is gone.
-    expect(find.text('InstaPay'), findsOneWidget);
+    expect(find.text('InstaPay'), findsWidgets); // the destination label and the InstaPay app tile
   });
 
   testWidgets(
@@ -124,8 +124,10 @@ void main() {
     final api = _FakeManualTransferApi();
     await _pump(tester, api);
 
-    final sendProof = find.text('Send payment proof via WhatsApp');
+    final sendProof = find.byKey(const Key('transfer-step3-sent'));
     expect(sendProof, findsOneWidget);
+    await tester.ensureVisible(sendProof);
+    await tester.pumpAndSettle();
     // Both taps fire before any frame is pumped in between — the button
     // itself hasn't yet rebuilt into its disabled state, so only the
     // screen's own `_isClaiming ? null : ...` guard (not a rebuilt

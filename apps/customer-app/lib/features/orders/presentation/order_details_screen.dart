@@ -113,6 +113,61 @@ class _OrderDetailsContent extends ConsumerWidget {
 
   final OrderDetails order;
 
+  List<Widget> _transferCard(BuildContext context, AppLocalizations l10n) {
+    final status = order.payment?.status;
+    final p = context.palette;
+    if (status == 'PENDING' || status == null) {
+      final code = order.payment?.electronicMethod ?? order.electronicPaymentMethod;
+      return [
+        const SizedBox(height: HatlySpacing.ms),
+        Container(
+          key: const Key('order-transfer-needed'),
+          padding: const EdgeInsets.all(HatlySpacing.ms),
+          decoration: BoxDecoration(color: p.warning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(HatlyRadius.card), border: Border.all(color: p.warning)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(Icons.warning_amber_rounded, color: p.warning),
+              const SizedBox(width: HatlySpacing.sm),
+              Expanded(child: Text(l10n.orderTransferProofNeededTitle, style: context.type.body.copyWith(fontWeight: FontWeight.w700))),
+            ]),
+            const SizedBox(height: 4),
+            Text(l10n.orderTransferProofNeededBody, style: context.type.small),
+            const SizedBox(height: HatlySpacing.sm),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                key: const Key('order-transfer-open'),
+                style: hatlyAccentButtonStyle(context),
+                onPressed: () => context.push(
+                  '/checkout/transfer/${order.id}${code != null ? '?m=$code' : ''}',
+                  extra: (
+                    totalMinor: order.payment?.amountDueMinor ?? order.amountDueMinor ?? order.totalMinor,
+                    orderNumber: order.orderNumber,
+                    paymentMethodLabel: code == null ? '' : electronicMethodLabel(context, code),
+                  ),
+                ),
+                child: Text(l10n.orderTransferProofButton),
+              ),
+            ),
+          ]),
+        ),
+      ];
+    }
+    if (status == 'CUSTOMER_CLAIMED_TRANSFER' || status == 'UNDER_REVIEW') {
+      return [
+        const SizedBox(height: HatlySpacing.ms),
+        _InfoCard(key: const Key('order-transfer-review'), icon: Icons.hourglass_top, iconColor: p.warning, title: l10n.orderTransferUnderReviewTitle, subtitle: l10n.orderTransferUnderReviewBody),
+      ];
+    }
+    if (status == 'REJECTED') {
+      return [
+        const SizedBox(height: HatlySpacing.ms),
+        _InfoCard(key: const Key('order-transfer-rejected'), icon: Icons.error_outline, iconColor: p.urgent, title: l10n.orderTransferRejectedTitle, subtitle: l10n.orderTransferRejectedBody),
+      ];
+    }
+    return const [];
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -141,6 +196,8 @@ class _OrderDetailsContent extends ConsumerWidget {
           '${l10n.orderNumberLabel} ${orderNumberTag(order.orderNumber)} · ${DateFormat.yMMMd(locale).add_jm().format(order.createdAt.toLocal())}',
           style: context.type.caption,
         ),
+        // Owner UAT 2026-11-27 (MT-01): a manual transfer that is not confirmed yet is never lost — the order shows what to do next.
+        if (order.paymentMethod == 'MANUAL_TRANSFER' && order.status != 'CANCELLED') ..._transferCard(context, l10n),
         if (order.status == 'CANCELLED' &&
             order.cancellationReason != null) ...[
           const SizedBox(height: HatlySpacing.ms),
@@ -326,7 +383,8 @@ class _OrderSurface extends StatelessWidget {
 
 class _InfoCard extends StatelessWidget {
   const _InfoCard(
-      {required this.icon,
+      {super.key,
+      required this.icon,
       required this.iconColor,
       required this.title,
       required this.subtitle});
