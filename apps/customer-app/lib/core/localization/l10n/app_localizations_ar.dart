@@ -2694,4 +2694,46 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get routeMapLinkNoLocation =>
       'لا يوجد موقع في هذا الرابط. انسخ رابط الدبوس وحاول مرة أخرى.';
+
+  @override
+  String get voiceNoteSection => 'رسالة صوتية (اختياري)';
+
+  @override
+  String get voiceNoteRecord => 'سجّل رسالة صوتية';
+
+  @override
+  String get voiceNoteStop => 'إيقاف';
+
+  @override
+  String get voiceNoteRecording => 'جارٍ التسجيل…';
+
+  @override
+  String get voiceNotePlay => 'تشغيل';
+
+  @override
+  String get voiceNoteStopPlaying => 'إيقاف';
+
+  @override
+  String get voiceNoteDelete => 'حذف الرسالة الصوتية';
+
+  @override
+  String get voiceNoteAttached => 'رسالة صوتية';
+
+  @override
+  String get voiceNoteLimitHint =>
+      'حتى 5 دقائق. يستمع إليها المندوب قبل الشراء.';
+
+  @override
+  String get voiceNotePermissionDenied =>
+      'يحتاج هاتلي إلى الميكروفون للتسجيل. اسمح به من إعدادات هاتفك.';
+
+  @override
+  String get voiceNoteTooShort => 'التسجيل قصير جدًا. حاول مرة أخرى.';
+
+  @override
+  String get voiceNoteFailed => 'تعذّر تسجيل الرسالة الصوتية. حاول مرة أخرى.';
+
+  @override
+  String get hatlyServiceContentHint =>
+      'اكتب ما تحتاجه أو أضف صورة أو سجّل رسالة صوتية — يكفي واحد منها.';
 }

@@ -11,6 +11,8 @@ import '../domain/delivery.dart';
 import 'cash_collection_sheet.dart';
 import 'proof_of_delivery_sheet.dart';
 import 'status_labels.dart';
+import '../../../core/media/media_url.dart';
+import '../../../shared_widgets/voice_note_player.dart';
 
 /// CONFIRMED (locked decision): the lifecycle action buttons below are the ONLY status-changing actions this screen offers — no Accept, no
 /// Reject/Decline. `_nextActions` mirrors the approved lifecycle only for which buttons to show; the backend's own OrderStateMachineService
@@ -392,6 +394,18 @@ class _DeliveryDetailScreenState extends ConsumerState<DeliveryDetailScreen> {
                 ),
               ),
             if (delivery.orderNote != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${context.t('Note', 'ملاحظة')}: ${delivery.orderNote}')),
+            if (delivery.operationsNote != null)
+              Container(
+                key: const Key('delivery-operations-note'),
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(color: const Color(0xFFE8F1FF), borderRadius: BorderRadius.circular(12)),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.support_agent, size: 20, color: Color(0xFF1F5FBF)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('${context.t('From Operations', 'من فريق العمليات')}: ${delivery.operationsNote}', style: const TextStyle(fontWeight: FontWeight.w600))),
+                ]),
+              ),
           ],
         ),
         _SectionCard(
@@ -530,7 +544,20 @@ class _ItemTile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${item.productNameSnapshot ?? item.freeTextDescriptionSnapshot ?? context.t('Item', 'صنف')} x${item.quantity}', style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text('${item.productNameSnapshot ?? ((item.freeTextDescriptionSnapshot?.isNotEmpty ?? false) ? item.freeTextDescriptionSnapshot! : (item.voiceNoteUrlSnapshot != null ? context.t('Voice note request', 'طلب برسالة صوتية') : context.t('Item', 'صنف')))} x${item.quantity}', style: const TextStyle(fontWeight: FontWeight.w600)),
+          if (item.isAdHoc && resolveMediaUrl(item.voiceNoteUrlSnapshot) != null)
+            Padding(padding: const EdgeInsets.only(top: 4), child: VoiceNotePlayer(url: resolveMediaUrl(item.voiceNoteUrlSnapshot)!)),
+          if (item.isAdHoc && item.imageUrlsSnapshot.map(resolveMediaUrl).whereType<String>().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(spacing: 8, children: [
+                for (final url in item.imageUrlsSnapshot.map(resolveMediaUrl).whereType<String>())
+                  GestureDetector(
+                    onTap: () => showDialog<void>(context: context, builder: (_) => Dialog(child: InteractiveViewer(child: Image.network(url)))),
+                    child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(url, width: 64, height: 64, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox(width: 64, height: 64, child: Icon(Icons.broken_image_outlined)))),
+                  ),
+              ]),
+            ),
           if (item.notes != null && item.notes!.isNotEmpty) Text(item.notes!, style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
           if (item.isWeighted)
             item.actualWeightGrams != null
@@ -558,7 +585,9 @@ class _ItemTile extends StatelessWidget {
                     ],
                   ),
           if (item.isAdHoc)
-            Row(
+            // A Wrap, not a Row: on a 360–400 px phone the label, the field and Save do not fit on one line.
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text('${context.t('Purchase amount', 'مبلغ الشراء')}:  '),
                 SizedBox(

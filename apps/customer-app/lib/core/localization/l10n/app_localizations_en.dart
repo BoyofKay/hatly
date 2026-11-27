@@ -2724,4 +2724,47 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get routeMapLinkNoLocation =>
       'No location found in this link. Copy the link of a dropped pin and try again.';
+
+  @override
+  String get voiceNoteSection => 'Voice note (optional)';
+
+  @override
+  String get voiceNoteRecord => 'Record a voice note';
+
+  @override
+  String get voiceNoteStop => 'Stop';
+
+  @override
+  String get voiceNoteRecording => 'Recording…';
+
+  @override
+  String get voiceNotePlay => 'Play';
+
+  @override
+  String get voiceNoteStopPlaying => 'Stop';
+
+  @override
+  String get voiceNoteDelete => 'Delete the voice note';
+
+  @override
+  String get voiceNoteAttached => 'Voice note';
+
+  @override
+  String get voiceNoteLimitHint =>
+      'Up to 5 minutes. The driver listens to it before buying.';
+
+  @override
+  String get voiceNotePermissionDenied =>
+      'Hatly needs the microphone to record. Allow it in your phone\'s settings.';
+
+  @override
+  String get voiceNoteTooShort => 'The recording was too short. Try again.';
+
+  @override
+  String get voiceNoteFailed =>
+      'The voice note could not be recorded. Try again.';
+
+  @override
+  String get hatlyServiceContentHint =>
+      'Write what you need, add a photo or record a voice note — any one is enough.';
 }

@@ -64,6 +64,10 @@ dependencies:
   # only, no webhook/bot capability.
   url_launcher: ^6.3.1
   google_maps_flutter: ^2.9.0
+  # Voice notes on Hatly / Wasaly requests (owner decision 2026-11-27): record up to 5 minutes, play back.
+  record: ^7.2.0
+  audioplayers: ^6.8.1
+  path_provider: ^2.1.4
 
 dev_dependencies:
   flutter_test:

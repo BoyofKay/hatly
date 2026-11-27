@@ -26,6 +26,7 @@ import '../../../shared_widgets/hatly_surface.dart';
 import 'order_status_label.dart';
 import 'order_widgets.dart';
 import 'item_unavailability_card.dart';
+import '../../../shared_widgets/voice_note/voice_note_field.dart';
 
 /// Real customer Order Details (this phase). Every product name/price
 /// shown here comes from the OrderItem's own historical snapshot
@@ -565,8 +566,11 @@ class _OrderItemRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final name =
-        item.productNameSnapshot ?? item.freeTextDescriptionSnapshot ?? '';
+    final name = item.productNameSnapshot ??
+        ((item.freeTextDescriptionSnapshot?.isNotEmpty ?? false)
+            ? item.freeTextDescriptionSnapshot!
+            : (item.voiceNoteUrlSnapshot != null ? l10n.voiceNoteAttached : ''));
+    final voiceUrl = resolveMediaUrl(item.voiceNoteUrlSnapshot);
     final productImageUrl = resolveMediaUrl(item.productImageUrlSnapshot);
 
     return Padding(
@@ -639,6 +643,8 @@ class _OrderItemRow extends ConsumerWidget {
                         ),
                       ),
                     ],
+                    if (item.productId == null && voiceUrl != null)
+                      VoiceNotePlayButton(url: voiceUrl),
                     if (item.productId == null &&
                         (item.imageUrlsSnapshot?.isNotEmpty ?? false)) ...[
                       const SizedBox(height: HatlySpacing.xs),

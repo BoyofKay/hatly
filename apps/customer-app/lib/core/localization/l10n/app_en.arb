@@ -1322,5 +1322,18 @@
   "routeMapLinkHelp": "Open Google Maps (Apple Maps on iPhone), drop a pin on the place, tap Share → Copy, then paste the link here.",
   "routeMapLinkUse": "Use link",
   "routeOpenMapsApp": "Open the maps app",
-  "routeMapLinkNoLocation": "No location found in this link. Copy the link of a dropped pin and try again."
+  "routeMapLinkNoLocation": "No location found in this link. Copy the link of a dropped pin and try again.",
+  "voiceNoteSection": "Voice note (optional)",
+  "voiceNoteRecord": "Record a voice note",
+  "voiceNoteStop": "Stop",
+  "voiceNoteRecording": "Recording…",
+  "voiceNotePlay": "Play",
+  "voiceNoteStopPlaying": "Stop",
+  "voiceNoteDelete": "Delete the voice note",
+  "voiceNoteAttached": "Voice note",
+  "voiceNoteLimitHint": "Up to 5 minutes. The driver listens to it before buying.",
+  "voiceNotePermissionDenied": "Hatly needs the microphone to record. Allow it in your phone's settings.",
+  "voiceNoteTooShort": "The recording was too short. Try again.",
+  "voiceNoteFailed": "The voice note could not be recorded. Try again.",
+  "hatlyServiceContentHint": "Write what you need, add a photo or record a voice note — any one is enough."
 }

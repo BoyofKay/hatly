@@ -2,6 +2,8 @@
     <!-- Every build variant needs these — the debug/profile-only INTERNET permission left the RELEASE manifest with none,
          so a release build could not reach the API at all (production-readiness slice). -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Voice notes on Hatly / Wasaly requests (recorded only when the customer taps "Record"). -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- "Use my current location" (GPS) in the address picker, both with and without the map enabled — see
          core/location/device_location_service.dart and docs/PRODUCT_DECISIONS.md. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>

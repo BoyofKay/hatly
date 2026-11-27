@@ -109,9 +109,10 @@ class CartController extends StateNotifier<AsyncValue<Cart>> {
     double? destinationLongitude,
     String? pickupLabel,
     String? destinationLabel,
-    required String freeTextDescription,
+    String? freeTextDescription,
     required int quantity,
     List<String>? imageUrls,
+    String? voiceNoteUrl,
   }) {
     return _mutate(() => _api.addAdHocItem(
           cartVendorGroupId: cartVendorGroupId,
@@ -126,6 +127,7 @@ class CartController extends StateNotifier<AsyncValue<Cart>> {
           freeTextDescription: freeTextDescription,
           quantity: quantity,
           imageUrls: imageUrls,
+          voiceNoteUrl: voiceNoteUrl,
         ));
   }
 

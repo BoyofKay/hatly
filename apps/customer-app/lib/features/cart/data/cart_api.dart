@@ -116,9 +116,10 @@ class CartApi {
     double? destinationLongitude,
     String? pickupLabel,
     String? destinationLabel,
-    required String freeTextDescription,
+    String? freeTextDescription,
     required int quantity,
     List<String>? imageUrls,
+    String? voiceNoteUrl,
   }) {
     return _client.request(
       (dio) => dio.post(
@@ -135,9 +136,11 @@ class CartApi {
             'destinationLongitude': destinationLongitude,
           if (pickupLabel != null) 'pickupLabel': pickupLabel,
           if (destinationLabel != null) 'destinationLabel': destinationLabel,
-          'freeTextDescription': freeTextDescription,
+          if (freeTextDescription != null && freeTextDescription.isNotEmpty)
+            'freeTextDescription': freeTextDescription,
           'quantity': quantity,
           if (imageUrls != null) 'imageUrls': imageUrls,
+          if (voiceNoteUrl != null) 'voiceNoteUrl': voiceNoteUrl,
         },
       ),
       (data) => Cart.fromJson(data['data'] as Map<String, dynamic>),

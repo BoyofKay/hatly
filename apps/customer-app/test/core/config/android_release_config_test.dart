@@ -26,9 +26,9 @@ void main() {
     expect(manifest, isNot(contains('android:debuggable')));
   });
 
-  test('only the permissions the app needs: internet, location (foreground) — no background location, advertising ID, contacts, SMS or storage', () {
+  test('only the permissions the app needs: internet, location (foreground), microphone (voice notes, asked only when recording) — no background location, advertising ID, contacts, SMS or storage', () {
     final declared = RegExp(r'<uses-permission android:name="([^"]+)"').allMatches(manifest).map((m) => m.group(1)).toSet();
-    expect(declared, {'android.permission.INTERNET', 'android.permission.ACCESS_FINE_LOCATION', 'android.permission.ACCESS_COARSE_LOCATION'});
+    expect(declared, {'android.permission.INTERNET', 'android.permission.ACCESS_FINE_LOCATION', 'android.permission.ACCESS_COARSE_LOCATION', 'android.permission.RECORD_AUDIO'});
   });
 
   test('release signing comes from the git-ignored key.properties (never a path or password in the Gradle file) and falls back to debug only with a warning', () {

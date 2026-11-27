@@ -8,6 +8,8 @@ import '../../../core/theme/hatly_theme.dart';
 import '../../../shared_widgets/hatly_error_banner.dart';
 import '../../../shared_widgets/hatly_primary_button.dart';
 import '../../../shared_widgets/hatly_surface.dart';
+import '../../../shared_widgets/voice_note/voice_note_engine.dart';
+import '../../../shared_widgets/voice_note/voice_note_field.dart';
 import '../../cart/data/cart_providers.dart';
 import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_error_messages.dart';
@@ -64,6 +66,7 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
   final _placeNameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final List<XFile> _images = [];
+  VoiceNoteDraft? _voice;
   // The route ends the CUSTOMER chose (PD-012). Null = "use the service default", which the server resolves again at quote and order time:
   //   هاتلي من مكان (Hatly):   origin = chosen, else Hatly's default start;   destination = chosen, else Hatly's default destination
   //   وصّلي لمكان (Wasally):   origin = ALWAYS chosen (never assumed to be home);   destination = chosen, else Wasally's default destination
@@ -110,11 +113,14 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
   /// A new request needs a type, a place name, a description and BOTH route ends resolved (the customer's choice or the service's
   /// configured default). Wasally's origin has no default, so it is always the customer's. The server re-resolves and validates the
   /// route at quote and order time; gating here only keeps the customer from reaching Submit without a usable route.
+  /// Owner decision 2026-11-27: what to buy / deliver may be written, shown in a photo or said in a voice note — any one is enough.
+  bool get _hasContent => _descriptionController.text.trim().isNotEmpty || _images.isNotEmpty || _voice != null;
+
   bool _isValid(RouteDefaults defaults) => _existingGroupIdCache != null
-      ? _descriptionController.text.trim().isNotEmpty
+      ? _hasContent
       : _serviceType != null &&
           _placeNameController.text.trim().isNotEmpty &&
-          _descriptionController.text.trim().isNotEmpty &&
+          _hasContent &&
           _effectiveOrigin(defaults) != null &&
           _effectiveDestination(defaults) != null;
 
@@ -169,6 +175,10 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
         final url = await uploadsApi.uploadImage(bytes, image.name);
         imageUrls.add(url);
       }
+      final voice = _voice;
+      final voiceNoteUrl = voice == null
+          ? null
+          : await uploadsApi.uploadAudio(await ref.read(voiceNoteEngineProvider).readBytes(voice.path));
 
       final error =
           await ref.read(cartControllerProvider.notifier).addAdHocItem(
@@ -187,6 +197,7 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
                 freeTextDescription: _descriptionController.text.trim(),
                 quantity: 1,
                 imageUrls: imageUrls.isEmpty ? null : imageUrls,
+                voiceNoteUrl: voiceNoteUrl,
               );
 
       if (!mounted) return;
@@ -308,6 +319,8 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
                 images: _images,
                 onPickImage: _pickImage,
                 onRemoveImage: _removeImage,
+                voice: _voice,
+                onVoiceChanged: (v) => setState(() => _voice = v),
                 origin: route.origin,
                 destination: route.destination,
                 originHint: isBuy ? l10n.routeDefaultMissingHint : l10n.routeOriginRequiredHint,
@@ -326,6 +339,7 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
                 placeName: _placeNameController.text.trim(),
                 description: _descriptionController.text.trim(),
                 images: _images,
+                voice: _voice,
                 origin: route.origin,
                 destination: route.destination,
                 isSubmitting: _isSubmitting,
@@ -350,6 +364,8 @@ class _FormPhase extends StatelessWidget {
     required this.images,
     required this.onPickImage,
     required this.onRemoveImage,
+    required this.voice,
+    required this.onVoiceChanged,
     required this.origin,
     required this.destination,
     required this.originHint,
@@ -371,6 +387,8 @@ class _FormPhase extends StatelessWidget {
   final List<XFile> images;
   final VoidCallback onPickImage;
   final ValueChanged<int> onRemoveImage;
+  final VoiceNoteDraft? voice;
+  final ValueChanged<VoiceNoteDraft?> onVoiceChanged;
   final RouteEndpoint? origin;
   final RouteEndpoint? destination;
   final String originHint;
@@ -445,6 +463,8 @@ class _FormPhase extends StatelessWidget {
           ),
           const SizedBox(height: HatlySpacing.lg),
         ],
+        Text(l10n.hatlyServiceContentHint, key: const Key('hatly-service-content-hint'), style: context.type.small),
+        const SizedBox(height: HatlySpacing.sm),
         HatlySection(
           title: l10n.hatlyServiceDescriptionLabel,
           child: TextField(
@@ -525,6 +545,11 @@ class _FormPhase extends StatelessWidget {
                 ),
             ],
           ),
+        ),
+        const SizedBox(height: HatlySpacing.lg),
+        HatlySection(
+          title: l10n.voiceNoteSection,
+          child: VoiceNoteField(key: const Key('hatly-service-voice'), value: voice, onChanged: onVoiceChanged),
         ),
         if (effectiveType != null) ...[
           const SizedBox(height: HatlySpacing.lg),
@@ -633,6 +658,7 @@ class _ReviewPhase extends StatelessWidget {
     required this.placeName,
     required this.description,
     required this.images,
+    required this.voice,
     required this.origin,
     required this.destination,
     required this.isSubmitting,
@@ -646,6 +672,7 @@ class _ReviewPhase extends StatelessWidget {
   final String placeName;
   final String description;
   final List<XFile> images;
+  final VoiceNoteDraft? voice;
   final RouteEndpoint? origin;
   final RouteEndpoint? destination;
   final bool isSubmitting;
@@ -691,8 +718,12 @@ class _ReviewPhase extends StatelessWidget {
                   _reviewRow(
                       context, l10n.hatlyServiceReviewPlaceLabel, placeName),
                 ],
-                _reviewRow(context, l10n.hatlyServiceReviewDescriptionLabel,
-                    description),
+                if (description.isNotEmpty)
+                  _reviewRow(context, l10n.hatlyServiceReviewDescriptionLabel,
+                      description),
+                if (voice != null)
+                  _reviewRow(context, l10n.voiceNoteAttached,
+                      formatVoiceDuration(voice!.duration)),
                 if (images.isNotEmpty) ...[
                   const SizedBox(height: HatlySpacing.sm),
                   Text(l10n.hatlyServiceReviewImagesLabel,

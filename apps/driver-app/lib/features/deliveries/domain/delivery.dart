@@ -28,6 +28,7 @@ class DeliverySegmentItem {
     this.notes,
     this.freeTextDescriptionSnapshot,
     required this.imageUrlsSnapshot,
+    this.voiceNoteUrlSnapshot,
     this.pricingUnitSnapshot,
     this.requestedWeightGrams,
     this.actualWeightGrams,
@@ -41,6 +42,9 @@ class DeliverySegmentItem {
   final String? notes;
   final String? freeTextDescriptionSnapshot;
   final List<String> imageUrlsSnapshot;
+
+  /// The customer's voice note on a Hatly / Wasaly request (null = none).
+  final String? voiceNoteUrlSnapshot;
 
   /// `'PIECE'` / `'WEIGHT'` / null (AD_HOC_SERVICE item).
   final String? pricingUnitSnapshot;
@@ -62,6 +66,7 @@ class DeliverySegmentItem {
       notes: json['notes'] as String?,
       freeTextDescriptionSnapshot: json['freeTextDescriptionSnapshot'] as String?,
       imageUrlsSnapshot: (json['imageUrlsSnapshot'] as List? ?? []).map((e) => e as String).toList(),
+      voiceNoteUrlSnapshot: json['voiceNoteUrlSnapshot'] as String?,
       pricingUnitSnapshot: json['pricingUnitSnapshot'] as String?,
       requestedWeightGrams: json['requestedWeightGrams'] as int?,
       actualWeightGrams: json['actualWeightGrams'] as int?,
@@ -273,6 +278,7 @@ class Delivery {
     required this.orderStatus,
     required this.fulfillmentType,
     this.orderNote,
+    this.operationsNote,
     required this.paymentMethod,
     this.electronicPaymentMethod,
     required this.totalMinor,
@@ -310,6 +316,9 @@ class Delivery {
   bool get isActive => activeStatuses.contains(orderStatus);
   final String fulfillmentType;
   final String? orderNote;
+
+  /// A note Operations wrote for the driver (owner decision 2026-11-27), or null.
+  final String? operationsNote;
   final String paymentMethod;
   final String? electronicPaymentMethod;
 
@@ -359,6 +368,7 @@ class Delivery {
       orderStatus: json['orderStatus'] as String,
       fulfillmentType: json['fulfillmentType'] as String,
       orderNote: json['orderNote'] as String?,
+      operationsNote: json['operationsNote'] as String?,
       paymentMethod: json['paymentMethod'] as String,
       electronicPaymentMethod: json['electronicPaymentMethod'] as String?,
       totalMinor: (json['totalMinor'] as num?)?.toInt(),

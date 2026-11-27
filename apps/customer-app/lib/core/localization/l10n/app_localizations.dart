@@ -4831,6 +4831,84 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'لا يوجد موقع في هذا الرابط. انسخ رابط الدبوس وحاول مرة أخرى.'**
   String get routeMapLinkNoLocation;
+
+  /// No description provided for @voiceNoteSection.
+  ///
+  /// In ar, this message translates to:
+  /// **'رسالة صوتية (اختياري)'**
+  String get voiceNoteSection;
+
+  /// No description provided for @voiceNoteRecord.
+  ///
+  /// In ar, this message translates to:
+  /// **'سجّل رسالة صوتية'**
+  String get voiceNoteRecord;
+
+  /// No description provided for @voiceNoteStop.
+  ///
+  /// In ar, this message translates to:
+  /// **'إيقاف'**
+  String get voiceNoteStop;
+
+  /// No description provided for @voiceNoteRecording.
+  ///
+  /// In ar, this message translates to:
+  /// **'جارٍ التسجيل…'**
+  String get voiceNoteRecording;
+
+  /// No description provided for @voiceNotePlay.
+  ///
+  /// In ar, this message translates to:
+  /// **'تشغيل'**
+  String get voiceNotePlay;
+
+  /// No description provided for @voiceNoteStopPlaying.
+  ///
+  /// In ar, this message translates to:
+  /// **'إيقاف'**
+  String get voiceNoteStopPlaying;
+
+  /// No description provided for @voiceNoteDelete.
+  ///
+  /// In ar, this message translates to:
+  /// **'حذف الرسالة الصوتية'**
+  String get voiceNoteDelete;
+
+  /// No description provided for @voiceNoteAttached.
+  ///
+  /// In ar, this message translates to:
+  /// **'رسالة صوتية'**
+  String get voiceNoteAttached;
+
+  /// No description provided for @voiceNoteLimitHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'حتى 5 دقائق. يستمع إليها المندوب قبل الشراء.'**
+  String get voiceNoteLimitHint;
+
+  /// No description provided for @voiceNotePermissionDenied.
+  ///
+  /// In ar, this message translates to:
+  /// **'يحتاج هاتلي إلى الميكروفون للتسجيل. اسمح به من إعدادات هاتفك.'**
+  String get voiceNotePermissionDenied;
+
+  /// No description provided for @voiceNoteTooShort.
+  ///
+  /// In ar, this message translates to:
+  /// **'التسجيل قصير جدًا. حاول مرة أخرى.'**
+  String get voiceNoteTooShort;
+
+  /// No description provided for @voiceNoteFailed.
+  ///
+  /// In ar, this message translates to:
+  /// **'تعذّر تسجيل الرسالة الصوتية. حاول مرة أخرى.'**
+  String get voiceNoteFailed;
+
+  /// No description provided for @hatlyServiceContentHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'اكتب ما تحتاجه أو أضف صورة أو سجّل رسالة صوتية — يكفي واحد منها.'**
+  String get hatlyServiceContentHint;
 }
 
 class _AppLocalizationsDelegate

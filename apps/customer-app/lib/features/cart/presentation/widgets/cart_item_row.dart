@@ -7,6 +7,8 @@ import '../../../../shared_widgets/hatly_badge.dart';
 import '../../../../shared_widgets/hatly_quantity_control.dart';
 import '../../../../shared_widgets/hatly_soft_image.dart';
 import '../../../../shared_widgets/ltr_text.dart';
+import '../../../../core/media/media_url.dart';
+import '../../../../shared_widgets/voice_note/voice_note_field.dart';
 import '../../domain/cart.dart';
 
 /// One cart line, built only from the real cart-item fields. Visual priority: product image, name, the
@@ -56,7 +58,12 @@ class CartItemRow extends StatelessWidget {
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final name = isArabic && item.productNameAr != null
         ? item.productNameAr!
-        : (item.productName ?? item.freeTextDescription ?? '');
+        : (item.productName ??
+            ((item.freeTextDescription?.isNotEmpty ?? false)
+                ? item.freeTextDescription!
+                : (item.voiceNoteUrl != null
+                    ? AppLocalizations.of(context).voiceNoteAttached
+                    : '')));
     final options = item.selectedOptionValues
         .map((v) => isArabic && v.nameAr != null ? v.nameAr! : v.name)
         .join('، ');
@@ -121,6 +128,8 @@ class CartItemRow extends StatelessWidget {
                             ],
                           ),
                         ),
+                      if (isCustomRequest && resolveMediaUrl(item.voiceNoteUrl) != null)
+                        VoiceNotePlayButton(url: resolveMediaUrl(item.voiceNoteUrl)!),
                       if (isCustomRequest && item.imageUrls.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: HatlySpacing.sm),

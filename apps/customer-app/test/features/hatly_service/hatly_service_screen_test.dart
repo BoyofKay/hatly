@@ -15,6 +15,7 @@ import 'package:hatly_customer/features/hatly_service/presentation/hatly_service
 import 'package:hatly_customer/features/uploads/data/uploads_api.dart';
 import 'package:hatly_customer/features/uploads/data/uploads_providers.dart';
 import 'package:hatly_customer/features/addresses/domain/saved_address.dart';
+import 'package:hatly_customer/shared_widgets/voice_note/voice_note_engine.dart';
 
 import '../../support/router_test_app.dart';
 
@@ -69,9 +70,10 @@ class _FakeCartApi implements CartApi {
     double? destinationLongitude,
     String? pickupLabel,
     String? destinationLabel,
-    required String freeTextDescription,
+    String? freeTextDescription,
     required int quantity,
     List<String>? imageUrls,
+    String? voiceNoteUrl,
   }) async {
     if (gate != null) await gate!.future;
     addAdHocCalls.add({
@@ -87,6 +89,7 @@ class _FakeCartApi implements CartApi {
       'freeTextDescription': freeTextDescription,
       'quantity': quantity,
       'imageUrls': imageUrls,
+      'voiceNoteUrl': voiceNoteUrl,
     });
     if (failNextAddAdHoc != null) {
       final e = failNextAddAdHoc!;
@@ -192,6 +195,42 @@ class _FakeUploadsApi implements UploadsApi {
     }
     return 'https://uploads.test/$filename';
   }
+
+  final List<int> audioSizes = [];
+
+  @override
+  Future<String> uploadAudio(List<int> bytes) async {
+    audioSizes.add(bytes.length);
+    return 'https://uploads.test/voice.m4a';
+  }
+}
+
+/// Stands in for the microphone and player.
+class _FakeVoiceEngine implements VoiceNoteEngine {
+  bool allow = true;
+  bool recording = false;
+  final List<String> played = [];
+
+  @override
+  Future<bool> ensurePermission() async => allow;
+  @override
+  Future<void> startRecording() async => recording = true;
+  @override
+  Future<String?> stopRecording() async {
+    recording = false;
+    return '/tmp/fake-voice.m4a';
+  }
+
+  @override
+  Future<void> cancelRecording() async => recording = false;
+  @override
+  Future<void> play(String pathOrUrl, {required void Function() onDone}) async => played.add(pathOrUrl);
+  @override
+  Future<void> stopPlayback() async {}
+  @override
+  Future<List<int>> readBytes(String path) async => List<int>.filled(1234, 1);
+  @override
+  Future<void> dispose() async {}
 }
 
 /// A real temp file so `Image.file(File(path))` in the widget under
@@ -310,6 +349,7 @@ Widget _app({
   SavedAddress? addedByAddScreen,
   RouteDefaults defaults = RouteDefaults.none,
   bool buyOnly = false,
+  _FakeVoiceEngine? voice,
 }) {
   var pickIndex = 0;
   return hatlyRouterApp(
@@ -318,6 +358,7 @@ Widget _app({
       uploadsApiProvider.overrideWithValue(uploadsApi),
       savedAddressesProvider.overrideWith((ref) async => saved),
       routeDefaultsProvider.overrideWith((ref) async => defaults),
+      voiceNoteEngineProvider.overrideWith((ref) => voice ?? _FakeVoiceEngine()),
     ],
     initialLocation: '/hatly-service',
     routes: [
@@ -692,6 +733,86 @@ void main() {
       await _settle(tester);
       expect(_badge('route-origin'), isFalse);
       expect(_label(tester, 'route-destination-label'), 'وجهة وصّلي');
+    });
+  });
+
+  group('voice notes (owner decision 2026-11-27): text, photos and voice are each optional, any one is enough', () {
+    Future<void> record(WidgetTester tester, {int seconds = 3}) async {
+      await tester.ensureVisible(find.byKey(const Key('voice-note-record')));
+      await tester.tap(find.byKey(const Key('voice-note-record')));
+      await tester.pump();
+      for (var i = 0; i < seconds; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+      await tester.tap(find.byKey(const Key('voice-note-stop')));
+      await _settle(tester);
+    }
+
+    testWidgets('a voice-only request can continue, is uploaded once and sent as voiceNoteUrl with no text', (tester) async {
+      _tallViewport(tester);
+      final cartApi = _FakeCartApi();
+      final uploads = _FakeUploadsApi();
+      await tester.pumpWidget(_app(cartApi: cartApi, uploadsApi: uploads, defaults: _allDefaults));
+      await _settle(tester);
+      await tester.tap(find.byKey(const Key('hatly-service-type-buy')));
+      await tester.enterText(find.byKey(const Key('hatly-service-place-name')), 'Carrefour');
+      await _settle(tester);
+      expect(_canContinue(tester), isFalse); // nothing said yet: no text, photo or voice
+
+      await record(tester);
+      expect(find.byKey(const Key('voice-note-attached')), findsOneWidget);
+      expect(_canContinue(tester), isTrue);
+
+      await tester.ensureVisible(_continueButton());
+      await tester.tap(_continueButton());
+      await _settle(tester);
+      await tester.tap(find.byType(ElevatedButton).first);
+      await _settle(tester);
+
+      expect(uploads.audioSizes, [1234]);
+      final call = cartApi.addAdHocCalls.single;
+      expect(call['voiceNoteUrl'], 'https://uploads.test/voice.m4a');
+      expect(call['freeTextDescription'], '');
+    });
+
+    testWidgets('recording stops by itself at the limit; deleting the note takes Continue away again', (tester) async {
+      _tallViewport(tester);
+      final engine = _FakeVoiceEngine();
+      await tester.pumpWidget(_app(cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi(), defaults: _allDefaults, voice: engine));
+      await _settle(tester);
+      await tester.tap(find.byKey(const Key('hatly-service-type-buy')));
+      await tester.enterText(find.byKey(const Key('hatly-service-place-name')), 'Carrefour');
+      await tester.ensureVisible(find.byKey(const Key('voice-note-record')));
+      await tester.tap(find.byKey(const Key('voice-note-record')));
+      await tester.pump();
+      expect(engine.recording, isTrue);
+      for (var i = 0; i < 301; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+      await _settle(tester);
+      expect(engine.recording, isFalse);
+      expect(find.textContaining('5:00'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('voice-note-play')));
+      await _settle(tester);
+      expect(engine.played, ['/tmp/fake-voice.m4a']);
+
+      await tester.tap(find.byKey(const Key('voice-note-delete')));
+      await _settle(tester);
+      expect(find.byKey(const Key('voice-note-record')), findsOneWidget);
+      expect(_canContinue(tester), isFalse);
+    });
+
+    testWidgets('a refused microphone says so and records nothing', (tester) async {
+      _tallViewport(tester);
+      final engine = _FakeVoiceEngine()..allow = false;
+      await tester.pumpWidget(_app(cartApi: _FakeCartApi(), uploadsApi: _FakeUploadsApi(), defaults: _allDefaults, voice: engine));
+      await _settle(tester);
+      await tester.ensureVisible(find.byKey(const Key('voice-note-record')));
+      await tester.tap(find.byKey(const Key('voice-note-record')));
+      await _settle(tester);
+      expect(find.byKey(const Key('voice-note-error')), findsOneWidget);
+      expect(engine.recording, isFalse);
     });
   });
 }

@@ -54,6 +54,7 @@ class CartItem {
     required this.isAvailable,
     this.freeTextDescription,
     required this.imageUrls,
+    this.voiceNoteUrl,
     this.offerId,
     this.offerDiscountType,
     this.offerDiscountValue,
@@ -101,6 +102,9 @@ class CartItem {
   /// AD_HOC_SERVICE items only.
   final String? freeTextDescription;
   final List<String> imageUrls;
+
+  /// Custom-request voice note (Hatly upload), or null.
+  final String? voiceNoteUrl;
 
   /// Offers preview (server-computed, best-effort — see the backend
   /// interface's own comment). Null for a WEIGHT item, an
@@ -151,6 +155,7 @@ class CartItem {
       freeTextDescription: json['freeTextDescription'] as String?,
       imageUrls:
           (json['imageUrls'] as List? ?? []).map((e) => e as String).toList(),
+      voiceNoteUrl: json['voiceNoteUrl'] as String?,
       offerId: json['offerId'] as String?,
       offerDiscountType: json['offerDiscountType'] as String?,
       offerDiscountValue: json['offerDiscountValue'] as int?,

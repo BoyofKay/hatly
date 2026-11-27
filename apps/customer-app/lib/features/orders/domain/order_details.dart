@@ -155,6 +155,7 @@ class OrderItemDetails {
     this.finalAmountMinor,
     this.freeTextDescriptionSnapshot,
     this.imageUrlsSnapshot,
+    this.voiceNoteUrlSnapshot,
     this.offerMechanismSnapshot,
     this.offerSpecialPriceMinorSnapshot,
     this.actualAmountMinor,
@@ -183,6 +184,9 @@ class OrderItemDetails {
   final int? finalAmountMinor;
   final String? freeTextDescriptionSnapshot;
   final List<String>? imageUrlsSnapshot;
+
+  /// The custom request's voice note, frozen on the order (null = none).
+  final String? voiceNoteUrlSnapshot;
 
   /// Customer Offers Integration. Historical FLASH_SALE snapshot —
   /// CONFIRMED read directly from the backend's frozen OrderItem
@@ -243,6 +247,7 @@ class OrderItemDetails {
       finalAmountMinor: json['finalAmountMinor'] as int?,
       freeTextDescriptionSnapshot:
           json['freeTextDescriptionSnapshot'] as String?,
+      voiceNoteUrlSnapshot: json['voiceNoteUrlSnapshot'] as String?,
       imageUrlsSnapshot: (json['imageUrlsSnapshot'] as List?)
           ?.map((e) => e as String)
           .toList(),

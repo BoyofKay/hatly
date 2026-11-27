@@ -39,6 +39,8 @@
 	     asks for location, with or without the interactive map enabled. See core/location/device_location_service.dart. -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Hatly needs access to your photos so you can attach a picture to a custom request or a Hatly Service order.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Hatly uses the microphone only when you record a voice note for a Hatly or Wasaly request.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Hatly can use your camera to take a picture for a custom request or a Hatly Service order.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

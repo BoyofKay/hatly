@@ -21,4 +21,12 @@ class UploadsApi {
       (data) => (data['data'] as Map<String, dynamic>)['url'] as String,
     );
   }
+
+  /// A voice note (up to 5 minutes) for a Hatly / Wasaly request — `POST /uploads/audio`; the server checks the audio type itself.
+  Future<String> uploadAudio(List<int> bytes) {
+    return _client.request(
+      (dio) => dio.post('/uploads/audio', data: {'base64Content': base64Encode(bytes)}),
+      (data) => (data['data'] as Map<String, dynamic>)['url'] as String,
+    );
+  }
 }

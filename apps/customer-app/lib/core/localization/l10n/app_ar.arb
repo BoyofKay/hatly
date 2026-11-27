@@ -1336,5 +1336,18 @@
   "routeMapLinkHelp": "افتح خرائط جوجل (أو خرائط آبل على الآيفون)، ضع دبوسًا على المكان، اضغط مشاركة ← نسخ، ثم الصق الرابط هنا.",
   "routeMapLinkUse": "استخدم الرابط",
   "routeOpenMapsApp": "افتح تطبيق الخرائط",
-  "routeMapLinkNoLocation": "لا يوجد موقع في هذا الرابط. انسخ رابط الدبوس وحاول مرة أخرى."
+  "routeMapLinkNoLocation": "لا يوجد موقع في هذا الرابط. انسخ رابط الدبوس وحاول مرة أخرى.",
+  "voiceNoteSection": "رسالة صوتية (اختياري)",
+  "voiceNoteRecord": "سجّل رسالة صوتية",
+  "voiceNoteStop": "إيقاف",
+  "voiceNoteRecording": "جارٍ التسجيل…",
+  "voiceNotePlay": "تشغيل",
+  "voiceNoteStopPlaying": "إيقاف",
+  "voiceNoteDelete": "حذف الرسالة الصوتية",
+  "voiceNoteAttached": "رسالة صوتية",
+  "voiceNoteLimitHint": "حتى 5 دقائق. يستمع إليها المندوب قبل الشراء.",
+  "voiceNotePermissionDenied": "يحتاج هاتلي إلى الميكروفون للتسجيل. اسمح به من إعدادات هاتفك.",
+  "voiceNoteTooShort": "التسجيل قصير جدًا. حاول مرة أخرى.",
+  "voiceNoteFailed": "تعذّر تسجيل الرسالة الصوتية. حاول مرة أخرى.",
+  "hatlyServiceContentHint": "اكتب ما تحتاجه أو أضف صورة أو سجّل رسالة صوتية — يكفي واحد منها."
 }
