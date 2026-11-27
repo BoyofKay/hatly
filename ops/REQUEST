@@ -1,3 +1,3 @@
 ACTION=deploy
 ARG=
-# 2026-11-24: owner-approved admin settings and sector menu polish; preserve production records. No reset or settlement changes.
+# 2026-11-27: owner-approved round (go given): promotions + delivery-fee campaigns, voice notes + driver note, bulk photos, grouped notifications, maps links, manual-transfer fix. Additive migrations 1700010100000, 1700010200000. No reset or settlement changes.
