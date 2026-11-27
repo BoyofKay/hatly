@@ -1,3 +1,4 @@
+import '../domain/service_area.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../domain/delivery_zone.dart';
@@ -117,6 +118,14 @@ class AddressesApi {
           longitude: (point['longitude'] as num).toDouble(),
         );
       },
+    );
+  }
+
+  /// The active service areas (owner UAT 2026-11-27) — for drawing on the map and checking a point before it is used.
+  Future<List<ServiceAreaCircle>> getServiceAreas() {
+    return _client.request(
+      (dio) => dio.get('/geo/service-areas'),
+      (data) => ((data['data'] as List?) ?? const []).map((e) => ServiceAreaCircle.fromJson(e as Map<String, dynamic>)).toList(),
     );
   }
 }

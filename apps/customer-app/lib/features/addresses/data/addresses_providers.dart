@@ -5,6 +5,7 @@ import '../../auth/presentation/auth_gate.dart';
 import 'addresses_api.dart';
 import '../domain/delivery_zone.dart';
 import '../domain/saved_address.dart';
+import '../domain/service_area.dart';
 
 final addressesApiProvider =
     Provider<AddressesApi>((ref) => AddressesApi(ref.watch(apiClientProvider)));
@@ -34,4 +35,14 @@ final deliveryZonesProvider =
 final addressCapabilitiesProvider =
     FutureProvider.autoDispose<AddressCapabilities>((ref) {
   return ref.watch(addressesApiProvider).getCapabilities();
+});
+
+/// Active service areas; an error (or a guest) is "unknown" — an empty list, and the server decides.
+final serviceAreasProvider = FutureProvider.autoDispose<List<ServiceAreaCircle>>((ref) async {
+  if (!ref.watch(isSignedInProvider)) return const <ServiceAreaCircle>[];
+  try {
+    return await ref.watch(addressesApiProvider).getServiceAreas();
+  } catch (_) {
+    return const <ServiceAreaCircle>[];
+  }
 });

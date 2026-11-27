@@ -7,6 +7,8 @@ import '../../../core/theme/hatly_theme.dart';
 import '../../../shared_widgets/hatly_key_value_row.dart';
 import '../../../shared_widgets/hatly_surface.dart';
 import '../data/addresses_providers.dart';
+import 'package:latlong2/latlong.dart' as ll;
+import 'map_point_screen.dart';
 
 /// Whether the interactive map may be built. The native projects now READ a Maps SDK key when one is configured (iOS
 /// `Local.xcconfig` / Android `local.properties`'s `MAPS_API_KEY` — see docs/PRODUCT_DECISIONS.md "Google Maps key
@@ -36,7 +38,11 @@ class AddressPinPicker extends ConsumerStatefulWidget {
     required this.onChanged,
     this.mapEnabled = HatlyMaps.enabled,
     this.showSearch = true,
+    this.avoid,
   });
+
+  /// The other end of a Hatly / Wasaly route: the map refuses the same place (owner UAT 2026-11-27).
+  final ll.LatLng? avoid;
 
   final double? latitude;
   final double? longitude;
@@ -209,14 +215,19 @@ class _AddressPinPickerState extends ConsumerState<AddressPinPicker> with Widget
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.map_outlined, color: p.textMuted),
-                    const SizedBox(width: HatlySpacing.ms),
-                    Expanded(
-                        child: Text(l10n.addressMapUnavailable,
-                            style: context.type.small)),
-                  ],
+                // Owner UAT 2026-11-27 (ML-03): choose the place on a map (OpenStreetMap, no key needed) — the main way.
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    key: const Key('address-pick-on-map'),
+                    style: hatlyAccentButtonStyle(context),
+                    onPressed: () async {
+                      final picked = await pickPointOnMap(context, latitude: widget.latitude, longitude: widget.longitude, avoid: widget.avoid);
+                      if (picked != null) widget.onChanged(picked.latitude, picked.longitude);
+                    },
+                    icon: const Icon(Icons.map_outlined),
+                    label: Text(l10n.mapPointOpen),
+                  ),
                 ),
                 if (widget.showSearch) ...[
                 const SizedBox(height: HatlySpacing.md),

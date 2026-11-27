@@ -386,7 +386,7 @@ export default function BranchDetailPage() {
             <label className="block text-sm font-medium">{t("Address", "العنوان")}</label>
             <input value={address} onChange={(e) => setAddress(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           </div>
-          <LocationFromLink lat={location?.lat ?? null} lng={location?.lng ?? null} onChange={(lat, lng) => setLocation({ lat, lng })} />
+          <LocationFromLink lat={location?.lat ?? null} lng={location?.lng ?? null} onChange={(lat, lng) => setLocation({ lat, lng })} areas={serviceAreas.filter((sa) => sa.isActive)} areaId={branch.serviceAreaId ?? null} />
           <div>
             <label className="block text-sm font-medium">{t("Hatly commission (%)", "عمولة هاتلي (%)")}</label>
             <input inputMode="decimal" dir="ltr" placeholder="15" value={commission} onChange={(e) => setCommission(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />

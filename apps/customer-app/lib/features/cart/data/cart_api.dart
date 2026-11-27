@@ -181,6 +181,7 @@ class CartApi {
     String? vendorBranchId,
     String? freeTextDescription,
     List<String>? imageUrls,
+    String? voiceNoteUrl,
   }) {
     return _client.request(
       (dio) => dio.post(
@@ -191,6 +192,7 @@ class CartApi {
           if (freeTextDescription != null)
             'freeTextDescription': freeTextDescription,
           if (imageUrls != null) 'imageUrls': imageUrls,
+          if (voiceNoteUrl != null) 'voiceNoteUrl': voiceNoteUrl,
         },
       ),
       (data) => Cart.fromJson(data['data'] as Map<String, dynamic>),

@@ -2767,4 +2767,37 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get hatlyServiceContentHint =>
       'Write what you need, add a photo or record a voice note — any one is enough.';
+
+  @override
+  String get mapPointOpen => 'Select a location on the map';
+
+  @override
+  String get mapPointTitle => 'Choose the place';
+
+  @override
+  String get mapPointHint =>
+      'Move the map until the pin is on the place, then confirm.';
+
+  @override
+  String get mapPointOutsideArea =>
+      'This place is outside the area Hatly serves.';
+
+  @override
+  String get mapPointSameAsOther =>
+      'This is the same place as the other end of the trip. Choose a different place.';
+
+  @override
+  String get routeSavedOutsideArea =>
+      'This saved address is outside the area Hatly serves.';
+
+  @override
+  String get routeOtherLocation => 'Another place';
+
+  @override
+  String get cartErrorRouteOutsideArea =>
+      'This place is outside the area Hatly serves. Choose a place inside it.';
+
+  @override
+  String get cartErrorRouteSamePoint =>
+      'The pickup and the destination are the same place. Choose a different place.';
 }

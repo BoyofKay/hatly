@@ -29,3 +29,32 @@ describe('maps links', () => {
     await expect(resolveMapsLink('https://evil.example.com/abc', fake)).resolves.toBeNull();
   });
 });
+
+describe('resolveMapsLink — UAT ML-01 real-world links', () => {
+  const reply = (status: number, headers: Record<string, string> = {}, body = '') =>
+    new Response(body, { status, headers });
+
+  it('goes through the EU consent page to the real link', async () => {
+    const calls: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      calls.push(url);
+      if (url.startsWith('https://maps.app.goo.gl/')) return reply(302, { location: 'https://consent.google.com/m?continue=' + encodeURIComponent('https://www.google.com/maps/place/X/@30.4171,31.5622,17z') });
+      throw new Error('unexpected ' + url);
+    }) as unknown as typeof fetch;
+    await expect(resolveMapsLink('https://maps.app.goo.gl/abc', fetchImpl)).resolves.toEqual({ lat: 30.4171, lng: 31.5622 });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('reads a place page whose address carries only the place name', async () => {
+    const fetchImpl = (async (url: string) => {
+      if (url.startsWith('https://maps.app.goo.gl/')) return reply(302, { location: 'https://www.google.com/maps?q=Some+Pharmacy&ftid=0x1:0x2' });
+      return reply(200, { 'content-type': 'text/html' }, '<meta content="https://maps.google.com/maps/api/staticmap?center=30.4213%2C31.5634&amp;zoom=15" itemprop="image">');
+    }) as unknown as typeof fetch;
+    await expect(resolveMapsLink('https://maps.app.goo.gl/xyz', fetchImpl)).resolves.toEqual({ lat: 30.4213, lng: 31.5634 });
+  });
+
+  it('never follows a consent page that points away from the map hosts', async () => {
+    const fetchImpl = (async () => reply(302, { location: 'https://consent.google.com/m?continue=' + encodeURIComponent('https://evil.example/') })) as unknown as typeof fetch;
+    await expect(resolveMapsLink('https://maps.app.goo.gl/abc', fetchImpl)).resolves.toBeNull();
+  });
+});

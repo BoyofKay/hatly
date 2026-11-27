@@ -242,6 +242,9 @@ class _HatlyServiceScreenState extends ConsumerState<HatlyServiceScreen> {
       isOrigin: isOrigin,
       current: isOrigin ? route.origin : route.destination,
       defaultEndpoint: isOrigin ? (isBuy ? defaults.hatlyOrigin : null) : (isBuy ? defaults.hatlyDestination : defaults.wasallyDestination),
+      // Owner UAT 2026-11-27: the two ends cannot be the same place; Hatly's destination and Wasaly's pickup list saved addresses first.
+      otherEnd: isOrigin ? route.destination : route.origin,
+      savedFirst: isBuy ? !isOrigin : isOrigin,
     );
     if (choice == null || !mounted) return;
     if (existing != null) {

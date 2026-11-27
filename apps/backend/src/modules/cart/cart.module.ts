@@ -1,3 +1,4 @@
+import { ServiceAreasModule } from '../service-areas/service-areas.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Cart } from './entities/cart.entity';
@@ -18,6 +19,7 @@ import { OffersModule } from '../offers/offers.module';
   imports: [
     TypeOrmModule.forFeature([Cart, CartVendorGroup, CartItem, CartItemOptionValue, VendorBranch]),
     UploadsModule,
+    ServiceAreasModule,
     DeliveryFeeCalculationModule,
     OffersModule,
     BusinessConfigModule,

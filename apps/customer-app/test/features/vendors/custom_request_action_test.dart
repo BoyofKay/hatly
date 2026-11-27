@@ -8,6 +8,9 @@ import 'package:hatly_customer/features/cart/domain/cart.dart';
 import 'package:hatly_customer/core/localization/l10n/app_localizations.dart';
 import 'package:hatly_customer/features/vendors/presentation/widgets/custom_request_action.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:hatly_customer/features/uploads/data/uploads_api.dart';
+import 'package:hatly_customer/features/uploads/data/uploads_providers.dart';
+import 'package:hatly_customer/shared_widgets/voice_note/voice_note_engine.dart';
 
 import '../../support/checkout_fakes.dart';
 import '../../support/test_app.dart';
@@ -24,6 +27,7 @@ final String l10nSubmitAr =
     lookupAppLocalizations(const Locale('ar')).customRequestSubmit;
 
 void main() {
+  voiceOnlyTest();
   testWidgets('movable store entry uses the existing vendor-specific request sheet',
       (tester) async {
     await tester.pumpWidget(hatlyTestApp(
@@ -165,6 +169,65 @@ void main() {
   });
 }
 
+
+class _FakeVoice implements VoiceNoteEngine {
+  @override
+  Future<bool> ensurePermission() async => true;
+  @override
+  Future<void> startRecording() async {}
+  @override
+  Future<String?> stopRecording() async => '/tmp/v.m4a';
+  @override
+  Future<void> cancelRecording() async {}
+  @override
+  Future<void> play(String pathOrUrl, {required void Function() onDone}) async {}
+  @override
+  Future<void> stopPlayback() async {}
+  @override
+  Future<List<int>> readBytes(String path) async => List<int>.filled(10, 1);
+  @override
+  Future<void> dispose() async {}
+}
+
+class _FakeUploads implements UploadsApi {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+  @override
+  Future<String> uploadAudio(List<int> bytes) async => '/uploads/files/v.m4a';
+}
+
+void voiceOnlyTest() {
+  testWidgets('UAT VN-02: a voice-only custom request inside a store can be sent', (tester) async {
+    tester.view.physicalSize = const Size(400, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final api = _AcceptingCartApi();
+    await tester.pumpWidget(hatlyTestApp(
+      const Scaffold(body: Center(child: CustomRequestAction(vendorBranchId: 'branch-1'))),
+      locale: const Locale('ar'),
+      overrides: [
+        cartApiProvider.overrideWithValue(api),
+        uploadsApiProvider.overrideWithValue(_FakeUploads()),
+        voiceNoteEngineProvider.overrideWith((ref) => _FakeVoice()),
+      ],
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.help_outline));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('voice-note-record')));
+    await tester.tap(find.byKey(const Key('voice-note-record')));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    await tester.tap(find.byKey(const Key('voice-note-stop')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text(l10nSubmitAr));
+    await tester.tap(find.text(l10nSubmitAr));
+    await tester.pumpAndSettle();
+    expect(api.voices, ['/uploads/files/v.m4a']);
+    expect(api.sent, [null]);
+  });
+}
+
 /// A cart API whose custom-item add is rejected with a fixed backend error.
 class _RejectingCartApi extends FakeCartApi {
   _RejectingCartApi(this.error);
@@ -178,6 +241,7 @@ class _RejectingCartApi extends FakeCartApi {
     String? vendorBranchId,
     String? freeTextDescription,
     List<String>? imageUrls,
+    String? voiceNoteUrl,
   }) async {
     attempts++;
     throw error;
@@ -187,6 +251,7 @@ class _RejectingCartApi extends FakeCartApi {
 /// A cart API that accepts the custom item (and records what was sent).
 class _AcceptingCartApi extends FakeCartApi {
   final sent = <String?>[];
+  final voices = <String?>[];
 
   @override
   Future<Cart> addVendorCustomItem({
@@ -194,8 +259,10 @@ class _AcceptingCartApi extends FakeCartApi {
     String? vendorBranchId,
     String? freeTextDescription,
     List<String>? imageUrls,
+    String? voiceNoteUrl,
   }) async {
     sent.add(freeTextDescription);
+    voices.add(voiceNoteUrl);
     return cart;
   }
 }

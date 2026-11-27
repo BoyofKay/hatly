@@ -9,6 +9,8 @@ import '../../../addresses/domain/saved_address.dart';
 import '../../../addresses/presentation/address_pin_picker.dart';
 import '../../../addresses/presentation/widgets/saved_address_picker.dart';
 import '../../domain/route_endpoint.dart';
+import 'package:latlong2/latlong.dart' as ll;
+import '../../../addresses/presentation/map_point_screen.dart';
 
 /// What the customer decided in the endpoint sheet: a point of their own, or "use the service default" (clears their choice).
 class RouteEndpointChoice {
@@ -30,23 +32,31 @@ Future<RouteEndpointChoice?> showRouteEndpointSheet(
   required bool isOrigin,
   RouteEndpoint? current,
   RouteEndpoint? defaultEndpoint,
+  RouteEndpoint? otherEnd,
+  bool savedFirst = false,
 }) {
   return showModalBottomSheet<RouteEndpointChoice>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     builder: (_) => _RouteEndpointSheet(
-        isOrigin: isOrigin, current: current, defaultEndpoint: defaultEndpoint),
+        isOrigin: isOrigin, current: current, defaultEndpoint: defaultEndpoint, otherEnd: otherEnd, savedFirst: savedFirst),
   );
 }
 
 class _RouteEndpointSheet extends ConsumerStatefulWidget {
   const _RouteEndpointSheet(
-      {required this.isOrigin, this.current, this.defaultEndpoint});
+      {required this.isOrigin, this.current, this.defaultEndpoint, this.otherEnd, this.savedFirst = false});
 
   final bool isOrigin;
   final RouteEndpoint? current;
   final RouteEndpoint? defaultEndpoint;
+
+  /// The route's other end: this end may not be the same place (owner UAT 2026-11-27).
+  final RouteEndpoint? otherEnd;
+
+  /// Owner UAT 2026-11-27: Hatly's destination and Wasaly's pickup are usually one of the customer's saved addresses — listed first.
+  final bool savedFirst;
 
   @override
   ConsumerState<_RouteEndpointSheet> createState() =>
@@ -58,6 +68,8 @@ class _RouteEndpointSheetState extends ConsumerState<_RouteEndpointSheet> {
   final _link = TextEditingController();
   bool _readingLink = false;
   String? _linkError;
+  String? _pointError;
+  String? _savedError;
   double? _lat;
   double? _lng;
   bool _fromCurrentLocation = false;
@@ -69,10 +81,24 @@ class _RouteEndpointSheetState extends ConsumerState<_RouteEndpointSheet> {
     super.dispose();
   }
 
+  /// Null when the point may be used; otherwise why not (outside the served areas, or the same place as the other end).
+  String? _problem(AppLocalizations l10n, double lat, double lng) {
+    final areas = ref.read(serviceAreasProvider).valueOrNull ?? const [];
+    if (!insideServiceAreas(areas, lat, lng)) return l10n.mapPointOutsideArea;
+    final o = widget.otherEnd;
+    if (o != null && distanceMeters(lat, lng, o.latitude, o.longitude) < samePlaceMeters) return l10n.mapPointSameAsOther;
+    return null;
+  }
+
   void _confirmPoint(AppLocalizations l10n) {
     final lat = _lat;
     final lng = _lng;
     if (lat == null || lng == null) return;
+    final problem = _problem(l10n, lat, lng);
+    if (problem != null) {
+      setState(() => _pointError = problem);
+      return;
+    }
     final typed = _name.text.trim();
     final label = typed.isNotEmpty
         ? typed
@@ -129,6 +155,12 @@ class _RouteEndpointSheetState extends ConsumerState<_RouteEndpointSheet> {
     final lat = a.latitude;
     final lng = a.longitude;
     if (lat == null || lng == null) return;
+    final l10n = AppLocalizations.of(context);
+    final problem = _problem(l10n, lat, lng);
+    if (problem != null) {
+      setState(() => _savedError = problem == l10n.mapPointOutsideArea ? l10n.routeSavedOutsideArea : problem);
+      return;
+    }
     final label = (a.label?.isNotEmpty ?? false)
         ? a.label!
         : (a.line1.isNotEmpty ? a.line1 : gpsAddressText(lat, lng));
@@ -140,6 +172,97 @@ class _RouteEndpointSheetState extends ConsumerState<_RouteEndpointSheet> {
           source: RouteEndpointSource.customer),
     ));
   }
+
+  List<Widget> _pointSection(AppLocalizations l10n) => [
+        AddressPinPicker(
+          key: const Key('route-sheet-picker'),
+          latitude: _lat,
+          longitude: _lng,
+          avoid: widget.otherEnd == null ? null : ll.LatLng(widget.otherEnd!.latitude, widget.otherEnd!.longitude),
+          onChanged: (lat, lng) => setState(() {
+            _lat = lat;
+            _lng = lng;
+            _fromCurrentLocation = false;
+            _pointError = null;
+          }),
+        ),
+        if (_lat != null) ...[
+          const SizedBox(height: HatlySpacing.sm),
+          TextField(
+            key: const Key('route-sheet-name'),
+            controller: _name,
+            maxLength: 120,
+            decoration: InputDecoration(
+              labelText: l10n.routeNameThisPlace,
+              hintText: l10n.routeNameThisPlaceHint,
+              counterText: '',
+            ),
+          ),
+          if (_pointError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: HatlySpacing.sm),
+              child: Text(_pointError!, key: const Key('route-sheet-point-error'), style: context.type.small.copyWith(color: context.palette.urgent)),
+            ),
+          const SizedBox(height: HatlySpacing.sm),
+          HatlyPrimaryButton(
+            key: const Key('route-sheet-confirm'),
+            label: l10n.routeConfirmPoint,
+            onPressed: () => _confirmPoint(l10n),
+          ),
+        ],
+      ];
+
+  List<Widget> _savedSection(AppLocalizations l10n) => [
+        Text(l10n.routeSheetSavedSection, style: context.type.small),
+        const SizedBox(height: HatlySpacing.sm),
+        SavedAddressPicker(
+          key: const Key('route-sheet-saved'),
+          selectedId: null,
+          requirePin: true,
+          onSelected: _useSaved,
+        ),
+        if (_savedError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: HatlySpacing.xs),
+            child: Text(_savedError!, key: const Key('route-sheet-saved-error'), style: context.type.small.copyWith(color: context.palette.urgent)),
+          ),
+      ];
+
+  /// Pasting a Google / Apple Maps link stays available, folded away (the map is the main way now).
+  Widget _linkSection(AppLocalizations l10n) => ExpansionTile(
+        key: const Key('route-sheet-link-section'),
+        tilePadding: EdgeInsets.zero,
+        title: Text(l10n.routeMapLinkSection, style: context.type.small),
+        children: [
+          Text(l10n.routeMapLinkHelp, style: context.type.caption),
+          const SizedBox(height: HatlySpacing.sm),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                key: const Key('route-sheet-link'),
+                controller: _link,
+                keyboardType: TextInputType.url,
+                textDirection: TextDirection.ltr,
+                decoration: InputDecoration(hintText: 'https://maps.app.goo.gl/…', errorText: _linkError),
+                onSubmitted: (_) => _readLink(l10n),
+              ),
+            ),
+            const SizedBox(width: HatlySpacing.sm),
+            _readingLink
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                : TextButton(key: const Key('route-sheet-link-use'), onPressed: () => _readLink(l10n), child: Text(l10n.routeMapLinkUse)),
+          ]),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              key: const Key('route-sheet-open-maps'),
+              onPressed: _openMapsApp,
+              icon: const Icon(Icons.map_outlined),
+              label: Text(l10n.routeOpenMapsApp),
+            ),
+          ),
+        ],
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -160,84 +283,21 @@ class _RouteEndpointSheetState extends ConsumerState<_RouteEndpointSheet> {
             style: context.type.title,
           ),
           const SizedBox(height: HatlySpacing.md),
-          Text(l10n.routeSheetPointSection, style: context.type.small),
-          const SizedBox(height: HatlySpacing.sm),
-          AddressPinPicker(
-            key: const Key('route-sheet-picker'),
-            latitude: _lat,
-            longitude: _lng,
-            onChanged: (lat, lng) => setState(() {
-              _lat = lat;
-              _lng = lng;
-              _fromCurrentLocation = true;
-            }),
-          ),
-          const SizedBox(height: HatlySpacing.md),
-          Text(l10n.routeMapLinkSection, style: context.type.small),
-          const SizedBox(height: HatlySpacing.xs),
-          Text(l10n.routeMapLinkHelp, style: context.type.caption),
-          const SizedBox(height: HatlySpacing.sm),
-          Row(children: [
-            Expanded(
-              child: TextField(
-                key: const Key('route-sheet-link'),
-                controller: _link,
-                keyboardType: TextInputType.url,
-                textDirection: TextDirection.ltr,
-                decoration: InputDecoration(
-                    hintText: 'https://maps.app.goo.gl/…',
-                    errorText: _linkError),
-                onSubmitted: (_) => _readLink(l10n),
-              ),
-            ),
-            const SizedBox(width: HatlySpacing.sm),
-            _readingLink
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : TextButton(
-                    key: const Key('route-sheet-link-use'),
-                    onPressed: () => _readLink(l10n),
-                    child: Text(l10n.routeMapLinkUse)),
-          ]),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: TextButton.icon(
-              key: const Key('route-sheet-open-maps'),
-              onPressed: _openMapsApp,
-              icon: const Icon(Icons.map_outlined),
-              label: Text(l10n.routeOpenMapsApp),
-            ),
-          ),
-          if (_lat != null) ...[
+          if (widget.savedFirst) ...[
+            ..._savedSection(l10n),
+            const SizedBox(height: HatlySpacing.lg),
+            Text(l10n.routeOtherLocation, style: context.type.small),
             const SizedBox(height: HatlySpacing.sm),
-            TextField(
-              key: const Key('route-sheet-name'),
-              controller: _name,
-              maxLength: 120,
-              decoration: InputDecoration(
-                labelText: l10n.routeNameThisPlace,
-                hintText: l10n.routeNameThisPlaceHint,
-                counterText: '',
-              ),
-            ),
+            ..._pointSection(l10n),
+          ] else ...[
+            Text(l10n.routeSheetPointSection, style: context.type.small),
             const SizedBox(height: HatlySpacing.sm),
-            HatlyPrimaryButton(
-              key: const Key('route-sheet-confirm'),
-              label: l10n.routeConfirmPoint,
-              onPressed: () => _confirmPoint(l10n),
-            ),
+            ..._pointSection(l10n),
+            const SizedBox(height: HatlySpacing.lg),
+            ..._savedSection(l10n),
           ],
-          const SizedBox(height: HatlySpacing.lg),
-          Text(l10n.routeSheetSavedSection, style: context.type.small),
-          const SizedBox(height: HatlySpacing.sm),
-          SavedAddressPicker(
-            key: const Key('route-sheet-saved'),
-            selectedId: null,
-            requirePin: true,
-            onSelected: _useSaved,
-          ),
+          const SizedBox(height: HatlySpacing.md),
+          _linkSection(l10n),
           if (defaultEndpoint != null) ...[
             const SizedBox(height: HatlySpacing.lg),
             OutlinedButton(

@@ -1,6 +1,6 @@
 import { GeoController } from './geo.controller';
 
-const build = (provider: Partial<{ geocode: any; reverseGeocode: any }>) => new GeoController({ geocode: jest.fn(), reverseGeocode: jest.fn(), ...provider } as any);
+const build = (provider: Partial<{ geocode: any; reverseGeocode: any }>) => new GeoController({ geocode: jest.fn(), reverseGeocode: jest.fn(), ...provider } as any, { find: jest.fn(async () => []) } as any, { resolveForPoint: jest.fn(async () => null) } as any);
 
 describe('GeoController — assistive suggestions that never block checkout', () => {
   it('reverse returns the provider suggestion', async () => {

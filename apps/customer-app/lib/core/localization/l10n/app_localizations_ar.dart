@@ -2736,4 +2736,37 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get hatlyServiceContentHint =>
       'اكتب ما تحتاجه أو أضف صورة أو سجّل رسالة صوتية — يكفي واحد منها.';
+
+  @override
+  String get mapPointOpen => 'اختر الموقع من الخريطة';
+
+  @override
+  String get mapPointTitle => 'اختر المكان';
+
+  @override
+  String get mapPointHint =>
+      'حرّك الخريطة حتى يكون الدبوس على المكان، ثم أكّد.';
+
+  @override
+  String get mapPointOutsideArea =>
+      'هذا المكان خارج المنطقة التي يخدمها هاتلي.';
+
+  @override
+  String get mapPointSameAsOther =>
+      'هذا هو نفس مكان الطرف الآخر من المشوار. اختر مكانًا مختلفًا.';
+
+  @override
+  String get routeSavedOutsideArea =>
+      'هذا العنوان المحفوظ خارج المنطقة التي يخدمها هاتلي.';
+
+  @override
+  String get routeOtherLocation => 'مكان آخر';
+
+  @override
+  String get cartErrorRouteOutsideArea =>
+      'هذا المكان خارج المنطقة التي يخدمها هاتلي. اختر مكانًا داخلها.';
+
+  @override
+  String get cartErrorRouteSamePoint =>
+      'مكان الاستلام والتوصيل واحد. اختر مكانًا مختلفًا.';
 }

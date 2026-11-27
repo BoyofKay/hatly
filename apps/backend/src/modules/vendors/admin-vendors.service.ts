@@ -1,3 +1,4 @@
+import { haversineDistanceMeters } from '../service-areas/service-area-resolver.service';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -100,6 +101,25 @@ export class AdminVendorsService {
     return this.vendorsRepository.save(vendor);
   }
 
+  /**
+   * Owner UAT 2026-11-27 (ML-01): a branch's location must lie inside its service area (or, with none assigned, inside an active service
+   * area when any exist). Stops a pasted link or a wrong pin from putting a store where Hatly does not deliver.
+   */
+  private async assertBranchLocation(latitude: number, longitude: number, serviceAreaId: string | null | undefined): Promise<void> {
+    if (typeof this.serviceAreasRepository.find !== 'function') return;
+    const areas = serviceAreaId
+      ? await this.serviceAreasRepository.find({ where: { id: serviceAreaId } })
+      : await this.serviceAreasRepository.find({ where: { isActive: true } });
+    if (areas.length === 0) return;
+    const inside = areas.some((a) => haversineDistanceMeters(latitude, longitude, Number(a.centerLatitude), Number(a.centerLongitude)) <= Number(a.radiusMeters));
+    if (!inside) {
+      throw new BadRequestException({
+        message: serviceAreaId ? `This location is outside the branch's service area (${areas[0].name}).` : 'This location is outside every area Hatly serves.',
+        details: { code: 'BRANCH_OUTSIDE_SERVICE_AREA' },
+      });
+    }
+  }
+
   async createVendorBranch(dto: CreateVendorBranchDto): Promise<VendorBranch> {
     const vendor = await this.vendorsRepository.findOne({ where: { id: dto.vendorId } });
     if (!vendor) {
@@ -108,6 +128,7 @@ export class AdminVendorsService {
         details: { code: 'VENDOR_NOT_FOUND' },
       });
     }
+    await this.assertBranchLocation(dto.latitude, dto.longitude, dto.serviceAreaId);
 
     return this.branchesRepository.save(
       this.branchesRepository.create({
@@ -168,6 +189,9 @@ export class AdminVendorsService {
         });
       }
       branch.serviceAreaId = dto.serviceAreaId;
+    }
+    if (dto.latitude !== undefined || dto.longitude !== undefined || dto.serviceAreaId !== undefined) {
+      await this.assertBranchLocation(Number(branch.latitude), Number(branch.longitude), dto.serviceAreaId ?? branch.serviceAreaId);
     }
     return this.branchesRepository.save(branch);
   }

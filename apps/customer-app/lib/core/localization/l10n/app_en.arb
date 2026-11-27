@@ -1335,5 +1335,14 @@
   "voiceNotePermissionDenied": "Hatly needs the microphone to record. Allow it in your phone's settings.",
   "voiceNoteTooShort": "The recording was too short. Try again.",
   "voiceNoteFailed": "The voice note could not be recorded. Try again.",
-  "hatlyServiceContentHint": "Write what you need, add a photo or record a voice note — any one is enough."
+  "hatlyServiceContentHint": "Write what you need, add a photo or record a voice note — any one is enough.",
+  "mapPointOpen": "Select a location on the map",
+  "mapPointTitle": "Choose the place",
+  "mapPointHint": "Move the map until the pin is on the place, then confirm.",
+  "mapPointOutsideArea": "This place is outside the area Hatly serves.",
+  "mapPointSameAsOther": "This is the same place as the other end of the trip. Choose a different place.",
+  "routeSavedOutsideArea": "This saved address is outside the area Hatly serves.",
+  "routeOtherLocation": "Another place",
+  "cartErrorRouteOutsideArea": "This place is outside the area Hatly serves. Choose a place inside it.",
+  "cartErrorRouteSamePoint": "The pickup and the destination are the same place. Choose a different place."
 }

@@ -153,12 +153,14 @@ class CartController extends StateNotifier<AsyncValue<Cart>> {
     String? vendorBranchId,
     String? freeTextDescription,
     List<String>? imageUrls,
+    String? voiceNoteUrl,
   }) {
     return _mutate(() => _api.addVendorCustomItem(
           cartVendorGroupId: cartVendorGroupId,
           vendorBranchId: vendorBranchId,
           freeTextDescription: freeTextDescription,
           imageUrls: imageUrls,
+          voiceNoteUrl: voiceNoteUrl,
         ));
   }
 

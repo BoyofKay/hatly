@@ -1,4 +1,9 @@
 import { resolveMapsLink } from '../../../common/geo/maps-link';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { ServiceArea } from '../../service-areas/entities/service-area.entity';
+import { ServiceAreaResolverService } from '../../service-areas/service-area-resolver.service';
+import { boxAround, nominatimSearch, openGeocoderEnabled } from '../../location/open-geocoder';
 import { Controller, Get, Inject, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { IsLatitude, IsLongitude, IsString, MaxLength, MinLength } from 'class-validator';
@@ -43,7 +48,26 @@ class SearchQuery {
 @UseGuards(RolesGuard)
 @Roles(Role.CUSTOMER)
 export class GeoController {
-  constructor(@Inject(MAP_PROVIDER) private readonly mapProvider: MapProvider) {}
+  constructor(
+    @Inject(MAP_PROVIDER) private readonly mapProvider: MapProvider,
+    @InjectRepository(ServiceArea) private readonly serviceAreas: Repository<ServiceArea>,
+    private readonly serviceAreaResolver: ServiceAreaResolverService,
+  ) {}
+
+  /** The active service areas (centre + radius), so the app's map can show where Hatly works (owner UAT 2026-11-27). */
+  @Get('service-areas')
+  async areas() {
+    const rows = await this.serviceAreas.find({ where: { isActive: true } });
+    return { data: rows.map((a) => ({ id: a.id, name: a.name, nameAr: a.nameAr ?? null, centerLatitude: Number(a.centerLatitude), centerLongitude: Number(a.centerLongitude), radiusMeters: Number(a.radiusMeters) })) };
+  }
+
+  /** Whether a point is inside an active service area — the app checks a chosen point before using it. */
+  @Throttled(RateLimitPolicies.geoLookup)
+  @Get('serviceable')
+  async serviceable(@Query() query: ReverseGeocodeQuery) {
+    const area = await this.serviceAreaResolver.resolveForPoint(query.latitude, query.longitude);
+    return { data: { serviceable: Boolean(area), serviceAreaName: area?.name ?? null } };
+  }
 
   @Throttled(RateLimitPolicies.geoLookup)
   @Get('reverse')
@@ -72,7 +96,14 @@ export class GeoController {
   async search(@Query() query: SearchQuery) {
     try {
       const point = await this.mapProvider.geocode(query.q);
-      return { data: point ? { latitude: point.latitude, longitude: point.longitude } : null };
+      if (point) return { data: { latitude: point.latitude, longitude: point.longitude } };
+    } catch {
+      /* the configured provider is off or failed: try the open fallback */
+    }
+    if (!openGeocoderEnabled()) return { data: null };
+    try {
+      const box = boxAround((await this.serviceAreas.find({ where: { isActive: true } })).map((a) => ({ centerLatitude: Number(a.centerLatitude), centerLongitude: Number(a.centerLongitude), radiusMeters: Number(a.radiusMeters) })));
+      return { data: await nominatimSearch(query.q, box) };
     } catch {
       return { data: null };
     }

@@ -20,6 +20,7 @@ import {
 import { apiErrorMessage } from '../../../../lib/api/errors';
 import { checkImageFile } from '../../../../lib/banners/banner-form';
 import { resolveMediaUrl } from '../../../../lib/media-url';
+import { LocationFromLink } from '../../../../components/admin/LocationFromLink';
 import { useLang } from '../../../../lib/ui/lang';
 import { SettlementTermsCard } from '../../../../components/vendor/SettlementTermsCard';
 import { DeleteRecordButton } from '../../../../components/admin/DeleteRecordButton';
@@ -299,20 +300,17 @@ export default function VendorDetailPage() {
           <LabeledInput label={t('Branch name (English)', 'اسم الفرع (إنجليزي)')} required value={branchName} onChange={(e) => setBranchName(e.target.value)} />
           <LabeledInput label={t('Branch name (Arabic)', 'اسم الفرع (عربي)')} required dir="rtl" value={branchNameAr} onChange={(e) => setBranchNameAr(e.target.value)} />
           <LabeledInput label={t('Address', 'العنوان')} required value={branchAddress} onChange={(e) => setBranchAddress(e.target.value)} />
-          <LabeledInput
-            label={t('Location: paste a Google Maps link or "lat, lng"', 'الموقع: الصق رابط خرائط جوجل أو "خط العرض، خط الطول"')}
-            dir="ltr" value={mapsLink} placeholder="https://maps.google.com/?q=30.4170,31.5620"
-            onChange={(e) => { const v = e.target.value; setMapsLink(v); const p = parseLatLng(v); if (p) { setBranchLat(String(p.lat)); setBranchLng(String(p.lng)); } else if (/^https:\/\//i.test(v.trim())) { apiClient.get('/admin/geo/maps-link', { params: { url: v.trim() } }).then((r) => { setBranchLat(String(r.data.data.latitude)); setBranchLng(String(r.data.data.longitude)); }).catch(() => undefined); } }}
-            hint={t('In Google Maps: long-press the shop → copy the coordinates or Share → Copy link.', 'في خرائط جوجل: اضغط مطولًا على المحل ← انسخ الإحداثيات أو مشاركة ← نسخ الرابط.')}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <LabeledInput label={t('Latitude', 'خط العرض')} required dir="ltr" inputMode="decimal" value={branchLat} onChange={(e) => setBranchLat(e.target.value)} />
-            <LabeledInput label={t('Longitude', 'خط الطول')} required dir="ltr" inputMode="decimal" value={branchLng} onChange={(e) => setBranchLng(e.target.value)} />
-          </div>
           <LabeledSelect label={t('Service area', 'منطقة الخدمة')} required value={branchAreaId} onChange={(e) => setBranchAreaId(e.target.value)}>
             <option value="">{t('Choose…', 'اختر…')}</option>
             {areas.map((a) => <option key={a.id} value={a.id}>{a.nameAr ? `${a.name} — ${a.nameAr}` : a.name}</option>)}
           </LabeledSelect>
+          <LocationFromLink
+            lat={branchLat.trim() && !Number.isNaN(Number(branchLat)) ? Number(branchLat) : null}
+            lng={branchLng.trim() && !Number.isNaN(Number(branchLng)) ? Number(branchLng) : null}
+            onChange={(lat, lng) => { setBranchLat(String(lat)); setBranchLng(String(lng)); }}
+            areas={areas.filter((a) => a.isActive)}
+            areaId={branchAreaId || null}
+          />
           <LabeledInput label={t('Hatly commission (%)', 'عمولة هاتلي (%)')} required dir="ltr" inputMode="decimal" placeholder="15" value={branchCommission} onChange={(e) => setBranchCommission(e.target.value)} />
           <p className="text-xs text-gray-500">{t('The new branch starts inactive and closed. Next, its page shows a go-live checklist: section, menu, staff, hours, then activate and open.', 'يبدأ الفرع غير مفعّل ومغلقًا. ستعرض صفحته قائمة الجاهزية: القسم والمنيو والموظفون والمواعيد ثم التفعيل والفتح.')}</p>
           {branchError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{branchError}</p>}

@@ -13,7 +13,9 @@
     "test:unit": "node --experimental-strip-types --test lib/legal/public-site.test.mts lib/banners/banner-form.test.mts lib/sectors/sector-form.test.mts lib/service-routes/route-defaults.test.mts lib/vendor/new-orders.test.mts lib/changes/change-feed.test.mts lib/ui/closures.test.mts lib/alerts/alarm-logic.test.mts lib/alerts/sw.test.mts lib/ui/start-page.test.mts lib/admin/lat-lng.test.mts lib/units.test.mts lib/api/errors.test.mts lib/catalog/photo-match.test.mts lib/notifications/group-by-order.test.mts lib/admin/form-messages.test.mts"
   },
   "dependencies": {
+    "@types/leaflet": "^1.9.12",
     "axios": "^1.7.4",
+    "leaflet": "^1.9.4",
     "next": "15.5.27",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

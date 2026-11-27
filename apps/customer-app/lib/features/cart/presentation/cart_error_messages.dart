@@ -24,6 +24,10 @@ String localizedCartErrorMessage(BuildContext context, ApiException error) {
       return l10n.cartErrorOptionLimit;
     case 'CUSTOM_REQUESTS_NOT_AVAILABLE':
       return l10n.cartErrorCustomRequestsUnavailable;
+    case 'ROUTE_POINT_OUTSIDE_SERVICE_AREA':
+      return l10n.cartErrorRouteOutsideArea;
+    case 'ROUTE_SAME_POINT':
+      return l10n.cartErrorRouteSamePoint;
     case 'CART_BRANCH_CONFLICT':
       return l10n.cartBranchConflictMessage;
     // Real cart rules of the multi-vendor cart (cart.service.ts assertCanAddNewGroup).

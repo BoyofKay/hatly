@@ -4909,6 +4909,60 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'اكتب ما تحتاجه أو أضف صورة أو سجّل رسالة صوتية — يكفي واحد منها.'**
   String get hatlyServiceContentHint;
+
+  /// No description provided for @mapPointOpen.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر الموقع من الخريطة'**
+  String get mapPointOpen;
+
+  /// No description provided for @mapPointTitle.
+  ///
+  /// In ar, this message translates to:
+  /// **'اختر المكان'**
+  String get mapPointTitle;
+
+  /// No description provided for @mapPointHint.
+  ///
+  /// In ar, this message translates to:
+  /// **'حرّك الخريطة حتى يكون الدبوس على المكان، ثم أكّد.'**
+  String get mapPointHint;
+
+  /// No description provided for @mapPointOutsideArea.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذا المكان خارج المنطقة التي يخدمها هاتلي.'**
+  String get mapPointOutsideArea;
+
+  /// No description provided for @mapPointSameAsOther.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذا هو نفس مكان الطرف الآخر من المشوار. اختر مكانًا مختلفًا.'**
+  String get mapPointSameAsOther;
+
+  /// No description provided for @routeSavedOutsideArea.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذا العنوان المحفوظ خارج المنطقة التي يخدمها هاتلي.'**
+  String get routeSavedOutsideArea;
+
+  /// No description provided for @routeOtherLocation.
+  ///
+  /// In ar, this message translates to:
+  /// **'مكان آخر'**
+  String get routeOtherLocation;
+
+  /// No description provided for @cartErrorRouteOutsideArea.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذا المكان خارج المنطقة التي يخدمها هاتلي. اختر مكانًا داخلها.'**
+  String get cartErrorRouteOutsideArea;
+
+  /// No description provided for @cartErrorRouteSamePoint.
+  ///
+  /// In ar, this message translates to:
+  /// **'مكان الاستلام والتوصيل واحد. اختر مكانًا مختلفًا.'**
+  String get cartErrorRouteSamePoint;
 }
 
 class _AppLocalizationsDelegate

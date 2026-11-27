@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { haversineDistanceMeters, ServiceAreaResolverService } from '../service-areas/service-area-resolver.service';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Optional, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { assertNonNegativeUnitPrice, validateOptionSelection } from '../products/option-selection';
@@ -37,6 +38,9 @@ function cleanLabel(label: string | null | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+/** Two route ends closer than this are the same place (owner UAT 2026-11-27). */
+const SAME_PLACE_METERS = 50;
+
 @Injectable()
 export class CartService {
   constructor(
@@ -47,7 +51,26 @@ export class CartService {
     private readonly uploadsService: UploadsService,
     private readonly deliveryFeeCalculationService: DeliveryFeeCalculationService,
     private readonly offerConsumptionService: OfferConsumptionService,
+    @Optional() private readonly serviceAreaResolver?: ServiceAreaResolverService,
   ) {}
+
+  /**
+   * Owner UAT 2026-11-27 (ML-03): every place the CUSTOMER chose for a Hatly / Wasaly route must be inside an active service area, and
+   * the two ends must not be the same place. Ends left on the service default are configured by Hatly and not checked here.
+   */
+  private async assertRoutePoints(points: Array<{ latitude: number; longitude: number } | null>): Promise<void> {
+    const chosen = points.filter((p): p is { latitude: number; longitude: number } => p != null);
+    if (this.serviceAreaResolver) {
+      for (const p of chosen) {
+        if (!(await this.serviceAreaResolver.resolveForPoint(p.latitude, p.longitude))) {
+          throw new BadRequestException({ message: 'This place is outside the area Hatly serves.', details: { code: 'ROUTE_POINT_OUTSIDE_SERVICE_AREA' } });
+        }
+      }
+    }
+    if (chosen.length === 2 && haversineDistanceMeters(chosen[0].latitude, chosen[0].longitude, chosen[1].latitude, chosen[1].longitude) < SAME_PLACE_METERS) {
+      throw new BadRequestException({ message: 'The pickup and the destination are the same place.', details: { code: 'ROUTE_SAME_POINT' } });
+    }
+  }
 
   async getCartView(customerId: string): Promise<CartView> {
     const cart = await this.getOrCreateActiveCart(customerId);
@@ -256,6 +279,10 @@ export class CartService {
             details: { code: 'INCOMPLETE_COORDINATE' },
           });
         }
+        await this.assertRoutePoints([
+          dto.pickupLatitude !== undefined ? { latitude: dto.pickupLatitude, longitude: dto.pickupLongitude! } : null,
+          dto.destinationLatitude !== undefined ? { latitude: dto.destinationLatitude, longitude: dto.destinationLongitude! } : null,
+        ]);
         group = await manager.save(
           CartVendorGroup,
           manager.create(CartVendorGroup, {
@@ -339,6 +366,8 @@ export class CartService {
         group.adHocDestinationLongitude = dto.destination?.longitude ?? null;
         group.adHocDestinationLabel = dto.destination ? cleanLabel(dto.destination.label) : null;
       }
+      const end = (lat?: number | null, lng?: number | null) => (lat != null && lng != null ? { latitude: Number(lat), longitude: Number(lng) } : null);
+      await this.assertRoutePoints([end(group.adHocPickupLatitude, group.adHocPickupLongitude), end(group.adHocDestinationLatitude, group.adHocDestinationLongitude)]);
       await manager.save(CartVendorGroup, group);
       return this.loadCartWithRelations(manager, cart.id);
     });

@@ -10,6 +10,8 @@ import '../../../auth/presentation/auth_gate.dart';
 import '../../../cart/data/cart_providers.dart';
 import '../../../uploads/data/uploads_providers.dart';
 import '../../../cart/presentation/cart_error_messages.dart';
+import '../../../../shared_widgets/voice_note/voice_note_engine.dart';
+import '../../../../shared_widgets/voice_note/voice_note_field.dart';
 
 const int _maxCustomRequestImages = 2;
 
@@ -118,11 +120,13 @@ class _CustomRequestSheet extends ConsumerStatefulWidget {
 class _CustomRequestSheetState extends ConsumerState<_CustomRequestSheet> {
   final _textController = TextEditingController();
   final List<XFile> _selectedImages = [];
+  VoiceNoteDraft? _voice;
   bool _isSubmitting = false;
   String? _errorMessage;
 
+  // UAT VN-02: a store's custom request takes a voice note too — text, photos and voice each optional, any one is enough.
   bool get _isValid =>
-      _textController.text.trim().isNotEmpty || _selectedImages.isNotEmpty;
+      _textController.text.trim().isNotEmpty || _selectedImages.isNotEmpty || _voice != null;
 
   @override
   void dispose() {
@@ -174,6 +178,10 @@ class _CustomRequestSheetState extends ConsumerState<_CustomRequestSheet> {
         final url = await uploadsApi.uploadImage(bytes, image.name);
         imageUrls.add(url);
       }
+      final voice = _voice;
+      final voiceNoteUrl = voice == null
+          ? null
+          : await uploadsApi.uploadAudio(await ref.read(voiceNoteEngineProvider).readBytes(voice.path));
 
       final error =
           await ref.read(cartControllerProvider.notifier).addVendorCustomItem(
@@ -182,6 +190,7 @@ class _CustomRequestSheetState extends ConsumerState<_CustomRequestSheet> {
                     ? null
                     : _textController.text.trim(),
                 imageUrls: imageUrls.isEmpty ? null : imageUrls,
+                voiceNoteUrl: voiceNoteUrl,
               );
 
       if (!mounted) return;
@@ -300,6 +309,10 @@ class _CustomRequestSheetState extends ConsumerState<_CustomRequestSheet> {
           const SizedBox(height: HatlySpacing.sm),
           Text(l10n.customRequestImageLimitHint(_maxCustomRequestImages),
               style: context.type.caption.copyWith(color: p.textMuted)),
+          const SizedBox(height: HatlySpacing.md),
+          Text(l10n.voiceNoteSection, style: context.type.small),
+          const SizedBox(height: HatlySpacing.xs),
+          VoiceNoteField(key: const Key('custom-request-voice'), value: _voice, onChanged: (v) => setState(() => _voice = v)),
           if (_errorMessage != null) ...[
             const SizedBox(height: HatlySpacing.sm),
             HatlyErrorBanner(message: _errorMessage!),
