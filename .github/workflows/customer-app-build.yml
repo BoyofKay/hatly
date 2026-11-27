@@ -68,11 +68,17 @@ jobs:
 
       - name: Build
         id: build
+        env:
+          # Optional (owner, 2026-11-27): the APP's Maps SDK key (Android-restricted, never the server key). When set, the in-app map is
+          # switched on for picking points (HATLY_MAPS_ENABLED); without it the app keeps GPS, saved addresses and pasted map links.
+          MAPS_API_KEY: ${{ secrets.CUSTOMER_MAPS_API_KEY }}
         run: |
           V="$(sed -n 's/^version: //p' pubspec.yaml)"
           echo "version=$V" >> "$GITHUB_OUTPUT"
-          flutter build appbundle --release --dart-define=API_BASE_URL=https://api.hatly.dev/api/v1
-          flutter build apk --release --dart-define=API_BASE_URL=https://api.hatly.dev/api/v1
+          MAPS_FLAG=""
+          if [ -n "$MAPS_API_KEY" ]; then MAPS_FLAG="--dart-define=HATLY_MAPS_ENABLED=true"; echo "In-app map: ON" >> "$GITHUB_STEP_SUMMARY"; else echo "In-app map: off (no CUSTOMER_MAPS_API_KEY)" >> "$GITHUB_STEP_SUMMARY"; fi
+          flutter build appbundle --release --dart-define=API_BASE_URL=https://api.hatly.dev/api/v1 $MAPS_FLAG
+          flutter build apk --release --dart-define=API_BASE_URL=https://api.hatly.dev/api/v1 $MAPS_FLAG
           mkdir -p "$RUNNER_TEMP/out"
           cp build/app/outputs/bundle/release/app-release.aab "$RUNNER_TEMP/out/hatly-customer-$V.aab"
           cp build/app/outputs/flutter-apk/app-release.apk "$RUNNER_TEMP/out/hatly-customer-$V.apk"

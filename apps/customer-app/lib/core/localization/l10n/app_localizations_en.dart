@@ -2707,4 +2707,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String checkoutDeliveryFeeDiscounted(String original) {
     return 'Delivery fee (was $original)';
   }
+
+  @override
+  String get routeMapLinkSection => 'Or choose it in your maps app';
+
+  @override
+  String get routeMapLinkHelp =>
+      'Open Google Maps (Apple Maps on iPhone), drop a pin on the place, tap Share → Copy, then paste the link here.';
+
+  @override
+  String get routeMapLinkUse => 'Use link';
+
+  @override
+  String get routeOpenMapsApp => 'Open the maps app';
+
+  @override
+  String get routeMapLinkNoLocation =>
+      'No location found in this link. Copy the link of a dropped pin and try again.';
 }

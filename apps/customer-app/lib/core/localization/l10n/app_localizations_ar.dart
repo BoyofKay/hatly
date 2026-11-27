@@ -2677,4 +2677,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String checkoutDeliveryFeeDiscounted(String original) {
     return 'رسوم التوصيل (بدلاً من $original)';
   }
+
+  @override
+  String get routeMapLinkSection => 'أو اختره من تطبيق الخرائط';
+
+  @override
+  String get routeMapLinkHelp =>
+      'افتح خرائط جوجل (أو خرائط آبل على الآيفون)، ضع دبوسًا على المكان، اضغط مشاركة ← نسخ، ثم الصق الرابط هنا.';
+
+  @override
+  String get routeMapLinkUse => 'استخدم الرابط';
+
+  @override
+  String get routeOpenMapsApp => 'افتح تطبيق الخرائط';
+
+  @override
+  String get routeMapLinkNoLocation =>
+      'لا يوجد موقع في هذا الرابط. انسخ رابط الدبوس وحاول مرة أخرى.';
 }

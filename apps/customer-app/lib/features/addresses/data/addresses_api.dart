@@ -32,10 +32,12 @@ class AddressesApi {
     try {
       return await _client.request(
         (dio) => dio.get('/addresses/capabilities'),
-        (data) => AddressCapabilities.fromJson(data['data'] as Map<String, dynamic>),
+        (data) =>
+            AddressCapabilities.fromJson(data['data'] as Map<String, dynamic>),
       );
     } on ApiException catch (e) {
-      if (e.code == 'NOT_FOUND' || e.statusCode == 404) return AddressCapabilities.legacyBackend;
+      if (e.code == 'NOT_FOUND' || e.statusCode == 404)
+        return AddressCapabilities.legacyBackend;
       rethrow;
     }
   }
@@ -83,6 +85,22 @@ class AddressesApi {
           queryParameters: {'latitude': latitude, 'longitude': longitude}),
       (data) =>
           (data['data'] as Map<String, dynamic>)['formattedAddress'] as String?,
+    );
+  }
+
+  /// A point from a Google Maps / Apple Maps link the customer copied (short share links included — the server opens them).
+  /// Null = no location in that link.
+  Future<({double latitude, double longitude})?> pointFromMapsLink(String url) {
+    return _client.request(
+      (dio) => dio.get('/geo/maps-link', queryParameters: {'url': url}),
+      (data) {
+        final point = data['data'];
+        if (point is! Map) return null;
+        return (
+          latitude: (point['latitude'] as num).toDouble(),
+          longitude: (point['longitude'] as num).toDouble()
+        );
+      },
     );
   }
 

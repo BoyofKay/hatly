@@ -1,3 +1,4 @@
+import { resolveMapsLink } from '../../../common/geo/maps-link';
 import { Controller, Get, Inject, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { IsLatitude, IsLongitude, IsString, MaxLength, MinLength } from 'class-validator';
@@ -16,6 +17,13 @@ class ReverseGeocodeQuery {
   @Type(() => Number)
   @IsLongitude()
   longitude: number;
+}
+
+class MapsLinkQuery {
+  @IsString()
+  @MinLength(5)
+  @MaxLength(2000)
+  url: string;
 }
 
 class SearchQuery {
@@ -46,6 +54,17 @@ export class GeoController {
     } catch {
       return { data: { formattedAddress: null } };
     }
+  }
+
+  /**
+   * Owner request 2026-11-27: a point for Hatly / Wasaly (or an address) from a link the customer copied in Google Maps or Apple Maps —
+   * long links are read directly, short share links are opened (Google / Apple map hosts only). Works while the in-app map is off.
+   */
+  @Throttled(RateLimitPolicies.geoLookup)
+  @Get('maps-link')
+  async mapsLink(@Query() query: MapsLinkQuery) {
+    const point = await resolveMapsLink(query.url).catch(() => null);
+    return { data: point ? { latitude: point.lat, longitude: point.lng } : null };
   }
 
   @Throttled(RateLimitPolicies.geoLookup)

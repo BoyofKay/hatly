@@ -1317,5 +1317,10 @@
         "type": "String"
       }
     }
-  }
+  },
+  "routeMapLinkSection": "Or choose it in your maps app",
+  "routeMapLinkHelp": "Open Google Maps (Apple Maps on iPhone), drop a pin on the place, tap Share → Copy, then paste the link here.",
+  "routeMapLinkUse": "Use link",
+  "routeOpenMapsApp": "Open the maps app",
+  "routeMapLinkNoLocation": "No location found in this link. Copy the link of a dropped pin and try again."
 }

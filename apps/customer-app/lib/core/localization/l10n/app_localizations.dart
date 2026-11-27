@@ -4801,6 +4801,36 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'رسوم التوصيل (بدلاً من {original})'**
   String checkoutDeliveryFeeDiscounted(String original);
+
+  /// No description provided for @routeMapLinkSection.
+  ///
+  /// In ar, this message translates to:
+  /// **'أو اختره من تطبيق الخرائط'**
+  String get routeMapLinkSection;
+
+  /// No description provided for @routeMapLinkHelp.
+  ///
+  /// In ar, this message translates to:
+  /// **'افتح خرائط جوجل (أو خرائط آبل على الآيفون)، ضع دبوسًا على المكان، اضغط مشاركة ← نسخ، ثم الصق الرابط هنا.'**
+  String get routeMapLinkHelp;
+
+  /// No description provided for @routeMapLinkUse.
+  ///
+  /// In ar, this message translates to:
+  /// **'استخدم الرابط'**
+  String get routeMapLinkUse;
+
+  /// No description provided for @routeOpenMapsApp.
+  ///
+  /// In ar, this message translates to:
+  /// **'افتح تطبيق الخرائط'**
+  String get routeOpenMapsApp;
+
+  /// No description provided for @routeMapLinkNoLocation.
+  ///
+  /// In ar, this message translates to:
+  /// **'لا يوجد موقع في هذا الرابط. انسخ رابط الدبوس وحاول مرة أخرى.'**
+  String get routeMapLinkNoLocation;
 }
 
 class _AppLocalizationsDelegate
