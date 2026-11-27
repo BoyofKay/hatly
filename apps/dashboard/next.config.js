@@ -19,6 +19,8 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   // Product / vendor images come from the API's own media (and a CDN over HTTPS when one is configured).
   `img-src 'self' data: blob: https: ${apiOrigin}`.trim(),
+  // Voice notes on Hatly / Wasaly requests are played from the API's own media (owner UAT 2026-11-27, VN-10).
+  `media-src 'self' blob: https: ${apiOrigin}`.trim(),
   "font-src 'self' data:",
   `connect-src 'self' ${apiOrigin}${isDev ? ' ws:' : ''}`.trim(),
   "frame-ancestors 'none'",

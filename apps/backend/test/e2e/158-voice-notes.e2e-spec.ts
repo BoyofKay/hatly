@@ -3,6 +3,7 @@
  * least one required. The voice note is the customer's own upload, travels cart → order → driver / Operations, and Operations can
  * write a note for the driver.
  */
+import * as http from 'http';
 import { bootWorld, World } from './support/world';
 import { Scenario, Actor, expectData, withQuoteToken } from './support/actors';
 import { Permission } from '../../src/modules/permissions/permission.enum';
@@ -66,6 +67,12 @@ describe('E2E — voice notes on Hatly / Wasaly requests', () => {
   it('a voice-only request reaches the order, Operations and the driver; Operations add a note for the driver', async () => {
     const c = await s.customer('Voice Only');
     const url = await uploadVoice(c);
+    // UAT VN-10: stored with its audio extension and served as audio (a browser's <audio> refuses a generic binary type).
+    expect(url).toMatch(/\.m4a$/);
+    const served = await new Promise<{ status: number; type: string }>((resolve, reject) =>
+      http.get(new URL(url, world.baseUrl), (res) => { res.resume(); resolve({ status: res.statusCode ?? 0, type: String(res.headers['content-type'] ?? '') }); }).on('error', reject));
+    expect(served.status).toBe(200);
+    expect(served.type).toMatch(/^audio\/mp4/);
     expectData(await world.api('post', '/cart/adhoc-items', { token: c.accessToken, body: request({ voiceNoteUrl: url }) }), 201);
     const cart = expectData<any>(await world.api('get', '/cart', { token: c.accessToken }));
     expect(cart.groups[0].items[0]).toMatchObject({ voiceNoteUrl: url, freeTextDescription: null });

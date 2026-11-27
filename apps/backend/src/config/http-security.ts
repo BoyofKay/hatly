@@ -68,7 +68,7 @@ export function securityHeaders(options: SecurityHeadersOptions): RequestHandler
 }
 
 /** `<uuid>.<ext>` — a name generated once per upload and never reused, so the bytes behind it can never change. */
-const GENERATED_UPLOAD_NAME = /(^|[\\/])[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp)$/;
+const GENERATED_UPLOAD_NAME = /(^|[\\/])[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|webp|m4a|aac|mp3|ogg|wav|webm)$/;
 
 /**
  * Headers for files served from the uploads directory: never executable/embeddable, usable cross-origin as images.

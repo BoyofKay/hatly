@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { UploadProvider, UploadResult } from '../upload-provider.interface';
-import { STORED_FILE_NAME } from './storage-keys';
+import { safeExtensionOf, STORED_FILE_NAME } from './storage-keys';
 
 /**
  * CHUNK 12B-1 CORRECTION. Real implementation of the existing
@@ -99,9 +99,6 @@ export class LocalFilesystemUploadProvider implements UploadProvider {
    * filesystem path.
    */
   private extractSafeExtension(filename: string): string {
-    const match = /\.([a-zA-Z0-9]{1,5})$/.exec(filename);
-    const ext = match ? `.${match[1].toLowerCase()}` : '';
-    const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
-    return allowed.includes(ext) ? ext : '';
+    return safeExtensionOf(filename);
   }
 }

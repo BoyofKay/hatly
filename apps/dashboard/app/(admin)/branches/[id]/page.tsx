@@ -41,6 +41,7 @@ import { BranchReadinessCard } from '../../../../components/admin/BranchReadines
 import { CategoryEditModal, ProductEditModal } from '../../../../components/admin/CatalogEditModals';
 import { useRouter } from 'next/navigation';
 import { useLang } from '../../../../lib/ui/lang';
+import { BulkItemPhotos } from '../../../../components/admin/BulkItemPhotos';
 
 /**
  * Real Branch detail/edit/activate + Sector assignment (reuses the
@@ -92,6 +93,7 @@ export default function BranchDetailPage() {
 
   // Menu import (MenuImportPanel).
   const [showImport, setShowImport] = useState(false);
+  const [showPhotos, setShowPhotos] = useState(false);
 
   async function refresh() {
     setError(null);
@@ -518,11 +520,14 @@ export default function BranchDetailPage() {
       </div>
 
       <div className="rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="sec-products" className="scroll-mt-16 font-semibold">{t("Products", "المنتجات")}</h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <button onClick={() => setShowImport((v) => !v)} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
               {showImport ? t("Close import", "إغلاق الاستيراد") : t("Import menu (Excel)", "استيراد القائمة (Excel)")}
+            </button>
+            <button onClick={() => setShowPhotos((v) => !v)} data-testid="branch-bulk-photos" className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium bg-white text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
+              {showPhotos ? t("Close photos", "إغلاق الصور") : t("Add many photos", "إضافة صور متعددة")}
             </button>
             <button onClick={() => setShowProductForm((v) => !v)} className="rounded-lg bg-hatly-orange px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
               {showProductForm ? t("Cancel", "إلغاء") : t("New Product", "منتج جديد")}
@@ -531,6 +536,7 @@ export default function BranchDetailPage() {
         </div>
 
         {showImport && <MenuImportPanel branchId={branch.id} branchName={branch.name} onImported={refresh} />}
+        {showPhotos && <div className="mt-3 rounded-lg border border-gray-200 p-3"><BulkItemPhotos branchId={branch.id} /></div>}
 
         {showProductForm && (
           <form onSubmit={handleCreateProduct} className="mt-3 space-y-3 rounded border p-3">
