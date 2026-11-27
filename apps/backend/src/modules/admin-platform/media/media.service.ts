@@ -332,13 +332,17 @@ export class MediaService {
     return this.ds.transaction(async (m) => {
       const [p] = await m.query(`SELECT id FROM products WHERE id = $1 AND deleted_at IS NULL FOR UPDATE`, [productId]);
       if (!p) throw err(404, 'NOT_FOUND', 'Product not found.');
-      const assets = assetIds.length ? await m.query(`SELECT a.id, a.status, a.purpose, (SELECT url FROM media_variants v WHERE v.asset_id = a.id AND v.name IN ('DISPLAY','ORIGINAL') ORDER BY CASE v.name WHEN 'DISPLAY' THEN 0 ELSE 1 END LIMIT 1) AS url FROM media_assets a WHERE a.id = ANY($1)`, [assetIds]) : [];
+      const assets = assetIds.length ? await m.query(`SELECT a.id, a.status, a.purpose, a.width, a.height, (SELECT url FROM media_variants v WHERE v.asset_id = a.id AND v.name IN ('DISPLAY','ORIGINAL') ORDER BY CASE v.name WHEN 'DISPLAY' THEN 0 ELSE 1 END LIMIT 1) AS url FROM media_assets a WHERE a.id = ANY($1)`, [assetIds]) : [];
       const byId = new Map<string, any>(assets.map((a: any) => [a.id, a]));
       for (const id of assetIds) {
         const a = byId.get(id);
         if (!a) throw err(404, 'MEDIA_NOT_FOUND', 'One of the images does not exist.');
         if (a.status !== 'ACTIVE') throw err(409, 'MEDIA_NOT_ACTIVE', 'One of the images is deleted.');
-        if (!['PRODUCT_PRIMARY', 'PRODUCT_ADDITIONAL', 'GENERAL'].includes(a.purpose)) throw err(400, 'MEDIA_PURPOSE_MISMATCH', 'One of the images was not uploaded for products.');
+        // Owner UAT 2026-11-28: an identical image uploaded earlier for something else (a sector, a banner) is de-duplicated to that
+        // asset, so its purpose is not a product one. It may still be a product photo when it meets the product minimum size.
+        const productPurpose = ['PRODUCT_PRIMARY', 'PRODUCT_ADDITIONAL', 'GENERAL'].includes(a.purpose);
+        const bigEnough = Number(a.width) >= PURPOSES.PRODUCT_ADDITIONAL.minWidth && Number(a.height) >= PURPOSES.PRODUCT_ADDITIONAL.minHeight;
+        if (!productPurpose && !bigEnough) throw err(400, 'MEDIA_PURPOSE_MISMATCH', 'One of the images is too small for a product photo (at least 300 × 300 pixels).');
       }
       await m.query(`DELETE FROM product_media WHERE product_id = $1`, [productId]);
       for (let i = 0; i < assetIds.length; i++) await m.query(`INSERT INTO product_media (product_id, media_asset_id, sort_order, is_primary) VALUES ($1,$2,$3,$4)`, [productId, assetIds[i], i, i === 0]);

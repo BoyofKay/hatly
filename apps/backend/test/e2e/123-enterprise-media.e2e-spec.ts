@@ -184,6 +184,18 @@ describe('E2E — Media platform', () => {
     expect(expectData<any>(await post(superAdmin, `/admin/media/${asset.id}/restore`), 201).status).toBe('ACTIVE');
   });
 
+  it('owner UAT 2026-11-28: the same picture uploaded earlier as sector artwork can still become a product photo (bulk photos)', async () => {
+    const v = await s.vendor({ name: 'Reuse Vendor', serviceAreaId: area.id, lat: 30.421, lng: 31.561 });
+    const p = await s.product(v, { priceMinor: 5000, inventoryMode: 'OPEN' });
+    const picture = await img(800, 800);
+    const asSector = await upload(superAdmin, picture, { purpose: 'SECTOR_IMAGE' });
+    expect(asSector.status).toBe(201);
+    const again = await upload(superAdmin, picture, { purpose: 'PRODUCT_ADDITIONAL' });
+    expect(again.body.data.id).toBe(asSector.body.data.id); // de-duplicated to the sector asset
+    const put = await world.api('put', `/admin/products/${p.id}/media`, { token: superAdmin.accessToken, body: { assetIds: [again.body.data.id] } });
+    expect(put.status).toBe(200);
+  });
+
   it('a product keeps ordered images (first = primary, mirrored to image_url); limits and states are validated; the library filters by purpose / usage / text', async () => {
     const v = await s.vendor({ name: 'Gallery Vendor', serviceAreaId: area.id, lat: 30.421, lng: 31.561 });
     const p = await s.product(v, { priceMinor: 5000, inventoryMode: 'OPEN' });
