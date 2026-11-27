@@ -197,8 +197,8 @@ export default function ManualTransferPage() {
                 {found.refundedMinor > 0 && <> · {t('already refunded', 'تم استرداد')} {money(found.refundedMinor)}</>}
               </p>
             )}
-            <LabeledInput label={t('Amount (EGP)', 'المبلغ (ج.م)')} inputMode="decimal" dir="ltr" placeholder="Amount (EGP)" value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} hint={refundMinor !== null ? `= ${money(refundMinor)}` : t('Up to two decimals.', 'حتى خانتين عشريتين.')} />
-            <LabeledInput label={t('Reason (optional)', 'السبب (اختياري)')} placeholder="Reason (optional)" value={refundReason} onChange={(e) => setRefundReason(e.target.value)} />
+            <LabeledInput label={t('Amount (EGP)', 'المبلغ (ج.م)')} inputMode="decimal" dir="ltr" placeholder={t('Amount (EGP)', 'المبلغ (ج.م)')} value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} hint={refundMinor !== null ? `= ${money(refundMinor)}` : t('Up to two decimals.', 'حتى خانتين عشريتين.')} />
+            <LabeledInput label={t('Reason (optional)', 'السبب (اختياري)')} placeholder={t('Reason (optional)', 'السبب (اختياري)')} value={refundReason} onChange={(e) => setRefundReason(e.target.value)} />
             {refundError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{refundError}</p>}
             <Button type="submit" variant="primary" loading={isRefunding} disabled={!found || found.status !== 'PAID'} className="min-h-[44px] w-full sm:w-auto">{isRefunding ? t('Recording...', 'جارٍ التسجيل...') : t('Record Refund', 'تسجيل الاسترداد')}</Button>
           </form>

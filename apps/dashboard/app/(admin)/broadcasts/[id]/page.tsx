@@ -47,7 +47,7 @@ export default function BroadcastDetailPage() {
             {error && !dlg && <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
             {d.rejectionReason && d.status === 'DRAFT' && <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{t('Returned by the reviewer:', 'أعادها المراجع:')} <bdi>{d.rejectionReason}</bdi></p>}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Card title="English"><p className="font-medium"><bdi>{d.titleEn}</bdi></p><p className="mt-1 whitespace-pre-wrap text-sm"><bdi>{d.bodyEn}</bdi></p></Card>
+              <Card title={t('English', 'الإنجليزية')}><p className="font-medium"><bdi>{d.titleEn}</bdi></p><p className="mt-1 whitespace-pre-wrap text-sm"><bdi>{d.bodyEn}</bdi></p></Card>
               <Card title="العربية"><div dir="rtl"><p className="font-medium">{d.titleAr}</p><p className="mt-1 whitespace-pre-wrap text-sm">{d.bodyAr}</p></div></Card>
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:max-w-xl">

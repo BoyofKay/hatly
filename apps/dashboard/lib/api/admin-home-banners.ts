@@ -94,14 +94,18 @@ const FRIENDLY: Record<string, string> = {
   FILE_REQUIRED: 'Choose an image file first.',
 };
 
+const FRIENDLY_AR: Record<string, string> = {"BANNER_IMAGE_REQUIRED":"ارفع صورة قبل نشر البانر.","BANNER_SCHEDULE_INVALID":"يجب أن تكون نهاية العرض بعد بدايته.","BANNER_ACTION_TARGET_REQUIRED":"اختر ما يفتحه البانر.","BANNER_ACTION_TARGET_UNEXPECTED":"لا يمكن تحديد وجهة لبانر بدون إجراء.","BANNER_ACTION_TARGET_NOT_FOUND":"الوجهة المحددة لم تعد موجودة.","BANNER_NOT_FOUND":"البانر غير موجود. حدّث القائمة.","UNSUPPORTED_IMAGE_TYPE":"الصيغ المسموح بها هي JPEG وPNG وWebP فقط.","IMAGE_TOO_LARGE":"حجم الصورة أكبر من 5 ميجابايت.","FILE_REQUIRED":"اختر ملف صورة أولًا."};
+
 /** The backend's reason for a failed call, in plain words — never swallowed, never a stack trace. */
 export function bannerErrorMessage(err: any, fallback: string): string {
   const status = err?.response?.status;
   const body = err?.response?.data;
-  if (status === 403) return 'You do not have permission to manage banners.';
-  if (status === 413) return FRIENDLY.IMAGE_TOO_LARGE;
+  const ar = typeof document !== 'undefined' && document.documentElement.lang === 'ar';
+  const friendly = ar ? FRIENDLY_AR : FRIENDLY;
+  if (status === 403) return ar ? 'ليست لديك صلاحية لإدارة البانرات.' : 'You do not have permission to manage banners.';
+  if (status === 413) return friendly.IMAGE_TOO_LARGE;
   const code = body?.error?.details?.code ?? body?.error?.code;
-  if (code && FRIENDLY[code]) return FRIENDLY[code];
+  if (code && friendly[code]) return friendly[code];
   const message = body?.error?.message ?? body?.message;
   if (Array.isArray(message)) return message.join(', ');
   return typeof message === 'string' ? message : fallback;

@@ -13,6 +13,7 @@ import { EMPTY_SECTOR_FORM, SectorFormState, buildCreateSectorBody, suggestSlug 
 import { apiErrorMessage } from '../../../lib/api/errors';
 import { useAdminPermission } from '../../../lib/auth/use-admin-permission';
 import { useLang } from '../../../lib/ui/lang';
+import { localizeAdminFormMessage } from '../../../lib/admin/form-messages';
 import { Badge, Button, Card, EmptyState, ErrorState, KpiCard, LabeledInput, PageHeader, Skeleton, Modal } from '../../../components/ui';
 
 /**
@@ -76,7 +77,7 @@ export default function SectorsPage() {
     try {
       setSectors(await listAdminSectors());
     } catch (err) {
-      setError(apiErrorMessage(err, 'Failed to load sectors.'));
+      setError(apiErrorMessage(err, t("Failed to load sectors.", "تعذّر تحميل القطاعات.")));
     }
   }
 
@@ -92,7 +93,7 @@ export default function SectorsPage() {
       const updated = await setSectorCustomRequests(sector.id, !sector.customRequestsEnabled);
       setSectors((all) => (all ?? []).map((s) => (s.id === updated.id ? updated : s)));
     } catch (err) {
-      setError(apiErrorMessage(err, 'Failed to update the sector.'));
+      setError(apiErrorMessage(err, t("Failed to update the sector.", "تعذّر تحديث القطاع.")));
     } finally {
       setBusyId(null);
     }
@@ -103,7 +104,7 @@ export default function SectorsPage() {
     if (saving) return;
     const v = buildCreateSectorBody(form);
     if (!v.ok) {
-      setFormError(v.error);
+      setFormError(localizeAdminFormMessage(v.error, t));
       return;
     }
     setSaving(true);
@@ -115,7 +116,7 @@ export default function SectorsPage() {
       setCreating(false);
       await refresh();
     } catch (err) {
-      setFormError(apiErrorMessage(err, 'Failed to create the sector.'));
+      setFormError(apiErrorMessage(err, t("Failed to create the sector.", "تعذّر إنشاء القطاع.")));
     } finally {
       setSaving(false);
     }
@@ -147,7 +148,7 @@ export default function SectorsPage() {
       const updated = await setSectorActive(sector.id, !sector.isActive);
       setSectors((all) => (all ?? []).map((s) => (s.id === updated.id ? updated : s)));
     } catch (err) {
-      setError(apiErrorMessage(err, 'Failed to update the sector.'));
+      setError(apiErrorMessage(err, t("Failed to update the sector.", "تعذّر تحديث القطاع.")));
     } finally {
       setBusyId(null);
     }
@@ -160,7 +161,7 @@ export default function SectorsPage() {
     <button
       role="switch"
       aria-checked={s.customRequestsEnabled}
-      aria-label={`Custom requests for ${s.name}`}
+      aria-label={t(`Custom requests for ${s.name}`, `الطلبات المخصصة لقطاع ${s.nameAr || s.name}`)}
       data-testid={testId}
       disabled={!canManage || busyId === s.id}
       title={canManage ? undefined : noPermission}
@@ -187,31 +188,29 @@ export default function SectorsPage() {
       {creating && (
         <form onSubmit={submitNew} data-testid="sector-form" className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <LabeledInput data-testid="sector-name" label="Name (EN)" value={form.name} placeholder="Restaurants" onChange={(e) => { const name = e.target.value; setForm((f) => ({ ...f, name, slug: slugTouched ? f.slug : suggestSlug(name) })); }} />
-            <LabeledInput data-testid="sector-name-ar" label="Name (AR)" required dir="rtl" value={form.nameAr} placeholder="مطاعم" onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))} />
-            <LabeledInput data-testid="sector-slug" label="Slug (lowercase, hyphens)" dir="ltr" value={form.slug} placeholder="restaurants" onChange={(e) => { setSlugTouched(true); setForm((f) => ({ ...f, slug: e.target.value })); }} />
-            <LabeledInput data-testid="sector-order" label="Display order (lowest first)" inputMode="numeric" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))} />
+            <LabeledInput data-testid="sector-name" label={t("Name (EN)", "الاسم بالإنجليزية")} value={form.name} placeholder="Restaurants" onChange={(e) => { const name = e.target.value; setForm((f) => ({ ...f, name, slug: slugTouched ? f.slug : suggestSlug(name) })); }} />
+            <LabeledInput data-testid="sector-name-ar" label={t("Name (AR)", "الاسم بالعربية")} required dir="rtl" value={form.nameAr} placeholder="مطاعم" onChange={(e) => setForm((f) => ({ ...f, nameAr: e.target.value }))} />
+            <LabeledInput data-testid="sector-slug" label={t("Slug (lowercase, hyphens)", "المعرّف النصي (حروف إنجليزية صغيرة وشرطات)")} dir="ltr" value={form.slug} placeholder="restaurants" onChange={(e) => { setSlugTouched(true); setForm((f) => ({ ...f, slug: e.target.value })); }} />
+            <LabeledInput data-testid="sector-order" label={t("Display order (lowest first)", "ترتيب العرض (الأقل أولًا)")} inputMode="numeric" value={form.sortOrder} onChange={(e) => setForm((f) => ({ ...f, sortOrder: e.target.value }))} />
           </div>
           <label className="flex min-h-[44px] items-center gap-2 text-sm">
             <input data-testid="sector-active" type="checkbox" checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} />
-            <span>Show on customers&apos; Home now (leave off until vendors are assigned to it)</span>
+            <span>{t("Show on customers' Home now (leave off until vendors are assigned to it)", "إظهار القطاع في الرئيسية للعملاء الآن (اتركه غير مفعّل حتى تعيين المتاجر إليه)")}</span>
           </label>
           {formError && <p data-testid="sector-form-error" role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>}
           <div className="flex gap-2">
-            <Button type="submit" variant="primary" loading={saving}>{saving ? 'Saving…' : 'Create sector'}</Button>
-            <Button type="button" onClick={() => setCreating(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" loading={saving}>{saving ? t("Saving…", "جارٍ الحفظ…") : t("Create sector", "إنشاء قطاع")}</Button>
+            <Button type="button" onClick={() => setCreating(false)}>{t("Cancel", "إلغاء")}</Button>
           </div>
         </form>
       )}
       <p data-testid="sectors-rule" className="mb-4 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
-        “Can’t find what you’re looking for?” lets a customer describe an item (text and/or photos) that the vendor prices later. Turn it on only for
-        sectors where a vendor can source items that are not on the menu — it is off for every new sector, and a vendor without a sector cannot receive
-        custom requests. Changes apply immediately.
+        {t('“Can’t find what you’re looking for?” lets a customer describe an item (text and/or photos) that the vendor prices later. Turn it on only for sectors where a vendor can source items that are not on the menu — it is off for every new sector, and a vendor without a sector cannot receive custom requests. Changes apply immediately.', 'تتيح خدمة هاتلي للعميل وصف صنف بالنص أو الصور ليُسعّره المتجر لاحقًا. فعّلها فقط للقطاعات التي تستطيع توفير أصناف خارج القائمة. تكون متوقفة افتراضيًا لكل قطاع جديد، ولا يمكن لمتجر غير مرتبط بقطاع استقبال طلبات مخصصة. تسري التغييرات فورًا.')}
       </p>
       {error && <p data-testid="sectors-error" role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       {sectors === null && !error && <div className="space-y-2" aria-busy="true">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>}
       {sectors && sectors.length === 0 && (
-        <Card><div data-testid="sectors-empty"><EmptyState title={t('No sectors yet', 'لا توجد قطاعات بعد')} hint="No sectors yet — customers see no categories on Home until you create and activate at least one." /></div></Card>
+        <Card><div data-testid="sectors-empty"><EmptyState title={t('No sectors yet', 'لا توجد قطاعات بعد')} hint={t("No sectors yet — customers see no categories on Home until you create and activate at least one.", "لا توجد قطاعات بعد — لن تظهر تصنيفات للعملاء حتى إنشاء قطاع واحد على الأقل وتفعيله.")} /></div></Card>
       )}
       {sectors && sectors.length > 0 && (
         <>

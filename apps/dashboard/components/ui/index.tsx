@@ -2,6 +2,7 @@
 
 import { createContext, ReactNode, useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { useLang } from '../../lib/ui/lang';
+import { commonStatusLabel } from '../../lib/admin/labels';
 
 /* ------------------------------------------------------------------ tokens / small primitives */
 
@@ -34,8 +35,9 @@ const STATUS_TONE: Record<string, Tone> = {
 
 /** Status text is ALWAYS shown (colour is never the only carrier of meaning). */
 export function StatusPill({ status, label }: { status: string | null | undefined; label?: string }) {
+  const { t } = useLang();
   if (!status) return <span className="text-gray-400">—</span>;
-  return <Badge tone={STATUS_TONE[status] ?? 'gray'}>{label ?? status.replace(/_/g, ' ')}</Badge>;
+  return <Badge tone={STATUS_TONE[status] ?? 'gray'}>{label ?? commonStatusLabel(status, t)}</Badge>;
 }
 
 export function Spinner({ className = '' }: { className?: string }) {
@@ -309,7 +311,7 @@ export function Pagination({ page, limit, total, onPage }: { page: number; limit
   const from = total === 0 ? 0 : (page - 1) * limit + 1;
   const to = Math.min(total, page * limit);
   return (
-    <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-3 py-2 text-xs text-gray-600">
+    <nav aria-label={t('Pagination', 'ترقيم الصفحات')} className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 px-3 py-2 text-xs text-gray-600">
       <span className="tabular-nums">{t(`${num(from)}–${num(to)} of ${num(total)}`, `${num(from)}–${num(to)} من ${num(total)}`)}</span>
       <span className="flex items-center gap-1">
         <Button size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label={t('Previous page', 'الصفحة السابقة')}>{t('Previous', 'السابق')}</Button>

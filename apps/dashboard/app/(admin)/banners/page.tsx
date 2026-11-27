@@ -32,6 +32,7 @@ import {
   isoToLocalInput,
 } from '../../../lib/banners/banner-form';
 import { useLang } from '../../../lib/ui/lang';
+import { localizeAdminFormMessage } from '../../../lib/admin/form-messages';
 import { useIsMobile } from '../../../lib/ui/use-media-query';
 
 /**
@@ -97,6 +98,7 @@ function BannerForm({
   onSubmit: (body: ReturnType<typeof buildCreateBody>) => Promise<void>;
   onCancel: () => void;
 }) {
+  const { t: tl } = useLang();
   const [form, setForm] = useState<BannerFormState>(initial);
   const [products, setProducts] = useState<Product[] | null>(null);
   const [productsError, setProductsError] = useState<string | null>(null);
@@ -115,7 +117,7 @@ function BannerForm({
     setProductsError(null);
     listProducts(productBranch)
       .then((p) => !cancelled && setProducts(p))
-      .catch((err) => !cancelled && setProductsError(bannerErrorMessage(err, 'Could not load the products of this branch.')));
+      .catch((err) => !cancelled && setProductsError(bannerErrorMessage(err, tl("Could not load the products of this branch.", "تعذّر تحميل منتجات هذا الفرع."))));
     return () => {
       cancelled = true;
     };
@@ -126,7 +128,7 @@ function BannerForm({
     if (busy) return;
     const v = isEdit ? buildUpdateBody(form) : buildCreateBody(form);
     if (!v.ok) {
-      setError(v.error);
+      setError(localizeAdminFormMessage(v.error, tl));
       return;
     }
     setBusy(true);
@@ -134,7 +136,7 @@ function BannerForm({
     try {
       await onSubmit(v as ReturnType<typeof buildCreateBody>);
     } catch (err) {
-      setError(bannerErrorMessage(err, 'Failed to save the banner.'));
+      setError(bannerErrorMessage(err, tl("Failed to save the banner.", "تعذّر حفظ البانر.")));
     } finally {
       setBusy(false);
     }
@@ -143,37 +145,37 @@ function BannerForm({
   return (
     <form onSubmit={submit} data-testid="banner-form" className="mt-4 space-y-3 rounded-xl border bg-white p-4 border-gray-200 shadow-sm">
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Title (EN) — also the description for screen readers" value={form.title} onChange={set('title')} testId="banner-title" placeholder="Weekend offers" />
-        <Field label="Title (AR)" value={form.titleAr} onChange={set('titleAr')} testId="banner-title-ar" dir="rtl" placeholder="عروض نهاية الأسبوع" />
+        <Field label={tl("Title (EN) — also the description for screen readers", "العنوان بالإنجليزية — ويُستخدم أيضًا كوصف لقارئات الشاشة")} value={form.title} onChange={set('title')} testId="banner-title" placeholder="Weekend offers" />
+        <Field label={tl("Title (AR)", "العنوان بالعربية")} value={form.titleAr} onChange={set('titleAr')} testId="banner-title-ar" dir="rtl" placeholder="عروض نهاية الأسبوع" />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-sm">
-          <span className="font-medium">When tapped, open…</span>
+          <span className="font-medium">{tl("When tapped, open…", "عند الضغط، افتح…")}</span>
           <select data-testid="banner-action" value={form.actionType} onChange={(e) => set('actionType')(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm">
             {(Object.keys(ACTION_LABEL) as BannerActionType[]).map((a) => (
               <option key={a} value={a}>
-                {ACTION_LABEL[a]}
+                {tl(ACTION_LABEL[a], { NONE: 'بدون إجراء (غير قابل للضغط)', PRODUCT: 'منتج', VENDOR: 'فرع متجر', SECTOR: 'قطاع (تصنيف)' }[a])}
               </option>
             ))}
           </select>
         </label>
-        <Field label="Display order (lowest first)" value={form.sortOrder} onChange={set('sortOrder')} testId="banner-sort-order" />
+        <Field label={tl("Display order (lowest first)", "ترتيب العرض (الأقل أولًا)")} value={form.sortOrder} onChange={set('sortOrder')} testId="banner-sort-order" />
       </div>
 
       <label className="block text-sm">
-        <span className="font-medium">Promotion's sector (controls header color, independent of tap destination)</span>
+        <span className="font-medium">{tl("Promotion's sector (controls header color, independent of tap destination)", "قطاع العرض (يتحكم في لون الترويسة، مستقل عن وجهة الضغط)")}</span>
         <select data-testid="banner-theme-sector" value={form.linkedSectorId ?? ''}
           onChange={(e) => set('linkedSectorId')(e.target.value)}
           className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white text-sm">
-          <option value="">Legacy / neutral tint</option>
+          <option value="">{tl("Legacy / neutral tint", "بدون قطاع / لون محايد")}</option>
           {sectors.filter((s) => s.isActive).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </label>
       {form.actionType === 'SECTOR' && (
         <label className="block text-sm">
-          <span className="font-medium">Sector</span>
+          <span className="font-medium">{tl("Sector", "القطاع")}</span>
           <select data-testid="banner-sector" value={form.sectorId} onChange={(e) => set('sectorId')(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm">
-            <option value="">Choose…</option>
+            <option value="">{tl("Choose…", "اختر…")}</option>
             {sectors.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -186,14 +188,14 @@ function BannerForm({
       )}
       {(form.actionType === 'VENDOR' || form.actionType === 'PRODUCT') && (
         <label className="block text-sm">
-          <span className="font-medium">Vendor branch</span>
+          <span className="font-medium">{tl("Vendor branch", "فرع المتجر")}</span>
           <select
             data-testid="banner-branch"
             value={form.branchId}
             onChange={(e) => setForm((f) => ({ ...f, branchId: e.target.value, productId: '' }))}
             className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm"
           >
-            <option value="">Choose…</option>
+            <option value="">{tl("Choose…", "اختر…")}</option>
             {branches.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
@@ -205,20 +207,20 @@ function BannerForm({
       )}
       {form.actionType === 'PRODUCT' && form.branchId && (
         <label className="block text-sm">
-          <span className="font-medium">Product</span>
+          <span className="font-medium">{tl("Product", "المنتج")}</span>
           {productsError ? (
             <p data-testid="banner-products-error" className="mt-1 text-sm text-red-600">
               {productsError}
             </p>
           ) : products === null ? (
-            <p className="mt-1 text-sm text-gray-500">Loading products…</p>
+            <p className="mt-1 text-sm text-gray-500">{tl("Loading products…", "جارٍ تحميل المنتجات…")}</p>
           ) : products.length === 0 ? (
             <p data-testid="banner-products-empty" className="mt-1 text-sm text-gray-500">
-              This branch has no products yet.
+              {tl("This branch has no products yet.", "لا توجد منتجات لهذا الفرع بعد.")}
             </p>
           ) : (
             <select data-testid="banner-product" value={form.productId} onChange={(e) => set('productId')(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm">
-              <option value="">Choose…</option>
+              <option value="">{tl("Choose…", "اختر…")}</option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -231,13 +233,13 @@ function BannerForm({
       )}
 
       <fieldset className="rounded border border-dashed p-3">
-        <legend className="px-1 text-xs text-gray-500">Schedule (optional, your local time) — leave empty to show it as soon as it is published</legend>
+        <legend className="px-1 text-xs text-gray-500">{tl("Schedule (optional, your local time) — leave empty to show it as soon as it is published", "الجدولة (اختيارية، بالتوقيت المحلي) — اتركها فارغة للعرض فور النشر")}</legend>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Show from" value={form.startsAt} onChange={set('startsAt')} testId="banner-starts" type="datetime-local" />
-          <Field label="Show until" value={form.endsAt} onChange={set('endsAt')} testId="banner-ends" type="datetime-local" />
+          <Field label={tl("Show from", "العرض من")} value={form.startsAt} onChange={set('startsAt')} testId="banner-starts" type="datetime-local" />
+          <Field label={tl("Show until", "العرض حتى")} value={form.endsAt} onChange={set('endsAt')} testId="banner-ends" type="datetime-local" />
         </div>
       </fieldset>
-      <p className="text-xs text-gray-500">{isEdit ? 'The image is changed from the list.' : 'You add the image next, then publish.'}</p>
+      <p className="text-xs text-gray-500">{isEdit ? tl("The image is changed from the list.", "يمكن تغيير الصورة من القائمة.") : tl("You add the image next, then publish.", "أضف الصورة أولًا ثم انشر البانر.")}</p>
       {error && (
         <p data-testid="banner-form-error" className="text-sm text-red-600">
           {error}
@@ -245,10 +247,10 @@ function BannerForm({
       )}
       <div className="flex gap-2">
         <button type="submit" disabled={busy} className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-          {busy ? 'Saving…' : submitLabel}
+          {busy ? tl("Saving…", "جارٍ الحفظ…") : submitLabel}
         </button>
         <button type="button" onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40">
-          Cancel
+          {tl("Cancel", "إلغاء")}
         </button>
       </div>
     </form>
@@ -279,7 +281,7 @@ export default function HomeBannersPage() {
     try {
       setBanners(await listHomeBanners());
     } catch (err) {
-      setError(bannerErrorMessage(err, 'Failed to load the banners.'));
+      setError(bannerErrorMessage(err, tl("Failed to load the banners.", "تعذّر تحميل البانرات.")));
     }
   }
 
@@ -294,12 +296,12 @@ export default function HomeBannersPage() {
     const sectorName = new Map(sectors.map((s) => [s.id, s.name]));
     const branchName = new Map(branches.map((b) => [b.id, b.name]));
     return (b: HomeBanner) => {
-      if (b.actionType === 'NONE') return 'Not tappable';
-      if (b.actionType === 'SECTOR') return `Sector: ${sectorName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`;
-      if (b.actionType === 'VENDOR') return `Branch: ${branchName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`;
-      return `Product: ${b.actionTargetId}`;
+      if (b.actionType === 'NONE') return tl("Not tappable", "غير قابل للضغط");
+      if (b.actionType === 'SECTOR') return tl(`Sector: ${sectorName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`, `القطاع: ${sectorName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`);
+      if (b.actionType === 'VENDOR') return tl(`Branch: ${branchName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`, `الفرع: ${branchName.get(b.actionTargetId ?? '') ?? b.actionTargetId}`);
+      return tl(`Product: ${b.actionTargetId}`, `المنتج: ${b.actionTargetId}`);
     };
-  }, [sectors, branches]);
+  }, [sectors, branches, tl]);
 
   async function run(banner: HomeBanner, action: () => Promise<unknown>, fallback: string) {
     if (busyId) return;
@@ -329,7 +331,7 @@ export default function HomeBannersPage() {
     if (!file || !banner) return;
     const problem = checkImageFile(file, BANNER_IMAGE_TYPES, BANNER_IMAGE_MAX_BYTES);
     if (problem) {
-      setRowError({ id: banner.id, message: problem });
+      setRowError({ id: banner.id, message: localizeAdminFormMessage(problem, tl) });
       return;
     }
     // The shape is checked here too (the server checks again): a wide image only, so the carousel never crops it badly.
@@ -338,14 +340,14 @@ export default function HomeBannersPage() {
       const shapeProblem = checkBannerShape(bitmap.width, bitmap.height);
       bitmap.close();
       if (shapeProblem) {
-        setRowError({ id: banner.id, message: shapeProblem });
+        setRowError({ id: banner.id, message: localizeAdminFormMessage(shapeProblem, tl) });
         return;
       }
     } catch {
-      setRowError({ id: banner.id, message: 'This file could not be read as an image.' });
+      setRowError({ id: banner.id, message: tl('This file could not be read as an image.', 'تعذّرت قراءة الملف كصورة.') });
       return;
     }
-    await run(banner, () => uploadHomeBannerImage(banner.id, file, uploadLanguage.current), 'Failed to upload the image.');
+    await run(banner, () => uploadHomeBannerImage(banner.id, file, uploadLanguage.current), tl('Failed to upload the image.', 'تعذّر رفع الصورة.'));
   }
 
   const shown = (banners ?? []).filter((b) => statusFilter === 'ALL' || b.displayStatus === statusFilter);
@@ -361,17 +363,15 @@ export default function HomeBannersPage() {
             setCreating((v) => !v);
           }}
           disabled={!canManage}
-          title={canManage ? undefined : 'Requires the MANAGE_HOME_BANNERS permission'}
+          title={canManage ? undefined : tl("Requires the MANAGE_HOME_BANNERS permission", "يتطلب صلاحية إدارة بانرات الرئيسية")}
           className="rounded-lg bg-hatly-orange px-4 py-2 text-sm font-medium text-white disabled:opacity-50 shadow-sm hover:bg-hatly-orangeDark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-hatly-orange/40"
         >
-          {creating ? 'Cancel' : 'New banner'}
+          {creating ? tl("Cancel", "إلغاء") : tl("New banner", "بانر جديد")}
         </button>
       </div>
       <div className="mt-2 space-y-1 text-sm text-gray-600">
         <p data-testid="banners-rule">
-          Banners appear in the carousel at the top of the customer app&apos;s Home, lowest display order first (at most 10). A new banner is a draft: add an
-          image (JPEG, PNG or WebP, up to 5 MB, square 1080×1080 recommended; top 35% clear), then publish it. Only published banners inside their schedule whose destination
-          still exists are shown.
+          {tl("Banners appear in the carousel at the top of the customer app's Home, lowest display order first (at most 10). A new banner is a draft: add an image (JPEG, PNG or WebP, up to 5 MB, square 1080×1080 recommended; top 35% clear), then publish it. Only published banners inside their schedule whose destination still exists are shown.", "تظهر البانرات في الشريط أعلى الصفحة الرئيسية لتطبيق العملاء بالترتيب التصاعدي (10 كحد أقصى). يبدأ البانر الجديد كمسودة: أضف صورة JPEG أو PNG أو WebP بحد أقصى 5 ميجابايت، ويُفضّل 1080×1080 مع ترك 35% من الأعلى خاليًا، ثم انشره. لا تظهر إلا البانرات المنشورة ضمن فترة العرض والتي لا تزال وجهتها موجودة.")}
         </p>
       </div>
       <input ref={fileInput} data-testid="banner-file" type="file" accept={BANNER_IMAGE_TYPES.join(',')} onChange={onFileChosen} className="hidden" />
@@ -382,7 +382,7 @@ export default function HomeBannersPage() {
           sectors={sectors}
           branches={branches}
           isEdit={false}
-          submitLabel="Create draft"
+          submitLabel={tl("Create draft", "إنشاء مسودة")}
           onCancel={() => setCreating(false)}
           onSubmit={async (v) => {
             if (!v.ok) return;
@@ -398,14 +398,14 @@ export default function HomeBannersPage() {
           <div data-testid="banners-error" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {error}{' '}
             <button onClick={refresh} className="underline">
-              Retry
+              {tl("Retry", "إعادة المحاولة")}
             </button>
           </div>
         )}
-        {!error && banners === null && <p className="text-gray-500">Loading...</p>}
+        {!error && banners === null && <p className="text-gray-500">{tl("Loading...", "جارٍ التحميل...")}</p>}
         {!error && banners !== null && banners.length === 0 && (
           <p data-testid="banners-empty" className="text-gray-500">
-            No banners yet. Create one, add an image, then publish it.
+            {tl("No banners yet. Create one, add an image, then publish it.", "لا توجد بانرات بعد. أنشئ بانرًا وأضف صورة ثم انشره.")}
           </p>
         )}
         {banners !== null && banners.length > 0 && (
@@ -426,12 +426,12 @@ export default function HomeBannersPage() {
           <table data-testid="banners-table" className="mt-2 w-full divide-y rounded border bg-white text-sm">
             <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 tracking-wide">
               <tr>
-                <th className="px-3 py-2 text-start font-medium">Image</th>
-                <th className="px-3 py-2 text-start font-medium">Title</th>
-                <th className="px-3 py-2 text-start font-medium">Opens</th>
-                <th className="px-3 py-2 text-start font-medium">Schedule</th>
-                <th className="px-3 py-2 text-start font-medium">Order</th>
-                <th className="px-3 py-2 text-start font-medium">Status</th>
+                <th className="px-3 py-2 text-start font-medium">{tl("Image", "الصورة")}</th>
+                <th className="px-3 py-2 text-start font-medium">{tl("Title", "العنوان")}</th>
+                <th className="px-3 py-2 text-start font-medium">{tl("Opens", "يفتح")}</th>
+                <th className="px-3 py-2 text-start font-medium">{tl("Schedule", "الجدولة")}</th>
+                <th className="px-3 py-2 text-start font-medium">{tl("Order", "الترتيب")}</th>
+                <th className="px-3 py-2 text-start font-medium">{tl("Status", "الحالة")}</th>
                 <th className="px-3 py-2 text-start font-medium" />
               </tr>
             </thead>
@@ -445,7 +445,7 @@ export default function HomeBannersPage() {
                         sectors={sectors}
                         branches={branches}
                         isEdit
-                        submitLabel="Save changes"
+                        submitLabel={tl("Save changes", "حفظ التغييرات")}
                         onCancel={() => setEditingId(null)}
                         onSubmit={async (v) => {
                           if (!v.ok) return;
@@ -464,7 +464,7 @@ export default function HomeBannersPage() {
                         <img data-testid="banner-thumb" src={resolveMediaUrl(b.imageUrl ?? b.imageUrlAr ?? '')} alt={b.title} className="h-16 w-16 rounded border object-cover" />
                       ) : (
                         <div data-testid="banner-no-image" className="flex h-16 w-16 items-center justify-center rounded border border-dashed text-xs text-gray-400">
-                          No image
+                          {tl("No image", "لا توجد صورة")}
                         </div>
                       )}
                     </td>
@@ -478,13 +478,13 @@ export default function HomeBannersPage() {
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-600">{label(b)}</td>
                     <td className="px-3 py-2 text-xs text-gray-600">
-                      <div>From: {formatWhen(b.startsAt)}</div>
-                      <div>Until: {formatWhen(b.endsAt)}</div>
+                      <div>{tl('From:', 'من:')} {formatWhen(b.startsAt)}</div>
+                      <div>{tl('Until:', 'حتى:')} {formatWhen(b.endsAt)}</div>
                     </td>
                     <td className="px-3 py-2">{b.sortOrder}</td>
                     <td className="px-3 py-2">
                       <span data-testid="banner-status" className={`rounded px-2 py-0.5 text-xs ${STATUS_STYLE[b.displayStatus]}`}>
-                        {b.isActive && (!b.imageUrl && !b.imageUrlAr) ? 'Draft' : STATUS_LABEL[b.displayStatus]}
+                        {b.isActive && (!b.imageUrl && !b.imageUrlAr) ? tl("Draft", "مسودة") : tl(STATUS_LABEL[b.displayStatus], { DRAFT: 'مسودة', LIVE: 'منشور', SCHEDULED: 'مجدول', EXPIRED: 'منتهٍ' }[b.displayStatus])}
                       </span>
                     </td>
                     <td className="space-x-2 px-3 py-2 text-right whitespace-nowrap">
@@ -494,28 +494,28 @@ export default function HomeBannersPage() {
                       </button>
 
                        <button data-testid="banner-edit" disabled={!canManage || busyId === b.id} onClick={() => { setCreating(false); setEditingId(b.id); }} className="text-xs text-gray-600 underline disabled:opacity-40">
-                        Edit
+                        {tl("Edit", "تعديل")}
                       </button>
                       <button
                         data-testid="banner-toggle"
                         disabled={!canManage || busyId === b.id || (!b.isActive && (!b.imageUrl && !b.imageUrlAr))}
-                        title={!b.isActive && (!b.imageUrl && !b.imageUrlAr) ? 'Upload an image first' : undefined}
-                        onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), 'Failed to update the banner.')}
+                        title={!b.isActive && (!b.imageUrl && !b.imageUrlAr) ? tl("Upload an image first", "ارفع صورة أولًا") : undefined}
+                        onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), tl('Failed to update the banner.', 'تعذّر تحديث البانر.'))}
                         className="text-xs text-gray-600 underline disabled:opacity-40"
                       >
-                        {b.isActive ? 'Unpublish' : 'Publish'}
+                        {b.isActive ? tl("Unpublish", "إلغاء النشر") : tl("Publish", "نشر")}
                       </button>
                       <button
                         data-testid="banner-delete"
                         disabled={!canManage || busyId === b.id}
                         onClick={() => {
-                          if (window.confirm(`Delete the banner "${b.title}"? Customers stop seeing it immediately.`)) {
-                            run(b, () => deleteHomeBanner(b.id), 'Failed to delete the banner.');
+                          if (window.confirm(tl(`Delete the banner "${b.title}"? Customers stop seeing it immediately.`, `حذف البانر «${b.title}»؟ سيتوقف ظهوره للعملاء فورًا.`))) {
+                            run(b, () => deleteHomeBanner(b.id), tl('Failed to delete the banner.', 'تعذّر حذف البانر.'));
                           }
                         }}
                         className="text-xs text-red-600 underline disabled:opacity-40"
                       >
-                        Delete
+                        {tl("Delete", "حذف")}
                       </button>
                       {rowError?.id === b.id && (
                         <p data-testid="banner-row-error" className="mt-1 whitespace-normal text-right text-xs text-red-600">
@@ -536,7 +536,7 @@ export default function HomeBannersPage() {
             {shown.map((b) => (
               <li key={`card-${b.id}`} className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
                 {editingId === b.id ? (
-                  <div className="p-3"><BannerForm initial={toForm(b)} sectors={sectors} branches={branches} isEdit submitLabel="Save changes" onCancel={() => setEditingId(null)} onSubmit={async (v) => { if (!v.ok) return; await updateHomeBanner(b.id, v.body); setEditingId(null); await refresh(); }} /></div>
+                  <div className="p-3"><BannerForm initial={toForm(b)} sectors={sectors} branches={branches} isEdit submitLabel={tl("Save changes", "حفظ التغييرات")} onCancel={() => setEditingId(null)} onSubmit={async (v) => { if (!v.ok) return; await updateHomeBanner(b.id, v.body); setEditingId(null); await refresh(); }} /></div>
                 ) : (
                   <>
                     {(b.imageUrl || b.imageUrlAr) ? (
@@ -548,15 +548,15 @@ export default function HomeBannersPage() {
                     <div className="space-y-2 p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0"><p className="font-semibold">{b.title}</p>{b.titleAr && <p className="text-sm text-gray-500" dir="rtl">{b.titleAr}</p>}</div>
-                        <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${STATUS_STYLE[b.displayStatus]}`}>{b.isActive && (!b.imageUrl && !b.imageUrlAr) ? 'Draft' : STATUS_LABEL[b.displayStatus]}</span>
+                        <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${STATUS_STYLE[b.displayStatus]}`}>{b.isActive && (!b.imageUrl && !b.imageUrlAr) ? tl("Draft", "مسودة") : tl(STATUS_LABEL[b.displayStatus], { DRAFT: 'مسودة', LIVE: 'منشور', SCHEDULED: 'مجدول', EXPIRED: 'منتهٍ' }[b.displayStatus])}</span>
                       </div>
                       <p className="text-xs text-gray-600">{label(b)} · #{b.sortOrder}</p>
                       <p className="text-xs text-gray-500">{formatWhen(b.startsAt)} → {formatWhen(b.endsAt)}</p>
                       <div className="flex flex-wrap gap-2 pt-1">
                         <button disabled={!canManage || busyId === b.id} onClick={() => { setRowError(null); setAssetsId(b.id); }} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{tl('Assets', 'الأصول')}</button>
                         <button disabled={!canManage || busyId === b.id} onClick={() => { setCreating(false); setEditingId(b.id); }} className="min-h-[44px] rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-40">{tl('Edit', 'تعديل')}</button>
-                        <button disabled={!canManage || busyId === b.id || (!b.isActive && (!b.imageUrl && !b.imageUrlAr))} onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), 'Failed to update the banner.')} className="min-h-[44px] rounded-lg bg-hatly-orange px-3 text-sm font-medium text-white disabled:opacity-40">{b.isActive ? tl('Unpublish', 'إلغاء النشر') : tl('Publish', 'نشر')}</button>
-                        <button disabled={!canManage || busyId === b.id} onClick={() => { if (window.confirm(`Delete the banner "${b.title}"? Customers stop seeing it immediately.`)) run(b, () => deleteHomeBanner(b.id), 'Failed to delete the banner.'); }} className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-red-600 disabled:opacity-40">{tl('Delete', 'حذف')}</button>
+                        <button disabled={!canManage || busyId === b.id || (!b.isActive && (!b.imageUrl && !b.imageUrlAr))} onClick={() => run(b, () => setHomeBannerActive(b.id, !b.isActive), tl('Failed to update the banner.', 'تعذّر تحديث البانر.'))} className="min-h-[44px] rounded-lg bg-hatly-orange px-3 text-sm font-medium text-white disabled:opacity-40">{b.isActive ? tl('Unpublish', 'إلغاء النشر') : tl('Publish', 'نشر')}</button>
+                        <button disabled={!canManage || busyId === b.id} onClick={() => { if (window.confirm(tl(`Delete the banner "${b.title}"? Customers stop seeing it immediately.`, `حذف البانر «${b.title}»؟ سيتوقف ظهوره للعملاء فورًا.`))) run(b, () => deleteHomeBanner(b.id), tl('Failed to delete the banner.', 'تعذّر حذف البانر.')); }} className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-red-600 disabled:opacity-40">{tl('Delete', 'حذف')}</button>
                       </div>
                       {rowError?.id === b.id && <p className="text-xs text-red-600">{rowError.message}</p>}
                     </div>
