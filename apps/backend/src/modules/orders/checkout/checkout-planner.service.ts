@@ -1,6 +1,25 @@
+import { PromotionsService } from '../../promotions/promotions.service';
+import { PromotionDecision } from '../../promotions/promotion-engine';
+
+/** What the customer reads when a Hatly code does not apply (the app also translates the code). */
+const PROMO_MESSAGES: Record<string, string> = {
+  PROMO_NOT_FOUND: 'This code is not valid.',
+  PROMO_NOT_ACTIVE: 'This code is paused.',
+  PROMO_EXPIRED: 'This code has expired.',
+  PROMO_NOT_STARTED: 'This code is not active yet.',
+  PROMO_NOT_IN_SCOPE: 'This code does not apply to the stores in your cart.',
+  PROMO_MIN_SUBTOTAL: 'Your order is below the minimum for this code.',
+  PROMO_CUSTOMER_LIMIT: 'You have already used this code the maximum number of times.',
+  PROMO_USAGE_LIMIT: 'This code has reached its usage limit.',
+  PROMO_BUDGET_EXHAUSTED: 'This code has run out.',
+  PROMO_NEW_CUSTOMERS_ONLY: 'This code is for new customers only.',
+  PROMO_NOTHING_TO_DISCOUNT: 'There is nothing in this order this code can discount.',
+  PROMO_NOT_COMBINABLE: 'This code cannot be combined with the offers already on your order.',
+  PROMO_PRICE_PENDING: 'This code can be used once the order is priced.',
+};
 import { branchIdsUnderClosure, isWithinOpeningHours } from '../../../common/branch-availability';
 import { AddressMode } from '../../addresses/address-mode';
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Optional } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { EntityManager } from 'typeorm';
 import { Cart } from '../../cart/entities/cart.entity';
@@ -42,6 +61,7 @@ export class CheckoutPlannerService {
     private readonly offerConsumptionService: OfferConsumptionService,
     private readonly addressValidationService: AddressValidationService,
     private readonly walletService: WalletService,
+    @Optional() private readonly promotionsService?: PromotionsService,
   ) {}
 
   async plan(manager: EntityManager, cart: Cart, input: CheckoutInput): Promise<CheckoutPlan> {
@@ -387,7 +407,20 @@ export class CheckoutPlannerService {
     }
 
     let coupon: CouponOutcome = { status: 'NONE' };
-    const couponCode = input.couponCode?.trim();
+    let couponCode = input.couponCode?.trim();
+    // Hatly promotions (2026-11-27): a code that is a Hatly promotion is decided with the promotions below (after the store discounts);
+    // anything else is a store coupon, exactly as before. Code guessing is slowed down per customer.
+    let promotionCode: string | null = null;
+    if (couponCode && this.promotionsService) {
+      if (await this.promotionsService.tooManyFailedCodes(input.customerId)) {
+        coupon = { status: 'REJECTED', code: couponCode.toUpperCase(), reasonCode: 'PROMO_TOO_MANY_ATTEMPTS', message: 'Too many wrong codes. Try again in an hour.' };
+        if (isOrder) throw new BadRequestException({ message: coupon.message, details: { code: coupon.reasonCode, couponCode: coupon.code } });
+        couponCode = undefined;
+      } else if (await this.promotionsService.isPromotionCode(manager, couponCode)) {
+        promotionCode = couponCode;
+        couponCode = undefined;
+      }
+    }
     if (couponCode) {
       const result = await this.offerConsumptionService.planCouponForCart(manager, {
         code: couponCode,
@@ -423,6 +456,7 @@ export class CheckoutPlannerService {
           discountMinor: result.plan.discountAmountMinor,
         };
       }
+      if (coupon.status === 'REJECTED' && coupon.reasonCode === 'COUPON_NOT_FOUND') await this.promotionsService?.recordFailedCode(input.customerId);
       if (coupon.status === 'REJECTED' && isOrder) {
         throw new BadRequestException({ message: coupon.message, details: { code: coupon.reasonCode, couponCode: coupon.code } });
       }
@@ -442,8 +476,37 @@ export class CheckoutPlannerService {
         couponApplied: coupon.status === 'APPLIED' && coupon.groupIndex === i,
       };
     });
-    const discountMinor = segments.reduce((sum, s) => sum + s.discountMinor, 0);
-    const deliveryFeeMinor = delivery.feeMinor;
+    const storeDiscountMinor = segments.reduce((sum, s) => sum + s.discountMinor, 0);
+
+    // ---- 8b. Hatly promotions: automatic campaigns + an entered Hatly code (items and/or delivery fee) ----------------
+    let promotions: PromotionDecision | null = null;
+    if (this.promotionsService) {
+      promotions = await this.promotionsService.decideFor(manager, {
+        customerId: input.customerId,
+        groups: segments.map((s) => ({
+          vendorBranchId: s.group.vendorBranchId ?? null,
+          sectorId: s.branch?.marketplaceSectorId ?? null,
+          subtotalMinor: s.groupView.subtotalMinor == null ? null : Math.max(0, Number(s.groupView.subtotalMinor) - s.discountMinor),
+        })),
+        deliveryFeeMinor: delivery.feeMinor,
+        existingStoreDiscountMinor: storeDiscountMinor,
+        code: promotionCode,
+        lock: isOrder,
+      });
+      if (promotionCode) {
+        const outcome = promotions.code;
+        const codePromo = promotions.applied.find((a) => a.code?.toUpperCase() === promotionCode!.toUpperCase());
+        if (outcome?.status === 'APPLIED' && codePromo) {
+          coupon = { status: 'APPLIED', code: outcome.code, offerId: codePromo.promotionId, offerName: codePromo.name, discountMinor: codePromo.discountMinor };
+        } else {
+          const reason = outcome?.reason ?? 'PROMO_NOT_FOUND';
+          coupon = { status: 'REJECTED', code: promotionCode.toUpperCase(), reasonCode: reason, message: PROMO_MESSAGES[reason] ?? 'This code cannot be used on this order.' };
+          if (isOrder) throw new BadRequestException({ message: coupon.message, details: { code: coupon.reasonCode, couponCode: coupon.code, minSubtotalMinor: outcome?.minSubtotalMinor } });
+        }
+      }
+    }
+    const discountMinor = storeDiscountMinor + (promotions?.itemsDiscountMinor ?? 0);
+    const deliveryFeeMinor = delivery.feeMinor == null ? null : delivery.feeMinor - (promotions?.deliveryFeeDiscountMinor ?? 0);
     const totalMinor = deliveryFeeMinor !== null && !hasPendingAdHocPricing ? view.subtotalMinor + deliveryFeeMinor - discountMinor : null;
 
     // ---- 9. wallet + amount due -----------------------------------------------------------------------------------
@@ -496,6 +559,7 @@ export class CheckoutPlannerService {
       offerPlans,
       subtotalPlansByGroupIndex,
       coupon,
+      promotions,
       subtotalMinor: view.subtotalMinor,
       discountMinor,
       deliveryFeeMinor,

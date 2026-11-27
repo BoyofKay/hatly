@@ -120,6 +120,8 @@ export interface CheckoutPlan {
   offerPlans: Map<string, OfferItemPlan>;
   subtotalPlansByGroupIndex: Map<number, OfferSegmentPlan>;
   coupon: CouponOutcome;
+  /** Hatly promotions applied (2026-11-27); already included in discountMinor (items) and deliveryFeeMinor (fee, as charged). */
+  promotions?: import('../../promotions/promotion-engine').PromotionDecision | null;
   subtotalMinor: number;
   discountMinor: number;
   deliveryFeeMinor: number | null;

@@ -6,6 +6,24 @@ import '../../support/checkout_fixtures.dart';
 
 void main() {
   group('CheckoutQuote.fromJson', () {
+    test('Hatly promotions: list and delivery-fee discount (absent on an older server = none)', () {
+      final json = quoteJson(discount: 1000)
+        ..['promotions'] = [
+          {'name': 'Free delivery week', 'nameAr': 'أسبوع توصيل مجاني', 'code': null, 'target': 'DELIVERY_FEE', 'discountMinor': 1500},
+          {'name': 'Welcome', 'code': 'WELCOME', 'target': 'ITEMS', 'discountMinor': 1000},
+        ]
+        ..['deliveryFeeDiscountMinor'] = 1500;
+      final q = CheckoutQuote.fromJson(json);
+      expect(q.promotions, hasLength(2));
+      expect(q.promotions.first.isDeliveryFee, isTrue);
+      expect(q.promotions.first.displayName(true), 'أسبوع توصيل مجاني');
+      expect(q.promotions.last.code, 'WELCOME');
+      expect(q.deliveryFeeDiscountMinor, 1500);
+      final old = CheckoutQuote.fromJson(quoteJson());
+      expect(old.promotions, isEmpty);
+      expect(old.deliveryFeeDiscountMinor, 0);
+    });
+
     test('parses the full server quote field for field', () {
       final q = CheckoutQuote.fromJson(quoteJson(discount: 1000, wallet: 2000));
       expect(q.canPlaceOrder, isTrue);

@@ -125,7 +125,8 @@ class CheckoutAddressSection extends StatelessWidget {
                               ],
                             ),
                             for (final line in snapshot.detailLinesFor(
-                                Localizations.localeOf(context).languageCode == 'ar'))
+                                Localizations.localeOf(context).languageCode ==
+                                    'ar'))
                               Text(line, style: context.type.small),
                             if (snapshot.instructions?.isNotEmpty == true)
                               Text(snapshot.instructions!,

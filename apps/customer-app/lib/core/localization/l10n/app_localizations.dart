@@ -4711,6 +4711,7 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'اختر قريتك أو حيّك'**
   String get addressVillageRequired;
+
   /// No description provided for @homeDeliverTo.
   ///
   /// In ar, this message translates to:
@@ -4770,12 +4771,36 @@ abstract class AppLocalizations {
   /// In ar, this message translates to:
   /// **'منتجات'**
   String get searchFilterProducts;
-  /// Short label for the floating vendor-specific custom-request control.
+
+  /// No description provided for @vendorCustomBubbleLabel.
+  ///
+  /// In ar, this message translates to:
+  /// **'خدمة هاتلي'**
   String get vendorCustomBubbleLabel;
 
-  /// Existing Wasaly cart group cannot be used for a Hatly-only sector entry.
+  /// No description provided for @sectorHatlyExistingWasaly.
+  ///
+  /// In ar, this message translates to:
+  /// **'لديك طلب «وصّلي لمكان» موجود بالفعل في السلة. هذه الصفحة تتيح «هاتلي من مكان» فقط. راجع السلة أولاً؛ لن يتم تغيير طلبك الحالي.'**
   String get sectorHatlyExistingWasaly;
 
+  /// No description provided for @checkoutPromoNewCustomersOnly.
+  ///
+  /// In ar, this message translates to:
+  /// **'هذا الكود للعملاء الجدد فقط.'**
+  String get checkoutPromoNewCustomersOnly;
+
+  /// No description provided for @checkoutPromoTooManyAttempts.
+  ///
+  /// In ar, this message translates to:
+  /// **'أكواد خاطئة كثيرة. حاول مرة أخرى بعد ساعة.'**
+  String get checkoutPromoTooManyAttempts;
+
+  /// No description provided for @checkoutDeliveryFeeDiscounted.
+  ///
+  /// In ar, this message translates to:
+  /// **'رسوم التوصيل (بدلاً من {original})'**
+  String checkoutDeliveryFeeDiscounted(String original);
 }
 
 class _AppLocalizationsDelegate

@@ -1,3 +1,4 @@
+import { PromotionsService } from '../promotions/promotions.service';
 import { recomputeDriverAvailability } from '../delivery/driver-capacity';
 import { notificationTypeForStatus, recordOrderNotification } from '../notifications/customer-notification-events';
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
@@ -203,6 +204,7 @@ export class OrderStateMachineService {
     private readonly orderWalletRefundService: OrderWalletRefundService,
     // Staff inbox (Admin/Vendor notification centre). Optional so unit tests that build this service by hand keep working unchanged.
     @Optional() private readonly staffAlerts?: StaffAlertsService,
+    @Optional() private readonly promotionsService?: PromotionsService,
   ) {}
 
   /**
@@ -447,6 +449,8 @@ export class OrderStateMachineService {
       // PD-014: the discount/coupon entitlement of every still-unreversed segment discount goes back with the order (once — see
       // OfferConsumptionService.reverseSubtotalDiscountConsumptionForOrder).
       await this.offerConsumptionService.reverseSubtotalDiscountConsumptionForOrder(manager, order.id);
+      // Hatly promotions (2026-11-27): the uses go back with the order (code usable again, limits and budget restored).
+      await this.promotionsService?.reverseForOrder(manager, order.id);
 
       // A cancelled order no longer waits for a driver: its open dispatch alerts are resolved (they would otherwise keep the operations
       // banner lit and be retried for an order nobody will deliver).

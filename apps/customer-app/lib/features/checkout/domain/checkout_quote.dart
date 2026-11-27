@@ -168,15 +168,18 @@ class QuoteAddressSnapshot {
         // A GPS address has no written text (the server stores ''): show its coordinates instead of a blank line.
         line1: ((json['line1'] as String?)?.trim().isNotEmpty ?? false)
             ? json['line1'] as String
-            : (((json['formattedAddress'] as String?)?.trim().isNotEmpty ?? false)
+            : (((json['formattedAddress'] as String?)?.trim().isNotEmpty ??
+                    false)
                 ? (json['formattedAddress'] as String).trim()
                 : json['latitude'] is num && json['longitude'] is num
-                ? gpsAddressText((json['latitude'] as num).toDouble(), (json['longitude'] as num).toDouble())
-                : ''),
+                    ? gpsAddressText((json['latitude'] as num).toDouble(),
+                        (json['longitude'] as num).toDouble())
+                    : ''),
         latitude: (json['latitude'] as num?)?.toDouble(),
         longitude: (json['longitude'] as num?)?.toDouble(),
         deliveryZone: json['deliveryZone'] is Map<String, dynamic>
-            ? DeliveryZone.fromJson(json['deliveryZone'] as Map<String, dynamic>)
+            ? DeliveryZone.fromJson(
+                json['deliveryZone'] as Map<String, dynamic>)
             : null,
         instructions: json['instructions'] as String?,
         governorate: json['governorate'] as String?,
@@ -364,10 +367,12 @@ class QuoteDelivery {
         eta: QuoteEta.fromJson(json['eta'] as Map<String, dynamic>),
         pricingSource: json['pricingSource'] as String?,
         deliveryZone: json['deliveryZone'] is Map<String, dynamic>
-            ? DeliveryZone.fromJson(json['deliveryZone'] as Map<String, dynamic>)
+            ? DeliveryZone.fromJson(
+                json['deliveryZone'] as Map<String, dynamic>)
             : null,
         hatlyService: json['hatlyService'] is Map<String, dynamic>
-            ? QuoteHatlyServiceFee.fromJson(json['hatlyService'] as Map<String, dynamic>)
+            ? QuoteHatlyServiceFee.fromJson(
+                json['hatlyService'] as Map<String, dynamic>)
             : null,
         route: ResolvedRoute.tryParse(json['route']),
         service: json['service'] as String?,
@@ -377,7 +382,11 @@ class QuoteDelivery {
 /// The two server-computed parts of a Hatly / Wasally delivery fee: the ordinary delivery BASE fee (the selected area's fixed fee for a
 /// manual address, or the road-distance fee for a GPS address) and the multiplier applied once to it — shown, never recomputed by the app.
 class QuoteHatlyServiceFee {
-  const QuoteHatlyServiceFee({required this.baseFeeMinor, required this.multiplier, this.pricingSource, this.distanceMeters});
+  const QuoteHatlyServiceFee(
+      {required this.baseFeeMinor,
+      required this.multiplier,
+      this.pricingSource,
+      this.distanceMeters});
 
   /// The base fee BEFORE the multiplier.
   final int baseFeeMinor;
@@ -395,9 +404,12 @@ class QuoteHatlyServiceFee {
     return fixed.replaceFirst(RegExp(r'\.?0+$'), '');
   }
 
-  factory QuoteHatlyServiceFee.fromJson(Map<String, dynamic> json) => QuoteHatlyServiceFee(
+  factory QuoteHatlyServiceFee.fromJson(Map<String, dynamic> json) =>
+      QuoteHatlyServiceFee(
         // An older server sends only the zone fee: that was the base fee.
-        baseFeeMinor: ((json['baseFeeMinor'] ?? json['zoneDeliveryFeeMinor']) as num).toInt(),
+        baseFeeMinor:
+            ((json['baseFeeMinor'] ?? json['zoneDeliveryFeeMinor']) as num)
+                .toInt(),
         multiplier: (json['multiplier'] as num).toDouble(),
         pricingSource: json['pricingSource'] as String?,
         distanceMeters: (json['distanceMeters'] as num?)?.toInt(),
@@ -560,6 +572,8 @@ class CheckoutQuote {
     this.delivery,
     required this.vendors,
     required this.coupon,
+    this.promotions = const [],
+    this.deliveryFeeDiscountMinor = 0,
     this.payment,
     this.quoteToken,
     this.expiresAt,
@@ -578,6 +592,12 @@ class CheckoutQuote {
   final QuoteDelivery? delivery;
   final List<QuoteVendor> vendors;
   final QuoteCoupon coupon;
+
+  /// Hatly promotions applied (2026-11-27) — already inside summary.discountMinor (items) and summary.deliveryFeeMinor (fee as charged).
+  final List<QuotePromotion> promotions;
+
+  /// How much the delivery fee was lowered by promotions (summary.deliveryFeeMinor is already the lowered fee).
+  final int deliveryFeeDiscountMinor;
   final QuotePayment? payment;
 
   /// Freezes the delivery fee for the inputs this quote was made for; sent back when the order is placed.
@@ -617,6 +637,11 @@ class CheckoutQuote {
       vendors: (json['vendors'] as List? ?? [])
           .map((e) => QuoteVendor.fromJson(e as Map<String, dynamic>))
           .toList(),
+      promotions: ((json['promotions'] as List?) ?? const [])
+          .map((e) => QuotePromotion.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      deliveryFeeDiscountMinor:
+          (json['deliveryFeeDiscountMinor'] as num?)?.toInt() ?? 0,
       coupon: map('coupon') == null
           ? const QuoteCoupon(status: 'NONE')
           : QuoteCoupon.fromJson(map('coupon')!),
@@ -629,4 +654,32 @@ class CheckoutQuote {
           : null,
     );
   }
+}
+
+/// One Hatly promotion applied to the order (a code or an automatic campaign).
+class QuotePromotion {
+  const QuotePromotion(
+      {required this.name,
+      this.nameAr,
+      this.code,
+      required this.target,
+      required this.discountMinor});
+  final String name;
+  final String? nameAr;
+  final String? code;
+
+  /// ITEMS or DELIVERY_FEE.
+  final String target;
+  final int discountMinor;
+  bool get isDeliveryFee => target == 'DELIVERY_FEE';
+  String displayName(bool arabic) =>
+      arabic && nameAr != null && nameAr!.isNotEmpty ? nameAr! : name;
+
+  factory QuotePromotion.fromJson(Map<String, dynamic> j) => QuotePromotion(
+        name: j['name'] as String? ?? '',
+        nameAr: j['nameAr'] as String?,
+        code: j['code'] as String?,
+        target: j['target'] as String? ?? 'ITEMS',
+        discountMinor: (j['discountMinor'] as num?)?.toInt() ?? 0,
+      );
 }

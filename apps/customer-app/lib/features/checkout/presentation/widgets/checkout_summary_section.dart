@@ -163,10 +163,26 @@ class CheckoutTotals extends StatelessWidget {
                 color: p.success),
           if (!isPickup)
             summary.deliveryFeeMinor != null
-                ? row(l10n.deliveryFee,
-                    formatMinorUnits(summary.deliveryFeeMinor!, context))
+                ? row(
+                    quote.deliveryFeeDiscountMinor > 0
+                        ? l10n.checkoutDeliveryFeeDiscounted(formatMinorUnits(
+                            summary.deliveryFeeMinor! +
+                                quote.deliveryFeeDiscountMinor,
+                            context))
+                        : l10n.deliveryFee,
+                    formatMinorUnits(summary.deliveryFeeMinor!, context),
+                    valueKey: const Key('checkout-summary-delivery-fee'))
                 : row(l10n.deliveryFee, l10n.checkoutDeliveryFeePending,
                     ltr: false),
+          for (final promo in quote.promotions)
+            Padding(
+              key: Key('checkout-promo-${promo.code ?? promo.name}'),
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                '🎉 ${promo.displayName(Localizations.localeOf(context).languageCode == 'ar')} · -${formatMinorUnits(promo.discountMinor, context)}${promo.isDeliveryFee ? ' (${l10n.deliveryFee})' : ''}',
+                style: TextStyle(color: p.success, fontSize: 12),
+              ),
+            ),
           if (summary.walletAppliedMinor > 0)
             row(l10n.checkoutWalletApplied,
                 '-${formatMinorUnits(summary.walletAppliedMinor, context)}',

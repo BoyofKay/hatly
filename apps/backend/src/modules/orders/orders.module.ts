@@ -63,6 +63,7 @@ import { VendorsModule } from '../vendors/vendors.module';
 import { DeliveryModule } from '../delivery/delivery.module';
 import { FinanceModule } from '../finance/finance.module';
 import { OffersModule } from '../offers/offers.module';
+import { PromotionsModule } from '../promotions/promotions.module';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { PaymentsModule } from '../payments/payments.module';
 import { DiscoveryModule } from '../discovery/discovery.module';
@@ -107,6 +108,7 @@ import { AdminOrdersService } from './admin-orders.service';
     // forwardRef is needed here, unlike DeliveryModule above.
     FinanceModule,
     OffersModule,
+    PromotionsModule,
     LoyaltyModule,
     PaymentsModule,
     DiscoveryModule,

@@ -66,9 +66,12 @@ class _TransferInstructionsScreenState
       var orderNumber = widget.orderNumber;
       if (orderNumber == null) {
         try {
-          orderNumber = (await ref.read(orderDetailsProvider(widget.orderId).future)).orderNumber;
+          orderNumber =
+              (await ref.read(orderDetailsProvider(widget.orderId).future))
+                  .orderNumber;
         } catch (_) {
-          orderNumber = widget.orderId; // offline: still identifies the order for staff
+          orderNumber =
+              widget.orderId; // offline: still identifies the order for staff
         }
       }
       if (!mounted) return;

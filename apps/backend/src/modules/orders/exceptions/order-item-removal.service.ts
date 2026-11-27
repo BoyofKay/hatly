@@ -125,8 +125,11 @@ export class OrderItemRemovalService {
         .filter((s) => s.status !== OrderVendorSegmentStatus.CANCELLED)
         .reduce((sum, s) => sum + n(s.offerDiscountAmountMinor), 0) + stillLive.reduce((sum, i) => sum + n(i.offerDiscountAmountMinor), 0);
     const deliveryFeeMinor = order.deliveryFeeMinor == null ? 0 : Number(order.deliveryFeeMinor);
-    order.discountMinor = discountMinor;
-    order.totalMinor = order.totalMinor == null ? null : Number(order.subtotalMinor) + deliveryFeeMinor - discountMinor;
+    // Hatly promotions (2026-11-27): the item promotion stays, capped at what is left of the items.
+    const promotionMinor = Math.min(Number(order.promotionDiscountMinor ?? 0), Math.max(0, Number(order.subtotalMinor) - discountMinor));
+    order.promotionDiscountMinor = promotionMinor;
+    order.discountMinor = discountMinor + promotionMinor;
+    order.totalMinor = order.totalMinor == null ? null : Number(order.subtotalMinor) + deliveryFeeMinor - order.discountMinor;
 
     let walletRefundedMinor = 0;
     let transferRefundedMinor = 0;

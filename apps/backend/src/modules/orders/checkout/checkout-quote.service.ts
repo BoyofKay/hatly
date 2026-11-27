@@ -272,6 +272,9 @@ export class CheckoutQuoteService {
                 reasonCode: plan.coupon.reasonCode ?? null,
                 message: plan.coupon.message ?? null,
               },
+        // Hatly promotions (2026-11-27): already inside discountMinor (items) and deliveryFeeMinor (fee, as charged) — listed by name.
+        promotions: (plan.promotions?.applied ?? []).map((p) => ({ name: p.name, nameAr: p.nameAr, code: p.code, target: p.target, discountMinor: p.discountMinor })),
+        deliveryFeeDiscountMinor: plan.promotions?.deliveryFeeDiscountMinor ?? 0,
         payment: {
           selected: { method: plan.payment.method, electronicMethod: plan.payment.electronicMethod },
           awaitsPaymentApproval: plan.payment.awaitsPaymentApproval,

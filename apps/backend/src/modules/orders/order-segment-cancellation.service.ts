@@ -71,13 +71,21 @@ export class OrderSegmentCancellationService {
         order.deliveryFeeBreakdownSnapshot,
         activeCatalog.length,
       );
+      // Hatly promotions (2026-11-27): the recalculated fee is before promotions — the fee discount stays (never below 0).
+      if (deliveryFeeMinor !== null && Number(order.deliveryFeeDiscountMinor ?? 0) > 0) {
+        order.deliveryFeeDiscountMinor = Math.min(Number(order.deliveryFeeDiscountMinor), deliveryFeeMinor);
+        deliveryFeeMinor -= order.deliveryFeeDiscountMinor;
+      }
     }
+    // The Hatly item promotion stays, but never more than what is left of the items.
+    const promotionMinor = Math.min(Number(order.promotionDiscountMinor ?? 0), Math.max(0, subtotalMinor - discountMinor));
+    order.promotionDiscountMinor = promotionMinor;
 
     // `totalMinor` stays null exactly where it was null (unknown price) — never a fabricated partial total.
-    const totalMinor = order.totalMinor == null ? null : subtotalMinor + (deliveryFeeMinor ?? 0) - discountMinor;
+    const totalMinor = order.totalMinor == null ? null : subtotalMinor + (deliveryFeeMinor ?? 0) - discountMinor - promotionMinor;
 
     order.subtotalMinor = subtotalMinor;
-    order.discountMinor = discountMinor;
+    order.discountMinor = discountMinor + promotionMinor;
     order.deliveryFeeMinor = deliveryFeeMinor;
     order.totalMinor = totalMinor;
 

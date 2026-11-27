@@ -2628,6 +2628,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get addressVillageRequired => 'اختر قريتك أو حيّك';
+
   @override
   String get homeDeliverTo => 'التوصيل إلى';
 
@@ -2657,10 +2658,23 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get searchFilterProducts => 'منتجات';
+
   @override
   String get vendorCustomBubbleLabel => 'خدمة هاتلي';
 
   @override
-  String get sectorHatlyExistingWasaly => 'لديك طلب «وصّلي لمكان» موجود بالفعل في السلة. هذه الصفحة تتيح «هاتلي من مكان» فقط. راجع السلة أولاً؛ لن يتم تغيير طلبك الحالي.';
+  String get sectorHatlyExistingWasaly =>
+      'لديك طلب «وصّلي لمكان» موجود بالفعل في السلة. هذه الصفحة تتيح «هاتلي من مكان» فقط. راجع السلة أولاً؛ لن يتم تغيير طلبك الحالي.';
 
+  @override
+  String get checkoutPromoNewCustomersOnly => 'هذا الكود للعملاء الجدد فقط.';
+
+  @override
+  String get checkoutPromoTooManyAttempts =>
+      'أكواد خاطئة كثيرة. حاول مرة أخرى بعد ساعة.';
+
+  @override
+  String checkoutDeliveryFeeDiscounted(String original) {
+    return 'رسوم التوصيل (بدلاً من $original)';
+  }
 }

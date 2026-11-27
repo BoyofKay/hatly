@@ -113,6 +113,8 @@ export const NAV: NavGroup[] = [
     id: 'offers', en: 'Offers', ar: 'العروض', icon: 'tag',
     items: [
       { href: '/offers', en: 'Offers', ar: 'العروض', perms: ['MANAGE_OFFERS'] },
+      // Owner decision 2026-11-27: Hatly-wide / per-store promo codes and delivery-fee campaigns.
+      { href: '/promotions', en: 'Promotions', ar: 'العروض الترويجية', perms: ['MANAGE_OFFERS'] },
       { href: '/banners', en: 'Banners', ar: 'البنرات', perms: ['MANAGE_HOME_BANNERS'] },
       { href: '/campaigns', en: 'Campaigns', ar: 'الحملات', perms: P.marketing },
       { href: '/broadcasts', en: 'Broadcasts', ar: 'الرسائل الجماعية', perms: P.marketing },

@@ -41,6 +41,30 @@ class _CheckoutCouponSectionState extends State<CheckoutCouponSection> {
 
   String _rejectionMessage(AppLocalizations l10n, QuoteCoupon rejection) {
     switch (rejection.reasonCode) {
+      // Hatly promotions (2026-11-27) answer with PROMO_* codes; same messages where the meaning is the same.
+      case 'PROMO_NEW_CUSTOMERS_ONLY':
+        return l10n.checkoutPromoNewCustomersOnly;
+      case 'PROMO_TOO_MANY_ATTEMPTS':
+        return l10n.checkoutPromoTooManyAttempts;
+      case 'PROMO_NOT_FOUND':
+      case 'PROMO_NOT_ACTIVE':
+        return l10n.checkoutCouponNotFound;
+      case 'PROMO_EXPIRED':
+        return l10n.checkoutCouponExpired;
+      case 'PROMO_NOT_STARTED':
+        return l10n.checkoutCouponNotStarted;
+      case 'PROMO_MIN_SUBTOTAL':
+        return l10n.checkoutCouponMinimumNotMet;
+      case 'PROMO_NOT_IN_SCOPE':
+      case 'PROMO_NOTHING_TO_DISCOUNT':
+      case 'PROMO_PRICE_PENDING':
+        return l10n.checkoutCouponNotApplicable;
+      case 'PROMO_NOT_COMBINABLE':
+        return l10n.checkoutCouponConflictsWithOffer;
+      case 'PROMO_CUSTOMER_LIMIT':
+      case 'PROMO_USAGE_LIMIT':
+      case 'PROMO_BUDGET_EXHAUSTED':
+        return l10n.checkoutCouponLimitReached;
       case 'COUPON_NOT_FOUND':
       case 'COUPON_INACTIVE':
         return l10n.checkoutCouponNotFound;

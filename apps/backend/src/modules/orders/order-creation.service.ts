@@ -1,3 +1,4 @@
+import { PromotionsService } from '../promotions/promotions.service';
 import { notifyVendorsOfNewOrder } from './vendor-new-order-alerts';
 import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { OpsAlertsService } from '../notifications/ops-alerts.service';
@@ -67,6 +68,7 @@ export class OrderCreationService {
     @Optional() private readonly staffAlerts?: StaffAlertsService,
     // Operations alerts (P0 2026-11-08): Operations are told of every new order in the same transaction. Optional for hand-built unit tests.
     @Optional() private readonly opsAlerts?: OpsAlertsService,
+    @Optional() private readonly promotionsService?: PromotionsService,
   ) {}
 
   /**
@@ -308,6 +310,10 @@ export class OrderCreationService {
         subtotalMinor: view.subtotalMinor,
         deliveryFeeMinor: plan.deliveryFeeMinor,
         discountMinor: plan.discountMinor,
+        promotionDiscountMinor: plan.promotions?.itemsDiscountMinor ?? 0,
+        deliveryFeeDiscountMinor: plan.promotions?.deliveryFeeDiscountMinor ?? 0,
+        deliveryFeeDiscountBearer: plan.promotions?.deliveryFeeBearer ?? null,
+        promotionSnapshot: plan.promotions && plan.promotions.applied.length > 0 ? { applied: plan.promotions.applied } : null,
         totalMinor: plan.totalMinor,
         hasPendingAdHocPricing: plan.hasPendingAdHocPricing,
         deliveryFeeBreakdownSnapshot: plan.delivery.breakdown,
@@ -461,7 +467,10 @@ export class OrderCreationService {
         .filter((x): x is { plan: OfferSegmentPlan; orderVendorSegmentId: string } => x !== null),
     });
 
-    if (plan.coupon.status === 'APPLIED') {
+    // Hatly promotions (2026-11-27): the uses are recorded in THIS transaction (the promotion rows were locked while planning).
+    if (plan.promotions && plan.promotions.applied.length > 0) await this.promotionsService?.redeem(manager, order.id, customerId, plan.promotions);
+
+    if (plan.coupon.status === 'APPLIED' && plan.coupon.vendorBranchId) {
       order.couponSnapshot = {
         code: plan.coupon.code!,
         offerId: plan.coupon.offerId!,

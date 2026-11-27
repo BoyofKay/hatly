@@ -143,7 +143,11 @@ export class OrderFinancialEventsService {
 
     // R28/R31/R40 (U1): the driver's % applies only to the driver's delivery compensation; a Hatly Service multiplier premium is
     // Hatly's own service revenue — recorded as its own entry (never merged with the driver's), whatever the driver's rate.
-    const split = splitDriverCompensation(Number(order.deliveryFeeMinor), order.deliveryFeeBreakdownSnapshot);
+    // Hatly promotions (2026-11-27): delivery_fee_minor is what the customer paid. When HATLY pays a fee discount the driver still earns
+    // on the full fee; when the DRIVER bears it he earns on the reduced fee. (The cash he collected is already the reduced amount, so
+    // the closing makes Hatly pay him the difference in the HATLY case — no other change.)
+    const feeBasis = Number(order.deliveryFeeMinor) + (order.deliveryFeeDiscountBearer === 'HATLY' ? Number(order.deliveryFeeDiscountMinor ?? 0) : 0);
+    const split = splitDriverCompensation(feeBasis, order.deliveryFeeBreakdownSnapshot);
 
     const delivery = await this.deliveriesRepository.findOne({ where: { orderId: order.id } });
     if (split.hatlyServiceRevenueMinor > 0) {

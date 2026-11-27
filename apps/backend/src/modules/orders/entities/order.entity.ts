@@ -186,6 +186,21 @@ export class Order extends BaseEntity {
   amountDueMinor?: number | null;
 
   /** Frozen coupon applied at creation ({ code, offerId, offerName, vendorBranchId, segmentId, discountMinor }); null when none. */
+  /** Hatly promotions (2026-11-27): the item-promotion part of discount_minor (Hatly-funded). */
+  @Column({ name: 'promotion_discount_minor', type: 'bigint', default: 0, transformer: { to: (v: number) => v, from: (v: string | null) => (v == null ? 0 : Number(v)) } })
+  promotionDiscountMinor: number;
+
+  /** Delivery-fee promotion already taken off delivery_fee_minor (which is what the customer pays). */
+  @Column({ name: 'delivery_fee_discount_minor', type: 'bigint', default: 0, transformer: { to: (v: number) => v, from: (v: string | null) => (v == null ? 0 : Number(v)) } })
+  deliveryFeeDiscountMinor: number;
+
+  /** Who pays that fee discount: HATLY (the driver still earns on the full fee) or DRIVER (he earns on the reduced fee). */
+  @Column({ name: 'delivery_fee_discount_bearer', type: 'varchar', length: 8, nullable: true })
+  deliveryFeeDiscountBearer: 'HATLY' | 'DRIVER' | null;
+
+  @Column({ name: 'promotion_snapshot', type: 'jsonb', nullable: true })
+  promotionSnapshot: Record<string, unknown> | null;
+
   @Column({ name: 'coupon_snapshot', type: 'jsonb', nullable: true })
   couponSnapshot?: {
     code: string;

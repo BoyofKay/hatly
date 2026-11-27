@@ -1307,5 +1307,15 @@
   "searchFilterVendors": "Stores only",
   "searchFilterProducts": "Products only",
   "vendorCustomBubbleLabel": "Hatly Service",
-  "sectorHatlyExistingWasaly": "You already have a Wasaly (Deliver to a place) request in your cart. This sector offers Hatly (Buy from a place) only. Review your cart first; your existing request will not be changed."
+  "sectorHatlyExistingWasaly": "You already have a Wasaly (Deliver to a place) request in your cart. This sector offers Hatly (Buy from a place) only. Review your cart first; your existing request will not be changed.",
+  "checkoutPromoNewCustomersOnly": "This code is for new customers only.",
+  "checkoutPromoTooManyAttempts": "Too many wrong codes. Try again in an hour.",
+  "checkoutDeliveryFeeDiscounted": "Delivery fee (was {original})",
+  "@checkoutDeliveryFeeDiscounted": {
+    "placeholders": {
+      "original": {
+        "type": "String"
+      }
+    }
+  }
 }

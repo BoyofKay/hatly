@@ -39,6 +39,7 @@ import { LocationModule } from './modules/location/location.module';
 import { RatingsModule } from './modules/ratings/ratings.module';
 import { FavoritesModule } from './modules/favorites/favorites.module';
 import { OffersModule } from './modules/offers/offers.module';
+import { PromotionsModule } from './modules/promotions/promotions.module';
 import { SectorsModule } from './modules/sectors/sectors.module';
 import { AddressesModule } from './modules/addresses/addresses.module';
 import { ServiceAreasModule } from './modules/service-areas/service-areas.module';
@@ -237,6 +238,7 @@ import { ProductRating } from './modules/ratings/entities/product-rating.entity'
     RatingsModule,
     FavoritesModule,
     OffersModule,
+    PromotionsModule,
     SectorsModule,
     AddressesModule,
     ServiceAreasModule,
