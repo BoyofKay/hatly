@@ -11,6 +11,7 @@ import { usePermissions } from '../../../lib/ui/permissions';
 import Link from 'next/link';
 import { DeleteRecordButton } from '../../../components/admin/DeleteRecordButton';
 import { ProductImages } from '../../../components/admin/ProductImages';
+import { BulkItemPhotos } from '../../../components/admin/BulkItemPhotos';
 import { MenuImportPanel } from '../../../components/admin/MenuImportPanel';
 import { MediaPicker } from '../../../components/media/MediaPicker';
 import { ExportButton } from '../../../components/reports/ExportButton';
@@ -48,6 +49,8 @@ export default function ProductsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imgProduct, setImgProduct] = useState<any>(null);
+  const [photosOpen, setPhotosOpen] = useState(false);
+  const [photosBranch, setPhotosBranch] = useState('');
   const canEdit = can('MANAGE_CATALOG');
   const toggle = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length < 50 ? [...s, id] : s));
   const bodyFor = (dry: boolean) => ({ ids: sel, action: bulk!.action, params: bulk!.action === 'PRICE_PERCENT' ? { percent: Number(pct) } : bulk!.action === 'SET_STOCK' ? { quantity: Number(qty) } : undefined, confirmCount: sel.length, dryRun: dry });
@@ -56,7 +59,7 @@ export default function ProductsPage() {
 
   return (
     <div>
-      <PageHeader title={t('Products', 'المنتجات')} subtitle={t('All products across vendors. Select up to 50 for a bulk action with a before/after preview. Images are managed through the media library.', 'كل المنتجات عبر الموردين. حدد حتى 50 لإجراء جماعي مع معاينة قبل/بعد. تُدار الصور عبر مكتبة الوسائط.')} actions={<span className="flex flex-wrap gap-2">{can('MANAGE_CATALOG') && <Button variant="primary" onClick={() => { setExcelBranch(branch); setExcelOpen(true); }}>{t('Excel: update / add products', 'إكسل: تعديل / إضافة منتجات')}</Button>}{can('CATALOG_EXPORT') && <ExportButton report="S07" params={{ vendorBranchId: branch || undefined, state: state || undefined }} />}</span>} />
+      <PageHeader title={t('Products', 'المنتجات')} subtitle={t('All products across vendors. Select up to 50 for a bulk action with a before/after preview. Images are managed through the media library.', 'كل المنتجات عبر الموردين. حدد حتى 50 لإجراء جماعي مع معاينة قبل/بعد. تُدار الصور عبر مكتبة الوسائط.')} actions={<span className="flex flex-wrap gap-2">{can('MANAGE_CATALOG') && <Button onClick={() => { setPhotosBranch(branch); setPhotosOpen(true); }} data-testid="open-bulk-photos">{t('Add many photos', 'إضافة صور كثيرة')}</Button>}{can('MANAGE_CATALOG') && <Button variant="primary" onClick={() => { setExcelBranch(branch); setExcelOpen(true); }}>{t('Excel: update / add products', 'إكسل: تعديل / إضافة منتجات')}</Button>}{can('CATALOG_EXPORT') && <ExportButton report="S07" params={{ vendorBranchId: branch || undefined, state: state || undefined }} />}</span>} />
       <Modal open={excelOpen} title={t('Products by Excel', 'المنتجات عبر الإكسل')} onClose={() => setExcelOpen(false)}>
         <div className="space-y-3">
           <p className="text-sm text-gray-600">{t('Choose the branch, download its sheet (it already lists every product with its current price, names, stock and availability), change what you need, then upload it. Rows with a productId update that product; rows without one add a new product.', 'اختر الفرع ونزّل ملفه (فيه كل المنتجات بأسعارها وأسمائها ومخزونها وحالتها الحالية)، عدّل ما تريد ثم ارفعه. الصف الذي به productId يعدّل المنتج، والصف بدونه يضيف منتجًا جديدًا.')}</p>
@@ -115,6 +118,12 @@ export default function ProductsPage() {
         {error && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
       </Modal>
 
+      <Modal open={photosOpen} wide title={t('Add many photos to a branch’s items', 'إضافة صور كثيرة لمنتجات فرع')} onClose={() => { setPhotosOpen(false); list.reload(); }}>
+        <div className="space-y-3">
+          <LabeledSelect label={t('Branch', 'الفرع')} value={photosBranch} onChange={(e) => setPhotosBranch(e.target.value)}><option value="">{t('Choose a branch…', 'اختر فرعًا…')}</option>{(branches.data ?? []).map((b: any) => <option key={b.id} value={b.id}>{b.vendorName} — {b.name}</option>)}</LabeledSelect>
+          {photosBranch && <BulkItemPhotos key={photosBranch} branchId={photosBranch} />}
+        </div>
+      </Modal>
       <Modal open={Boolean(imgProduct)} wide title={imgProduct ? t(`Images — ${imgProduct.name}`, `الصور — ${imgProduct.name}`) : ''} onClose={() => setImgProduct(null)}>
         <ProductImages productId={imgProduct?.id} onChanged={() => list.reload()} />
       </Modal>

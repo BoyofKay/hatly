@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { groupByOrder } from '../../lib/notifications/group-by-order';
 import { useChangeFeed } from '../../lib/changes/use-change-feed';
 import type { ChangesPage } from '../../lib/changes/change-feed';
 import { ACTION, CATEGORY, noteText } from '../../lib/notifications/wording';
@@ -145,26 +146,35 @@ export function StaffAlertsBell({ t, locale, hrefFor, navigate, changes, centerH
             <ul className="max-h-[26rem] divide-y divide-gray-100 overflow-y-auto">
               {items === null && !failed && <li className="px-3 py-4 text-sm text-gray-500">{t('Loading…', 'جارٍ التحميل…')}</li>}
               {items?.length === 0 && <li className="px-3 py-4 text-sm text-gray-500">{t('No alerts.', 'لا توجد تنبيهات.')}</li>}
-              {items?.map((a) => {
+              {items && groupByOrder(items).map((g) => {
+                // Owner request 2026-11-27: one entry per order — the newest update leads, the earlier ones are listed under it.
+                const a = g.latest;
                 const href = hrefFor(a);
                 const body = (
                   <>
                     <span className="flex items-center gap-2">
-                      {!a.isRead && <span className="h-2 w-2 shrink-0 rounded-full bg-hatly-orange" aria-label={t('unread', 'غير مقروء')} />}
+                      {g.unread > 0 && <span className="h-2 w-2 shrink-0 rounded-full bg-hatly-orange" aria-label={t('unread', 'غير مقروء')} />}
                       <span className="text-sm font-medium text-gray-900">{L(CATEGORY, a.category)}</span>
                       {a.severity === 'CRITICAL' && <span className="rounded-full bg-red-50 px-1.5 text-[10px] font-medium text-red-800 ring-1 ring-inset ring-red-200">{t('Critical', 'حرِج')}</span>}
                     </span>
                     <span className="mt-0.5 block text-xs text-gray-600">{a.orderNumber && <bdi>{a.orderNumber}</bdi>}{a.requiredAction && <> · {L(ACTION, a.requiredAction)}</>}</span>
                     {a.note && <span className="mt-0.5 block text-xs text-gray-700"><bdi>{noteText(a, locale)}</bdi></span>}
                     <span className="mt-0.5 block text-[11px] text-gray-400">{new Date(a.createdAt).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-GB')}</span>
+                    {g.items.length > 1 && (
+                      <span className="mt-1 block text-[11px] text-gray-500" data-testid="alert-group-earlier">
+                        <span className="font-medium text-gray-700">{t(`${g.items.length} updates`, `${g.items.length} تحديثات`)}{g.unread > 0 ? t(` · ${g.unread} unread`, ` · ${g.unread} غير مقروء`) : ''}</span>
+                        {g.items.slice(1, 4).map((x) => <span key={x.id} className="block">• {L(CATEGORY, x.category)}</span>)}
+                      </span>
+                    )}
                   </>
                 );
+                const readGroup = async () => { await Promise.all(g.items.filter((x) => !x.isRead).map((x) => read(x))); };
                 return (
-                  <li key={a.id} className={a.isRead ? '' : 'bg-orange-50/40'}>
+                  <li key={g.key} className={g.unread === 0 ? '' : 'bg-orange-50/40'} data-testid={`alert-group-${g.key}`}>
                     {href ? (
-                      <a href={href} onClick={(e) => void open_(e, a, href)} className="block px-3 py-2 hover:bg-gray-50">{body}</a>
+                      <a href={href} onClick={(e) => { void Promise.all(g.items.filter((x) => !x.isRead && x.id !== a.id).map((x) => read(x))); void open_(e, a, href); }} className="block px-3 py-2 hover:bg-gray-50">{body}</a>
                     ) : (
-                      <button type="button" onClick={() => void read(a)} className="block w-full px-3 py-2 text-start hover:bg-gray-50">{body}</button>
+                      <button type="button" onClick={() => void readGroup()} className="block w-full px-3 py-2 text-start hover:bg-gray-50">{body}</button>
                     )}
                   </li>
                 );

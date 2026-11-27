@@ -1,6 +1,8 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { listStaffAlerts } from '../../lib/api/staff-notifications';
+import { unreadByOrder } from '../../lib/notifications/group-by-order';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useApi } from '../../lib/ui/api';
 import { useLang } from '../../lib/ui/lang';
@@ -111,6 +113,15 @@ function Board() {
   const canStore = can('MANAGE_ORDER_FULFILMENT');
   const canAssign = can('ASSIGN_REASSIGN_ORDERS');
   const board = useApi<any>('/admin/operations/board', undefined, { refreshInterval: 10_000 });
+  // Owner request 2026-11-27: each order row also shows its own unread notifications, so one place holds the order's updates and actions.
+  const [orderAlerts, setOrderAlerts] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    let stop = false;
+    const load = () => listStaffAlerts(100).then((r) => !stop && setOrderAlerts(unreadByOrder(r.items))).catch(() => undefined);
+    void load();
+    const id = setInterval(load, 30_000);
+    return () => { stop = true; clearInterval(id); };
+  }, []);
   const drivers = useApi<DispatchDriver[]>(canAssign ? '/admin/control-tower/drivers' : null, undefined, { refreshInterval: 20_000 });
   const [filter, setFilter] = useState<'urgent' | 'all' | Reason>('urgent');
   const [q, setQ] = useState('');
@@ -249,6 +260,10 @@ function Board() {
                     <Link href={`/order-management?order=${o.id}`} className="font-mono text-base font-bold text-gray-900 hover:underline"><bdi>{o.orderNumber}</bdi></Link>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${r.tone}`} data-testid="board-reason">{t(r.en, r.ar)}</span>
                     <span className="text-xs text-gray-500">{age(o.createdAt, now, ar)}</span>
+                    {(orderAlerts.get(o.id) ?? 0) > 0 && (
+                      <Link href={`/order-management?order=${o.id}`} className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-800 ring-1 ring-inset ring-red-200" data-testid="board-order-alerts"
+                        title={t('Unread notifications for this order', 'إشعارات غير مقروءة لهذا الطلب')}>🔔 {orderAlerts.get(o.id)}</Link>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-gray-600">
                     {o.fulfillmentType === 'PICKUP' ? t('Customer pickup', 'استلام من العميل') : <bdi>{o.area ?? t('Delivery', 'توصيل')}</bdi>}

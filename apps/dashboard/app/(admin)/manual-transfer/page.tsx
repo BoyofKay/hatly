@@ -64,9 +64,17 @@ export default function ManualTransferPage() {
   // Opened for one order (?order=HT-…, e.g. "Verify the transfer" on the operations board): that transfer is highlighted and scrolled
   // to, and the refund box below is pre-filled with the same order number.
   const [focusOrder, setFocusOrder] = useState<string | null>(null);
+  // Bug fix 2026-11-27: opening an order used to pre-fill the REFUND box, so an order whose transfer is not waiting for review (customer
+  // has not confirmed sending yet, or it is already approved) looked like a refund screen. Now the order's own transfer status is shown
+  // at the top, and the refund box is only pre-filled when that transfer is really paid.
+  const [focusInfo, setFocusInfo] = useState<TransferByOrder | 'none' | null>(null);
   useEffect(() => {
     const o = new URLSearchParams(window.location.search).get('order');
-    if (o) { setFocusOrder(o); setRefundOrder(o); }
+    if (!o) return;
+    setFocusOrder(o);
+    findTransferByOrderNumber(o)
+      .then((r) => { setFocusInfo(r); if (r.status === 'PAID') setRefundOrder(o); })
+      .catch(() => setFocusInfo('none'));
   }, []);
   useEffect(() => {
     if (!focusOrder || !payments) return;
@@ -144,6 +152,24 @@ export default function ManualTransferPage() {
         subtitle={t('Customers who paid by transfer claim they sent the money. Approve once Hatly has really received it; the order is released on approval.', 'عملاء دفعوا بالتحويل ويقولون إنهم أرسلوا المبلغ. وافق بعد التأكد من وصول المبلغ فعلًا؛ يُفرج عن الطلب عند الموافقة.')}
         actions={<Button onClick={refresh} loading={loading}>{t('Refresh', 'تحديث')}</Button>}
       />
+
+      {focusOrder && focusInfo && !(payments ?? []).some((p) => p.orderNumber === focusOrder) && (
+        <div role="status" className="mb-4 rounded-xl border border-hatly-orange/40 bg-orange-50 p-4 text-sm text-gray-800" data-testid="transfer-focus">
+          <p className="font-semibold"><bdi dir="ltr">{focusOrder}</bdi>{' — '}
+            {focusInfo === 'none'
+              ? t('no bank transfer was found for this order.', 'لا يوجد تحويل بنكي لهذا الطلب.')
+              : focusInfo.status === 'PAID'
+                ? t('the transfer is already approved as paid; the order was released.', 'التحويل معتمد كمدفوع بالفعل؛ تم الإفراج عن الطلب.')
+                : focusInfo.status === 'REJECTED'
+                  ? t('the transfer was rejected.', 'تم رفض التحويل.')
+                  : focusInfo.status === 'UNDER_REVIEW'
+                    ? t('the transfer is waiting for review.', 'التحويل بانتظار المراجعة.')
+                    : t('waiting for the customer to send the money and confirm it in the app. Nothing to verify yet.', 'بانتظار أن يرسل العميل المبلغ ويؤكد ذلك في التطبيق. لا شيء للتحقق منه بعد.')}
+          </p>
+          {focusInfo !== 'none' && focusInfo.amountMinor != null && <p className="mt-1 text-xs text-gray-600">{t('Amount', 'المبلغ')}: {money(focusInfo.amountMinor)}{focusInfo.customerName ? <> · <bdi>{focusInfo.customerName}</bdi></> : null}</p>}
+          {focusInfo !== 'none' && <Link href={`/order-management?order=${focusInfo.orderId}`} className="mt-2 inline-block text-sm font-medium text-hatly-orangeDark hover:underline">{t('Open the order →', 'افتح الطلب ←')}</Link>}
+        </div>
+      )}
 
       {payments && payments.length > 0 && <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4"><KpiCard label={t('Awaiting review', 'بانتظار المراجعة')} value={payments.length} tone="bad" /></div>}
 

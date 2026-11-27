@@ -1,5 +1,6 @@
 'use client';
 
+import { groupByOrder } from '../../lib/notifications/group-by-order';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge, Button, Card, EmptyState, KpiCard, PageHeader, Pagination, Tabs } from '../ui';
@@ -110,13 +111,15 @@ export function NotificationCenter({ hrefFor, changes }: { hrefFor: (a: StaffAle
           {data && data.items.length === 0 && <EmptyState title={tab === 'unread' ? t('You are all caught up.', 'لا يوجد ما لم تقرأه.') : t('No notifications yet.', 'لا توجد إشعارات بعد.')} />}
           {!data && !error && <p className="p-5 text-sm text-gray-500">{t('Loading…', 'جارٍ التحميل…')}</p>}
           <ul className="divide-y divide-gray-100" data-testid="notification-list">
-            {(data?.items ?? []).map((a) => {
+            {groupByOrder(data?.items ?? []).map((g) => {
+              // Owner request 2026-11-27: one entry per order; the earlier updates of the same order are listed inside it.
+              const a = g.latest;
               const href = hrefFor(a);
               const note = noteText(a, locale);
               return (
-                <li key={a.id} data-testid={`notification-${a.id}`} data-read={a.isRead ? 'true' : 'false'} className={`flex items-start gap-3 px-5 py-4 ${a.isRead ? '' : 'bg-orange-50/50'}`}>
-                  <span aria-hidden className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${a.isRead ? 'bg-transparent' : 'bg-hatly-orange'}`} />
-                  <button type="button" onClick={() => void open(a)} disabled={!href && a.isRead} className="min-w-0 flex-1 text-start disabled:cursor-default">
+                <li key={g.key} data-testid={`notification-${a.id}`} data-read={g.unread === 0 ? 'true' : 'false'} className={`flex items-start gap-3 px-5 py-4 ${g.unread === 0 ? '' : 'bg-orange-50/50'}`}>
+                  <span aria-hidden className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${g.unread === 0 ? 'bg-transparent' : 'bg-hatly-orange'}`} />
+                  <button type="button" onClick={() => { void Promise.all(g.items.filter((x) => !x.isRead && x.id !== a.id).map((x) => markStaffAlertRead(x.id).catch(() => undefined))); void open(a); }} disabled={!href && a.isRead} className="min-w-0 flex-1 text-start disabled:cursor-default">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className={`text-sm ${a.isRead ? 'font-medium text-gray-700' : 'font-semibold text-gray-900'}`}>{words(CATEGORY, a.category, locale) || a.title}</span>
                       {a.severity === 'CRITICAL' && <Badge tone="red">{t('Critical', 'حرِج')}</Badge>}
@@ -128,9 +131,17 @@ export function NotificationCenter({ hrefFor, changes }: { hrefFor: (a: StaffAle
                     </span>
                     {note && <span className="mt-0.5 block text-xs text-gray-700"><bdi>{note}</bdi></span>}
                     <span className="mt-1 block text-xs text-gray-400">{ago(a.createdAt, locale)}</span>
+                    {g.items.length > 1 && (
+                      <span className="mt-2 block rounded-lg bg-gray-50 px-2 py-1.5 text-xs text-gray-600" data-testid={`notification-group-${g.key}`}>
+                        <span className="font-medium text-gray-800">{t(`${g.items.length} updates for this order`, `${g.items.length} تحديثات لهذا الطلب`)}</span>
+                        {g.items.slice(1).map((x) => (
+                          <span key={x.id} className="mt-0.5 block">{x.isRead ? '○' : '●'} {words(CATEGORY, x.category, locale) || x.title} · {ago(x.createdAt, locale)}</span>
+                        ))}
+                      </span>
+                    )}
                   </button>
-                  {!a.isRead && (
-                    <button type="button" onClick={() => void markRead(a)} className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-medium text-hatly-orangeDark hover:bg-orange-50" data-testid={`notification-read-${a.id}`}>
+                  {g.unread > 0 && (
+                    <button type="button" onClick={() => void Promise.all(g.items.filter((x) => !x.isRead).map((x) => markRead(x)))} className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-medium text-hatly-orangeDark hover:bg-orange-50" data-testid={`notification-read-${a.id}`}>
                       {t('Mark read', 'تعليم كمقروء')}
                     </button>
                   )}

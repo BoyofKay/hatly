@@ -1,5 +1,6 @@
 'use client';
 
+import { listStaffAlerts, markStaffAlertRead } from '../../lib/api/staff-notifications';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AdminOrderDetail, getAdminOrderDetail } from '../../lib/api/admin-failed-deliveries';
@@ -41,6 +42,12 @@ import { MessageKey } from '../../lib/i18n/messages';
  */
 /** The order workspace body: the SAME view is the full page (`/order-search/:id`) and the drawer opened from the Orders workspace. */
 export function OrderDetailView({ orderId, embedded = false, onClose }: { orderId: string; embedded?: boolean; onClose?: () => void }) {
+  // Owner request 2026-11-27: the order is the one place for its updates — opening it clears its unread notifications.
+  useEffect(() => {
+    listStaffAlerts(100)
+      .then((r) => Promise.all(r.items.filter((x) => x.orderId === orderId && !x.isRead).map((x) => markStaffAlertRead(x.id))))
+      .catch(() => undefined);
+  }, [orderId]);
   return (
     <I18nProvider>
       <OrderDetailScreen orderId={orderId} embedded={embedded} onClose={onClose} />
