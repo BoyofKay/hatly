@@ -2,3 +2,4 @@
 "NSLocationWhenInUseUsageDescription" = "يستخدم هاتلي موقعك لتحديد عنوان التوصيل والتأكد من أن هاتلي يوصّل إليه.";
 "NSCameraUsageDescription" = "يمكن لهاتلي استخدام الكاميرا لالتقاط صورة لطلب خاص أو لطلب «Hatly Service».";
 "NSPhotoLibraryUsageDescription" = "يحتاج هاتلي إلى الوصول إلى صورك لتتمكن من إرفاق صورة بطلب خاص أو بطلب «Hatly Service».";
+"NSMicrophoneUsageDescription" = "يستخدم هاتلي الميكروفون فقط عندما تسجّل رسالة صوتية لطلب «هاتلي» أو «وصّلي».";
