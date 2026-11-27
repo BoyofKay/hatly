@@ -1,5 +1,6 @@
 'use client';
 
+import { LocationFromLink } from '../../../../components/admin/LocationFromLink';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -68,6 +69,7 @@ export default function BranchDetailPage() {
   const [categoryNameAr, setCategoryNameAr] = useState('');
   const [productNameAr, setProductNameAr] = useState('');
   const [address, setAddress] = useState('');
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [commission, setCommission] = useState('');
   const [deliveryEnabled, setDeliveryEnabled] = useState(true);
   const [pickupEnabled, setPickupEnabled] = useState(true);
@@ -105,6 +107,7 @@ export default function BranchDetailPage() {
       setName(b.name);
       setNameAr(b.nameAr ?? '');
       setAddress(b.address);
+      setLocation(b.latitude != null && b.longitude != null ? { lat: Number(b.latitude), lng: Number(b.longitude) } : null);
       setCommission(basisPointsToPercent(b.commissionRateBasisPoints));
       setDeliveryEnabled(b.deliveryEnabled);
       setPickupEnabled(b.pickupEnabled);
@@ -144,6 +147,7 @@ export default function BranchDetailPage() {
         name,
         nameAr: nameAr.trim(),
         address,
+        ...(location ? { latitude: location.lat, longitude: location.lng } : {}),
         deliveryEnabled,
         pickupEnabled,
         commissionRateBasisPoints: commissionBp,
@@ -380,6 +384,7 @@ export default function BranchDetailPage() {
             <label className="block text-sm font-medium">{t("Address", "العنوان")}</label>
             <input value={address} onChange={(e) => setAddress(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />
           </div>
+          <LocationFromLink lat={location?.lat ?? null} lng={location?.lng ?? null} onChange={(lat, lng) => setLocation({ lat, lng })} />
           <div>
             <label className="block text-sm font-medium">{t("Hatly commission (%)", "عمولة هاتلي (%)")}</label>
             <input inputMode="decimal" dir="ltr" placeholder="15" value={commission} onChange={(e) => setCommission(e.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 border-gray-300 bg-white shadow-sm focus:border-hatly-orange focus:outline-none focus:ring-2 focus:ring-hatly-orange/30 disabled:bg-gray-100 text-sm" />

@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { resolveMapsLink } from '../../common/geo/maps-link';
+import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags } from '@nestjs/swagger';
 import { AuthenticatedUser, CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
 import { requireUploadedFile, singleFileMultipartLimits } from '../products/multipart-limits';
-import { RequiresPermission } from '../permissions/decorators/requires-permission.decorator';
+import { RequiresAnyPermission, RequiresPermission } from '../permissions/decorators/requires-permission.decorator';
 import { Permission } from '../permissions/permission.enum';
 import { AdminVendorsService } from './admin-vendors.service';
 import { CreateVendorDto } from './dto/create-vendor.dto';
@@ -20,6 +22,20 @@ import { UpdateVendorBranchDto } from './dto/update-vendor-branch.dto';
  * `PATCH admin/vendor-branches/:id/sector`, none of the paths below.
  */
 @ApiTags('admin-vendors')
+/** Owner request 2026-11-27: a branch location from a pasted Google / Apple Maps link (short share links are opened server-side). */
+@ApiTags('admin-geo')
+@Controller('admin/geo')
+export class AdminGeoController {
+  @Get('maps-link')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @RequiresAnyPermission(Permission.MANAGE_VENDORS, Permission.MANAGE_SERVICE_AREAS)
+  async mapsLink(@Query('url') url: string) {
+    const point = await resolveMapsLink(String(url ?? '').slice(0, 2000)).catch(() => null);
+    if (!point) throw new BadRequestException({ message: 'No location found in this link. In Google Maps: Share → Copy link, or long-press the place and copy the coordinates.', details: { code: 'MAPS_LINK_NO_LOCATION' } });
+    return { data: { latitude: point.lat, longitude: point.lng } };
+  }
+}
+
 @Controller('admin/vendors')
 export class AdminVendorsController {
   constructor(private readonly adminVendorsService: AdminVendorsService) {}

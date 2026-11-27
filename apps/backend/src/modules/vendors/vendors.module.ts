@@ -9,7 +9,7 @@ import { VendorStaffService } from './vendor-staff.service';
 import { VendorStaffAuthorizationService } from './vendor-staff-authorization.service';
 import { AdminVendorStaffController } from './admin-vendor-staff.controller';
 import { AdminVendorsService } from './admin-vendors.service';
-import { AdminVendorsController, AdminVendorBranchesController } from './admin-vendors.controller';
+import { AdminGeoController, AdminVendorsController, AdminVendorBranchesController } from './admin-vendors.controller';
 import { VendorBranchesController } from './vendor-branches.controller';
 
 /**
@@ -23,7 +23,7 @@ import { VendorBranchesController } from './vendor-branches.controller';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([Vendor, VendorBranch, VendorStaff, ServiceArea]), UploadsModule],
-  controllers: [
+  controllers: [AdminGeoController, 
     AdminVendorStaffController,
     AdminVendorsController,
     AdminVendorBranchesController,

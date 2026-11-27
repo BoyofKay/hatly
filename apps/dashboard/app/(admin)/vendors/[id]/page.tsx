@@ -1,5 +1,6 @@
 'use client';
 
+import { apiClient } from '../../../../lib/api/client';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -301,7 +302,7 @@ export default function VendorDetailPage() {
           <LabeledInput
             label={t('Location: paste a Google Maps link or "lat, lng"', 'الموقع: الصق رابط خرائط جوجل أو "خط العرض، خط الطول"')}
             dir="ltr" value={mapsLink} placeholder="https://maps.google.com/?q=30.4170,31.5620"
-            onChange={(e) => { setMapsLink(e.target.value); const p = parseLatLng(e.target.value); if (p) { setBranchLat(String(p.lat)); setBranchLng(String(p.lng)); } }}
+            onChange={(e) => { const v = e.target.value; setMapsLink(v); const p = parseLatLng(v); if (p) { setBranchLat(String(p.lat)); setBranchLng(String(p.lng)); } else if (/^https:\/\//i.test(v.trim())) { apiClient.get('/admin/geo/maps-link', { params: { url: v.trim() } }).then((r) => { setBranchLat(String(r.data.data.latitude)); setBranchLng(String(r.data.data.longitude)); }).catch(() => undefined); } }}
             hint={t('In Google Maps: long-press the shop → copy the coordinates or Share → Copy link.', 'في خرائط جوجل: اضغط مطولًا على المحل ← انسخ الإحداثيات أو مشاركة ← نسخ الرابط.')}
           />
           <div className="grid grid-cols-2 gap-3">
