@@ -13,6 +13,7 @@ class StoreCoverImage extends StatelessWidget {
     this.width,
     required this.height,
     this.radius = HatlyRadius.card,
+    this.fillWithLogo = false,
   });
 
   final String? coverUrl;
@@ -20,6 +21,9 @@ class StoreCoverImage extends StatelessWidget {
   final double? width;
   final double height;
   final double radius;
+
+  /// Owner request 2026-11-27 (sector store list): without a cover, the logo fills the whole tile — no frame, no padding.
+  final bool fillWithLogo;
 
   bool get _hasCover => coverUrl?.trim().isNotEmpty == true;
   bool get _hasLogo => logoUrl?.trim().isNotEmpty == true;
@@ -33,6 +37,17 @@ class StoreCoverImage extends StatelessWidget {
         height: height,
         radius: radius,
         placeholderIcon: Icons.storefront_outlined,
+      );
+    }
+    if (fillWithLogo && _hasLogo) {
+      return HatlySoftImage(
+        key: const Key('store-cover-logo-fill'),
+        url: logoUrl,
+        width: width,
+        height: height,
+        radius: radius,
+        fit: BoxFit.cover,
+        placeholderIcon: Icons.store_outlined,
       );
     }
     final p = context.palette;

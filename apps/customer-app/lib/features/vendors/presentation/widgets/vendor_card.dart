@@ -84,6 +84,7 @@ class VendorCard extends StatelessWidget {
                           coverUrl: vendor.coverImageUrl,
                           logoUrl: vendor.logoUrl,
                           width: 92, height: 92, radius: 14,
+                          fillWithLogo: true,
                         ),
                       ),
                       if (vendor.coverImageUrl != null &&
