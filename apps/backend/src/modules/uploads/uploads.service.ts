@@ -1,3 +1,4 @@
+import { decodeBase64Audio } from './audio-validation';
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
@@ -34,6 +35,19 @@ export class UploadsService {
       base64Content: decoded.base64,
       filename: `upload${decoded.image.extension}`,
     });
+    return this.repo.save(this.repo.create({ url, uploadedByUserId }));
+  }
+
+  /** Voice notes (2026-11-27): same boundary as images — bytes checked first, extension from the DETECTED type, never the file name. */
+  async uploadAudio(base64Content: string, uploadedByUserId: string): Promise<Upload> {
+    let decoded: ReturnType<typeof decodeBase64Audio>;
+    try {
+      decoded = decodeBase64Audio(base64Content);
+    } catch (error) {
+      if (error instanceof UploadRejectedError) throw new BadRequestException({ message: error.message, details: { code: error.code } });
+      throw error;
+    }
+    const { url } = await this.uploadProvider.store({ base64Content: decoded.base64, filename: `voice${decoded.audio.extension}` });
     return this.repo.save(this.repo.create({ url, uploadedByUserId }));
   }
 

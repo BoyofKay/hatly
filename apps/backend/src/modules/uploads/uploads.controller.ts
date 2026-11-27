@@ -1,9 +1,12 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { ApiTags } from '@nestjs/swagger';
 import { RateLimitPolicies, Throttled } from '../../common/throttling/rate-limit-policies';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '../../common/enums/role.enum';
 import { UploadsService } from './uploads.service';
-import { CreateUploadDto } from './dto/create-upload.dto';
+import { CreateAudioUploadDto, CreateUploadDto } from './dto/create-upload.dto';
 
 /**
  * Open to any authenticated role (no @Roles/@RequiresPermission) —
@@ -21,6 +24,17 @@ export class UploadsController {
   @Post()
   async create(@Body() dto: CreateUploadDto, @CurrentUser() user: AuthenticatedUser) {
     const upload = await this.uploadsService.upload(dto.base64Content, dto.filename, user.id);
+    return { data: { id: upload.id, url: upload.url } };
+  }
+
+  /** Voice notes for Hatly / Wasaly requests (owner decision 2026-11-27): up to 5 minutes, audio formats checked by their bytes. */
+  // Customers only: voice notes are recorded by the customer; Operations write their driver note as text.
+  @UseGuards(RolesGuard)
+  @Roles(Role.CUSTOMER)
+  @Throttled(RateLimitPolicies.mediaUpload)
+  @Post('audio')
+  async createAudio(@Body() dto: CreateAudioUploadDto, @CurrentUser() user: AuthenticatedUser) {
+    const upload = await this.uploadsService.uploadAudio(dto.base64Content, user.id);
     return { data: { id: upload.id, url: upload.url } };
   }
 }

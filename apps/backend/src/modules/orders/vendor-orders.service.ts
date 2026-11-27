@@ -38,6 +38,7 @@ export interface VendorOrderItemView {
   notes: string | null;
   freeTextDescriptionSnapshot: string | null;
   imageUrlsSnapshot: string[] | null;
+  voiceNoteUrlSnapshot: string | null;
   /**
    * PHASE I-A, CHUNK 4 addition (Vendor Dashboard). Read-only,
    * already-existing OrderItem fields — previously not projected onto
@@ -190,6 +191,7 @@ export class VendorOrdersService {
           notes: item.notes ?? null,
           freeTextDescriptionSnapshot: item.freeTextDescriptionSnapshot ?? null,
           imageUrlsSnapshot: item.imageUrlsSnapshot ?? null,
+            voiceNoteUrlSnapshot: item.voiceNoteUrlSnapshot ?? null,
           pricingUnitSnapshot: item.pricingUnitSnapshot ?? null,
           requestedWeightGrams: item.requestedWeightGrams ?? null,
           actualWeightGrams: item.actualWeightGrams ?? null,

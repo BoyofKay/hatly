@@ -430,6 +430,7 @@ export class OrderCreationService {
             notes: item.notes ?? null,
             freeTextDescriptionSnapshot: item.freeTextDescription ?? null,
             imageUrlsSnapshot: item.imageUrls ?? null,
+            voiceNoteUrlSnapshot: item.voiceNoteUrl ?? null,
             // "وصّلي لمكان" buys nothing: its item has no price to confirm later, so it is recorded as priced at 0 (the delivery
             // fee is the whole charge). That keeps the "custom items still need a final price" gate and the ops price queue away
             // from it. A "هاتلي من مكان" item stays null = pending until Hatly records the purchase.

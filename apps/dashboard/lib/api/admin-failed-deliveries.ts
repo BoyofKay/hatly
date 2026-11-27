@@ -64,6 +64,8 @@ export interface AdminOrderDetail {
   /** M3b (G-04) addition to this existing type — the backend's `AdminOrderDetailView` already returned this field; it just wasn't declared here yet since Failed Deliveries never needed to show it. */
   orderNumber: string;
   status: string;
+  /** Operations' note for the driver (owner decision 2026-11-27). */
+  operationsNoteForDriver?: string | null;
   customerId: string;
   fulfillmentType: string;
   paymentMethod: string;
@@ -125,6 +127,8 @@ export interface AdminOrderDetail {
       productNameSnapshot: string | null;
       freeTextDescription: string | null;
       imageUrls: string[] | null;
+      /** The customer's voice note (Hatly upload), or null. */
+      voiceNoteUrl?: string | null;
       quantity: number;
       unitPriceMinor: number | null;
       actualAmountMinor: number | null;
@@ -197,4 +201,10 @@ export async function createFailedDeliveryResolution(
 export async function executeFailedDeliveryRefund(orderId: string): Promise<FailedDeliveryRefundResult> {
   const res = await apiClient.post(`/admin/orders/${orderId}/failed-delivery-refund`);
   return res.data.data;
+}
+
+/** Operations write (or clear with an empty text) the note the driver sees on this order. */
+export async function setOrderDriverNote(orderId: string, note: string): Promise<string | null> {
+  const res = await apiClient.patch(`/admin/orders/${orderId}/driver-note`, { note });
+  return res.data.data.operationsNoteForDriver ?? null;
 }

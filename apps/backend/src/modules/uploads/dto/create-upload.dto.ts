@@ -13,3 +13,11 @@ export class CreateUploadDto {
   @MaxLength(255)
   filename: string;
 }
+
+/** Voice note upload (2026-11-27): ≤ 4 MB of audio → ≤ ~5.6 M base64 characters. */
+export class CreateAudioUploadDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(6_000_000)
+  base64Content: string;
+}

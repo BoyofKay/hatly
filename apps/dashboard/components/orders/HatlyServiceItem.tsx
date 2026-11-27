@@ -132,6 +132,13 @@ export function HatlyServiceItem({
         {t('hsQuantity')}: {item.quantity}
       </p>
 
+      {item.voiceNoteUrl && (
+        <div className="mt-2" data-testid="hatly-item-voice">
+          <p className="text-xs text-gray-500">{t('hsVoiceNote')}</p>
+          <audio controls preload="none" src={resolveMediaUrl(item.voiceNoteUrl)} className="mt-1 w-full max-w-sm" />
+        </div>
+      )}
+
       {item.imageUrls && item.imageUrls.length > 0 && (
         <div className="mt-2">
           <p className="text-xs text-gray-500">{t('hsImages')}</p>

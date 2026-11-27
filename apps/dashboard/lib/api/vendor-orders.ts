@@ -10,6 +10,8 @@ export interface VendorOrderItem {
   notes: string | null;
   freeTextDescriptionSnapshot: string | null;
   imageUrlsSnapshot: string[] | null;
+  /** The customer's voice note for a custom request, or null. */
+  voiceNoteUrlSnapshot?: string | null;
   pricingUnitSnapshot: 'PIECE' | 'WEIGHT' | null;
   requestedWeightGrams: number | null;
   actualWeightGrams: number | null;

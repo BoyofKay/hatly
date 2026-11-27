@@ -74,6 +74,10 @@ export class CartItem extends BaseEntity {
   @Column({ name: 'image_urls', type: 'jsonb', nullable: true })
   imageUrls?: string[] | null;
 
+  /** Custom-request items only — a voice note (Hatly upload, up to 5 minutes). Owner decision 2026-11-27. */
+  @Column({ name: 'voice_note_url', type: 'varchar', length: 500, nullable: true })
+  voiceNoteUrl?: string | null;
+
   @OneToMany(() => CartItemOptionValue, (value) => value.cartItem, { cascade: true })
   selectedOptionValues: CartItemOptionValue[];
 }

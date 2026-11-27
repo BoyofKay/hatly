@@ -13,6 +13,7 @@ import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-
 import { Role } from '../../common/enums/role.enum';
 import { OrderVendorSegmentStateMachineService } from './order-vendor-segment-state-machine.service';
 import { UpdateSegmentStatusDto } from './dto/update-segment-status.dto';
+import { DriverNoteDto } from './dto/driver-note.dto';
 
 /**
  * Admin Order Detail View (Chunk 2a). Read-only, general-purpose —
@@ -70,6 +71,13 @@ export class AdminOrdersController {
       reason: dto.reason,
     });
     return { data: segment };
+  }
+
+  /** Owner decision 2026-11-27: Operations can write a note for the driver (shown in the driver app). An empty note clears it. */
+  @Patch(':id([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/driver-note')
+  @RequiresPermission(Permission.MANAGE_ORDER_FULFILMENT)
+  async setDriverNote(@Param('id') id: string, @Body() dto: DriverNoteDto) {
+    return { data: await this.adminOrdersService.setDriverNote(id, dto.note) };
   }
 
   @Get()

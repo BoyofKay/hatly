@@ -99,6 +99,7 @@ export interface AdminOrderItemView {
   productNameSnapshot: string | null;
   freeTextDescription: string | null;
   imageUrls: string[] | null;
+  voiceNoteUrl: string | null;
   quantity: number;
   unitPriceMinor: number | null;
   actualAmountMinor: number | null;
@@ -162,6 +163,8 @@ export interface AdminOrderPaymentView {
 
 export interface AdminOrderDetailView {
   id: string;
+  /** Operations' note for the driver (null = none). */
+  operationsNoteForDriver: string | null;
   /** The customer-facing reference (`HT-100234`) — what support reads back to a customer, never the id. */
   orderNumber: string;
   status: string;
@@ -264,6 +267,14 @@ export class AdminOrdersService {
     return this.getOne(idOrOrderNumber);
   }
 
+  /** Operations write (or clear, with an empty text) the note the driver sees on this order. */
+  async setDriverNote(orderId: string, note: string | null | undefined): Promise<{ operationsNoteForDriver: string | null }> {
+    const clean = note?.trim() ? note.trim().slice(0, 1000) : null;
+    const result = await this.dataSource.getRepository(Order).update({ id: orderId }, { operationsNoteForDriver: clean });
+    if (!result.affected) throw new NotFoundException('Order not found.');
+    return { operationsNoteForDriver: clean };
+  }
+
   async getOne(orderId: string): Promise<AdminOrderDetailView> {
     const order = await this.dataSource.getRepository(Order).findOne({ where: { id: orderId } });
     if (!order) {
@@ -324,6 +335,7 @@ export class AdminOrdersService {
       id: order.id,
       orderNumber: order.orderNumber,
       status: order.status,
+      operationsNoteForDriver: order.operationsNoteForDriver ?? null,
       customerId: order.customerId,
       fulfillmentType: order.fulfillmentType,
       paymentMethod: order.paymentMethod,
@@ -403,6 +415,7 @@ export class AdminOrdersService {
             productNameSnapshot: item.productNameSnapshot ?? null,
             freeTextDescription: item.freeTextDescriptionSnapshot ?? null,
             imageUrls: item.imageUrlsSnapshot ?? null,
+            voiceNoteUrl: item.voiceNoteUrlSnapshot ?? null,
             quantity: item.quantity,
             unitPriceMinor: item.unitPriceMinor ?? null,
             actualAmountMinor: item.actualAmountMinor ?? null,

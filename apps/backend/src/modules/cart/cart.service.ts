@@ -274,6 +274,13 @@ export class CartService {
       }
 
       const imageUrls = dto.imageUrls ?? [];
+      const voiceNoteUrl = await this.ownedVoiceNote(dto.voiceNoteUrl, customerId);
+      if (!dto.freeTextDescription?.trim() && imageUrls.length === 0 && !voiceNoteUrl) {
+        throw new BadRequestException({
+          message: 'A request needs a description, a photo or a voice note.',
+          details: { code: 'CUSTOM_ITEM_CONTENT_REQUIRED' },
+        });
+      }
       if (imageUrls.length > MAX_IMAGES_PER_AD_HOC_ITEM) {
         throw new BadRequestException({
           message: `A Hatly Service item may have at most ${MAX_IMAGES_PER_AD_HOC_ITEM} images.`,
@@ -297,8 +304,9 @@ export class CartService {
           cartVendorGroupId: group.id,
           productId: null,
           quantity: dto.quantity,
-          freeTextDescription: dto.freeTextDescription,
+          freeTextDescription: dto.freeTextDescription?.trim() || null,
           imageUrls: imageUrls.length > 0 ? imageUrls : null,
+          voiceNoteUrl,
         }),
       );
 
@@ -433,9 +441,10 @@ export class CartService {
       // here, the same way this DTO's own group-targeting cross-field
       // rule is enforced here rather than in the DTO.
       const imageUrls = dto.imageUrls ?? [];
-      if (!dto.freeTextDescription && imageUrls.length === 0) {
+      const voiceNoteUrl = await this.ownedVoiceNote(dto.voiceNoteUrl, customerId);
+      if (!dto.freeTextDescription && imageUrls.length === 0 && !voiceNoteUrl) {
         throw new BadRequestException({
-          message: 'A custom item requires a description or at least one image.',
+          message: 'A custom item requires a description, an image or a voice note.',
           details: { code: 'CUSTOM_ITEM_CONTENT_REQUIRED' },
         });
       }
@@ -465,6 +474,7 @@ export class CartService {
           quantity: 1,
           freeTextDescription: dto.freeTextDescription ?? null,
           imageUrls: imageUrls.length > 0 ? imageUrls : null,
+          voiceNoteUrl,
         }),
       );
 
@@ -474,6 +484,17 @@ export class CartService {
     // Rendered AFTER the transaction has committed and released its connection: buildView reads other tables through the
     // pool, and doing that while still holding a pooled connection starves the pool under concurrent load (M5 Batch 3).
     return this.buildView(fullCart);
+  }
+
+  /** A voice note must be this customer's own Hatly upload (never an arbitrary URL). Returns the URL, or null when none was sent. */
+  private async ownedVoiceNote(url: string | undefined, customerId: string): Promise<string | null> {
+    const clean = url?.trim();
+    if (!clean) return null;
+    const owned = await this.uploadsService.findOwnedUrls([clean], customerId);
+    if (!owned.has(clean)) {
+      throw new BadRequestException({ message: 'The voice note is not a valid Hatly upload.', details: { code: 'INVALID_VOICE_NOTE_REFERENCE' } });
+    }
+    return clean;
   }
 
   private async assertCustomRequestsAllowed(manager: EntityManager, vendorBranchId: string | null | undefined): Promise<void> {

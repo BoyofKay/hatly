@@ -38,6 +38,7 @@ export interface DriverDeliverySegmentItemView {
   notes: string | null;
   freeTextDescriptionSnapshot: string | null;
   imageUrlsSnapshot: string[] | null;
+  voiceNoteUrlSnapshot: string | null;
   /**
    * PHASE I-A, CHUNK 5 addition. Same additive, read-only fix already
    * applied to VendorOrderItemView in Chunk 4 — previously absent
@@ -77,6 +78,8 @@ export interface DriverDeliveryView {
   orderStatus: string;
   fulfillmentType: string;
   orderNote: string | null;
+  /** Operations' note for the driver (owner decision 2026-11-27), or null. */
+  operationsNote: string | null;
   paymentMethod: string;
   electronicPaymentMethod: string | null;
   totalMinor: number | null;
@@ -213,6 +216,7 @@ export class DriverDeliveriesService {
       orderStatus: delivery.order.status,
       fulfillmentType: delivery.order.fulfillmentType,
       orderNote: delivery.order.orderNote ?? null,
+      operationsNote: delivery.order.operationsNoteForDriver ?? null,
       paymentMethod: delivery.order.paymentMethod,
       electronicPaymentMethod: delivery.order.electronicPaymentMethod ?? null,
       totalMinor: delivery.order.totalMinor ?? null,
@@ -253,6 +257,7 @@ export class DriverDeliveriesService {
             notes: item.notes ?? null,
             freeTextDescriptionSnapshot: item.freeTextDescriptionSnapshot ?? null,
             imageUrlsSnapshot: item.imageUrlsSnapshot ?? null,
+            voiceNoteUrlSnapshot: item.voiceNoteUrlSnapshot ?? null,
             pricingUnitSnapshot: item.pricingUnitSnapshot ?? null,
             requestedWeightGrams: item.requestedWeightGrams ?? null,
             actualWeightGrams: item.actualWeightGrams ?? null,

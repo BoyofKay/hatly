@@ -67,6 +67,10 @@ export class OrderItem extends BaseEntity {
   @Column({ name: 'image_urls_snapshot', type: 'jsonb', nullable: true })
   imageUrlsSnapshot?: string[] | null;
 
+  /** The custom request's voice note, frozen at order creation (owner decision 2026-11-27). */
+  @Column({ name: 'voice_note_url_snapshot', type: 'varchar', length: 500, nullable: true })
+  voiceNoteUrlSnapshot?: string | null;
+
   /**
    * PHASE 3 STEP 4 addition — a denormalized CACHE of the driver's
    * recorded actual purchase amount for an AD_HOC_SERVICE item, for

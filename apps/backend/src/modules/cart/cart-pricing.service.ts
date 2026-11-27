@@ -126,6 +126,7 @@ export class CartPricingService {
         isAvailable: true,
         freeTextDescription: item.freeTextDescription ?? null,
         imageUrls: item.imageUrls ?? [],
+        voiceNoteUrl: item.voiceNoteUrl ?? null,
         offerId: null,
         offerDiscountType: null,
         offerDiscountValue: null,
@@ -178,6 +179,7 @@ export class CartPricingService {
       isAvailable: item.product.isAvailable && !item.product.deletedAt,
       freeTextDescription: null,
       imageUrls: [],
+      voiceNoteUrl: null,
       // PHASE G addition (Offers & Promotions). Populated afterward by
       // CartService.buildView's offer-preview step, never computed
       // here — CartPricingService.buildCartView stays a pure, DB-free

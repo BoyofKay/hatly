@@ -1,4 +1,5 @@
 'use client';
+import { resolveMediaUrl } from '../../lib/media-url';
 import { parseKgToGrams } from '../../lib/money';
 
 import { useEffect, useRef, useState } from 'react';
@@ -289,6 +290,9 @@ export function VendorOrderDetailView({ id, embedded = false, onChanged }: { id:
                     return (
                       <div className="mt-1 rounded bg-blue-50 p-2 text-sm">
                         <p className="text-xs font-medium text-blue-800">{t('Custom Request', 'طلب مخصّص')}</p>
+                        {item.voiceNoteUrlSnapshot && (
+                          <audio controls preload="none" src={resolveMediaUrl(item.voiceNoteUrlSnapshot)} className="mt-1 w-full max-w-sm" aria-label={t('Voice note', 'رسالة صوتية')} />
+                        )}
                         {item.imageUrlsSnapshot && item.imageUrlsSnapshot.length > 0 && (
                           <div className="mt-1 flex gap-2">
                             {item.imageUrlsSnapshot.map((url) => (

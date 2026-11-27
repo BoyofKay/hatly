@@ -9,7 +9,7 @@
  */
 export const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024;
 
-export type UploadRejectionCode = 'UPLOAD_NOT_BASE64' | 'UPLOAD_EMPTY' | 'UPLOAD_TOO_LARGE' | 'UNSUPPORTED_IMAGE_TYPE';
+export type UploadRejectionCode = 'UPLOAD_NOT_BASE64' | 'UPLOAD_EMPTY' | 'UPLOAD_TOO_LARGE' | 'UNSUPPORTED_IMAGE_TYPE' | 'UNSUPPORTED_AUDIO_TYPE';
 
 export class UploadRejectedError extends Error {
   constructor(public readonly code: UploadRejectionCode, message: string) {

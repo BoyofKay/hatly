@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 /**
  * Vendor/Pharmacy Custom Item (inside an existing CATALOG group).
@@ -46,4 +46,10 @@ export class AddVendorCustomItemDto {
   @ArrayMaxSize(2)
   @IsString({ each: true })
   imageUrls?: string[];
+
+  /** A voice note (up to 5 minutes) uploaded through POST /uploads/audio by this customer. Owner decision 2026-11-27. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  voiceNoteUrl?: string;
 }

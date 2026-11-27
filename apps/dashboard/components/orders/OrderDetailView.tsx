@@ -3,7 +3,7 @@
 import { listStaffAlerts, markStaffAlertRead } from '../../lib/api/staff-notifications';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AdminOrderDetail, getAdminOrderDetail } from '../../lib/api/admin-failed-deliveries';
+import { AdminOrderDetail, getAdminOrderDetail, setOrderDriverNote } from '../../lib/api/admin-failed-deliveries';
 import { MANAGE_HATLY_SERVICE_PRICING } from '../../lib/api/admin-hatly-service-pricing';
 import { useAdminPermission } from '../../lib/auth/use-admin-permission';
 import { I18nProvider, useI18n } from '../../lib/i18n/i18n';
@@ -146,6 +146,8 @@ function OrderDetailScreen({ orderId, embedded, onClose }: { orderId: string; em
               </div>
             </Card>
           )}
+
+          <DriverNoteCard orderId={detail.id} initial={detail.operationsNoteForDriver ?? null} />
 
           <Card title={t('detailItems')}>
             {hasHatlyService && (
@@ -426,5 +428,68 @@ function PickupCollection({ detail, onChanged }: { detail: AdminOrderDetail; onC
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Owner decision 2026-11-27: Operations can write a note for the driver on any order (shown in the driver app next to the customer's
+ * note). Editing needs MANAGE_ORDER_FULFILMENT; everyone who can open the order sees it.
+ */
+function DriverNoteCard({ orderId, initial }: { orderId: string; initial: string | null }) {
+  const { t: tl } = useLang();
+  const canEdit = useAdminPermission('MANAGE_ORDER_FULFILMENT');
+  const [saved, setSaved] = useState<string | null>(initial);
+  const [text, setText] = useState(initial ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  useEffect(() => { setSaved(initial); setText(initial ?? ''); }, [initial]);
+  if (!canEdit && !saved) return null;
+  const save = async () => {
+    setBusy(true);
+    setError(null);
+    setDone(false);
+    try {
+      const next = await setOrderDriverNote(orderId, text);
+      setSaved(next);
+      setText(next ?? '');
+      setDone(true);
+    } catch (e) {
+      setError(apiErrorMessage(e, tl('The note was not saved.', 'لم تُحفظ الملاحظة.')));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card title={tl('Note for the driver', 'ملاحظة للمندوب')}>
+      {canEdit ? (
+        <div className="space-y-2" data-testid="driver-note">
+          <textarea
+            value={text}
+            maxLength={1000}
+            rows={2}
+            onChange={(e) => { setText(e.target.value); setDone(false); }}
+            placeholder={tl('E.g. ask for the large pack; call the customer before buying.', 'مثال: اطلب العبوة الكبيرة؛ اتصل بالعميل قبل الشراء.')}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-hatly-orange focus:outline-none"
+            data-testid="driver-note-input"
+          />
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={save}
+              disabled={busy || text.trim() === (saved ?? '')}
+              className="rounded-lg bg-hatly-orange px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              data-testid="driver-note-save"
+            >
+              {busy ? tl('Saving…', 'جارٍ الحفظ…') : tl('Save note', 'حفظ الملاحظة')}
+            </button>
+            {done && <span className="text-xs text-green-700">{saved ? tl('Saved — the driver sees it.', 'تم الحفظ — يراها المندوب.') : tl('Note removed.', 'أُزيلت الملاحظة.')}</span>}
+            {error && <span role="alert" className="text-xs text-red-700">{error}</span>}
+          </div>
+        </div>
+      ) : (
+        <p className="whitespace-pre-wrap text-sm text-gray-800">{saved}</p>
+      )}
+    </Card>
   );
 }

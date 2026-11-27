@@ -73,9 +73,11 @@ export class AddAdHocCartItemDto {
   @MaxLength(120)
   destinationLabel?: string;
 
+  /** Owner decision 2026-11-27: text, photos and a voice note are each optional — at least one of them is required (enforced in CartService). */
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  freeTextDescription: string;
+  @MaxLength(2000)
+  freeTextDescription?: string;
 
   @IsInt()
   @Min(1)
@@ -87,4 +89,10 @@ export class AddAdHocCartItemDto {
   @ArrayMaxSize(2)
   @IsString({ each: true })
   imageUrls?: string[];
+
+  /** A voice note (up to 5 minutes) uploaded through POST /uploads/audio by this customer. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  voiceNoteUrl?: string;
 }

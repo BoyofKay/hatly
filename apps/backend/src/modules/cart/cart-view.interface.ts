@@ -54,6 +54,8 @@ export interface CartItemView {
   freeTextDescription: string | null;
   /** AD_HOC_SERVICE items only — always Hatly-upload-produced URLs (see uploads module), never arbitrary external links. */
   imageUrls: string[];
+  /** Custom-request voice note (Hatly upload) or null. */
+  voiceNoteUrl: string | null;
   /**
    * PHASE G addition (Offers & Promotions). BEST-EFFORT PREVIEW ONLY —
    * checks targeting/validity/perOrderLimit but deliberately NOT

@@ -107,6 +107,7 @@ export interface CustomerOrderItemView {
   finalAmountMinor: number | null;
   freeTextDescriptionSnapshot: string | null;
   imageUrlsSnapshot: string[] | null;
+  voiceNoteUrlSnapshot: string | null;
   offerMechanismSnapshot: string | null;
   offerSpecialPriceMinorSnapshot: number | null;
 }
@@ -417,6 +418,7 @@ export class CustomerOrdersService {
           finalAmountMinor: item.finalAmountMinor ?? null,
           freeTextDescriptionSnapshot: item.freeTextDescriptionSnapshot ?? null,
           imageUrlsSnapshot: item.imageUrlsSnapshot ?? null,
+            voiceNoteUrlSnapshot: item.voiceNoteUrlSnapshot ?? null,
           offerMechanismSnapshot: item.offerMechanismSnapshot ?? null,
           offerSpecialPriceMinorSnapshot: item.offerSpecialPriceMinorSnapshot ?? null,
         })),
