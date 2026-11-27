@@ -159,7 +159,7 @@ describe('E2E — Hatly vs Wasally: direction, delivery-fee-only pricing, paymen
 
   it('the fee does not depend on the direction or on the chosen place: both services quote the same final delivery fee', async () => {
     const a = await withItem(hatlyItem);
-    const b = await withItem({ ...wasallyItem, destinationLatitude: 30.9, destinationLongitude: 31.9 });
+    const b = await withItem({ ...wasallyItem, destinationLatitude: 30.6, destinationLongitude: 31.75 }); // a different place, still inside the 50 km service area (places outside it are refused since UAT 2026-11-27)
     // (zone-priced: the route never changes a manual fee)
     const qa = expectData<any>(await quote(a), 201);
     const qb = expectData<any>(await quote(b), 201);
