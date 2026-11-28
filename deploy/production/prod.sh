@@ -74,7 +74,12 @@ case "${1:-help}" in
     DEMO_MEDIA_DIR="${DEMO_MEDIA_DIR:-$PROD_SRC_DIR/docs/assets/pack}"
     [ -d "$DEMO_MEDIA_DIR" ] || { echo "asset pack not found at $DEMO_MEDIA_DIR (set DEMO_MEDIA_DIR)"; exit 1; }
     dc run --rm -T --no-deps -e DEMO_IMPORT_CONFIRM_DATABASE -v "$DEMO_MEDIA_DIR:/demo-media:ro" prod-backend node dist/src/scripts/demo-marketplace.js --media-dir /demo-media "${@:2}" </dev/null;;
+  recompress-uploads)
+    # Owner decision 2026-11-28: recompress stored photos IN PLACE (same names and formats; links unchanged; metadata removed).
+    # Dry run unless --apply is passed; take `prod.sh backup` first.
+    target_check
+    dc run --rm -T --no-deps prod-backend node dist/src/scripts/recompress-uploads.js "${@:2}" </dev/null;;
   stop-apps) echo "stopping backend + dashboard (data stores and volumes stay)"; dc stop prod-dashboard prod-backend;;
   down)      echo "refusing: production is never brought down with one command. Use stop-apps, or compose directly with intent (never -v)."; exit 1;;
-  help|*)    sed -n '2,4p' "$0"; echo "commands: validate env-check build data plan migrate apps status logs [svc] backup bootstrap-admin demo-marketplace stop-apps";;
+  help|*)    sed -n '2,4p' "$0"; echo "commands: validate env-check build data plan migrate apps status logs [svc] backup bootstrap-admin demo-marketplace recompress-uploads stop-apps";;
 esac

@@ -8,6 +8,7 @@ import sharp = require('sharp');
 import { bootWorld, World } from './support/world';
 import { Scenario, Actor, expectData, withQuoteToken } from './support/actors';
 import { Permission } from '../../src/modules/permissions/permission.enum';
+import { AttachmentRetentionService } from '../../src/modules/uploads/attachment-retention.service';
 
 /** A tiny but real-looking M4A header (the server reads the type from the bytes, not from a name). */
 const M4A = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypM4A \0\0\0\0M4A isom', 'latin1'), Buffer.alloc(64, 1)]).toString('base64');
@@ -68,6 +69,34 @@ describe('E2E — voice notes on Hatly / Wasaly requests', () => {
     expect(placed.status).toBe(201);
     const admin = expectData<any>(await world.api('get', `/admin/orders/${placed.body.data.id}`, { token: ops.accessToken }));
     expect(admin.segments[0].items[0].imageUrls).toEqual([up.url]);
+  });
+
+  it('owner 2026-11-28: 90 days after an order ends its photos and voice note are removed; a recent order keeps them', async () => {
+    const makeOrder = async (name: string) => {
+      const c = await s.customer(name);
+      const url = await uploadVoice(c);
+      expectData(await world.api('post', '/cart/adhoc-items', { token: c.accessToken, body: request({ voiceNoteUrl: url }) }), 201);
+      const placed = await world.api('post', '/orders', { token: c.accessToken, body: await withQuoteToken(world, c.accessToken, { deliveryAddress: address, paymentMethod: 'COD' }) });
+      expect(placed.status).toBe(201);
+      const orderId = placed.body.data.id as string;
+      const [seg] = await world.ds.query(`SELECT id FROM order_vendor_segments WHERE order_id = $1`, [orderId]);
+      expectData(await world.api('patch', `/admin/orders/segments/${seg.id}/status`, { token: (await s.superAdmin()).accessToken, body: { status: 'CANCELLED', reason: 'Test' } }));
+      expect((await world.ds.query(`SELECT status FROM orders WHERE id = $1`, [orderId]))[0].status).toBe('CANCELLED');
+      return { orderId, url };
+    };
+    const old = await makeOrder('Old Order');
+    const recent = await makeOrder('Recent Order');
+    await world.ds.query(`UPDATE order_status_events SET created_at = now() - interval '91 days' WHERE order_id = $1`, [old.orderId]);
+    await world.ds.query(`UPDATE orders SET created_at = now() - interval '92 days' WHERE id = $1`, [old.orderId]);
+
+    const result = await world.app.get(AttachmentRetentionService).purge();
+    expect(result.orders).toBe(1);
+    const voiceOf = async (id: string) => (await world.ds.query(`SELECT i.voice_note_url_snapshot AS v FROM order_items i JOIN order_vendor_segments s ON s.id = i.order_vendor_segment_id WHERE s.order_id = $1`, [id]))[0].v;
+    expect(await voiceOf(old.orderId)).toBeNull();
+    expect((await world.ds.query(`SELECT attachments_purged_at FROM orders WHERE id = $1`, [old.orderId]))[0].attachments_purged_at).not.toBeNull();
+    expect(await voiceOf(recent.orderId)).toBe(recent.url);
+    expect((await world.ds.query(`SELECT count(*)::int AS n FROM uploads WHERE url = $1`, [old.url]))[0].n).toBe(0);
+    expect((await world.app.get(AttachmentRetentionService).purge()).orders).toBe(0); // idempotent
   });
 
   it('rejects a file that is not audio, and an empty request (no text, photo or voice)', async () => {

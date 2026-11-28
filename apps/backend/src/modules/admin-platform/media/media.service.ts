@@ -42,6 +42,22 @@ export const PURPOSES: Record<string, PurposePolicy> = {
   GENERAL: { permission: Permission.MANAGE_MEDIA, minWidth: 100, minHeight: 100, maxEdge: 8000 },
 };
 
+/**
+ * Owner decision 2026-11-28: the library keeps ONE copy of an identical picture (the first upload's purpose). It may be reused for
+ * another use when it meets that use's specification: minimum size, square for logos, the banner aspect range.
+ */
+export function meetsPurposeSpec(asset: { purpose: string; width: number | string; height: number | string }, purpose: string): boolean {
+  if (asset.purpose === purpose) return true;
+  const p = PURPOSES[purpose];
+  if (!p) return false;
+  const w = Number(asset.width);
+  const h = Number(asset.height);
+  if (!(w >= p.minWidth && h >= p.minHeight)) return false;
+  if (p.square && Math.abs(w - h) > Math.max(2, Math.round(Math.min(w, h) * 0.01))) return false;
+  if (p.aspect && !(w / h >= p.aspect.min && w / h <= p.aspect.max)) return false;
+  return true;
+}
+
 export interface AssignTarget {
   table: string;
   fk: string;
@@ -120,7 +136,13 @@ export class MediaService {
 
     const sha256 = crypto.createHash('sha256').update(processed.display).digest('hex');
     const [existing] = await this.ds.query(`SELECT id FROM media_assets WHERE sha256 = $1 AND status = 'ACTIVE' AND legacy_source_url IS NULL`, [sha256]);
-    if (existing) return { ...(await this.get(existing.id)), deduplicated: true };
+    if (existing) {
+      const found = await this.get(existing.id);
+      if (input.purpose && found.purpose !== input.purpose && !meetsPurposeSpec({ purpose: found.purpose, width: found.width, height: found.height }, input.purpose)) {
+        throw err(409, 'MEDIA_EXISTS_FOR_OTHER_USE', `This exact picture is already in the library as ${found.purpose} and does not meet the ${input.purpose} requirements (size / shape). Use a different picture.`);
+      }
+      return { ...found, deduplicated: true };
+    }
 
     const stored: string[] = [];
     try {
@@ -300,7 +322,7 @@ export class MediaService {
       const [a] = await m.query(`SELECT * FROM media_assets WHERE id = $1`, [assetId]);
       if (!a) throw err(404, 'MEDIA_NOT_FOUND', 'Media asset not found.');
       if (a.status !== 'ACTIVE') throw err(409, 'MEDIA_NOT_ACTIVE', 'This asset is deleted. Restore it first.');
-      if (!t.purposes.includes(a.purpose)) throw err(400, 'MEDIA_PURPOSE_MISMATCH', `This image was uploaded for ${a.purpose}; ${entity} accepts ${t.purposes.join(' or ')}.`);
+      if (!t.purposes.includes(a.purpose) && !meetsPurposeSpec(a, t.purposes[0])) throw err(400, 'MEDIA_PURPOSE_MISMATCH', `This image was uploaded for ${a.purpose} and does not meet the ${t.purposes[0]} requirements (size / shape).`);
       const [display] = await m.query(`SELECT url FROM media_variants WHERE asset_id = $1 AND name IN ('DISPLAY','ORIGINAL') ORDER BY CASE name WHEN 'DISPLAY' THEN 0 ELSE 1 END LIMIT 1`, [assetId]);
       await m.query(`UPDATE ${t.table} SET ${t.fk} = $2${t.urlColumn ? `, ${t.urlColumn} = $3` : ''}, updated_at = now() WHERE id = $1`, t.urlColumn ? [entityId, assetId, display.url] : [entityId, assetId]);
       if (entity === 'product') {
@@ -341,8 +363,7 @@ export class MediaService {
         // Owner UAT 2026-11-28: an identical image uploaded earlier for something else (a sector, a banner) is de-duplicated to that
         // asset, so its purpose is not a product one. It may still be a product photo when it meets the product minimum size.
         const productPurpose = ['PRODUCT_PRIMARY', 'PRODUCT_ADDITIONAL', 'GENERAL'].includes(a.purpose);
-        const bigEnough = Number(a.width) >= PURPOSES.PRODUCT_ADDITIONAL.minWidth && Number(a.height) >= PURPOSES.PRODUCT_ADDITIONAL.minHeight;
-        if (!productPurpose && !bigEnough) throw err(400, 'MEDIA_PURPOSE_MISMATCH', 'One of the images is too small for a product photo (at least 300 × 300 pixels).');
+        if (!productPurpose && !meetsPurposeSpec(a, 'PRODUCT_ADDITIONAL')) throw err(400, 'MEDIA_PURPOSE_MISMATCH', 'One of the images does not meet the product photo requirements (at least 300 × 300 pixels).');
       }
       await m.query(`DELETE FROM product_media WHERE product_id = $1`, [productId]);
       for (let i = 0; i < assetIds.length; i++) await m.query(`INSERT INTO product_media (product_id, media_asset_id, sort_order, is_primary) VALUES ($1,$2,$3,$4)`, [productId, assetIds[i], i, i === 0]);

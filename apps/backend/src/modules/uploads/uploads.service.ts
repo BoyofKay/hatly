@@ -1,3 +1,4 @@
+import sharp = require('sharp');
 import { decodeBase64Audio } from './audio-validation';
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -31,9 +32,22 @@ export class UploadsService {
       }
       throw error;
     }
+    // Owner decision 2026-11-28: customer and driver photos are stored compressed — WebP, at most 1280 px on the long edge,
+    // orientation applied, all metadata (GPS, camera) removed. Typically 3–5× smaller than what the phone sends.
+    let stored = { base64: decoded.base64, extension: decoded.image.extension as string };
+    try {
+      const out = await sharp(Buffer.from(decoded.base64, 'base64'), { limitInputPixels: 60_000_000 })
+        .rotate()
+        .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toBuffer();
+      stored = { base64: out.toString('base64'), extension: '.webp' };
+    } catch {
+      /* a valid image sharp cannot re-encode is kept as sent (it already passed the type check) */
+    }
     const { url } = await this.uploadProvider.store({
-      base64Content: decoded.base64,
-      filename: `upload${decoded.image.extension}`,
+      base64Content: stored.base64,
+      filename: `upload${stored.extension}`,
     });
     return this.repo.save(this.repo.create({ url, uploadedByUserId }));
   }

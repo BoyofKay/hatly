@@ -168,9 +168,12 @@ describe('E2E — Media platform', () => {
     expect(del.body.error.details.code).toBe('MEDIA_IN_USE');
     await expect(world.ds.query(`DELETE FROM media_assets WHERE id = $1`, [asset.id])).rejects.toThrow(/foreign key|violates/i); // the database itself refuses (ON DELETE RESTRICT)
 
-    // wrong purpose is refused
-    const sectorImg = (await upload(superAdmin, await img(500, 500), { purpose: 'SECTOR_IMAGE' })).body.data;
-    expect((await post(superAdmin, '/admin/media/assign', { entity: 'vendor', entityId: v.vendorId, assetId: sectorImg.id })).status).toBe(400);
+    // Owner decision 2026-11-28: a picture uploaded for another use is reused only when it meets this use's spec (a logo is square)
+    const wideSectorImg = (await upload(superAdmin, await img(600, 300), { purpose: 'SECTOR_IMAGE' })).body.data;
+    expect((await post(superAdmin, '/admin/media/assign', { entity: 'vendor', entityId: v.vendorId, assetId: wideSectorImg.id })).status).toBe(400);
+    const squareSectorImg = (await upload(superAdmin, await img(500, 500), { purpose: 'SECTOR_IMAGE' })).body.data;
+    expect((await post(superAdmin, '/admin/media/assign', { entity: 'vendor', entityId: v.vendorId, assetId: squareSectorImg.id })).status).toBe(201);
+    expect((await post(superAdmin, '/admin/media/assign', { entity: 'vendor', entityId: v.vendorId, assetId: asset.id })).status).toBe(201); // back to the logo the rest of this test expects
     // a different permission holder cannot change the vendor
     const catalog = await s.admin([Permission.MANAGE_CATALOG]);
     expect((await post(catalog, '/admin/media/assign', { entity: 'vendor', entityId: v.vendorId, assetId: asset.id })).status).toBe(403);

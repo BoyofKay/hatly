@@ -5,6 +5,7 @@ import { Upload } from './entities/upload.entity';
 import { UploadsService } from './uploads.service';
 import { UploadsController } from './uploads.controller';
 import { UPLOAD_PROVIDER } from './upload-provider.interface';
+import { AttachmentRetentionService } from './attachment-retention.service';
 import { StubUploadProvider } from './providers/stub-upload.provider';
 import { LocalFilesystemUploadProvider } from './providers/local-filesystem-upload.provider';
 import { buildS3UploadProvider } from './providers/s3-upload.settings';
@@ -24,6 +25,7 @@ import { buildS3UploadProvider } from './providers/s3-upload.settings';
   imports: [TypeOrmModule.forFeature([Upload])],
   controllers: [UploadsController],
   providers: [
+    AttachmentRetentionService,
     UploadsService,
     StubUploadProvider,
     LocalFilesystemUploadProvider,

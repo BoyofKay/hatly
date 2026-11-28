@@ -67,23 +67,23 @@ describe.each([['local filesystem', localHarness], ['S3-compatible', s3Harness]]
     ['PNG', PNG_1X1_BASE64, 'png'],
     ['JPEG', JPEG_BYTES.toString('base64'), 'jpg'],
     ['WebP', WEBP_BYTES.toString('base64'), 'webp'],
-  ])('stores a valid %s under a generated <uuid>.%s key, byte-for-byte, returning a stable /uploads/files reference', async (_label, base64, ext) => {
+  ])('stores a valid %s under a generated <uuid> key — re-encoded as WebP (owner decision 2026-11-28), or as sent (.%s) when it cannot be re-encoded — returning a stable /uploads/files reference', async (_label, base64, ext) => {
     const upload = await h.service.upload(base64, 'whatever.txt', 'user-1');
-    expect(upload.url).toMatch(new RegExp(`^/uploads/files/[0-9a-f-]{36}\\.${ext}$`));
+    expect(upload.url).toMatch(new RegExp(`^/uploads/files/[0-9a-f-]{36}\\.(webp|${ext})$`));
     const files = await h.stored();
     expect(files).toHaveLength(1);
     expect(files[0].key).toMatch(KEY);
-    expect(files[0].key.endsWith(`.${ext}`)).toBe(true);
-    expect(files[0].bytes.equals(Buffer.from(base64, 'base64'))).toBe(true);
+    if (files[0].key.endsWith('.webp') && ext !== 'webp') expect(files[0].bytes.subarray(8, 12).toString('latin1')).toBe('WEBP');
+    else expect(files[0].bytes.equals(Buffer.from(base64, 'base64'))).toBe(true);
   });
 
-  it('the extension comes from the DETECTED type: a PNG uploaded as "evil.html"/"x.jpg"/"../../x.png" is still stored as <uuid>.png', async () => {
+  it('the client name never chooses the extension: a PNG uploaded as "evil.html"/"x.jpg"/"../../x.png" is stored as <uuid>.webp', async () => {
     for (const filename of ['evil.html', 'x.jpg', '../../x.png', 'a\\b.svg', '', 'x.png\0.exe']) {
       await h.service.upload(PNG_1X1_BASE64, filename, 'user-1');
     }
     const files = await h.stored();
     expect(files).toHaveLength(6);
-    for (const f of files) expect(f.key).toMatch(/^[0-9a-f-]{36}\.png$/);
+    for (const f of files) expect(f.key).toMatch(/^[0-9a-f-]{36}\.webp$/);
     expect(new Set(files.map((f) => f.key)).size).toBe(6);
   });
 

@@ -45,7 +45,9 @@ describe('UploadsService', () => {
 
     const result = await service.upload(PNG_1X1_BASE64, 'photo.png', 'user-1');
 
-    expect(provider.store).toHaveBeenCalledWith({ base64Content: PNG_1X1_BASE64, filename: 'upload.png' });
+    // Owner decision 2026-11-28: a decodable photo is stored re-encoded as WebP (smaller, metadata removed).
+    expect(provider.store).toHaveBeenCalledWith({ base64Content: expect.any(String), filename: 'upload.webp' });
+    expect((provider.store.mock.calls[0] as any)[0].base64Content).not.toBe(PNG_1X1_BASE64);
     expect(result.url).toBe('stub-upload://abc/photo.png');
     expect(repo.save).toHaveBeenCalledTimes(1);
   });

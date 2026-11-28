@@ -201,6 +201,10 @@ export class Order extends BaseEntity {
   @Column({ name: 'promotion_snapshot', type: 'jsonb', nullable: true })
   promotionSnapshot: Record<string, unknown> | null;
 
+  /** When the order's attachments (request photos, voice notes, proof photo) were removed by the 90-day retention (owner 2026-11-28). */
+  @Column({ name: 'attachments_purged_at', type: 'timestamptz', nullable: true })
+  attachmentsPurgedAt?: Date | null;
+
   /** A note Operations writes for the driver (owner decision 2026-11-27) — shown in the driver app next to the customer's note. */
   @Column({ name: 'operations_note_for_driver', type: 'varchar', length: 1000, nullable: true })
   operationsNoteForDriver?: string | null;

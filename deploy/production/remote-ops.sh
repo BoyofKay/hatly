@@ -120,6 +120,12 @@ case "$action" in
     $SUDO docker exec -i hatly-prod-postgres-1 sh -c "psql -X -q -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -v cutoff=\"'$CUTOFF'\" -v apply=$APPLY -f -" < "$SQL"
     ;;
 
+  recompress-dry-run|recompress-apply)
+    if [ "$action" = recompress-apply ]; then step "backup first"; "$PD/current/deploy/production/prod.sh" backup; fi
+    step "recompress stored photos ($([ "$action" = recompress-apply ] && echo APPLY || echo DRY RUN))"
+    "$PD/current/deploy/production/prod.sh" recompress-uploads $([ "$action" = recompress-apply ] && echo --apply)
+    ;;
+
   disk-report)
     step "filesystem"; df -h / | tail -1
     step "docker (images / containers / volumes / build cache)"; $SUDO docker system df
