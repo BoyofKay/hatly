@@ -97,8 +97,8 @@ export class CatalogDiscoveryService {
       const t = `$${args.length}`;
       // Linked rows match on the SHARED catalog name, unlinked rows on their own — so a group is never
       // partially counted because one vendor spelled the name differently.
-      filters += ` AND CASE WHEN c.id IS NOT NULL THEN (c.name ILIKE ${t} OR c.name_ar ILIKE ${t})
-                            ELSE (p.name ILIKE ${t} OR p.name_ar ILIKE ${t}) END`;
+      filters += ` AND CASE WHEN c.id IS NOT NULL THEN (hatly_norm(c.name) ILIKE hatly_norm(${t}) OR hatly_norm(c.name_ar) ILIKE hatly_norm(${t}))
+                            ELSE (hatly_norm(p.name) ILIKE hatly_norm(${t}) OR hatly_norm(p.name_ar) ILIKE hatly_norm(${t})) END`;
     }
 
     const sort = params.sort ?? 'newest';

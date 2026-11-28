@@ -16,14 +16,12 @@ function buildHarness(opts: {
   const distances = opts.distances ?? {};
 
   const driversRepository = {
-    find: jest.fn(async ({ where }: any) =>
-      drivers.filter(
-        (d) =>
-          d.isOnline === where.isOnline &&
-          d.isAvailable === where.isAvailable &&
-          d.verificationStatus === where.verificationStatus,
-      ),
-    ),
+    // The service asks for [no-GPS drivers, drivers inside the pickup area's box] (2026-11-28); the box pre-filter is exercised by the
+    // e2e suites — here only the shared base conditions are applied.
+    find: jest.fn(async ({ where }: any) => {
+      const w = Array.isArray(where) ? where[0] : where;
+      return drivers.filter((d) => d.isOnline === w.isOnline && d.isAvailable === w.isAvailable && d.verificationStatus === w.verificationStatus);
+    }),
     findOne: jest.fn(async ({ where }: any) => drivers.find((d) => d.id === where.id) ?? null),
     // activeLoad() and roundRobinOrder() both read through query(): answer the load query from opts.activeLoads, everything else empty.
     query: jest.fn(async (sql: string): Promise<any[]> =>

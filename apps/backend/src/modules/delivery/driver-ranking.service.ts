@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, IsNull, Repository } from 'typeorm';
 import { Driver } from './entities/driver.entity';
 import { Order } from '../orders/entities/order.entity';
 import { VendorBranch } from '../vendors/entities/vendor-branch.entity';
@@ -9,6 +9,13 @@ import { AdHocServiceType } from '../cart/ad-hoc-service-type.enum';
 import { MAP_PROVIDER, MapProvider, GeoPoint, isMapsDisabled } from '../location/map-provider.interface';
 import { BusinessConfigService } from '../business-config/business-config.service';
 import { ServiceAreaResolverService, haversineDistanceMeters } from '../service-areas/service-area-resolver.service';
+
+/** The latitude / longitude box around a circle (a pre-filter only; the exact area test follows). */
+function boxAround(lat: number, lng: number, radiusMeters: number) {
+  const dLat = radiusMeters / 111_320;
+  const dLng = radiusMeters / (111_320 * Math.max(0.01, Math.cos((lat * Math.PI) / 180)));
+  return { south: lat - dLat, north: lat + dLat, west: lng - dLng, east: lng + dLng };
+}
 
 /**
  * CONFIRMED BUSINESS DECISIONS implemented here:
@@ -95,9 +102,18 @@ export class DriverRankingService {
     }
 
     const freshSince = Date.now() - DISPATCH_APP_FRESH_MS;
+    // Owner decision 2026-11-28 (scale): only drivers that can qualify are read — the database keeps drivers inside the box around the
+    // pickup's service area (a driver must be inside that area anyway) plus drivers with no known location (R14: still eligible, in turn);
+    // the vehicle type comes with them. Same ranking rules as before; far fewer rows and queries with thousands of drivers online.
+    const base = { isOnline: true, isAvailable: true, verificationStatus: 'APPROVED' } as const;
+    const box = boxAround(Number(pickupServiceArea.centerLatitude), Number(pickupServiceArea.centerLongitude), Number(pickupServiceArea.radiusMeters));
     const eligibleDrivers = (
       await this.driversRepository.find({
-        where: { isOnline: true, isAvailable: true, verificationStatus: 'APPROVED' },
+        where: [
+          { ...base, lastLatitude: IsNull() },
+          { ...base, lastLatitude: Between(box.south, box.north), lastLongitude: Between(box.west, box.east) },
+        ],
+        relations: { vehicleType: true },
       })
     )
       .filter((d) => d.lastSeenAt != null && new Date(d.lastSeenAt).getTime() >= freshSince)
@@ -111,6 +127,7 @@ export class DriverRankingService {
     // mandatory for eligibility — a driver with no known location (or whose distance cannot be computed) is still a candidate, AFTER every
     // driver ranked by proximity, in turn (least recently assigned first). Bicycles stay excluded without a location: their road-distance
     // limit cannot be checked.
+    const activeAreas = typeof this.serviceAreaResolverService.listActive === 'function' ? await this.serviceAreaResolverService.listActive() : null;
     const withoutGps: string[] = [];
     const straightLine = isMapsDisabled(this.mapProvider);
     let bicyclesExcluded = 0;
@@ -122,10 +139,9 @@ export class DriverRankingService {
 
       // ServiceArea boundary — additive, does not replace or alter the
       // distance check that follows.
-      const driverServiceArea = await this.serviceAreaResolverService.resolveForPoint(
-        driver.lastLatitude,
-        driver.lastLongitude,
-      );
+      const driverServiceArea = activeAreas
+        ? ServiceAreaResolverService.pick(activeAreas, driver.lastLatitude, driver.lastLongitude)
+        : await this.serviceAreaResolverService.resolveForPoint(driver.lastLatitude, driver.lastLongitude);
       if (!driverServiceArea || driverServiceArea.id !== pickupServiceArea.id) {
         continue;
       }

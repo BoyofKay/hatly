@@ -50,7 +50,16 @@ export class ServiceAreaResolverService {
    */
   async resolveForPoint(latitude: number, longitude: number): Promise<ServiceArea | null> {
     const activeAreas = await this.serviceAreasRepository.find({ where: { isActive: true } });
+    return ServiceAreaResolverService.pick(activeAreas, latitude, longitude);
+  }
 
+  /** The active areas, for callers that resolve many points at once (dispatch ranking) — one query instead of one per point. */
+  async listActive(): Promise<ServiceArea[]> {
+    return this.serviceAreasRepository.find({ where: { isActive: true } });
+  }
+
+  /** Same rule as [resolveForPoint], on an already-loaded list. */
+  static pick(activeAreas: ServiceArea[], latitude: number, longitude: number): ServiceArea | null {
     let nearest: { area: ServiceArea; distanceMeters: number } | null = null;
     for (const area of activeAreas) {
       const distanceMeters = haversineDistanceMeters(latitude, longitude, area.centerLatitude, area.centerLongitude);

@@ -129,7 +129,7 @@ export class CatalogProductsService {
     if (query.isActive !== undefined) qb.andWhere('catalog.is_active = :isActive', { isActive: query.isActive });
     if (query.barcode) qb.andWhere('catalog.barcode = :barcode', { barcode: query.barcode.trim() });
     if (query.search?.trim()) {
-      qb.andWhere('(catalog.name ILIKE :term OR catalog.name_ar ILIKE :term OR catalog.brand ILIKE :term)', {
+      qb.andWhere('(hatly_norm(catalog.name) ILIKE hatly_norm(:term) OR hatly_norm(catalog.name_ar) ILIKE hatly_norm(:term) OR catalog.brand ILIKE :term)', {
         term: `%${query.search.trim()}%`,
       });
     }
