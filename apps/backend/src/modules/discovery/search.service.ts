@@ -146,7 +146,7 @@ export class SearchService {
       .innerJoinAndSelect('branch.vendor', 'vendor')
       .where('branch.is_active = true')
       .andWhere('vendor.is_active = true')
-      .andWhere('(hatly_norm(vendor.name) ILIKE hatly_norm(:term) OR hatly_norm(vendor.name_ar) ILIKE hatly_norm(:term))', { term: `%${term}%` });
+      .andWhere('(vendor.name_norm ILIKE hatly_norm(:term) OR vendor.name_ar_norm ILIKE hatly_norm(:term))', { term: `%${term}%` });
 
     if (serviceAreaId) {
       qb = qb.andWhere('branch.service_area_id = :serviceAreaId', { serviceAreaId });
@@ -160,8 +160,8 @@ export class SearchService {
     qb = qb
       .addSelect(
         `CASE
-          WHEN hatly_norm(vendor.name) = hatly_norm(:exactTerm) OR hatly_norm(vendor.name_ar) = hatly_norm(:exactTerm) THEN 0
-          WHEN hatly_norm(vendor.name) ILIKE hatly_norm(:prefixTerm) OR hatly_norm(vendor.name_ar) ILIKE hatly_norm(:prefixTerm) THEN 1
+          WHEN vendor.name_norm = hatly_norm(:exactTerm) OR vendor.name_ar_norm = hatly_norm(:exactTerm) THEN 0
+          WHEN vendor.name_norm ILIKE hatly_norm(:prefixTerm) OR vendor.name_ar_norm ILIKE hatly_norm(:prefixTerm) THEN 1
           ELSE 2
         END`,
         'relevance_rank',
@@ -228,7 +228,7 @@ export class SearchService {
       // condition here — visible as long as isAvailable is true,
       // matching the Inventory Foundation's own closed decision.
       .andWhere('product.is_available = true')
-      .andWhere('(hatly_norm(product.name) ILIKE hatly_norm(:term) OR hatly_norm(product.name_ar) ILIKE hatly_norm(:term))', { term: `%${term}%` });
+      .andWhere('(product.name_norm ILIKE hatly_norm(:term) OR product.name_ar_norm ILIKE hatly_norm(:term))', { term: `%${term}%` });
 
     if (serviceAreaId) {
       qb = qb.andWhere('branch.service_area_id = :serviceAreaId', { serviceAreaId });
@@ -237,8 +237,8 @@ export class SearchService {
     qb = qb
       .addSelect(
         `CASE
-          WHEN hatly_norm(product.name) = hatly_norm(:exactTerm) OR hatly_norm(product.name_ar) = hatly_norm(:exactTerm) THEN 0
-          WHEN hatly_norm(product.name) ILIKE hatly_norm(:prefixTerm) OR hatly_norm(product.name_ar) ILIKE hatly_norm(:prefixTerm) THEN 1
+          WHEN product.name_norm = hatly_norm(:exactTerm) OR product.name_ar_norm = hatly_norm(:exactTerm) THEN 0
+          WHEN product.name_norm ILIKE hatly_norm(:prefixTerm) OR product.name_ar_norm ILIKE hatly_norm(:prefixTerm) THEN 1
           ELSE 2
         END`,
         'relevance_rank',

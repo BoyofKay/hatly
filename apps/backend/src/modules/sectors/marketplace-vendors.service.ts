@@ -187,7 +187,7 @@ export class MarketplaceVendorsService {
     }
 
     if (searchTerm) {
-      qb = qb.andWhere('(hatly_norm(vendor.name) ILIKE hatly_norm(:term) OR hatly_norm(vendor.name_ar) ILIKE hatly_norm(:term))', { term: `%${searchTerm}%` });
+      qb = qb.andWhere('(vendor.name_norm ILIKE hatly_norm(:term) OR vendor.name_ar_norm ILIKE hatly_norm(:term))', { term: `%${searchTerm}%` });
     }
 
     // Filters V1 additions — all additive, all optional, all real data (no fabricated/inferred values).
